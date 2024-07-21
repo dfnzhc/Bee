@@ -1,5 +1,5 @@
 /**
- * @File polynomial.hpp
+ * @File Polynomial.hpp
  * @Author dfnzhc (https://github.com/dfnzhc)
  * @Date 2024/6/1
  * @Brief 
