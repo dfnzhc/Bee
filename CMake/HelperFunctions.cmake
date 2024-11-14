@@ -111,6 +111,12 @@ function(BeeDefaultSettings ProjectName)
             "$<TARGET_FILE_DIR:${ProjectName}>/${ProjectName}.dll"
             ${${PROJECT_NAME_UPPERCASE}_BINARY_DIR})
 
+    # TODO: 临时的解决方法
+    add_custom_command(TARGET ${ProjectName} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_FILE_DIR:${ProjectName}>/${ProjectName}.dll"
+            ${CMAKE_BINARY_DIR}/Tests)
+
     add_library(Bee::${ProjectName} ALIAS ${ProjectName})
 endfunction(BeeDefaultSettings)
 

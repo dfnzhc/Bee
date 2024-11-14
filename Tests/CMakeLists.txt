@@ -9,7 +9,12 @@ find_package(GTest CONFIG REQUIRED)
 
 set(TEST_SOURCES
         Core/CoreTest.cpp
+        Core/LoggerTest.cpp
 )
+
+if (MSVC)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX_STANDARD} /Zc:preprocessor")
+endif()
 
 set(${CMAKE_CURRENT_BINARY_DIR})
 

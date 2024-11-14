@@ -6,10 +6,16 @@ AssignSourceGroup(${SOURCE_FILES})
 add_library(${BEE_TARGET} SHARED ${SOURCE_FILES})
 BeeDefaultSettings(${BEE_TARGET})
 
-#target_link_libraries(${BEE_TARGET}
-#        #    PRIVATE
-#        PUBLIC
-#)
+
+find_package(fmt CONFIG REQUIRED)
+find_package(libassert CONFIG REQUIRED)
+
+target_link_libraries(${BEE_TARGET}
+        #    PRIVATE
+        PUBLIC
+        fmt::fmt
+        libassert::assert
+)
 
 target_compile_options(${BEE_TARGET}
         PUBLIC
