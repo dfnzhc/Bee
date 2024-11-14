@@ -134,3 +134,27 @@ function(AssignSourceGroup)
         source_group("${_source_path_msvc}" FILES "${_source}")
     endforeach ()
 endfunction(AssignSourceGroup)
+
+# 添加测试程序
+function(AddTestProgram TestFile Dlls)
+    get_filename_component(FILE_NAME ${TestFile} NAME_WE)
+    add_executable(${FILE_NAME} ${TestFile})
+    set_target_properties(${FILE_NAME}
+            PROPERTIES
+            FOLDER "Tests")
+
+    message(STATUS ${Dlls})
+    target_link_libraries(${FILE_NAME}
+            PUBLIC GTest::gtest GTest::gtest_main #benchmark::benchmark 
+    )
+    
+    foreach(Dll ${Dlls})
+        target_link_libraries(${FILE_NAME}
+                PRIVATE ${Dll})
+    endforeach()
+
+    add_test(NAME "${FILE_NAME}Test"
+            COMMAND ${FILE_NAME}
+            WORKING_DIRECTORY ${${PROJECT_NAME_UPPERCASE}_BINARY_DIR})
+
+endfunction(AddTestProgram)

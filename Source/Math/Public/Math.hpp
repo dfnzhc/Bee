@@ -6,3 +6,14 @@
  */
 
 #pragma once
+
+#include "./Setup.hpp"
+#include "./Constant.hpp"
+#include "./Common.hpp"
+
+namespace bee {
+
+BEE_API void MathTmp();
+
+
+} // namespace bee

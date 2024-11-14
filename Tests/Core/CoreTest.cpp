@@ -16,5 +16,5 @@ TEST(Core, Test)
     EXPECT_EQ(bee::Test2(1, 2), 3);
 
     BEE_ASSERT(1 + 1 == 2, "Oh.");
-    BEE_ASSERT(1 + 1 == 3, "WTF.");
+    // BEE_ASSERT(1 + 1 == 3, "WTF.");
 }

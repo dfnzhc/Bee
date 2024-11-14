@@ -89,7 +89,7 @@ BreakConstructorInitializers: BeforeColon
 BreakInheritanceList: BeforeColon
 BreakStringLiterals: true
 BreakAfterJavaFieldAnnotations: false
-ColumnLimit: 200
+ColumnLimit: 150
 CompactNamespaces: false
 ConstructorInitializerIndentWidth: 0
 ContinuationIndentWidth: 4
