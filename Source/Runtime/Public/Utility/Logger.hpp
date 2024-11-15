@@ -30,7 +30,7 @@ public:
         Info,
     };
 
-    static Logger& inst()
+    static Logger& Inst()
     {
         static Logger logger;
         return logger;
@@ -48,10 +48,10 @@ private:
     Logger()  = default;
     ~Logger() = default;
 
-    std::mutex _mutex;
+    std::mutex _mutex = {};
 
     Logger::Level _level = Logger::Level::Info;
-    std::unordered_map<std::string_view, LogNotifyType> _subscribers;
+    std::unordered_map<std::string_view, LogNotifyType> _subscribers = {};
 };
 
 inline auto operator<=>(Logger::Level lhs, Logger::Level rhs)
@@ -63,29 +63,30 @@ inline auto operator<=>(Logger::Level lhs, Logger::Level rhs)
 
 inline void LogInfo(std::string_view msg)
 {
-    Logger::inst().log(Logger::Level::Info, msg);
+    Logger::Inst().log(Logger::Level::Info, msg);
 }
 
 template<typename... Args> inline void LogInfo(fmt::format_string<Args...> format, Args&&... args)
 {
-    Logger::inst().log(Logger::Level::Info, fmt::format(format, std::forward<Args>(args)...));
+    Logger::Inst().log(Logger::Level::Info, fmt::format(format, std::forward<Args>(args)...));
 }
 
 inline void LogWarn(std::string_view msg)
 {
-    Logger::inst().log(Logger::Level::Warning, msg);
+    Logger::Inst().log(Logger::Level::Warning, msg);
 }
 
 template<typename... Args> inline void LogWarn(fmt::format_string<Args...> format, Args&&... args)
 {
-    Logger::inst().log(Logger::Level::Warning, fmt::format(format, std::forward<Args>(args)...));
+    Logger::Inst().log(Logger::Level::Warning, fmt::format(format, std::forward<Args>(args)...));
 }
 
 namespace detail {
 
 void BEE_API LogWithSourceLocation(Logger::Level level, std::source_location sl, std::string_view msg);
 
-template<typename... Args> inline void LogWithSourceLocation(Logger::Level level, std::source_location sl, fmt::format_string<Args...> fmt, Args&&... args)
+template<typename... Args>
+inline void LogWithSourceLocation(Logger::Level level, std::source_location sl, fmt::format_string<Args...> fmt, Args&&... args)
 {
     LogWithSourceLocation(level, sl, fmt::format(fmt, std::forward<Args>(args)...));
 }

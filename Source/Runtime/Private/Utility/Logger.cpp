@@ -19,10 +19,10 @@ namespace {
 constexpr inline const char* logLevelString(Logger::Level level)
 {
     switch (level) {
-    case Logger::Level::Fatal   : return "Fatal";
-    case Logger::Level::Error   : return "Error";
-    case Logger::Level::Warning : return "Warning";
-    case Logger::Level::Info    : return "Info";
+    case Logger::Level::Fatal   : return "灾难";
+    case Logger::Level::Error   : return "错误";
+    case Logger::Level::Warning : return "警告";
+    case Logger::Level::Info    : return "信息";
     }
     BEE_UNREACHABLE();
 }
@@ -41,10 +41,10 @@ void Logger::log(Level level, std::string_view msg)
     case Logger::Level::Fatal   : color = fmt::color::red; break;
     case Logger::Level::Error   : color = fmt::color::magenta; break;
     case Logger::Level::Warning : color = fmt::color::coral; break;
-    case Logger::Level::Info    : color = fmt::color::green; break;
+    case Logger::Level::Info    : color = fmt::color::green_yellow; break;
     }
 
-    const auto s = fmt::format(fmt::fg(color), "[{:>7}]: {}\n", logLevelString(level), msg);
+    const auto s = fmt::format(fmt::fg(color), "[{}]: {}\n", logLevelString(level), msg);
     auto& os     = level > Logger::Level::Error ? std::cout : std::cerr;
     os << s;
 
@@ -81,5 +81,5 @@ void Logger::unsubscribe(std::string_view name)
 
 void BEE_API detail::LogWithSourceLocation(Logger::Level level, std::source_location sl, std::string_view msg)
 {
-    Logger::inst().log(level, fmt::format("{}: '{}' {}({}:{})", msg, sl.function_name(), sl.file_name(), sl.line(), sl.column()));
+    Logger::Inst().log(level, fmt::format("{}: '{}' {}({}:{})", msg, sl.function_name(), sl.file_name(), sl.line(), sl.column()));
 }
