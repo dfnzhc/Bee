@@ -6,7 +6,6 @@ AssignSourceGroup(${SOURCE_FILES})
 add_library(${BEE_TARGET} SHARED ${SOURCE_FILES})
 BeeDefaultSettings(${BEE_TARGET})
 
-
 find_package(fmt CONFIG REQUIRED)
 find_package(libassert CONFIG REQUIRED)
 

@@ -15,5 +15,4 @@ set(${CMAKE_CURRENT_BINARY_DIR})
 
 AddTestProgram(Core/CoreTest.cpp "Bee::Core")
 AddTestProgram(Core/LoggerTest.cpp "Bee::Core")
-AddTestProgram(Math/CommonTest.cpp "Bee::Math")
-AddTestProgram(Math/PolynomialTest.cpp "Bee::Math")
+AddTestProgram(Core/MathTest.cpp "Bee::Core")

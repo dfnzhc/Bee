@@ -143,7 +143,6 @@ function(AddTestProgram TestFile Dlls)
             PROPERTIES
             FOLDER "Tests")
 
-    message(STATUS ${Dlls})
     target_link_libraries(${FILE_NAME}
             PUBLIC GTest::gtest GTest::gtest_main #benchmark::benchmark 
     )

@@ -7,10 +7,17 @@
 
 #pragma once
 
-#include "./Defines.hpp"
-#include "./Portability.hpp"
-#include "./Assert.hpp"
-#include "./Logger.hpp"
+
+
+
+
+
+// -------------------------
+
+#include "Base/Defines.hpp"
+#include "Base/Portability.hpp"
+#include "Base/Assert.hpp"
+#include "Base/Logger.hpp"
 
 namespace bee {
 

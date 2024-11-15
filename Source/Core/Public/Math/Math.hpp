@@ -1,14 +1,15 @@
 /**
- * @File Common.hpp
+ * @File Math.hpp
  * @Author dfnzhc (https://github.com/dfnzhc)
- * @Date 2024/11/14
+ * @Date 2024/11/13
  * @Brief This file is part of Bee.
  */
 
 #pragma once
 
-#include "./Setup.hpp"
-#include "./Constant.hpp"
+#include "Math/Setup.hpp"
+#include "Math/Constant.hpp"
+#include "Base/Assert.hpp"
 
 namespace bee {
 

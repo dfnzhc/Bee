@@ -5,8 +5,8 @@
  * @Brief This file is part of Bee.
  */
 
-#include "Logger.hpp"
-#include "./Assert.hpp"
+#include "Base/Logger.hpp"
+#include "Base/Assert.hpp"
 
 #include <fmt/format.h>
 #include <fmt/color.h>

@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include "./Common.hpp"
+#include "Math/Math.hpp"
 
 namespace bee {
 
