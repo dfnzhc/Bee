@@ -1,4 +1,4 @@
-set(BEE_TARGET Core)
+set(BEE_TARGET BeeRuntime)
 
 file(GLOB_RECURSE SOURCE_FILES ./*.hpp ./*.cpp)
 AssignSourceGroup(${SOURCE_FILES})

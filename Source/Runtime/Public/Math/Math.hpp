@@ -9,7 +9,7 @@
 
 #include "Math/Setup.hpp"
 #include "Math/Constant.hpp"
-#include "Base/Assert.hpp"
+#include "Utility/Assert.hpp"
 
 namespace bee {
 

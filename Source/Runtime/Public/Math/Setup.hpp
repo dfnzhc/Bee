@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include "Base/Defines.hpp"
+#include "Core/Defines.hpp"
 
 #ifndef GLM_FORCE_SWIZZLE
 #  define GLM_FORCE_SWIZZLE

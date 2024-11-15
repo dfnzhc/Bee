@@ -13,6 +13,6 @@ endif()
 
 set(${CMAKE_CURRENT_BINARY_DIR})
 
-AddTestProgram(Core/CoreTest.cpp "Bee::Core")
-AddTestProgram(Core/LoggerTest.cpp "Bee::Core")
-AddTestProgram(Core/MathTest.cpp "Bee::Core")
+AddTestProgram(Runtime/LoggerTest.cpp "Bee::Runtime")
+AddTestProgram(Runtime/MathTest.cpp "Bee::Runtime")
+AddTestProgram(Engine/EngineTest.cpp "Bee::Runtime;Bee::Engine")

@@ -102,6 +102,8 @@ function(BeeDefaultSettings ProjectName)
         message(AUTHOR_WARNING "${ProjectName} is not a target, thus no compiler warning were added.")
         return()
     endif ()
+    set(ProjectBriefName ${ProjectName})
+    string(REPLACE "Bee" "" ProjectBriefName "${ProjectBriefName}")
 
     SetCompilerFlags(${ProjectName})
     SetDefaultCompileDefinitions(${ProjectName})
@@ -116,8 +118,8 @@ function(BeeDefaultSettings ProjectName)
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "$<TARGET_FILE_DIR:${ProjectName}>/${ProjectName}.dll"
             ${CMAKE_BINARY_DIR}/Tests)
-
-    add_library(Bee::${ProjectName} ALIAS ${ProjectName})
+    
+    add_library(Bee::${ProjectBriefName} ALIAS ${ProjectName})
 endfunction(BeeDefaultSettings)
 
 

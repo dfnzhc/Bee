@@ -7,7 +7,7 @@
  
 
 #include <gtest/gtest.h>
-#include <Core.hpp>
+#include <Bee.hpp>
 #include <libassert/assert-gtest.hpp>
 
 using namespace bee;
