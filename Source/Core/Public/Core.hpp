@@ -7,13 +7,7 @@
 
 #pragma once
 
-
-
-
-
-
-// -------------------------
-
+#include "Base/Version.hpp"
 #include "Base/Defines.hpp"
 #include "Base/Portability.hpp"
 #include "Base/Assert.hpp"

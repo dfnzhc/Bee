@@ -9,7 +9,7 @@
 
 #include <functional>
 #include <string>
-#include <format>
+#include <fmt/format.h>
 #include <source_location>
 #include <mutex>
 
@@ -66,9 +66,9 @@ inline void LogInfo(std::string_view msg)
     Logger::inst().log(Logger::Level::Info, msg);
 }
 
-template<typename... Args> inline void LogInfo(std::format_string<Args...> format, Args&&... args)
+template<typename... Args> inline void LogInfo(fmt::format_string<Args...> format, Args&&... args)
 {
-    Logger::inst().log(Logger::Level::Info, std::format(format, std::forward<Args>(args)...));
+    Logger::inst().log(Logger::Level::Info, fmt::format(format, std::forward<Args>(args)...));
 }
 
 inline void LogWarn(std::string_view msg)
@@ -76,18 +76,18 @@ inline void LogWarn(std::string_view msg)
     Logger::inst().log(Logger::Level::Warning, msg);
 }
 
-template<typename... Args> inline void LogWarn(std::format_string<Args...> format, Args&&... args)
+template<typename... Args> inline void LogWarn(fmt::format_string<Args...> format, Args&&... args)
 {
-    Logger::inst().log(Logger::Level::Warning, std::format(format, std::forward<Args>(args)...));
+    Logger::inst().log(Logger::Level::Warning, fmt::format(format, std::forward<Args>(args)...));
 }
 
 namespace detail {
 
 void BEE_API LogWithSourceLocation(Logger::Level level, std::source_location sl, std::string_view msg);
 
-template<typename... Args> inline void LogWithSourceLocation(Logger::Level level, std::source_location sl, std::format_string<Args...> fmt, Args&&... args)
+template<typename... Args> inline void LogWithSourceLocation(Logger::Level level, std::source_location sl, fmt::format_string<Args...> fmt, Args&&... args)
 {
-    LogWithSourceLocation(level, sl, std::format(fmt, std::forward<Args>(args)...));
+    LogWithSourceLocation(level, sl, fmt::format(fmt, std::forward<Args>(args)...));
 }
 
 } // namespace detail
