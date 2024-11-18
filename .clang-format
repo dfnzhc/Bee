@@ -56,7 +56,6 @@ AttributeMacros:
 BinPackArguments: false
 BinPackParameters: false
 BitFieldColonSpacing: None
-
 BraceWrapping:
   AfterCaseLabel: true
   AfterClass: true

@@ -13,6 +13,15 @@ endif()
 
 set(${CMAKE_CURRENT_BINARY_DIR})
 
-AddTestProgram(Runtime/LoggerTest.cpp "Bee::Runtime")
-AddTestProgram(Runtime/MathTest.cpp "Bee::Runtime")
-AddTestProgram(Engine/EngineTest.cpp "Bee::Runtime;Bee::Engine")
+AddTestProgram(Runtime/LoggerTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Runtime")
+AddTestProgram(Runtime/MathTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Runtime")
+
+# Launch Test
+add_executable(EngineLaunchTest WIN32 Engine/LaunchTest.cpp)
+set_target_properties(EngineLaunchTest
+        PROPERTIES
+        FOLDER "Tests"
+        WORKING_DIRECTORY ${${PROJECT_NAME_UPPERCASE}_BINARY_DIR}
+)
+
+target_link_libraries(EngineLaunchTest PRIVATE Bee::Engine -mwindows)

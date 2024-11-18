@@ -47,6 +47,7 @@ void Logger::log(Level level, std::string_view msg)
     const auto s = fmt::format(fmt::fg(color), "[{}]: {}\n", logLevelString(level), msg);
     auto& os     = level > Logger::Level::Error ? std::cout : std::cerr;
     os << s;
+    std::flush(os);
 
     if (!_subscribers.empty()) {
         for (const auto& notify : _subscribers | std::views::values) {
@@ -81,5 +82,5 @@ void Logger::unsubscribe(std::string_view name)
 
 void BEE_API detail::LogWithSourceLocation(Logger::Level level, std::source_location sl, std::string_view msg)
 {
-    Logger::Inst().log(level, fmt::format("{}: '{}' {}({}:{})", msg, sl.function_name(), sl.file_name(), sl.line(), sl.column()));
+    Logger::Instance().log(level, fmt::format("{}: '{}' {}({}:{})", msg, sl.function_name(), sl.file_name(), sl.line(), sl.column()));
 }

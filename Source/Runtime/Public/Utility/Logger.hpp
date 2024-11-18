@@ -30,7 +30,7 @@ public:
         Info,
     };
 
-    static Logger& Inst()
+    static Logger& Instance()
     {
         static Logger logger;
         return logger;
@@ -63,22 +63,22 @@ inline auto operator<=>(Logger::Level lhs, Logger::Level rhs)
 
 inline void LogInfo(std::string_view msg)
 {
-    Logger::Inst().log(Logger::Level::Info, msg);
+    Logger::Instance().log(Logger::Level::Info, msg);
 }
 
 template<typename... Args> inline void LogInfo(fmt::format_string<Args...> format, Args&&... args)
 {
-    Logger::Inst().log(Logger::Level::Info, fmt::format(format, std::forward<Args>(args)...));
+    Logger::Instance().log(Logger::Level::Info, fmt::format(format, std::forward<Args>(args)...));
 }
 
 inline void LogWarn(std::string_view msg)
 {
-    Logger::Inst().log(Logger::Level::Warning, msg);
+    Logger::Instance().log(Logger::Level::Warning, msg);
 }
 
 template<typename... Args> inline void LogWarn(fmt::format_string<Args...> format, Args&&... args)
 {
-    Logger::Inst().log(Logger::Level::Warning, fmt::format(format, std::forward<Args>(args)...));
+    Logger::Instance().log(Logger::Level::Warning, fmt::format(format, std::forward<Args>(args)...));
 }
 
 namespace detail {

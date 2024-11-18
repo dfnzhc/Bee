@@ -138,20 +138,16 @@ function(AssignSourceGroup)
 endfunction(AssignSourceGroup)
 
 # 添加测试程序
-function(AddTestProgram TestFile Dlls)
+function(AddTestProgram TestFile Libraries)
     get_filename_component(FILE_NAME ${TestFile} NAME_WE)
     add_executable(${FILE_NAME} ${TestFile})
     set_target_properties(${FILE_NAME}
             PROPERTIES
             FOLDER "Tests")
-
-    target_link_libraries(${FILE_NAME}
-            PUBLIC GTest::gtest GTest::gtest_main #benchmark::benchmark 
-    )
     
-    foreach(Dll ${Dlls})
+    foreach(Lib ${Libraries})
         target_link_libraries(${FILE_NAME}
-                PRIVATE ${Dll})
+                PUBLIC ${Lib})
     endforeach()
 
     add_test(NAME "${FILE_NAME}Test"
