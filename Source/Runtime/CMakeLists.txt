@@ -9,6 +9,7 @@ BeeDefaultSettings(${BEE_TARGET})
 find_package(fmt CONFIG REQUIRED)
 find_package(libassert CONFIG REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
+find_package(magic_enum CONFIG REQUIRED)
 
 target_link_libraries(${BEE_TARGET}
         #    PRIVATE
@@ -16,6 +17,7 @@ target_link_libraries(${BEE_TARGET}
         fmt::fmt
         libassert::assert
         glfw
+        magic_enum::magic_enum
 )
 
 target_compile_options(${BEE_TARGET}
