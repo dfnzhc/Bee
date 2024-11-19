@@ -11,10 +11,10 @@
 #  include <Windows.h>
 #  include <intrin.h>
 #  define BEE_IN_WINDOWS
-#elif defined(__unix__) || defined(__unix) || defined(__linux__)
-#  define BEE_IN_LINUX
-#elif defined(__APPLE__) || defined(__MACH__)
-#  define BEE_IN_MAC
+//#elif defined(__unix__) || defined(__unix) || defined(__linux__)
+//#  define BEE_IN_LINUX
+//#elif defined(__APPLE__) || defined(__MACH__)
+//#  define BEE_IN_MAC
 #else
 #  error Unsupport Platform
 #endif

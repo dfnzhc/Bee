@@ -6,16 +6,20 @@
  */
 
 #include "Launch/LaunchEngineLoop.hpp"
-#include <Core/Globals.hpp>
+#include "Core/Globals.hpp"
+#include "Utility/Logger.hpp"
+#include "Core/Version.hpp"
 
 using namespace bee;
 
 // TODO：命令行支持
 int GuardedMain()
 {
+    LogInfo("Bee Engine({}.{}.{})", BEE_VERSION_MAJOR, BEE_VERSION_MINOR, BEE_VERSION_PATCH);
+    
     struct EngineLoopCleanupGuard
     {
-        ~EngineLoopCleanupGuard() { EngineLoop::Instance().Exit(); }
+        ~EngineLoopCleanupGuard() { EngineLoop::Instance().Shutdown(); }
     } CleanupGuard;
     
     // TODO：设置错误类型，使用 std::expected？

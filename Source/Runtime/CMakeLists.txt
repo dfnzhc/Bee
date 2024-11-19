@@ -8,12 +8,14 @@ BeeDefaultSettings(${BEE_TARGET})
 
 find_package(fmt CONFIG REQUIRED)
 find_package(libassert CONFIG REQUIRED)
+find_package(glfw3 CONFIG REQUIRED)
 
 target_link_libraries(${BEE_TARGET}
         #    PRIVATE
         PUBLIC
         fmt::fmt
         libassert::assert
+        glfw
 )
 
 target_compile_options(${BEE_TARGET}

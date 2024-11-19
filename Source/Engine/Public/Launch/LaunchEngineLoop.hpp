@@ -29,7 +29,7 @@ public:
     
     void Tick();
 
-    void Exit();
+    void Shutdown();
     
 protected:
 
