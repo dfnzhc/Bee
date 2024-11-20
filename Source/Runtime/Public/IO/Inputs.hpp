@@ -7,12 +7,13 @@
 
 #pragma once
 
-#include <bitset>
 #include "Core/Defines.hpp"
 #include "Core/Portability.hpp"
 #include "Math/Constant.hpp"
 #include "Utility/Enum.hpp"
 #include "Utility/Assert.hpp"
+#include <set>
+#include <fmt/format.h>
 
 namespace bee {
 
@@ -145,8 +146,6 @@ enum class ModifierFlags : u8
     Alt   = 4
 };
 
-using Modifiers = mec::bitset<ModifierFlags>;
-
 struct MouseEvent
 {
     enum class Type
@@ -158,13 +157,11 @@ struct MouseEvent
     };
 
     Type type;
-    vec2 pos;           // 标准化坐标，范围[0, 1]
-    vec2 screenPos;     // 屏幕空间坐标，范围[0, 窗口大小]
-    vec2 wheelDelta;    // 鼠标滚轮滚动量
-    Modifiers mods;     // 键盘修饰键标记
-    MouseButton button; // 鼠标按钮
-                        
-    BEE_NODISCARD bool hasModifier(ModifierFlags mod) const { return mods.test(mod); }
+    vec2 pos        = {}; // 标准化坐标，范围[0, 1]
+    vec2 screenPos  = {}; // 屏幕空间坐标，范围[0, 窗口大小]
+    vec2 wheelDelta = {}; // 鼠标滚轮滚动量
+    ModifierFlags mods;   // 键盘修饰键标记
+    MouseButton button;   // 鼠标按钮
 };
 
 struct KeyboardEvent
@@ -177,12 +174,10 @@ struct KeyboardEvent
         Input,
     };
 
-    Type type;         // 事件类型
-    Key key;           // 按下/释放的键
-    Modifiers mods;    // 键盘修饰键标记
-    u32 codepoint = 0; // UTF-32 码点
-
-    BEE_NODISCARD bool hasModifier(ModifierFlags mod) const { return mods.test(mod); }
+    Type type;          // 事件类型
+    Key key;            // 按下/释放的键
+    ModifierFlags mods; // 键盘修饰键标记
+    u32 codepoint = 0;  // UTF-32 码点
 };
 
 class InputState
@@ -227,7 +222,7 @@ public:
         }
     }
 
-    void endFrame()
+    void tick()
     {
         _previousKeyState   = _currentKeyState;
         _previousMouseState = _currentMouseState;
@@ -258,5 +253,48 @@ private:
 
     bool _mouseMoving = false;
 };
+
+inline std::string ToString(const MouseEvent& me)
+{
+    std::string_view typeName;
+    switch (me.type) {
+    case MouseEvent::Type::ButtonDown : typeName = "按下"; break;
+    case MouseEvent::Type::ButtonUp   : typeName = "松开"; break;
+    case MouseEvent::Type::Move       : typeName = "移动"; break;
+    case MouseEvent::Type::Wheel      : typeName = "滚轮"; break;
+    }
+
+    std::string_view button;
+    switch (me.button) {
+    case MouseButton::Left   : button = "左键"; break;
+    case MouseButton::Middle : button = "中建"; break;
+    case MouseButton::Right  : button = "右键"; break;
+    default                  : break;
+    }
+
+    return fmt::format("鼠标 [\"{}{}\" - {},{}({:.3f},{:.3f})|{:.3f}/{:.3f}| - {}]",
+                       typeName,
+                       button,
+                       int(me.screenPos.x),
+                       int(me.screenPos.y),
+                       me.pos.x,
+                       me.pos.y,
+                       me.wheelDelta.x,
+                       me.wheelDelta.y,
+                       magic_enum::enum_name(me.mods));
+}
+
+inline std::string ToString(const KeyboardEvent& ke)
+{
+    std::string_view typeName;
+    switch (ke.type) {
+    case KeyboardEvent::Type::KeyPressed  : typeName = "按下"; break;
+    case KeyboardEvent::Type::KeyReleased : typeName = "松开"; break;
+    case KeyboardEvent::Type::KeyRepeated : typeName = "重复"; break;
+    case KeyboardEvent::Type::Input       : typeName = "输入"; break;
+    }
+
+    return fmt::format("键盘 [\"{}:{}\" - {}]", typeName, me::enum_name(ke.key), magic_enum::enum_name(ke.mods));
+}
 
 } // namespace bee

@@ -8,8 +8,10 @@
 #pragma once
 
 #include "Core/Defines.hpp"
+#include "Utility/Macros.hpp"
 #include "Math/Math.hpp"
 #include "Platform/Handles.hpp"
+#include "IO/Inputs.hpp"
 #include <functional>
 
 namespace bee {
@@ -40,11 +42,18 @@ public:
     class ICallbacks
     {
     public:
+        virtual ~ICallbacks() = default;
+
         virtual void handleWindowSizeChange() = 0;
+
+        virtual void handleKeyboardEvent(const KeyboardEvent& keyEvent) = 0;
+        virtual void handleMouseEvent(const MouseEvent& mouseEvent)     = 0;
     };
 
     Window(const Desc& desc, ICallbacks* pCallbacks);
     ~Window();
+
+    BEE_CLASS_DELETE_COPY(Window);
 
     // clang-format off
     void shutdown();
@@ -58,7 +67,7 @@ public:
     void setPos(int x, int y);
     void setPos(vec2i pos) { setPos(pos.x, pos.y); }
 
-    void setTitle(std::string title);
+    void setTitle(std::string_view title);
     void setIcon(const std::filesystem::path& path);
 
     BEE_NODISCARD vec2u extent() const { return _desc.extent; }
@@ -67,18 +76,24 @@ public:
     
     BEE_NODISCARD const Handle& handle() const { return _handle; }
     BEE_NODISCARD const   Desc& desc()   const { return _desc; }
+
     // clang-format on
 
 private:
-    void setWindowSize(u32 width, u32 height);
-    void updateWindowSize();
-    
-private:
-    Desc _desc           = {};
-    Handle _handle       = {};
-    ApiHandle _apiHandle = {};
+    void _setWindowSize(u32 width, u32 height);
+    void _updateWindowSize();
 
+    BEE_NODISCARD const vec2& _getMouseScale() const { return _mouseScale; }
+
+    friend class ApiCallbacks;
+
+private:
+    Desc _desc              = {};
+    Handle _handle          = {};
+    ApiHandle _apiHandle    = {};
     ICallbacks* _pCallbacks = nullptr;
+
+    vec2 _mouseScale;
 };
 
 } // namespace bee

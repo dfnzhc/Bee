@@ -7,85 +7,8 @@
 
 #include <gtest/gtest.h>
 #include <IO/Inputs.hpp>
-#include <libassert/assert-gtest.hpp>
 
 using namespace bee;
-
-class MouseButtonEventTest : public ::testing::Test
-{
-protected:
-    MouseEvent mouseEvent;
-};
-
-TEST_F(MouseButtonEventTest, HasModifierTest)
-{
-    // Test with no modifiers
-    EXPECT_FALSE(mouseEvent.hasModifier(ModifierFlags::Shift));
-
-    // Press Shift
-    mouseEvent.mods.set(ModifierFlags::Shift);
-    EXPECT_TRUE(mouseEvent.hasModifier(ModifierFlags::Shift));
-    EXPECT_FALSE(mouseEvent.hasModifier(ModifierFlags::Ctrl));
-    EXPECT_FALSE(mouseEvent.hasModifier(ModifierFlags::Alt));
-
-    // Press Ctrl and Alt
-    mouseEvent.mods.set(ModifierFlags::Ctrl);
-    mouseEvent.mods.set(ModifierFlags::Alt);
-    EXPECT_TRUE(mouseEvent.hasModifier(ModifierFlags::Shift));
-    EXPECT_TRUE(mouseEvent.hasModifier(ModifierFlags::Ctrl));
-    EXPECT_TRUE(mouseEvent.hasModifier(ModifierFlags::Alt));
-
-    // Release Ctrl
-    mouseEvent.mods.reset(ModifierFlags::Ctrl);
-    EXPECT_TRUE(mouseEvent.hasModifier(ModifierFlags::Shift));
-    EXPECT_FALSE(mouseEvent.hasModifier(ModifierFlags::Ctrl));
-    EXPECT_TRUE(mouseEvent.hasModifier(ModifierFlags::Alt));
-
-    // Release all modifiers
-    mouseEvent.mods.reset(ModifierFlags::Shift);
-    mouseEvent.mods.reset(ModifierFlags::Alt);
-    EXPECT_FALSE(mouseEvent.hasModifier(ModifierFlags::Shift));
-    EXPECT_FALSE(mouseEvent.hasModifier(ModifierFlags::Ctrl));
-    EXPECT_FALSE(mouseEvent.hasModifier(ModifierFlags::Alt));
-}
-
-class KeyboardEventTest : public ::testing::Test
-{
-protected:
-    KeyboardEvent keyEvent;
-};
-
-TEST_F(KeyboardEventTest, HasModifierTest)
-{
-    // Test with no modifiers
-    EXPECT_FALSE(keyEvent.hasModifier(ModifierFlags::Shift));
-
-    // Press Shift
-    keyEvent.mods.set(ModifierFlags::Shift);
-    EXPECT_TRUE(keyEvent.hasModifier(ModifierFlags::Shift));
-    EXPECT_FALSE(keyEvent.hasModifier(ModifierFlags::Ctrl));
-    EXPECT_FALSE(keyEvent.hasModifier(ModifierFlags::Alt));
-
-    // Press Ctrl and Alt
-    keyEvent.mods.set(ModifierFlags::Ctrl);
-    keyEvent.mods.set(ModifierFlags::Alt);
-    EXPECT_TRUE(keyEvent.hasModifier(ModifierFlags::Shift));
-    EXPECT_TRUE(keyEvent.hasModifier(ModifierFlags::Ctrl));
-    EXPECT_TRUE(keyEvent.hasModifier(ModifierFlags::Alt));
-
-    // Release Ctrl
-    keyEvent.mods.reset(ModifierFlags::Ctrl);
-    EXPECT_TRUE(keyEvent.hasModifier(ModifierFlags::Shift));
-    EXPECT_FALSE(keyEvent.hasModifier(ModifierFlags::Ctrl));
-    EXPECT_TRUE(keyEvent.hasModifier(ModifierFlags::Alt));
-
-    // Release all modifiers
-    keyEvent.mods.reset(ModifierFlags::Shift);
-    keyEvent.mods.reset(ModifierFlags::Alt);
-    EXPECT_FALSE(keyEvent.hasModifier(ModifierFlags::Shift));
-    EXPECT_FALSE(keyEvent.hasModifier(ModifierFlags::Ctrl));
-    EXPECT_FALSE(keyEvent.hasModifier(ModifierFlags::Alt));
-}
 
 class InputStateTest : public ::testing::Test
 {
@@ -99,7 +22,7 @@ TEST_F(InputStateTest, MouseMovingTest)
     mouseEvent.type = MouseEvent::Type::Move;
     inputState.onMouseEvent(mouseEvent);
     EXPECT_TRUE(inputState.isMouseMoving());
-    inputState.endFrame();
+    inputState.tick();
     EXPECT_FALSE(inputState.isMouseMoving());
 }
 
@@ -120,7 +43,7 @@ TEST_F(InputStateTest, MouseButtonUpTest)
     mouseEvent.button = MouseButton::Left;
     mouseEvent.type   = MouseEvent::Type::ButtonDown;
     inputState.onMouseEvent(mouseEvent);
-    inputState.endFrame();
+    inputState.tick();
     mouseEvent.type = MouseEvent::Type::ButtonUp;
     inputState.onMouseEvent(mouseEvent);
     EXPECT_FALSE(inputState.isMouseButtonDown(MouseButton::Left));
@@ -145,7 +68,7 @@ TEST_F(InputStateTest, KeyUpTest)
     keyEvent.key  = Key::A;
     keyEvent.type = KeyboardEvent::Type::KeyPressed;
     inputState.onKeyEvent(keyEvent);
-    inputState.endFrame();
+    inputState.tick();
     keyEvent.type = KeyboardEvent::Type::KeyReleased;
     inputState.onKeyEvent(keyEvent);
     EXPECT_FALSE(inputState.isKeyDown(Key::A));
@@ -179,7 +102,7 @@ TEST_F(InputStateTest, ModifierPressedTest)
     keyEventShiftDown.key  = Key::LeftShift;
     inputState.onKeyEvent(keyEventShiftDown);
     EXPECT_TRUE(inputState.isModifierPressed(ModifierFlags::Shift));
-    inputState.endFrame();
+    inputState.tick();
 
     // Release Shift
     KeyboardEvent keyEventShiftUp;
@@ -196,7 +119,7 @@ TEST_F(InputStateTest, ModifierReleasedTest)
     keyEventShiftDown.type = KeyboardEvent::Type::KeyPressed;
     keyEventShiftDown.key  = Key::LeftShift;
     inputState.onKeyEvent(keyEventShiftDown);
-    inputState.endFrame();
+    inputState.tick();
 
     // Release Shift in the next frame
     KeyboardEvent keyEventShiftUp;
