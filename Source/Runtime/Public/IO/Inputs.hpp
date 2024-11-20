@@ -12,7 +12,7 @@
 #include "Math/Constant.hpp"
 #include "Utility/Enum.hpp"
 #include "Utility/Assert.hpp"
-#include <set>
+#include <bitset>
 #include <fmt/format.h>
 
 namespace bee {
@@ -157,11 +157,15 @@ struct MouseEvent
     };
 
     Type type;
-    vec2 pos        = {}; // 标准化坐标，范围[0, 1]
-    vec2 screenPos  = {}; // 屏幕空间坐标，范围[0, 窗口大小]
-    vec2 wheelDelta = {}; // 鼠标滚轮滚动量
-    ModifierFlags mods;   // 键盘修饰键标记
-    MouseButton button;   // 鼠标按钮
+    vec2 pos           = {};                  // 标准化坐标，范围[0, 1]
+    vec2 screenPos     = {};                  // 屏幕空间坐标，范围[0, 窗口大小]
+    vec2 wheelDelta    = {};                  // 鼠标滚轮滚动量
+    ModifierFlags mods = ModifierFlags::None; // 键盘修饰键标记
+    MouseButton button;                       // 鼠标按钮
+
+    BEE_NODISCARD bool hasModifier(ModifierFlags mod) const { return (mods & mod) == mod; }
+
+    BEE_NODISCARD bool noneModifier() const { return mods == ModifierFlags::None; }
 };
 
 struct KeyboardEvent
@@ -174,10 +178,14 @@ struct KeyboardEvent
         Input,
     };
 
-    Type type;          // 事件类型
-    Key key;            // 按下/释放的键
-    ModifierFlags mods; // 键盘修饰键标记
-    u32 codepoint = 0;  // UTF-32 码点
+    Type type;                                // 事件类型
+    Key key;                                  // 按下/释放的键
+    ModifierFlags mods = ModifierFlags::None; // 键盘修饰键标记
+    u32 codepoint      = 0;                   // UTF-32 码点
+
+    BEE_NODISCARD bool hasModifier(ModifierFlags mod) const { return (mods & mod) == mod; }
+
+    BEE_NODISCARD bool noneModifier() const { return mods == ModifierFlags::None; }
 };
 
 class InputState
@@ -185,13 +193,13 @@ class InputState
 public:
     // clang-format off
     BEE_NODISCARD bool isMouseMoving()                       const { return _mouseMoving; }
-    BEE_NODISCARD bool isMouseButtonDown(MouseButton mb)     const { return _currentMouseState.contains(mb); }
-    BEE_NODISCARD bool isMouseButtonClicked(MouseButton mb)  const { return _currentMouseState.contains(mb) && !_previousMouseState.contains(mb); }
-    BEE_NODISCARD bool isMouseButtonReleased(MouseButton mb) const { return !_currentMouseState.contains(mb) && _previousMouseState.contains(mb); }
+    BEE_NODISCARD bool isMouseButtonDown(MouseButton mb)     const { return _currentMouseState[static_cast<size_t>(mb)]; }
+    BEE_NODISCARD bool isMouseButtonClicked(MouseButton mb)  const { return _currentMouseState[static_cast<size_t>(mb)] && !_previousMouseState[static_cast<size_t>(mb)]; }
+    BEE_NODISCARD bool isMouseButtonReleased(MouseButton mb) const { return !_currentMouseState[static_cast<size_t>(mb)] && _previousMouseState[static_cast<size_t>(mb)]; }
 
-    BEE_NODISCARD bool isKeyDown(Key key)     const { return _currentKeyState.contains(key); }
-    BEE_NODISCARD bool isKeyPressed(Key key)  const { return _currentKeyState.contains(key) && !_previousKeyState.contains(key); }
-    BEE_NODISCARD bool isKeyReleased(Key key) const { return !_currentKeyState.contains(key) && _previousKeyState.contains(key); }
+    BEE_NODISCARD bool isKeyDown(Key key)     const { return _currentKeyState[static_cast<size_t>(key)]; }
+    BEE_NODISCARD bool isKeyPressed(Key key)  const { return _currentKeyState[static_cast<size_t>(key)] && !_previousKeyState[static_cast<size_t>(key)]; }
+    BEE_NODISCARD bool isKeyReleased(Key key) const { return !_currentKeyState[static_cast<size_t>(key)] && _previousKeyState[static_cast<size_t>(key)]; }
 
     BEE_NODISCARD bool isModifierDown(ModifierFlags mod)     const { return getModifierState(_currentKeyState, mod); }
     BEE_NODISCARD bool isModifierPressed(ModifierFlags mod)  const { return getModifierState(_currentKeyState, mod) && !getModifierState(_previousKeyState, mod); }
@@ -201,21 +209,15 @@ public:
 
     void onKeyEvent(const KeyboardEvent& keyEvent)
     {
-        if (keyEvent.type == KeyboardEvent::Type::KeyPressed) {
-            _currentKeyState.insert(keyEvent.key);
-        }
-        else if (keyEvent.type == KeyboardEvent::Type::KeyReleased) {
-            _currentKeyState.extract(keyEvent.key);
+        if (keyEvent.type == KeyboardEvent::Type::KeyPressed || keyEvent.type == KeyboardEvent::Type::KeyReleased) {
+            _currentKeyState[static_cast<size_t>(keyEvent.key)] = keyEvent.type == KeyboardEvent::Type::KeyPressed;
         }
     }
 
     void onMouseEvent(const MouseEvent& mouseEvent)
     {
-        if (mouseEvent.type == MouseEvent::Type::ButtonDown) {
-            _currentMouseState.insert(mouseEvent.button);
-        }
-        else if (mouseEvent.type == MouseEvent::Type::ButtonUp) {
-            _currentMouseState.extract(mouseEvent.button);
+        if (mouseEvent.type == MouseEvent::Type::ButtonDown || mouseEvent.type == MouseEvent::Type::ButtonUp) {
+            _currentMouseState[static_cast<size_t>(mouseEvent.button)] = mouseEvent.type == MouseEvent::Type::ButtonDown;
         }
         else if (mouseEvent.type == MouseEvent::Type::Move) {
             _mouseMoving = true;
@@ -231,15 +233,18 @@ public:
     }
 
 private:
-    using KeyStates  = std::set<Key>;
-    using MouseState = std::set<MouseButton>;
+    static constexpr size_t kKeyCount         = static_cast<size_t>(Key::Count);
+    static constexpr size_t kMouseButtonCount = static_cast<size_t>(MouseButton::Count);
+
+    using KeyStates  = std::bitset<kKeyCount>;
+    using MouseState = std::bitset<kMouseButtonCount>;
 
     BEE_NODISCARD bool getModifierState(const KeyStates& keys, ModifierFlags mod) const
     {
         switch (mod) {
-        case ModifierFlags::Shift : return keys.contains(Key::LeftShift) || keys.contains(Key::RightShift);
-        case ModifierFlags::Ctrl  : return keys.contains(Key::LeftControl) || keys.contains(Key::RightControl);
-        case ModifierFlags::Alt   : return keys.contains(Key::LeftAlt) || keys.contains(Key::RightAlt);
+        case ModifierFlags::Shift : return keys[static_cast<size_t>(Key::LeftShift)] || keys[static_cast<size_t>(Key::RightShift)];
+        case ModifierFlags::Ctrl  : return keys[static_cast<size_t>(Key::LeftControl)] || keys[static_cast<size_t>(Key::RightControl)];
+        case ModifierFlags::Alt   : return keys[static_cast<size_t>(Key::LeftAlt)] || keys[static_cast<size_t>(Key::RightAlt)];
         case ModifierFlags::None  : break;
         }
 
@@ -281,7 +286,7 @@ inline std::string ToString(const MouseEvent& me)
                        me.pos.y,
                        me.wheelDelta.x,
                        me.wheelDelta.y,
-                       magic_enum::enum_name(me.mods));
+                       me::enum_flags_name(me.mods));
 }
 
 inline std::string ToString(const KeyboardEvent& ke)
@@ -294,7 +299,7 @@ inline std::string ToString(const KeyboardEvent& ke)
     case KeyboardEvent::Type::Input       : typeName = "输入"; break;
     }
 
-    return fmt::format("键盘 [\"{}:{}\" - {}]", typeName, me::enum_name(ke.key), magic_enum::enum_name(ke.mods));
+    return fmt::format("键盘 [\"{}:{}\" - {}]", typeName, me::enum_name(ke.key), me::enum_flags_name(ke.mods));
 }
 
 } // namespace bee

@@ -6,26 +6,27 @@
  */
 
 #include "Launch/LaunchEngineLoop.hpp"
+#include "Launch/LaunchParam.hpp"
+
 #include <Utility/Logger.hpp>
 
-#include <Windows.h>
+namespace bee {
+extern int GuardedMain(BeeLaunchParam&& launchParam);
 
-extern int GuardedMain();
-
-using namespace bee;
-
-BEE_API int LaunchWindowsStartup(HINSTANCE hInInstance, HINSTANCE hPrevInstance, char*, int nCmdShow)
+BEE_API int LaunchStartup(BeeLaunchParam&& launchParam)
 {
-    LogInfo("Windows Launch Startup.");
+    LogInfo("Launch Startup.");
 
+    // TODO：捕捉异常
     int ErrorLevel = 0;
-
-    ErrorLevel = GuardedMain();
+    ErrorLevel     = GuardedMain(std::forward<BeeLaunchParam>(launchParam));
 
     return ErrorLevel;
 }
 
-BEE_API void LaunchWindowsShutdown()
+BEE_API void LaunchShutdown()
 {
-    LogInfo("Windows Launch Shutdown.");
+    LogInfo("Launch Shutdown.");
 }
+
+} // namespace bee

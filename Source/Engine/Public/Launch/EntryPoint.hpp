@@ -10,17 +10,26 @@
 #include <Core/Defines.hpp>
 #include <Core/Portability.hpp>
 
+#include "Launch/LaunchParam.hpp"
+
+namespace bee {
+
 #ifdef BEE_IN_WINDOWS
-extern int LaunchWindowsStartup(HINSTANCE, HINSTANCE, PSTR, int);
-extern void LaunchWindowsShutdown();
+extern BeeLaunchParam LaunchParamSetup(_In_ HINSTANCE hInInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ PSTR pCmdLine, _In_ int nCmdShow);
+extern int LaunchStartup(BeeLaunchParam&& launchParam);
+#endif
+
+extern void LaunchShutdown();
+
+} // namespace bee
+
+#ifdef BEE_IN_WINDOWS
 
 int WINAPI WinMain(_In_ HINSTANCE hInInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ PSTR pCmdLine, _In_ int nCmdShow)
 {
-    int Result = LaunchWindowsStartup(hInInstance, hPrevInstance, pCmdLine, nCmdShow);
-    LaunchWindowsShutdown();
+    int Result = bee::LaunchStartup(bee::LaunchParamSetup(hInInstance, hPrevInstance, pCmdLine, nCmdShow));
+    bee::LaunchShutdown();
     return Result;
 }
 
-#else
-#  error "不支持的平台"
 #endif

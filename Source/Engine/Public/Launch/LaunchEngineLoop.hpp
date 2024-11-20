@@ -8,8 +8,13 @@
 #pragma once
 
 #include <Core/Defines.hpp>
+#include <memory>
+
+#include "Launch/LaunchParam.hpp"
 
 namespace bee {
+
+class Application;
 
 class BEE_API EngineLoop
 {
@@ -24,15 +29,11 @@ public:
         return loop;
     }
     
-    int PreInit();
-    int Init();
+    int preInit(BeeLaunchParam&& param);
+    int init();
     
-    void Tick();
-
-    void Shutdown();
-    
-protected:
-
+    void tick();
+    void shutdown();
 };
 
 } // namespace bee

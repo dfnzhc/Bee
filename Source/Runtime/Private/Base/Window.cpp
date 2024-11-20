@@ -31,7 +31,7 @@ public:
 
     static void KeyboardCallback(GLFWwindow* pGlfwWindow, int key, int /*scanCode*/, int action, int modifiers)
     {
-        KeyboardEvent event{};
+        KeyboardEvent event;
         if (PrepareKeyboardEvent(key, action, modifiers, event)) {
             auto* pWindow = (Window*)glfwGetWindowUserPointer(pGlfwWindow);
             if (pWindow != nullptr) {
@@ -42,7 +42,7 @@ public:
     
     static void CharInputCallback(GLFWwindow* pGlfwWindow, u32 input)
     {
-        KeyboardEvent event{};
+        KeyboardEvent event;
         event.type      = KeyboardEvent::Type::Input;
         event.codepoint = input;
 
@@ -54,7 +54,7 @@ public:
 
     static void MouseButtonCallback(GLFWwindow* pGlfwWindow, int button, int action, int modifiers)
     {
-        MouseEvent event{};
+        MouseEvent event;
         switch (button) {
         case GLFW_MOUSE_BUTTON_LEFT :
             event.button = MouseButton::Left;
@@ -86,7 +86,7 @@ public:
     {
         auto* pWindow = (Window*)glfwGetWindowUserPointer(pGlfwWindow);
         if (pWindow != nullptr) {
-            MouseEvent event{};
+            MouseEvent event;
             event.type       = MouseEvent::Type::Move;
             event.pos        = CalcMousePos(mouseX, mouseY, pWindow->_getMouseScale());
             event.screenPos  = {mouseX, mouseY};
@@ -100,7 +100,7 @@ public:
     {
         auto* pWindow = (Window*)glfwGetWindowUserPointer(pGlfwWindow);
         if (pWindow != nullptr) {
-            MouseEvent event{};
+            MouseEvent event;
             event.type = MouseEvent::Type::Wheel;
             double x, y;
             glfwGetCursorPos(pGlfwWindow, &x, &y);
@@ -193,6 +193,12 @@ private:
             flags |= ModifierFlags::Ctrl;
         if (modifiers & GLFW_MOD_SHIFT)
             flags |= ModifierFlags::Shift;
+        
+        if (static_cast<int>(flags) == 6)
+        {
+            int a = 0;
+        }
+        
         return flags;
     }
 
@@ -281,6 +287,7 @@ Window::Window(const Window::Desc& desc, Window::ICallbacks* pCallbacks)
     BEE_ASSERT(_handle, "获取 Win32 窗口 Handle 失败");
 #endif
 
+    setPos(_desc.pos);
     _updateWindowSize();
     glfwSetWindowUserPointer(_apiHandle, this);
 
@@ -335,7 +342,7 @@ void Window::resize(u32 width, u32 height)
     }
 
     if (_pCallbacks)
-        _pCallbacks->handleWindowSizeChange();
+        _pCallbacks->handleWindowSizeChange(width, height);
 }
 
 void Window::pollForEvents()

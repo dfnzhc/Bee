@@ -44,10 +44,10 @@ void Logger::log(Level level, std::string_view msg)
     case Logger::Level::Info    : color = fmt::color::green_yellow; break;
     }
 
-    const auto s = fmt::format(fmt::fg(color), "[{}]: {}\n", logLevelString(level), msg);
+    const auto s = fmt::format(fmt::fg(color), "[{}]: {}", logLevelString(level), msg);
     auto& os     = level > Logger::Level::Error ? std::cout : std::cerr;
-    os << s;
-    std::flush(os);
+    os << s << std::endl;
+//    std::flush(os);
 
     if (!_subscribers.empty()) {
         for (const auto& notify : _subscribers | std::views::values) {

@@ -32,6 +32,7 @@ public:
     struct Desc
     {
         vec2u extent      = {1'920, 1'080};
+        vec2u pos         = {50, 100};
         std::string title = "Bee Engine";
         Mode mode         = Mode::Normal;
 
@@ -44,7 +45,7 @@ public:
     public:
         virtual ~ICallbacks() = default;
 
-        virtual void handleWindowSizeChange() = 0;
+        virtual void handleWindowSizeChange(u32 width, u32 height) = 0;
 
         virtual void handleKeyboardEvent(const KeyboardEvent& keyEvent) = 0;
         virtual void handleMouseEvent(const MouseEvent& mouseEvent)     = 0;
@@ -73,6 +74,7 @@ public:
     BEE_NODISCARD vec2u extent() const { return _desc.extent; }
     BEE_NODISCARD   u32 width()  const { return _desc.extent.x; }
     BEE_NODISCARD   u32 height() const { return _desc.extent.y; }
+    BEE_NODISCARD vec2u pos()    const { return _desc.pos; }
     
     BEE_NODISCARD const Handle& handle() const { return _handle; }
     BEE_NODISCARD const   Desc& desc()   const { return _desc; }
