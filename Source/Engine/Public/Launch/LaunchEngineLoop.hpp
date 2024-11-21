@@ -29,7 +29,7 @@ public:
         return loop;
     }
     
-    int preInit(BeeLaunchParam&& param);
+    int preInit(const BeeLaunchParam& param);
     int init();
     
     void tick();

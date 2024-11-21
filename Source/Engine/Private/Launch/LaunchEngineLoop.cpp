@@ -20,12 +20,12 @@ std::unique_ptr<bee::Application> app = nullptr;
 
 namespace bee {
 
-int EngineLoop::preInit(BeeLaunchParam&& param)
+int EngineLoop::preInit(const BeeLaunchParam& param)
 {
     LogInfo("EngineLoop::preInit");
     app = param.createFunc();
-    BEE_ASSERT(app, "未能创建应用程序");
-    
+    BEE_ASSERT(app, "未能创建应用程序实例");
+
     app->preInit();
 
     return 0;
@@ -34,6 +34,7 @@ int EngineLoop::preInit(BeeLaunchParam&& param)
 int EngineLoop::init()
 {
     LogInfo("EngineLoop::init");
+
     app->init();
 
     return 0;
@@ -41,6 +42,8 @@ int EngineLoop::init()
 
 void EngineLoop::tick()
 {
+    BEE_DEBUG_ASSERT(app);
+
     app->tick();
     if (app->shouldTerminate())
         Globals::RequestEngineExit();
@@ -48,7 +51,8 @@ void EngineLoop::tick()
 
 void EngineLoop::shutdown()
 {
-    app->shutdown();
+    if (app)
+        app->shutdown();
     LogInfo("EngineLoop::shutdown");
 }
 } // namespace bee

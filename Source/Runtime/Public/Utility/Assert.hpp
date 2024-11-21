@@ -29,6 +29,9 @@ namespace bee {
 
 #define BEE_ASSERT_VAL(expr, ...) LIBASSERT_ASSERT_VAL(expr, __VA_ARGS__)
 
-// TODO: 添加一个断言错误处理类型，支持添加断言失败前调用
+BEE_API void AssertHandler(const libassert::assertion_info& assertion);
+
+#define BEE_SET_ASSERT_FAILURE_HANDLER  \
+    libassert::set_failure_handler(bee::AssertHandler)
 
 } // namespace bee

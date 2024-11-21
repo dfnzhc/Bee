@@ -7,17 +7,18 @@
 
 #include "Launch/LaunchParam.hpp"
 #include <Utility/Logger.hpp>
+#include <Utility/Error.hpp>
 
 namespace bee {
-extern int GuardedMain(BeeLaunchParam&& launchParam);
+extern int GuardedMain(const BeeLaunchParam& launchParam);
 
-BEE_API int LaunchStartup(BeeLaunchParam&& launchParam)
+BEE_API int LaunchStartup(const BeeLaunchParam& launchParam)
 {
     LogInfo("Launch Startup.");
 
     // TODO：捕捉异常
     int ErrorLevel = 0;
-    ErrorLevel     = GuardedMain(std::forward<BeeLaunchParam>(launchParam));
+    ErrorLevel     = CatchAndReportAllExceptions([&launchParam] { return GuardedMain(launchParam); });
 
     return ErrorLevel;
 }

@@ -16,7 +16,7 @@ namespace bee {
 
 #ifdef BEE_IN_WINDOWS
 extern BeeLaunchParam LaunchParamSetup(_In_ HINSTANCE hInInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ PSTR pCmdLine, _In_ int nCmdShow);
-extern int LaunchStartup(BeeLaunchParam&& launchParam);
+extern int LaunchStartup(const BeeLaunchParam& launchParam);
 #endif
 
 extern void LaunchShutdown();

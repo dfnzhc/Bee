@@ -50,7 +50,7 @@ private:
 
     std::mutex _mutex = {};
 
-    Logger::Level _level = Logger::Level::Info;
+    Logger::Level _level                                             = Logger::Level::Info;
     std::unordered_map<std::string_view, LogNotifyType> _subscribers = {};
 };
 
