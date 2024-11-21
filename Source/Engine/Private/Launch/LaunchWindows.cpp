@@ -5,9 +5,7 @@
  * @Brief This file is part of Bee.
  */
 
-#include "Launch/LaunchEngineLoop.hpp"
 #include "Launch/LaunchParam.hpp"
-
 #include <Utility/Logger.hpp>
 
 namespace bee {

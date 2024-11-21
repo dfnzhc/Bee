@@ -6,7 +6,7 @@
  */
 
 #include "Base/Application.hpp"
-#include "Utility/Logger.hpp"
+#include <Utility/Logger.hpp>
 
 using namespace bee;
 

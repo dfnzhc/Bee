@@ -7,8 +7,8 @@
 
 #include "Launch/LaunchEngineLoop.hpp"
 #include <Utility/Logger.hpp>
-#include <Base/Application.hpp>
 #include <Core/Globals.hpp>
+#include "Base/Application.hpp"
 
 namespace {
 

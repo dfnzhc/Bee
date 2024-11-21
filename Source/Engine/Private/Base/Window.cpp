@@ -6,8 +6,8 @@
  */
 
 #include "Base/Window.hpp"
-#include "Utility/Logger.hpp"
-#include "Platform/Platform.hpp"
+#include <Utility/Logger.hpp>
+#include <Platform/Platform.hpp>
 
 using namespace bee;
 
