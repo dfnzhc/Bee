@@ -16,6 +16,7 @@ set(${CMAKE_CURRENT_BINARY_DIR})
 AddTestProgram(Runtime/LoggerTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Runtime")
 AddTestProgram(Runtime/MathTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Runtime")
 AddTestProgram(Runtime/InputsTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Runtime")
+AddTestProgram(Runtime/GraphTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Runtime")
 
 # Launch Test
 add_executable(EngineLaunchTest WIN32 Engine/LaunchTest.cpp)

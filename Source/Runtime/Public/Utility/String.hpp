@@ -16,4 +16,7 @@ namespace sz = ashvardanian::stringzilla;
 using String     = sz::string;
 using StringView = sz::string_view;
 
+template<typename T>
+concept CanFormatType = requires(T t) { fmt::format("{}", t); };
+
 } // namespace bee
