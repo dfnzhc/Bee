@@ -7,7 +7,7 @@
 
 #include "Base/Window.hpp"
 #include <Utility/Logger.hpp>
-#include <Platform/Platform.hpp>
+//#include <Platform/Platform.hpp>
 
 using namespace bee;
 
@@ -253,12 +253,11 @@ Window::Window(const Window::Desc& desc, Window::ICallbacks* pCallbacks)
 {
     LogInfo("创建窗口 '{}'({}x{})", desc.title, desc.extent.x, desc.extent.y);
 
-    glfwSetErrorCallback(ApiCallbacks::ErrorCallback);
-
     if (sWindowCount.fetch_add(1) == 0) {
         BEE_ASSERT(glfwInit() == GLFW_TRUE, "GLFW 初始化失败");
     }
-
+    
+    glfwSetErrorCallback(ApiCallbacks::ErrorCallback);
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     if (!desc.resizable) {
         glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
@@ -362,7 +361,7 @@ void Window::setTitle(std::string_view title)
 
 void Window::setIcon(const std::filesystem::path& path)
 {
-    SetWindowIcon(path, _handle);
+//    SetWindowIcon(path, _handle);
 }
 
 void Window::_updateWindowSize()

@@ -19,6 +19,7 @@ AddTestProgram(Runtime/InputsTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Runti
 AddTestProgram(Runtime/ObjectTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Runtime")
 AddTestProgram(Runtime/GraphTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Runtime")
 
+find_package (Vulkan REQUIRED)
 # Launch Test
 add_executable(EngineLaunchTest WIN32 Engine/LaunchTest.cpp)
 set_target_properties(EngineLaunchTest
@@ -27,4 +28,4 @@ set_target_properties(EngineLaunchTest
         WORKING_DIRECTORY ${${PROJECT_NAME_UPPERCASE}_BINARY_DIR}
 )
 
-target_link_libraries(EngineLaunchTest PRIVATE Bee::Engine -mwindows)
+target_link_libraries(EngineLaunchTest PRIVATE Bee::Engine -mwindows Vulkan::Vulkan)

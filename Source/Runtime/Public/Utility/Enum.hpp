@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include <magic_enum_all.hpp>
+#include <magic_enum/magic_enum_all.hpp>
 
 namespace bee {
 

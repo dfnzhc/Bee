@@ -66,7 +66,7 @@ void Object::dumpAliveObjects()
     DirectedGraph<std::string, u64> graph;
 
     for (const auto* object : sTrackedObjects) {
-        auto va = graph.addVertex(std::format("{}", fmt::ptr(object)));
+        auto va = graph.addVertex(std::format("{}({})", object->className(), fmt::ptr(object)));
         for (const auto& it : object->_refTrackers) {
             auto vb = graph.addVertex(std::format("{}", it.first));
             graph.addEdge(vb, va, 1);
