@@ -273,3 +273,63 @@ TEST(QuadraticTest, ImaginaryRootsCase)
 
     EXPECT_FALSE(Quadratic(a, b, c, &t0, &t1));
 }
+
+TEST(PowerOfTwoTests, NextPowerOfTwo) {
+    EXPECT_EQ(NextPowerOfTwo(0), 0u);
+    EXPECT_EQ(NextPowerOfTwo(1), 1u);
+    EXPECT_EQ(NextPowerOfTwo(2), 2u);
+    EXPECT_EQ(NextPowerOfTwo(3), 4u);
+    EXPECT_EQ(NextPowerOfTwo(4), 4u);
+    EXPECT_EQ(NextPowerOfTwo(5), 8u);
+    EXPECT_EQ(NextPowerOfTwo(15), 16u);
+    EXPECT_EQ(NextPowerOfTwo(16), 16u);
+    EXPECT_EQ(NextPowerOfTwo(17), 32u);
+    EXPECT_EQ(NextPowerOfTwo(31), 32u);
+    EXPECT_EQ(NextPowerOfTwo(32), 32u);
+}
+
+TEST(PowerOfTwoTests, PreviousPowerOfTwo) {
+    EXPECT_EQ(PreviousPowerOfTwo(0), 0u);
+    EXPECT_EQ(PreviousPowerOfTwo(1), 1u);
+    EXPECT_EQ(PreviousPowerOfTwo(2), 2u);
+    EXPECT_EQ(PreviousPowerOfTwo(3), 2u);
+    EXPECT_EQ(PreviousPowerOfTwo(4), 4u);
+    EXPECT_EQ(PreviousPowerOfTwo(5), 4u);
+    EXPECT_EQ(PreviousPowerOfTwo(15), 8u);
+    EXPECT_EQ(PreviousPowerOfTwo(16), 16u);
+    EXPECT_EQ(PreviousPowerOfTwo(17), 16u);
+    EXPECT_EQ(PreviousPowerOfTwo(31), 16u);
+    EXPECT_EQ(PreviousPowerOfTwo(32), 32u);
+}
+
+TEST(PowerOfTwoTests, ClosestPowerOfTwo) {
+    EXPECT_EQ(ClosestPowerOfTwo(0), 0u);
+    EXPECT_EQ(ClosestPowerOfTwo(1), 1u);
+    EXPECT_EQ(ClosestPowerOfTwo(2), 2u);
+    EXPECT_EQ(ClosestPowerOfTwo(3), 4u);
+    EXPECT_EQ(ClosestPowerOfTwo(4), 4u);
+    EXPECT_EQ(ClosestPowerOfTwo(5), 4u);
+    EXPECT_EQ(ClosestPowerOfTwo(15), 16u);
+    EXPECT_EQ(ClosestPowerOfTwo(16), 16u);
+    EXPECT_EQ(ClosestPowerOfTwo(17), 16u);
+    EXPECT_EQ(ClosestPowerOfTwo(31), 32u);
+    EXPECT_EQ(ClosestPowerOfTwo(32), 32u);
+}
+
+TEST(BitSwapTests, BitSwap_u16) {
+    EXPECT_EQ(BitSwap<u16>(0x1234u), 0x3412u);
+    EXPECT_EQ(BitSwap<u16>(0x0000u), 0x0000u);
+    EXPECT_EQ(BitSwap<u16>(0xFFFFu), 0xFFFFu);
+}
+
+TEST(BitSwapTests, BitSwap_u32) {
+    EXPECT_EQ(BitSwap(0x12345678u), 0x78563412u);
+    EXPECT_EQ(BitSwap(0x00000000u), 0x00000000u);
+    EXPECT_EQ(BitSwap(0xFFFFFFFFu), 0xFFFFFFFFu);
+}
+
+TEST(BitSwapTests, BitSwap_u64) {
+    EXPECT_EQ(BitSwap(0x123456789ABCDEF0ull), 0xF0DEBC9A78563412ull);
+    EXPECT_EQ(BitSwap(0x0000000000000000ull), 0x0000000000000000ull);
+    EXPECT_EQ(BitSwap(0xFFFFFFFFFFFFFFFFull), 0xFFFFFFFFFFFFFFFFull);
+}

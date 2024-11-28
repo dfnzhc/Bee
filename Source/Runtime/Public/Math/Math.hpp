@@ -224,4 +224,55 @@ BEE_FUNC BEE_CONSTEXPR u32 Parity(u32 x)
     return x & 1;
 }
 
+BEE_FUNC BEE_CONSTEXPR u32 NextPowerOfTwo(u32 x)
+{
+    if (x == 0)
+        return 0;
+
+    --x;
+    x |= x >> 1;
+    x |= x >> 2;
+    x |= x >> 4;
+    x |= x >> 8;
+    x |= x >> 16;
+
+    return ++x;
+}
+
+BEE_FUNC BEE_CONSTEXPR u32 PreviousPowerOfTwo(u32 x)
+{
+    x |= x >> 1;
+    x |= x >> 2;
+    x |= x >> 4;
+    x |= x >> 8;
+    x |= x >> 16;
+    return x - (x >> 1);
+}
+
+BEE_FUNC BEE_CONSTEXPR u32 ClosestPowerOfTwo(u32 x)
+{
+    auto nx = NextPowerOfTwo(x);
+    auto px = PreviousPowerOfTwo(x);
+    return (nx - x) > (x - px) ? px : nx;
+}
+
+template<std::unsigned_integral T> BEE_FUNC BEE_CONSTEXPR T BitSwap(T x)
+{
+    if constexpr (sizeof(T) == 1) {
+        return x;
+    }
+    else if constexpr (sizeof(T) == 2) {
+        return (x >> 8) | (x << 8);
+    }
+    else if constexpr (sizeof(T) == 4) {
+        return ((x << 24) | ((x << 8) & 0x00FF0000) | ((x >> 8) & 0x0000FF00) | (x >> 24));
+    }
+    else {
+        x = (x & 0x00000000FFFFFFFF) << 32 | (x & 0xFFFFFFFF00000000) >> 32;
+        x = (x & 0x0000FFFF0000FFFF) << 16 | (x & 0xFFFF0000FFFF0000) >> 16;
+        x = (x & 0x00FF00FF00FF00FF) << 8 | (x & 0xFF00FF00FF00FF00) >> 8;
+        return x;
+    }
+}
+
 } // namespace bee
