@@ -5,7 +5,7 @@
  * @Brief This file is part of Bee.
  */
 
-#include "Core/Globals.hpp"
+#include "Base/Globals.hpp"
 
 using namespace bee;
 
@@ -15,6 +15,9 @@ class GlobalState
 {
 public:
     bool IsRequestingExit = false;
+    
+    // TODO：添加控制
+    bool IsVerbosePrintEnable = true;
 };
 
 GlobalState globals;
@@ -30,4 +33,9 @@ bool Globals::IsEngineExitRequested()
 void Globals::RequestEngineExit()
 {
     globals.IsRequestingExit = true;
+}
+
+bool Globals::IsPrintVerboseEnabled()
+{
+    return false;
 }

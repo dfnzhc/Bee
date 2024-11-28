@@ -7,7 +7,7 @@
 
 #include "Launch/LaunchEngineLoop.hpp"
 #include "Launch/LaunchParam.hpp"
-#include <Core/Globals.hpp>
+#include "Base/Globals.hpp"
 #include <Utility/Logger.hpp>
 #include <Utility/Error.hpp>
 #include <Core/Version.hpp>
@@ -22,19 +22,19 @@ int GuardedMain(const BeeLaunchParam& launchParam)
 
     struct EngineLoopCleanupGuard
     {
-        ~EngineLoopCleanupGuard() { EngineLoop::Instance().shutdown(); }
+        ~EngineLoopCleanupGuard() { LaunchLoop::Instance().shutdown(); }
     } CleanupGuard;
 
     // TODO：设置错误类型，使用 std::expected？
-    int ErrorLevel = EngineLoop::Instance().preInit(launchParam);
+    int ErrorLevel = LaunchLoop::Instance().preInit(launchParam);
     if (ErrorLevel != 0) {
         return ErrorLevel;
     }
 
-    ErrorLevel = EngineLoop::Instance().init();
+    ErrorLevel = LaunchLoop::Instance().init();
 
     while (!Globals::IsEngineExitRequested()) {
-        EngineLoop::Instance().tick();
+        LaunchLoop::Instance().tick();
     }
 
     return 0;

@@ -7,21 +7,19 @@
 
 #pragma once
 
-#include "Core/Defines.hpp"
+#include <Core/Defines.hpp>
 #include <memory>
 
 namespace bee {
 
 class BEE_API Globals
 {
-private:
-    Globals() = default;
-    ~Globals() = default;
 public:
     
     static bool IsEngineExitRequested();
     static void RequestEngineExit();
     
+    static bool IsPrintVerboseEnabled();
 };
 
 

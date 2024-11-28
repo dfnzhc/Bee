@@ -1,5 +1,5 @@
 /**
- * @File LaunchEngineLoop.hpp
+ * @File LaunchLoop.hpp
  * @Author dfnzhc (https://github.com/dfnzhc)
  * @Date 2024/11/18
  * @Brief This file is part of Bee.
@@ -16,16 +16,16 @@ namespace bee {
 
 class Application;
 
-class BEE_API EngineLoop
+class BEE_API LaunchLoop
 {
 private:
-    EngineLoop() = default;
-    ~EngineLoop() = default;
+    LaunchLoop() = default;
+    ~LaunchLoop() = default;
     
 public:
-    static EngineLoop& Instance()
+    static LaunchLoop& Instance()
     {
-        static EngineLoop loop;
+        static LaunchLoop loop;
         return loop;
     }
     

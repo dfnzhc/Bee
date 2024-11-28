@@ -1,5 +1,5 @@
 /**
- * @File LaunchEngineLoop.cpp
+ * @File LaunchLoop.cpp
  * @Author dfnzhc (https://github.com/dfnzhc)
  * @Date 2024/11/18
  * @Brief This file is part of Bee.
@@ -7,7 +7,7 @@
 
 #include "Launch/LaunchEngineLoop.hpp"
 #include <Utility/Logger.hpp>
-#include <Core/Globals.hpp>
+#include "Base/Globals.hpp"
 #include "Base/Application.hpp"
 
 namespace {
@@ -20,7 +20,7 @@ std::unique_ptr<bee::Application> app = nullptr;
 
 namespace bee {
 
-int EngineLoop::preInit(const BeeLaunchParam& param)
+int LaunchLoop::preInit(const BeeLaunchParam& param)
 {
     LogInfo("EngineLoop::preInit");
     app = param.createFunc();
@@ -31,7 +31,7 @@ int EngineLoop::preInit(const BeeLaunchParam& param)
     return 0;
 }
 
-int EngineLoop::init()
+int LaunchLoop::init()
 {
     LogInfo("EngineLoop::init");
 
@@ -40,7 +40,7 @@ int EngineLoop::init()
     return 0;
 }
 
-void EngineLoop::tick()
+void LaunchLoop::tick()
 {
     BEE_DEBUG_ASSERT(app);
 
@@ -49,7 +49,7 @@ void EngineLoop::tick()
         Globals::RequestEngineExit();
 }
 
-void EngineLoop::shutdown()
+void LaunchLoop::shutdown()
 {
     if (app)
         app->shutdown();
