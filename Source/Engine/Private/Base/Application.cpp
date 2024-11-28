@@ -7,6 +7,7 @@
 
 #include "Base/Application.hpp"
 #include <Utility/Logger.hpp>
+#include "Render/RenderDevice.hpp"
 
 using namespace bee;
 
@@ -33,6 +34,9 @@ int Application::preInit()
 
 int Application::init()
 {
+    _pRenderDevice = std::make_unique<RenderDevice>();
+    _pRenderDevice->init(createDevices());
+    
     return onInit();
 }
 
@@ -52,6 +56,7 @@ void Application::shutdown()
 {
     onShutdown();
 
+    _pRenderDevice->shutdown();
     if (_pWindow)
         _pWindow->shutdown();
     
@@ -123,4 +128,12 @@ void Application::handleMouseEvent(const MouseEvent& mouseEvent)
 bool Application::shouldTerminate() const
 {
     return _shouldTerminate;
+}
+
+RenderDeviceConfig Application::createDevices() const
+{
+    RenderDeviceConfig config;
+    config.deviceType = RenderDeviceType::Vulkan;
+    
+    return config;
 }
