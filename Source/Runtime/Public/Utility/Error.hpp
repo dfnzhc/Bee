@@ -19,14 +19,27 @@ namespace bee {
 enum class Error
 {
     Ok = 0,
-    Failed,
-
+    Failed,             // 通常意义的失败
+    InitializeError,    // 初始化失败
+    VulkanError,        // Vulkan 调用失败 
+    CheckError,         // 当不满足预定条件
 };
 
 inline constexpr std::string_view ErrorName(Error err)
 {
     return me::enum_name(err);
 }
+
+#define BEE_REPORT_IF_FAILED(expr)                                                                                                                   \
+    do {                                                                                                                                             \
+        auto err = expr;                                                                                                                             \
+        if (err != Error::Ok) [[unlikely]] {                                                                                                         \
+            LogError("调用失败：'{}' = {}", #expr, ErrorName(err));                                                                                  \
+            return err;                                                                                                                              \
+        }                                                                                                                                            \
+        else                                                                                                                                         \
+            ((void)0);                                                                                                                                \
+    } while (false)
 
 // clang-format off
 #ifdef _MSC_VER

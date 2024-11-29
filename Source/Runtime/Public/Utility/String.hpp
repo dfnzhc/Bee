@@ -8,6 +8,7 @@
 #pragma once
 
 #include <stringzilla/stringzilla.hpp>
+#include <fmt/format.h>
 
 namespace bee {
 

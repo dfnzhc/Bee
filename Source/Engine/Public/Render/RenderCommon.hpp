@@ -10,19 +10,22 @@
 #include "RenderContext.hpp"
 #include "RenderDriver.hpp"
 
+#include <Platform/Platform.hpp>
+
 namespace bee {
 
 enum class RenderDeviceType : u8
 {
     Unknown = 0,
     Vulkan,
-
+        
     // ...
 };
 
 struct RenderDeviceConfig
 {
-    RenderDeviceType deviceType;
+    RenderDeviceType deviceType = {};
+    bool headless = false;
 };
 
 struct RenderHandle

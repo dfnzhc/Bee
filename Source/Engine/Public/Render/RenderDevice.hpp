@@ -9,7 +9,7 @@
 
 #include "Render/RenderContext.hpp"
 #include "Render/RenderDriver.hpp"
-#include "RenderCommon.hpp"
+#include "Render/RenderCommon.hpp"
 #include <Utility/Macros.hpp>
 
 namespace bee {
@@ -22,8 +22,8 @@ public:
     
     BEE_CLASS_DELETE_COPY(RenderDevice);
     
-    Error init(const RenderDeviceConfig& config);
-    void shutdown();
+    Error create(const RenderDeviceConfig& config);
+    void destroy();
     
 private:
     std::unique_ptr<RenderContext> _context = nullptr;

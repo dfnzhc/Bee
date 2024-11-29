@@ -51,6 +51,7 @@ const std::vector<const char*> validationLayers = {"VK_LAYER_KHRONOS_validation"
 const std::vector<const char*> deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
 const bool enableValidationLayers = false;
+
 //#ifdef NDEBUG
 //const bool enableValidationLayers = false;
 //#else
@@ -182,7 +183,7 @@ private:
     VkSurfaceKHR surface;
 
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
-    VkDevice device;
+    VkDevice device = VK_NULL_HANDLE;;
 
     VkQueue graphicsQueue;
     VkQueue presentQueue;
@@ -263,66 +264,141 @@ private:
 
     void cleanupSwapChain()
     {
-        vkDestroyImageView(device, depthImageView, nullptr);
-        vkDestroyImage(device, depthImage, nullptr);
-        vkFreeMemory(device, depthImageMemory, nullptr);
+        if (depthImageView) {
+            vkDestroyImageView(device, depthImageView, nullptr);
+            vkDestroyImage(device, depthImage, nullptr);
+            vkFreeMemory(device, depthImageMemory, nullptr);
+            
+            depthImageView = VK_NULL_HANDLE;
+            depthImage = VK_NULL_HANDLE;
+            depthImageMemory = VK_NULL_HANDLE;
+        }
 
         for (auto framebuffer : swapChainFramebuffers) {
             vkDestroyFramebuffer(device, framebuffer, nullptr);
+            framebuffer = VK_NULL_HANDLE;
         }
 
         for (auto imageView : swapChainImageViews) {
             vkDestroyImageView(device, imageView, nullptr);
+            imageView = VK_NULL_HANDLE;
         }
 
-        vkDestroySwapchainKHR(device, swapChain, nullptr);
+        if (swapChain)
+        {
+            vkDestroySwapchainKHR(device, swapChain, nullptr);
+            swapChain = VK_NULL_HANDLE;
+        }
     }
 
     void cleanup()
     {
+        if (!device)
+            return;
+        
         cleanupSwapChain();
 
-        vkDestroyPipeline(device, graphicsPipeline, nullptr);
-        vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-        vkDestroyRenderPass(device, renderPass, nullptr);
-
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            vkDestroyBuffer(device, uniformBuffers[i], nullptr);
-            vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
+        if (graphicsPipeline)
+        {
+            vkDestroyPipeline(device, graphicsPipeline, nullptr);
+            graphicsPipeline = VK_NULL_HANDLE;
+        }
+    
+        if (pipelineLayout)
+        {
+            vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+            pipelineLayout = VK_NULL_HANDLE;
+        }
+        if (renderPass)
+        {
+            vkDestroyRenderPass(device, renderPass, nullptr);
+            renderPass = VK_NULL_HANDLE;
         }
 
-        vkDestroyDescriptorPool(device, descriptorPool, nullptr);
-
-        vkDestroySampler(device, textureSampler, nullptr);
-        vkDestroyImageView(device, textureImageView, nullptr);
-
-        vkDestroyImage(device, textureImage, nullptr);
-        vkFreeMemory(device, textureImageMemory, nullptr);
-
-        vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
-
-        vkDestroyBuffer(device, indexBuffer, nullptr);
-        vkFreeMemory(device, indexBufferMemory, nullptr);
-
-        vkDestroyBuffer(device, vertexBuffer, nullptr);
-        vkFreeMemory(device, vertexBufferMemory, nullptr);
-
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
-            vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
-            vkDestroyFence(device, inFlightFences[i], nullptr);
+            if (uniformBuffers[i])
+            {
+                vkDestroyBuffer(device, uniformBuffers[i], nullptr);
+                vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
+                uniformBuffers[i] = VK_NULL_HANDLE;
+                uniformBuffersMemory[i] = VK_NULL_HANDLE;
+            }
+        }
+        
+        if (descriptorPool)
+        {
+            vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+            descriptorPool = VK_NULL_HANDLE;
         }
 
-        vkDestroyCommandPool(device, commandPool, nullptr);
+        if (textureSampler)
+        {
+            vkDestroySampler(device, textureSampler, nullptr);
+            vkDestroyImageView(device, textureImageView, nullptr);
+            vkDestroyImage(device, textureImage, nullptr);
+            vkFreeMemory(device, textureImageMemory, nullptr);
+            textureSampler = VK_NULL_HANDLE;
+            textureImageView = VK_NULL_HANDLE;
+            textureImage = VK_NULL_HANDLE;
+            textureImageMemory = VK_NULL_HANDLE;
+        }
 
-        vkDestroyDevice(device, nullptr);
+        if (descriptorSetLayout)
+        {
+            vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+            descriptorSetLayout = VK_NULL_HANDLE;
+        }
 
-        if (enableValidationLayers) {
+        if (indexBuffer)
+        {
+            vkDestroyBuffer(device, indexBuffer, nullptr);
+            vkFreeMemory(device, indexBufferMemory, nullptr);
+            indexBuffer = VK_NULL_HANDLE;
+            indexBufferMemory = VK_NULL_HANDLE;
+        }
+
+        if (vertexBuffer)
+        {
+            vkDestroyBuffer(device, vertexBuffer, nullptr);
+            vkFreeMemory(device, vertexBufferMemory, nullptr);
+            vertexBuffer = VK_NULL_HANDLE;
+            vertexBufferMemory = VK_NULL_HANDLE;
+        }
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            if (renderFinishedSemaphores[i]) {
+                vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
+                vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
+                vkDestroyFence(device, inFlightFences[i], nullptr);
+                renderFinishedSemaphores[i] = VK_NULL_HANDLE;
+                imageAvailableSemaphores[i] = VK_NULL_HANDLE;
+                inFlightFences[i] = VK_NULL_HANDLE;
+            }
+        }
+
+        if (commandPool)
+        {
+            vkDestroyCommandPool(device, commandPool, nullptr);
+            commandPool = VK_NULL_HANDLE;
+        }
+
+        if (device) {
+            vkDestroyDevice(device, nullptr);
+            device = VK_NULL_HANDLE;
+        }
+
+        if (enableValidationLayers && debugMessenger) {
             DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
+            debugMessenger = nullptr;
         }
 
-        vkDestroySurfaceKHR(instance, surface, nullptr);
-        vkDestroyInstance(instance, nullptr);
+        if (surface) {
+            vkDestroySurfaceKHR(instance, surface, nullptr);
+            vkDestroyInstance(instance, nullptr);
+            
+            surface = VK_NULL_HANDLE;
+            instance = VK_NULL_HANDLE;
+        }
     }
 
     void recreateSwapChain()
@@ -1512,7 +1588,7 @@ private:
             return capabilities.currentExtent;
         }
         else {
-            const auto width = window()->width();
+            const auto width  = window()->width();
             const auto height = window()->height();
 
             VkExtent2D actualExtent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};

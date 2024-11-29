@@ -13,8 +13,14 @@ RenderDriverVulkan::RenderDriverVulkan(RenderContextVulkan* context) : _context(
 {
 }
 
-Error RenderDriverVulkan::initialize(u32 deviceIndex, u32 frameCount)
+RenderDriverVulkan::~RenderDriverVulkan()
 {
+    
+}
+
+Error RenderDriverVulkan::create(u32 deviceIndex, u32 frameCount)
+{
+    LogInfo("创建 Vulkan 渲染驱动...");
     // TODO：从 context 中获取物理设备 & 队列信息
     // TODO：Extensions 和 Layers
     // TODO：设备特性与 Capabilities
@@ -24,6 +30,11 @@ Error RenderDriverVulkan::initialize(u32 deviceIndex, u32 frameCount)
     
     
     return Error::Ok;
+}
+
+void RenderDriverVulkan::destroy()
+{
+    LogInfo("Vulkan 渲染驱动已摧毁");
 }
 
 void RenderDriverVulkan::createBuffer()
@@ -354,3 +365,4 @@ bool RenderDriverVulkan::isCompositeAlphaSupported() const
 {
     return RenderDriver::isCompositeAlphaSupported();
 }
+

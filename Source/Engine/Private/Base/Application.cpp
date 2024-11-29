@@ -35,8 +35,9 @@ int Application::preInit()
 int Application::init()
 {
     _pRenderDevice = std::make_unique<RenderDevice>();
-    _pRenderDevice->init(createDevices());
-    
+    auto res       = _pRenderDevice->create(createDevices());
+    BEE_ASSERT(res == Error::Ok, "渲染设备创建失败");
+
     return onInit();
 }
 
@@ -56,10 +57,11 @@ void Application::shutdown()
 {
     onShutdown();
 
-    _pRenderDevice->shutdown();
+    _pRenderDevice->destroy();
+
     if (_pWindow)
         _pWindow->shutdown();
-    
+
     LogInfo("{} 已关闭.", _config.appName);
 }
 
@@ -132,8 +134,9 @@ bool Application::shouldTerminate() const
 
 RenderDeviceConfig Application::createDevices() const
 {
-    RenderDeviceConfig config;
-    config.deviceType = RenderDeviceType::Vulkan;
-    
-    return config;
+    RenderDeviceConfig rdc{};
+    rdc.deviceType = RenderDeviceType::Vulkan;
+    rdc.headless   = _config.headless;
+
+    return rdc;
 }

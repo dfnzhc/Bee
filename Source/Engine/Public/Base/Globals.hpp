@@ -16,10 +16,19 @@ class BEE_API Globals
 {
 public:
     
+    // -------------------------
+    // 全局
+    // -------------------------
     static bool IsEngineExitRequested();
     static void RequestEngineExit();
     
     static bool IsPrintVerboseEnabled();
+
+    // -------------------------
+    // 渲染相关
+    // -------------------------
+    static bool EnableValidationLayer();
+    
 };
 
 

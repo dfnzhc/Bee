@@ -18,6 +18,8 @@ public:
     
     // TODO：添加控制
     bool IsVerbosePrintEnable = true;
+    
+    bool IsValidationLayerEnable = true;
 };
 
 GlobalState globals;
@@ -37,5 +39,10 @@ void Globals::RequestEngineExit()
 
 bool Globals::IsPrintVerboseEnabled()
 {
-    return false;
+    return globals.IsVerbosePrintEnable;
+}
+
+bool Globals::EnableValidationLayer()
+{
+    return globals.IsValidationLayerEnable;
 }

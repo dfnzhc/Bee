@@ -32,11 +32,17 @@ public:
         String name     = "Unknown";
         DeviceType type = DeviceType::Unknown;
     };
+    
+    struct Config
+    {
+        bool headless = false;
+    };
 
     virtual ~RenderContext() = default;
 
     // clang-format off
-    virtual Error initialize() = 0;
+    virtual Error create(const Config&) = 0;
+    virtual void destroy() = 0;
 
     BEE_NODISCARD virtual const DeviceInfo& deviceInfo(u32 devIdx) const = 0;
     BEE_NODISCARD virtual u32 deviceCount() const                        = 0;

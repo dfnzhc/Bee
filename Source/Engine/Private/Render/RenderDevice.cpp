@@ -9,19 +9,24 @@
 
 using namespace bee;
 
-Error RenderDevice::init(const RenderDeviceConfig& config)
+Error RenderDevice::create(const RenderDeviceConfig& config)
 {
     _context = CreateRenderContext(config.deviceType);
-    _context->initialize();
+    RenderContext::Config ctxConfig{};
+    ctxConfig.headless = config.headless;
+    BEE_REPORT_IF_FAILED(_context->create(ctxConfig));
 
     _driver = _context->createDriver();
-    _driver->initialize(0, 4);
+    BEE_REPORT_IF_FAILED(_driver->create(0, 4));
 
     return Error::Ok;
 }
 
-void RenderDevice::shutdown()
+void RenderDevice::destroy()
 {
-    _driver.reset();
-    _context.reset();
+    if (_driver)
+        _driver->destroy();
+    
+    if (_context)
+        _context->destroy();
 }

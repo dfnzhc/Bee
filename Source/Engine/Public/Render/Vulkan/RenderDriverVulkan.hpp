@@ -18,8 +18,9 @@ class BEE_API RenderDriverVulkan final : public RenderDriver
 public:
     RenderDriverVulkan(RenderContextVulkan* context);
     
-    ~RenderDriverVulkan() override = default;
-    Error initialize(u32 deviceIndex, u32 frameCount) override;
+    ~RenderDriverVulkan() override;
+    Error create(u32 deviceIndex, u32 frameCount) override;
+    void destroy() override;
     
     // -------------------------
     // 组件创建

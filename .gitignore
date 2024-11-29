@@ -370,3 +370,4 @@ MigrationBackup/
 /.idea/
 /build/
 /Bin/
+/Tools/tracy/

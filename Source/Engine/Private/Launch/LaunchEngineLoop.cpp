@@ -33,7 +33,7 @@ int LaunchLoop::preInit(const BeeLaunchParam& param)
 
 int LaunchLoop::init()
 {
-    LogInfo("EngineLoop::init");
+    LogInfo("EngineLoop::create");
 
     app->init();
 
@@ -53,6 +53,6 @@ void LaunchLoop::shutdown()
 {
     if (app)
         app->shutdown();
-    LogInfo("EngineLoop::shutdown");
+    LogInfo("EngineLoop::destroy");
 }
 } // namespace bee
