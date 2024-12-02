@@ -166,6 +166,14 @@ struct MouseEvent
     BEE_NODISCARD bool hasModifier(ModifierFlags mod) const { return (mods & mod) == mod; }
 
     BEE_NODISCARD bool noneModifier() const { return mods == ModifierFlags::None; }
+
+    friend BEE_CONSTEXPR bool operator==(const MouseEvent& lhs, const MouseEvent rhs)
+    {
+        if (lhs.type != rhs.type || lhs.pos != rhs.pos || lhs.screenPos != rhs.screenPos || lhs.wheelDelta != rhs.wheelDelta ||
+            lhs.mods != rhs.mods || lhs.button != rhs.button)
+            return false;
+        return true;
+    }
 };
 
 struct KeyboardEvent
@@ -186,6 +194,13 @@ struct KeyboardEvent
     BEE_NODISCARD bool hasModifier(ModifierFlags mod) const { return (mods & mod) == mod; }
 
     BEE_NODISCARD bool noneModifier() const { return mods == ModifierFlags::None; }
+
+    friend BEE_CONSTEXPR bool operator==(const KeyboardEvent& lhs, const KeyboardEvent rhs)
+    {
+        if (lhs.type != rhs.type || lhs.key != rhs.key || lhs.mods != rhs.mods)
+            return false;
+        return true;
+    }
 };
 
 class InputState
@@ -303,3 +318,37 @@ inline std::string ToString(const KeyboardEvent& ke)
 }
 
 } // namespace bee
+
+#include "Math/Hash.hpp"
+
+namespace std {
+template<> struct hash<bee::MouseEvent>
+{
+    size_t operator()(const bee::MouseEvent& me) const
+    {
+        size_t seed = 0;
+        bee::HashCombine(seed, magic_enum::enum_name(me.type));
+        bee::HashCombine(seed, me.pos);
+        bee::HashCombine(seed, me.screenPos);
+        bee::HashCombine(seed, me.wheelDelta);
+        bee::HashCombine(seed, magic_enum::enum_name(me.mods));
+        bee::HashCombine(seed, magic_enum::enum_name(me.button));
+
+        return seed;
+    }
+};
+
+template<> struct hash<bee::KeyboardEvent>
+{
+    size_t operator()(const bee::KeyboardEvent& ke) const
+    {
+        size_t seed = 0;
+        bee::HashCombine(seed, magic_enum::enum_name(ke.type));
+        bee::HashCombine(seed, magic_enum::enum_name(ke.key));
+        bee::HashCombine(seed, magic_enum::enum_name(ke.mods));
+        bee::HashCombine(seed, ke.codepoint);
+
+        return seed;
+    }
+};
+} // namespace std

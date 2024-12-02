@@ -27,6 +27,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtx/rotate_vector.hpp>
 #include <glm/gtx/transform.hpp>
+#include <glm/gtx/hash.hpp>
 
 #include <concepts>
 

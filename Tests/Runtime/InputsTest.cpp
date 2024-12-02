@@ -128,3 +128,35 @@ TEST_F(InputStateTest, ModifierReleasedTest)
     inputState.onKeyEvent(keyEventShiftUp);
     EXPECT_TRUE(inputState.isModifierReleased(ModifierFlags::Shift));
 }
+
+TEST(MouseEventHashTest, DifferentEventsHaveDifferentHashes) {
+    bee::MouseEvent event1{bee::MouseEvent::Type::ButtonDown, {0.5, 0.5}, {100, 100}, {0, 0}, bee::ModifierFlags::None, bee::MouseButton::Left};
+    bee::MouseEvent event2{bee::MouseEvent::Type::ButtonUp, {0.5, 0.5}, {100, 100}, {0, 0}, bee::ModifierFlags::None, bee::MouseButton::Left};
+    
+    std::hash<bee::MouseEvent> hasher;
+    EXPECT_NE(hasher(event1), hasher(event2));
+}
+
+TEST(MouseEventHashTest, SameEventsHaveSameHashes) {
+    bee::MouseEvent event1{bee::MouseEvent::Type::ButtonDown, {0.5, 0.5}, {100, 100}, {0, 0}, bee::ModifierFlags::None, bee::MouseButton::Left};
+    bee::MouseEvent event2{bee::MouseEvent::Type::ButtonDown, {0.5, 0.5}, {100, 100}, {0, 0}, bee::ModifierFlags::None, bee::MouseButton::Left};
+
+    std::hash<bee::MouseEvent> hasher;
+    EXPECT_EQ(hasher(event1), hasher(event2));
+}
+
+TEST(KeyboardEventHashTest, DifferentEventsHaveDifferentHashes) {
+    bee::KeyboardEvent event1{bee::KeyboardEvent::Type::KeyPressed, bee::Key::A, bee::ModifierFlags::None, 0};
+    bee::KeyboardEvent event2{bee::KeyboardEvent::Type::KeyReleased, bee::Key::A, bee::ModifierFlags::None, 0};
+
+    std::hash<bee::KeyboardEvent> hasher;
+    EXPECT_NE(hasher(event1), hasher(event2));
+}
+
+TEST(KeyboardEventHashTest, SameEventsHaveSameHashes) {
+    bee::KeyboardEvent event1{bee::KeyboardEvent::Type::KeyPressed, bee::Key::A, bee::ModifierFlags::None, 65};
+    bee::KeyboardEvent event2{bee::KeyboardEvent::Type::KeyPressed, bee::Key::A, bee::ModifierFlags::None, 65};
+
+    std::hash<bee::KeyboardEvent> hasher;
+    EXPECT_EQ(hasher(event1), hasher(event2));
+}
