@@ -39,7 +39,7 @@ public:
             }
         }
     }
-    
+
     static void CharInputCallback(GLFWwindow* pGlfwWindow, u32 input)
     {
         KeyboardEvent event;
@@ -56,18 +56,12 @@ public:
     {
         MouseEvent event;
         switch (button) {
-        case GLFW_MOUSE_BUTTON_LEFT :
-            event.button = MouseButton::Left;
-            break;
-        case GLFW_MOUSE_BUTTON_MIDDLE :
-            event.button = MouseButton::Middle;
-            break;
-        case GLFW_MOUSE_BUTTON_RIGHT :
-            event.button = MouseButton::Right;
-            break;
-        default : return;
+        case GLFW_MOUSE_BUTTON_LEFT   : event.button = MouseButton::Left; break;
+        case GLFW_MOUSE_BUTTON_MIDDLE : event.button = MouseButton::Middle; break;
+        case GLFW_MOUSE_BUTTON_RIGHT  : event.button = MouseButton::Right; break;
+        default                       : return;
         }
-        
+
         event.type = (action == GLFW_PRESS) ? MouseEvent::Type::ButtonDown : MouseEvent::Type::ButtonUp;
 
         auto* pWindow = (Window*)glfwGetWindowUserPointer(pGlfwWindow);
@@ -187,18 +181,18 @@ private:
     inline static ModifierFlags GetModifierFlags(int modifiers)
     {
         ModifierFlags flags = ModifierFlags::None;
+        BEE_USE_MAGIC_ENUM_BIT_OPERATOR;
         if (modifiers & GLFW_MOD_ALT)
             flags |= ModifierFlags::Alt;
         if (modifiers & GLFW_MOD_CONTROL)
             flags |= ModifierFlags::Ctrl;
         if (modifiers & GLFW_MOD_SHIFT)
             flags |= ModifierFlags::Shift;
-        
-        if (static_cast<int>(flags) == 6)
-        {
+
+        if (static_cast<int>(flags) == 6) {
             int a = 0;
         }
-        
+
         return flags;
     }
 
@@ -256,7 +250,7 @@ Window::Window(const Window::Desc& desc, Window::ICallbacks* pCallbacks)
     if (sWindowCount.fetch_add(1) == 0) {
         BEE_ASSERT(glfwInit() == GLFW_TRUE, "GLFW 初始化失败");
     }
-    
+
     glfwSetErrorCallback(ApiCallbacks::ErrorCallback);
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     if (!desc.resizable) {
@@ -301,10 +295,10 @@ Window::Window(const Window::Desc& desc, Window::ICallbacks* pCallbacks)
 
     // 设置回调
     glfwSetWindowSizeCallback(_apiHandle, ApiCallbacks::WindowSizeCallback);
-    
+
     glfwSetKeyCallback(_apiHandle, ApiCallbacks::KeyboardCallback);
     glfwSetCharCallback(_apiHandle, ApiCallbacks::CharInputCallback);
-    
+
     glfwSetMouseButtonCallback(_apiHandle, ApiCallbacks::MouseButtonCallback);
     glfwSetCursorPosCallback(_apiHandle, ApiCallbacks::MouseMoveCallback);
     glfwSetScrollCallback(_apiHandle, ApiCallbacks::MouseWheelCallback);
@@ -361,7 +355,7 @@ void Window::setTitle(std::string_view title)
 
 void Window::setIcon(const std::filesystem::path& path)
 {
-//    SetWindowIcon(path, _handle);
+    //    SetWindowIcon(path, _handle);
 }
 
 void Window::_updateWindowSize()

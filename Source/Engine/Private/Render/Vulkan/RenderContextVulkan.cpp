@@ -4,7 +4,14 @@
  * @Date 2024/11/27
  * @Brief This file is part of Bee.
  */
-
+ 
+#ifndef VK_NO_PROTOTYPES
+#  define VK_NO_PROTOTYPES
+#endif
+#ifndef VOLK_IMPLEMENTATION
+#  define VOLK_IMPLEMENTATION
+#endif
+#include "Render/Vulkan/VulkanCommon.hpp"
 #include "Render/Vulkan/RenderContextVulkan.hpp"
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
@@ -12,6 +19,8 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 #include "Render/RenderCommon.hpp"
 #include "Base/Globals.hpp"
 #include "Base/Common.hpp"
+#include <Core/Version.hpp>
+#include <algorithm>
 
 using namespace bee;
 
@@ -62,19 +71,18 @@ std::unique_ptr<RenderDriver> RenderContextVulkan::createDriver()
 
 Error RenderContextVulkan::_initVulkanAPI()
 {
+    if (volkInitialize() != VK_SUCCESS) {
+        LogError("Volk 初始化失败");
+        return Error::VulkanError;
+    }
+    
     auto vkGetInstanceProcAddr = vk::DynamicLoader().getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
     VULKAN_HPP_DEFAULT_DISPATCHER.init(vkGetInstanceProcAddr);
     
     auto FN_vkEnumerateInstanceVersion = PFN_vkEnumerateInstanceVersion(vkGetInstanceProcAddr(nullptr, "vkEnumerateInstanceVersion"));
-
-    if (FN_vkEnumerateInstanceVersion == nullptr) {
+    if (!FN_vkEnumerateInstanceVersion || VK_SUCCESS != FN_vkEnumerateInstanceVersion(&_apiVersion)) {
         _apiVersion = VK_API_VERSION_1_0;
         LogWarn("'vkEnumerateInstanceVersion' 不可用，假设 Vulkan 版本为 '1.0'");
-    }
-    else {
-        auto result = FN_vkEnumerateInstanceVersion(&_apiVersion);
-        if (result != VK_SUCCESS)
-            return Error::VulkanError;
     }
 
     return Error::Ok;
@@ -130,6 +138,66 @@ Error RenderContextVulkan::_initInstanceExtensions(const Config& config)
 
 Error RenderContextVulkan::_initInstance()
 {
+    vk::ApplicationInfo appInfo = {};
+    appInfo.pApplicationName    = "Bee";
+    appInfo.pEngineName         = "BeeEngine";
+    appInfo.engineVersion       = VK_MAKE_VERSION(BEE_VERSION_MAJOR, BEE_VERSION_MINOR, BEE_VERSION_PATCH);
+    appInfo.apiVersion          = VK_API_VERSION_1_3;
+
+    std::vector<const char*> enabledExtensions;
+    enabledExtensions.reserve(_enabledInstanceExtensions.size());
+    for (const auto& ext : _enabledInstanceExtensions) {
+        enabledExtensions.push_back(ext.data());
+    }
+
+    std::vector<const char*> enabledLayers;
+    if (Globals::EnableValidationLayer()) {
+        const auto& layers = vk::enumerateInstanceLayerProperties();
+
+        if (std::ranges::find_if(layers, [](const vk::LayerProperties& props) {
+                return std::strcmp(props.layerName, "VK_LAYER_KHRONOS_validation") == 0;
+            }) != layers.end())
+        {
+            enabledLayers.emplace_back("VK_LAYER_KHRONOS_validation");
+        }
+    }
+
+    vk::InstanceCreateInfo instanceInfo  = {};
+    instanceInfo.pApplicationInfo        = &appInfo;
+    instanceInfo.enabledExtensionCount   = enabledExtensions.size();
+    instanceInfo.ppEnabledExtensionNames = enabledExtensions.data();
+    instanceInfo.enabledLayerCount       = enabledLayers.size();
+    instanceInfo.ppEnabledLayerNames     = enabledLayers.data();
+
+    vk::DebugUtilsMessengerCreateInfoEXT debugMessengerInfo      = {};
+    vk::DebugReportCallbackCreateInfoEXT debugReportCallbackInfo = {};
+    const auto hasDebugUtilsExtension                            = _enabledInstanceExtensions.contains(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    const auto hasDebugReportExtension                           = _enabledInstanceExtensions.contains(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+    // clang-format off
+    if (hasDebugUtilsExtension) {
+        debugMessengerInfo.pNext = nullptr;
+        debugMessengerInfo.messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eError | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning;
+        debugMessengerInfo.messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance;
+        debugMessengerInfo.pfnUserCallback = _debugMessengerCallback;
+        debugMessengerInfo.pUserData = this;
+        instanceInfo.pNext = &debugMessengerInfo;
+    } else if (hasDebugReportExtension) {
+        debugReportCallbackInfo.flags = vk::DebugReportFlagBitsEXT::eError | vk::DebugReportFlagBitsEXT::eWarning | vk::DebugReportFlagBitsEXT::ePerformanceWarning | vk::DebugReportFlagBitsEXT::eInformation | vk::DebugReportFlagBitsEXT::eDebug;
+        debugReportCallbackInfo.pfnCallback = _debugReportCallback;
+        debugReportCallbackInfo.pUserData = this;
+        instanceInfo.pNext = &debugReportCallbackInfo;
+    }
+    // clang-format on
+
+    _instance = vk::createInstance(instanceInfo);
+    if (_instance == VK_NULL_HANDLE) {
+        LogError("创建 Vulkan 实例失败");
+        return Error::VulkanError;
+    }
+
+    VULKAN_HPP_DEFAULT_DISPATCHER.init(_instance);
+    volkLoadInstance(_instance);
+
     return Error::Ok;
 }
 
@@ -149,4 +217,114 @@ void RenderContextVulkan::_registerInstanceExtension(StringView extName, bool re
     }
 
     _requestedInstanceExtensions.emplace(extName, required);
+}
+
+VKAPI_ATTR VkBool32 VKAPI_CALL RenderContextVulkan::_debugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT pMessageSeverity,
+                                                                            VkDebugUtilsMessageTypeFlagsEXT pMessageType,
+                                                                            const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+                                                                            void* pUserData)
+{
+    String msg{pCallbackData->pMessage};
+
+    // 需要忽略的消息
+    if (msg.contains("Mapping an image with layout") && msg.contains("can result in undefined behavior if this memory is used by the device")) {
+        return VK_FALSE;
+    }
+    if (msg.contains("Invalid SPIR-V binary version 1.3")) {
+        return VK_FALSE;
+    }
+    if (msg.contains("Shader requires flag")) {
+        return VK_FALSE;
+    }
+    if (msg.contains("SPIR-V module not valid: Pointer operand") && msg.contains("must be a memory object")) {
+        return VK_FALSE;
+    }
+    if (pCallbackData->pMessageIdName && String{pCallbackData->pMessageIdName}.contains("UNASSIGNED-CoreValidation-DrawState-ClearCmdBeforeDraw")) {
+        return VK_FALSE;
+    }
+
+    String type;
+    switch (pMessageType) {
+    case (VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT)                                                      : type = "常规"; break;
+    case (VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT)                                                   : type = "验证"; break;
+    case (VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT)                                                  : type = "性能"; break;
+    case (VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT & VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT) : type = "验证|性能"; break;
+    default                                                                                                 : BEE_UNREACHABLE(); break;
+    }
+
+    String objects;
+    if (pCallbackData->objectCount > 0) {
+        objects = fmt::format("\n\t存在 '{}' 个对象：", pCallbackData->objectCount);
+        for (u32 object = 0; object < pCallbackData->objectCount; ++object) {
+            objects += fmt::format("\n\t\t对象[{}] - {}, Handle {}",
+                                   object,
+                                   me::enum_name(vk::ObjectType(pCallbackData->pObjects[object].objectType)),
+                                   fmt::to_string(pCallbackData->pObjects[object].objectHandle));
+            if (pCallbackData->pObjects[object].pObjectName && std::strlen(pCallbackData->pObjects[object].pObjectName) > 0) {
+                objects += fmt::format(", 名称 \"{}\"", pCallbackData->pObjects[object].pObjectName);
+            }
+        }
+    }
+
+    String labels_string;
+    String labels;
+    if (pCallbackData->cmdBufLabelCount > 0) {
+        labels = fmt::format("\n\t存在 '{}' 个命令缓冲区标签：", pCallbackData->cmdBufLabelCount);
+        for (u32 label = 0; label < pCallbackData->cmdBufLabelCount; ++label) {
+            labels += fmt::format("\n\t\t标签[{}] - {}{{ ", label, pCallbackData->pCmdBufLabels[label].pLabelName);
+            for (int idx = 0; idx < 4; ++idx) {
+                labels += fmt::format("{}", pCallbackData->pCmdBufLabels[label].color[idx]);
+                if (idx < 3) {
+                    labels += ", ";
+                }
+            }
+            labels += " }";
+        }
+    }
+
+    const auto errMsg = std::format("{} - 消息索引与名称为：{} | {}\n\t{}{}{}",
+                                    type.data(),
+                                    pCallbackData->messageIdNumber,
+                                    pCallbackData->pMessageIdName,
+                                    pCallbackData->pMessage,
+                                    objects.data(),
+                                    labels.data());
+
+    // Convert VK severity to our own log macros.
+    switch (pMessageSeverity) {
+    case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT : LogVerbose(errMsg); break;
+    case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT    : LogInfo(errMsg); break;
+    case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT : LogWarn(errMsg); break;
+    case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT :
+        LogError(errMsg.data());
+        // TODO：GPU 错误直接退出程序？
+        break;
+    case VK_DEBUG_UTILS_MESSAGE_SEVERITY_FLAG_BITS_MAX_ENUM_EXT : break;
+    default                                                     : BEE_UNREACHABLE(); break;
+    }
+
+    return VK_FALSE;
+}
+
+VKAPI_ATTR VkBool32 VKAPI_CALL RenderContextVulkan::_debugReportCallback(VkDebugReportFlagsEXT pFlags,
+                                                                         VkDebugReportObjectTypeEXT pObjectType,
+                                                                         u64 pObject,
+                                                                         size_t pLocation,
+                                                                         i32 pMessageCode,
+                                                                         const char* pLayerPrefix,
+                                                                         const char* pMessage,
+                                                                         void* pUserData)
+{
+    const auto dbgMsg = std::format("Vulkan 调试报告：有 '{}' 个对象：\n{}", pObject, pMessage);
+
+    switch (pFlags) {
+    case VK_DEBUG_REPORT_DEBUG_BIT_EXT :
+    case VK_DEBUG_REPORT_INFORMATION_BIT_EXT         : LogInfo(dbgMsg); break;
+    case VK_DEBUG_REPORT_WARNING_BIT_EXT             :
+    case VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT : LogWarn(dbgMsg); break;
+    case VK_DEBUG_REPORT_ERROR_BIT_EXT               : LogError(dbgMsg); break;
+    default                                          : BEE_UNREACHABLE(); break;
+    }
+
+    return VK_FALSE;
 }

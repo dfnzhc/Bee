@@ -13,7 +13,7 @@ namespace bee {
 
 namespace me = magic_enum;
 namespace mec = magic_enum::containers;
-using namespace magic_enum::bitwise_operators;
+#define BEE_USE_MAGIC_ENUM_BIT_OPERATOR using namespace magic_enum::bitwise_operators
 
 using me::iostream_operators::operator<<;
 using me::iostream_operators::operator>>;

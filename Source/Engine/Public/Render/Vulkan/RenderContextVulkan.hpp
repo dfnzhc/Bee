@@ -8,12 +8,8 @@
 #pragma once
 
 #include "Render/RenderContext.hpp"
-
-#ifndef VULKAN_HPP_DISPATCH_LOADER_DYNAMIC
-#  define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
-#endif
-#include <vulkan/vulkan.hpp>
 #include <unordered_set>
+#include <vulkan/vulkan.hpp>
 
 namespace bee {
 
@@ -40,6 +36,11 @@ private:
     Error _initPhysicalDevice();
     
     void _registerInstanceExtension(StringView extName, bool required = true);
+    
+    // clang-format off
+    static VKAPI_ATTR VkBool32 VKAPI_CALL _debugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT pMessageSeverity, VkDebugUtilsMessageTypeFlagsEXT pMessageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData);
+    static VKAPI_ATTR VkBool32 VKAPI_CALL _debugReportCallback(VkDebugReportFlagsEXT pFlags, VkDebugReportObjectTypeEXT pObjectType, u64 pObject, size_t pLocation, i32 pMessageCode, const char* pLayerPrefix, const char* pMessage, void* pUserData);
+    // clang-format on
 
 private:
     vk::Instance _instance = {};

@@ -163,7 +163,11 @@ struct MouseEvent
     ModifierFlags mods = ModifierFlags::None; // 键盘修饰键标记
     MouseButton button;                       // 鼠标按钮
 
-    BEE_NODISCARD bool hasModifier(ModifierFlags mod) const { return (mods & mod) == mod; }
+    BEE_NODISCARD bool hasModifier(ModifierFlags mod) const
+    {
+        BEE_USE_MAGIC_ENUM_BIT_OPERATOR;
+        return (mods & mod) == mod;
+    }
 
     BEE_NODISCARD bool noneModifier() const { return mods == ModifierFlags::None; }
 
@@ -191,7 +195,11 @@ struct KeyboardEvent
     ModifierFlags mods = ModifierFlags::None; // 键盘修饰键标记
     u32 codepoint      = 0;                   // UTF-32 码点
 
-    BEE_NODISCARD bool hasModifier(ModifierFlags mod) const { return (mods & mod) == mod; }
+    BEE_NODISCARD bool hasModifier(ModifierFlags mod) const
+    {
+        BEE_USE_MAGIC_ENUM_BIT_OPERATOR;
+        return (mods & mod) == mod;
+    }
 
     BEE_NODISCARD bool noneModifier() const { return mods == ModifierFlags::None; }
 
