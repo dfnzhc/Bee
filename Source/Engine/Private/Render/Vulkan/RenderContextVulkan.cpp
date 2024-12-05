@@ -4,7 +4,7 @@
  * @Date 2024/11/27
  * @Brief This file is part of Bee.
  */
- 
+
 #ifndef VK_NO_PROTOTYPES
 #  define VK_NO_PROTOTYPES
 #endif
@@ -39,6 +39,8 @@ Error RenderContextVulkan::create(const Config& config)
 
     BEE_REPORT_IF_FAILED(_initVulkanAPI());
     BEE_REPORT_IF_FAILED(_initInstanceExtensions(config));
+    BEE_REPORT_IF_FAILED(_initInstance());
+    BEE_REPORT_IF_FAILED(_initPhysicalDevice());
 
     return Error::Ok;
 }
@@ -64,7 +66,7 @@ bool RenderContextVulkan::deviceSupportsPresent(u32 devIdx) const
     return false;
 }
 
-std::unique_ptr<RenderDriver> RenderContextVulkan::createDriver()
+UniquePtr<RenderDriver> RenderContextVulkan::createDriver()
 {
     return std::make_unique<RenderDriverVulkan>(this);
 }
@@ -75,10 +77,9 @@ Error RenderContextVulkan::_initVulkanAPI()
         LogError("Volk 初始化失败");
         return Error::VulkanError;
     }
-    
-    auto vkGetInstanceProcAddr = vk::DynamicLoader().getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
-    VULKAN_HPP_DEFAULT_DISPATCHER.init(vkGetInstanceProcAddr);
-    
+
+    VULKAN_HPP_DEFAULT_DISPATCHER.init(vk::DynamicLoader().getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr"));
+
     auto FN_vkEnumerateInstanceVersion = PFN_vkEnumerateInstanceVersion(vkGetInstanceProcAddr(nullptr, "vkEnumerateInstanceVersion"));
     if (!FN_vkEnumerateInstanceVersion || VK_SUCCESS != FN_vkEnumerateInstanceVersion(&_apiVersion)) {
         _apiVersion = VK_API_VERSION_1_0;
@@ -110,7 +111,7 @@ Error RenderContextVulkan::_initInstanceExtensions(const Config& config)
     for (const auto& ext : extensions) {
         const auto* extName = ext.extensionName.data();
         if (_requestedInstanceExtensions.contains(extName)) {
-            _enabledInstanceExtensions.insert(extName);
+            _enabledInstanceExtensions.emplace(extName);
         }
     }
 
@@ -142,12 +143,12 @@ Error RenderContextVulkan::_initInstance()
     appInfo.pApplicationName    = "Bee";
     appInfo.pEngineName         = "BeeEngine";
     appInfo.engineVersion       = VK_MAKE_VERSION(BEE_VERSION_MAJOR, BEE_VERSION_MINOR, BEE_VERSION_PATCH);
-    appInfo.apiVersion          = VK_API_VERSION_1_3;
+    appInfo.apiVersion          = _apiVersion;
 
     std::vector<const char*> enabledExtensions;
     enabledExtensions.reserve(_enabledInstanceExtensions.size());
     for (const auto& ext : _enabledInstanceExtensions) {
-        enabledExtensions.push_back(ext.data());
+        enabledExtensions.emplace_back(ext.data());
     }
 
     std::vector<const char*> enabledLayers;
@@ -160,6 +161,11 @@ Error RenderContextVulkan::_initInstance()
         {
             enabledLayers.emplace_back("VK_LAYER_KHRONOS_validation");
         }
+    }
+
+    LogVerbose("\t开启的 Vulkan 层有：");
+    for (const auto& layer : enabledLayers) {
+        LogVerbose("\t\t已添加：{}", layer);
     }
 
     vk::InstanceCreateInfo instanceInfo  = {};
@@ -203,6 +209,34 @@ Error RenderContextVulkan::_initInstance()
 
 Error RenderContextVulkan::_initPhysicalDevice()
 {
+    const auto physicalDevices = _instance.enumeratePhysicalDevices();
+    if (physicalDevices.empty()) {
+        LogError("无可用的 Vulkan 物理设备");
+        return Error::VulkanError;
+    }
+
+    const auto devCount = physicalDevices.size();
+
+    std::vector<DeviceInfo>(devCount).swap(_devices);
+    std::vector<vk::PhysicalDevice>(devCount).swap(_physicalDevices);
+    std::vector<DeviceQueueFamilies>(devCount).swap(_deviceQueueFamilies);
+    
+    LogVerbose("\t发现 '{}' 个可用的物理设备：", devCount);
+    for (size_t i = 0u; i < devCount; ++i) {
+        const auto& dev = physicalDevices[i];
+        auto props      = dev.getProperties();
+
+        auto& devInfo  = _devices[i];
+        devInfo.name   = props.deviceName.data();
+        devInfo.vendor = Vendor(props.vendorID);
+        devInfo.type   = DeviceType(props.deviceType);
+        
+        LogVerbose("\t\t [{}]: {}", i + 1, devInfo.name);
+        
+        _deviceQueueFamilies[i].properties = dev.getQueueFamilyProperties();
+        _physicalDevices[i] = dev;
+    }
+
     return Error::Ok;
 }
 

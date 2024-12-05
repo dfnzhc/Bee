@@ -13,6 +13,7 @@
 #include <Platform/Handles.hpp>
 #include <IO/Inputs.hpp>
 #include <functional>
+#include <Memory/Memory.hpp>
 
 namespace bee {
 
@@ -94,7 +95,7 @@ private:
     Desc _desc              = {};
     Handle _handle          = {};
     ApiHandle _apiHandle    = {};
-    ICallbacks* _pCallbacks = nullptr;
+    RawPtr<ICallbacks> _pCallbacks = nullptr;
 
     vec2 _mouseScale;
 };

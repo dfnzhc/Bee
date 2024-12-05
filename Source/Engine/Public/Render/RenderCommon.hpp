@@ -60,6 +60,6 @@ struct RenderHandle
 /// 方法
 /// ================================================================================
 
-BEE_API std::unique_ptr<RenderContext> CreateRenderContext(RenderDeviceType type);
+BEE_API UniquePtr<RenderContext> CreateRenderContext(RenderDeviceType type);
 
 } // namespace bee

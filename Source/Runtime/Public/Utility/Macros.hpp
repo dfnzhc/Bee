@@ -13,3 +13,7 @@
 #define BEE_CLASS_DELETE_COPY(ClassName)                                                                                                             \
     ClassName(const ClassName&)            = delete;                                                                                                 \
     ClassName& operator=(const ClassName&) = delete
+
+#define BEE_CLASS_DELETE_MOVE(ClassName)                                                                                                             \
+    ClassName(ClassName&&)            = delete;                                                                                                 \
+    ClassName& operator=(ClassName&&) = delete

@@ -10,6 +10,7 @@
 #include "Render/RenderContext.hpp"
 #include "Render/RenderDriver.hpp"
 #include "Render/RenderCommon.hpp"
+#include <Memory/Memory.hpp>
 #include <Utility/Macros.hpp>
 
 namespace bee {
@@ -26,8 +27,8 @@ public:
     void destroy();
     
 private:
-    std::unique_ptr<RenderContext> _context = nullptr;
-    std::unique_ptr<RenderDriver> _driver   = nullptr;
+    UniquePtr<RenderContext> _context = nullptr;
+    UniquePtr<RenderDriver> _driver   = nullptr;
 };
 
 } // namespace bee

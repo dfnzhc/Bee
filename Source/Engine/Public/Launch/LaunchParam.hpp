@@ -13,7 +13,7 @@
 
 namespace bee {
 
-using AppCreateFunc = std::function<std::unique_ptr<Application>()>;
+using AppCreateFunc = std::function<UniquePtr<Application>()>;
 
 struct BeeLaunchParam
 {

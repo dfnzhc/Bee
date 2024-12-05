@@ -21,3 +21,22 @@ template<typename T>
 concept CanFormatType = requires(T t) { fmt::format("{}", t); };
 
 } // namespace bee
+
+template<> class fmt::formatter<bee::String>
+{
+public:
+    constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+
+    template<typename Context> constexpr auto format(const bee::String& bs, Context& ctx) const { return format_to(ctx.out(), "{}", bs.data()); }
+};
+
+template<> class fmt::formatter<bee::StringView>
+{
+public:
+    constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+
+    template<typename Context> constexpr auto format(const bee::StringView& bsv, Context& ctx) const
+    {
+        return format_to(ctx.out(), "{}", bsv.data());
+    }
+};

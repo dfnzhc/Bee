@@ -10,7 +10,7 @@
 
 namespace bee {
 
-std::unique_ptr<RenderContext> CreateRenderContext(RenderDeviceType type)
+UniquePtr<RenderContext> CreateRenderContext(RenderDeviceType type)
 {
     if (type == RenderDeviceType::Vulkan)
         return std::make_unique<RenderContextVulkan>();

@@ -25,9 +25,9 @@ class BEE_API RenderDriver
 {
 public:
     virtual ~RenderDriver() = default;
-    
+
     virtual Error create(u32 deviceIndex, u32 frameCount) = 0;
-    virtual void destroy() = 0;
+    virtual void destroy()                                = 0;
 
     // -------------------------
     // 组件创建

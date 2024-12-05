@@ -13,7 +13,6 @@
 #include "Render/RenderCommon.hpp"
 
 namespace bee {
-
 struct AppConfig
 {
     Window::Desc windowDesc;
@@ -29,6 +28,9 @@ class BEE_API Application : public Window::ICallbacks
 public:
     explicit Application(const AppConfig& config);
     ~Application() override;
+
+    BEE_CLASS_DELETE_MOVE(Application);
+    BEE_CLASS_DELETE_COPY(Application);
 
     int preInit();
     int init();
@@ -46,7 +48,7 @@ protected:
     virtual void onResize(u32 width, u32 height);
     virtual bool onMouseEvent(const MouseEvent& mouseEvent);
     virtual bool onKeyEvent(const KeyboardEvent& keyEvent);
-    
+
     virtual RenderDeviceConfig createDevices() const;
 
 private:
@@ -56,13 +58,12 @@ private:
 
 private:
     AppConfig _config;
-    std::unique_ptr<Window> _pWindow;
-    
+    UniquePtr<Window> _pWindow;
+
     // TODO: 支持多个渲染设备？
-    std::unique_ptr<RenderDevice> _pRenderDevice;
-    
+    UniquePtr<RenderDevice> _pRenderDevice;
+
     InputState _inputState;
     bool _shouldTerminate = false;
 };
-
 } // namespace bee
