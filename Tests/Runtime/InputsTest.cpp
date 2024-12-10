@@ -5,158 +5,434 @@
  * @Brief This file is part of Bee.
  */
 
+#include <unordered_set>
 #include <gtest/gtest.h>
 #include <IO/Inputs.hpp>
 
 using namespace bee;
 
-class InputStateTest : public ::testing::Test
+TEST(MouseEventTest, EqualityOperator)
 {
-protected:
-    InputState inputState;
-};
+    MouseEvent input1;
+    input1.type       = MouseEvent::Type::ButtonDown;
+    input1.pos        = {0.5f, 0.5f};
+    input1.screenPos  = {100.0f, 100.0f};
+    input1.wheelDelta = {0.0f, 0.0f};
+    input1.button     = MouseEvent::Button::Left;
 
-TEST_F(InputStateTest, MouseMovingTest)
+    MouseEvent input2 = input1;
+
+    EXPECT_TRUE(input1 == input2);
+}
+
+TEST(MouseEventTest, InequalityOperator)
 {
+    MouseEvent input1;
+    input1.type       = MouseEvent::Type::ButtonDown;
+    input1.pos        = {0.5f, 0.5f};
+    input1.screenPos  = {100.0f, 100.0f};
+    input1.wheelDelta = {0.0f, 0.0f};
+    input1.button     = MouseEvent::Button::Left;
+
+    MouseEvent input2;
+    input2.type = MouseEvent::Type::ButtonUp;
+
+    EXPECT_FALSE(input1 == input2);
+}
+
+TEST(MouseEventHashTest, DifferentEventsHaveDifferentHashes)
+{
+    bee::MouseEvent event1{
+      bee::MouseEvent::Type::ButtonDown, {0.5, 0.5},
+       {100, 100},
+       {  0,   0}
+    };
+    bee::MouseEvent event2{
+      bee::MouseEvent::Type::ButtonUp, {0.5, 0.5},
+       {100, 100},
+       {  0,   0}
+    };
+
+    std::hash<bee::MouseEvent> hasher;
+    EXPECT_NE(hasher(event1), hasher(event2));
+}
+
+TEST(MouseEventHashTest, SameEventsHaveSameHashes)
+{
+    bee::MouseEvent event1{
+      bee::MouseEvent::Type::ButtonDown, {0.5, 0.5},
+       {100, 100},
+       {  0,   0}
+    };
+    bee::MouseEvent event2{
+      bee::MouseEvent::Type::ButtonDown, {0.5, 0.5},
+       {100, 100},
+       {  0,   0}
+    };
+
+    std::hash<bee::MouseEvent> hasher;
+    EXPECT_EQ(hasher(event1), hasher(event2));
+}
+
+TEST(MouseInputTest, MouseButtonEvent)
+{
+    MouseInput mouseInput;
+    MouseEvent mouseEvent;
+    mouseEvent.type   = MouseEvent::Type::ButtonDown;
+    mouseEvent.button = MouseEvent::Button::Left;
+
+    mouseInput.onMouseEvent(mouseEvent);
+
+    EXPECT_TRUE(mouseInput.isButtonDown(MouseEvent::Button::Left));
+    EXPECT_FALSE(mouseInput.wasButtonDown(MouseEvent::Button::Left));
+
+    EXPECT_TRUE(mouseInput.hasButtonDown());
+    EXPECT_FALSE(mouseInput.hasButtonUp());
+
+    EXPECT_FALSE(mouseInput.isButtonRepeated(MouseEvent::Button::Left));
+    EXPECT_TRUE(mouseInput.isButtonClicked(MouseEvent::Button::Left));
+    EXPECT_FALSE(mouseInput.isButtonReleased(MouseEvent::Button::Left));
+
+    mouseInput.tick();
+    mouseInput.onMouseEvent(mouseEvent);
+
+    EXPECT_TRUE(mouseInput.isButtonDown(MouseEvent::Button::Left));
+    EXPECT_TRUE(mouseInput.wasButtonDown(MouseEvent::Button::Left));
+
+    EXPECT_TRUE(mouseInput.hasButtonDown());
+    EXPECT_FALSE(mouseInput.hasButtonUp());
+
+    EXPECT_TRUE(mouseInput.isButtonRepeated(MouseEvent::Button::Left));
+    EXPECT_FALSE(mouseInput.isButtonClicked(MouseEvent::Button::Left));
+    EXPECT_FALSE(mouseInput.isButtonReleased(MouseEvent::Button::Left));
+
+    mouseInput.tick();
+    mouseEvent.type = MouseEvent::Type::ButtonUp;
+    mouseInput.onMouseEvent(mouseEvent);
+
+    EXPECT_TRUE(mouseInput.isButtonUp(MouseEvent::Button::Left));
+    EXPECT_TRUE(mouseInput.wasButtonDown(MouseEvent::Button::Left));
+
+    EXPECT_FALSE(mouseInput.hasButtonDown());
+    EXPECT_TRUE(mouseInput.hasButtonUp());
+
+    EXPECT_FALSE(mouseInput.isButtonRepeated(MouseEvent::Button::Left));
+    EXPECT_FALSE(mouseInput.isButtonClicked(MouseEvent::Button::Left));
+    EXPECT_TRUE(mouseInput.isButtonReleased(MouseEvent::Button::Left));
+}
+
+TEST(MouseInputTest, MouseMoving)
+{
+    MouseInput mouseInput;
     MouseEvent mouseEvent;
     mouseEvent.type = MouseEvent::Type::Move;
-    inputState.onMouseEvent(mouseEvent);
-    EXPECT_TRUE(inputState.isMouseMoving());
-    inputState.tick();
-    EXPECT_FALSE(inputState.isMouseMoving());
+    mouseInput.onMouseEvent(mouseEvent);
+
+    EXPECT_TRUE(mouseInput.isMoving());
+    mouseInput.tick();
+    EXPECT_FALSE(mouseInput.isMoving());
 }
 
-TEST_F(InputStateTest, MouseButtonDownTest)
+TEST(MouseInputTest, MouseDragging)
 {
+    MouseInput mouseInput;
     MouseEvent mouseEvent;
+    mouseEvent.type = MouseEvent::Type::Move;
+    mouseInput.onMouseEvent(mouseEvent);
+
+    mouseEvent.button = MouseEvent::Button::Left;
     mouseEvent.type   = MouseEvent::Type::ButtonDown;
-    mouseEvent.button = MouseButton::Left;
-    inputState.onMouseEvent(mouseEvent);
-    EXPECT_TRUE(inputState.isMouseButtonDown(MouseButton::Left));
-    EXPECT_TRUE(inputState.isMouseButtonClicked(MouseButton::Left));
-    EXPECT_FALSE(inputState.isMouseButtonReleased(MouseButton::Left));
+    mouseInput.onMouseEvent(mouseEvent);
+
+    EXPECT_TRUE(mouseInput.isDragging(MouseEvent::Button::Left));
+    mouseInput.tick();
+    EXPECT_FALSE(mouseInput.isDragging(MouseEvent::Button::Left));
 }
 
-TEST_F(InputStateTest, MouseButtonUpTest)
+TEST(MouseInputTest, MouseScrolled)
 {
+    MouseInput mouseInput;
     MouseEvent mouseEvent;
-    mouseEvent.button = MouseButton::Left;
-    mouseEvent.type   = MouseEvent::Type::ButtonDown;
-    inputState.onMouseEvent(mouseEvent);
-    inputState.tick();
-    mouseEvent.type = MouseEvent::Type::ButtonUp;
-    inputState.onMouseEvent(mouseEvent);
-    EXPECT_FALSE(inputState.isMouseButtonDown(MouseButton::Left));
-    EXPECT_FALSE(inputState.isMouseButtonClicked(MouseButton::Left));
-    EXPECT_TRUE(inputState.isMouseButtonReleased(MouseButton::Left));
+    mouseEvent.type = MouseEvent::Type::Wheel;
+    mouseInput.onMouseEvent(mouseEvent);
+    EXPECT_FALSE(mouseInput.isWheelScrolling());
+
+    mouseEvent.button = MouseEvent::Button::Middle;
+    mouseInput.onMouseEvent(mouseEvent);
+
+    EXPECT_TRUE(mouseInput.isWheelScrolling());
+    mouseInput.tick();
+    EXPECT_FALSE(mouseInput.isWheelScrolling());
 }
 
-TEST_F(InputStateTest, KeyDownTest)
+TEST(MouseInputTest, PosDelta)
 {
-    KeyboardEvent keyEvent;
-    keyEvent.type = KeyboardEvent::Type::KeyPressed;
-    keyEvent.key  = Key::A;
-    inputState.onKeyEvent(keyEvent);
-    EXPECT_TRUE(inputState.isKeyDown(Key::A));
-    EXPECT_TRUE(inputState.isKeyPressed(Key::A));
-    EXPECT_FALSE(inputState.isKeyReleased(Key::A));
+    MouseInput mouseInput;
+    MouseEvent mouseEvent1, mouseEvent2;
+
+    mouseEvent1.type = MouseEvent::Type::Move;
+    mouseEvent1.pos  = {0.1f, 0.1f};
+    mouseInput.onMouseEvent(mouseEvent1);
+    mouseInput.tick();
+
+    mouseEvent2.type = MouseEvent::Type::Move;
+    mouseEvent2.pos  = {0.2f, 0.3f};
+    mouseInput.onMouseEvent(mouseEvent2);
+
+    auto delta = mouseInput.posDelta();
+    ASSERT_TRUE(delta);
+    EXPECT_FLOAT_EQ(delta.value().x, 0.1f);
+    EXPECT_FLOAT_EQ(delta.value().y, 0.2f);
 }
 
-TEST_F(InputStateTest, KeyUpTest)
+TEST(MouseInputTest, ScreenPosDelta)
 {
-    KeyboardEvent keyEvent;
-    keyEvent.key  = Key::A;
-    keyEvent.type = KeyboardEvent::Type::KeyPressed;
-    inputState.onKeyEvent(keyEvent);
-    inputState.tick();
-    keyEvent.type = KeyboardEvent::Type::KeyReleased;
-    inputState.onKeyEvent(keyEvent);
-    EXPECT_FALSE(inputState.isKeyDown(Key::A));
-    EXPECT_FALSE(inputState.isKeyPressed(Key::A));
-    EXPECT_TRUE(inputState.isKeyReleased(Key::A));
+    MouseInput mouseInput;
+    MouseEvent mouseEvent1, mouseEvent2;
+
+    mouseEvent1.type      = MouseEvent::Type::Move;
+    mouseEvent1.screenPos = {10.0f, 10.0f};
+    mouseInput.onMouseEvent(mouseEvent1);
+    mouseInput.tick();
+
+    mouseEvent2.type      = MouseEvent::Type::Move;
+    mouseEvent2.screenPos = {20.0f, 30.0f};
+    mouseInput.onMouseEvent(mouseEvent2);
+
+    auto delta = mouseInput.screenPosDelta();
+    ASSERT_TRUE(delta);
+    EXPECT_EQ(delta.value(), vec2(10.0f, 20.0f));
 }
 
-TEST_F(InputStateTest, ModifierDownTest)
+TEST(MouseInputTest, WheelDelta)
 {
-    KeyboardEvent keyEvent;
-    keyEvent.type = KeyboardEvent::Type::KeyPressed;
-    keyEvent.key  = Key::LeftShift;
-    inputState.onKeyEvent(keyEvent);
-    EXPECT_TRUE(inputState.isModifierDown(ModifierFlags::Shift));
+    MouseInput mouseInput;
+    MouseEvent mouseEvent1, mouseEvent2;
+
+    mouseEvent1.type       = MouseEvent::Type::Wheel;
+    mouseEvent1.button     = MouseEvent::Button::Middle;
+    mouseEvent1.wheelDelta = {1.0f, 0.0f};
+    mouseInput.onMouseEvent(mouseEvent1);
+
+    auto delta1 = mouseInput.wheelDelta();
+    ASSERT_TRUE(delta1);
+    EXPECT_EQ(delta1.value(), vec2(1.0f, 0.0f));
+
+    mouseInput.tick();
+
+    mouseEvent2.type       = MouseEvent::Type::Wheel;
+    mouseEvent2.button     = MouseEvent::Button::Middle;
+    mouseEvent2.wheelDelta = {2.0f, 1.0f};
+    mouseInput.onMouseEvent(mouseEvent2);
+
+    auto delta2 = mouseInput.wheelDelta();
+    ASSERT_TRUE(delta2);
+    EXPECT_EQ(delta2.value(), vec2(1.0f, 1.0f));
 }
 
-TEST_F(InputStateTest, ModifierUpTest)
+TEST(MouseInputTest, PosDeltaNoMovement)
 {
-    KeyboardEvent keyEvent;
-    keyEvent.type = KeyboardEvent::Type::KeyReleased;
-    keyEvent.key  = Key::LeftShift;
-    inputState.onKeyEvent(keyEvent);
-    EXPECT_FALSE(inputState.isModifierDown(ModifierFlags::Shift));
+    MouseInput mouseInput;
+    MouseEvent mouseEvent;
+
+    mouseEvent.pos  = {0.1f, 0.1f};
+    mouseEvent.type = MouseEvent::Type::Move;
+    mouseInput.onMouseEvent(mouseEvent);
+    mouseInput.tick();
+
+    auto delta = mouseInput.posDelta();
+    EXPECT_TRUE(delta);
+    EXPECT_EQ(delta.value(), vec2(0.0f, 0.0f));
 }
 
-TEST_F(InputStateTest, ModifierPressedTest)
+TEST(MouseInputTest, ScreenPosDeltaNoMovement)
 {
-    // Press Shift
-    KeyboardEvent keyEventShiftDown;
-    keyEventShiftDown.type = KeyboardEvent::Type::KeyPressed;
-    keyEventShiftDown.key  = Key::LeftShift;
-    inputState.onKeyEvent(keyEventShiftDown);
-    EXPECT_TRUE(inputState.isModifierPressed(ModifierFlags::Shift));
-    inputState.tick();
+    MouseInput mouseInput;
+    MouseEvent mouseEvent;
 
-    // Release Shift
-    KeyboardEvent keyEventShiftUp;
-    keyEventShiftUp.type = KeyboardEvent::Type::KeyReleased;
-    keyEventShiftUp.key  = Key::LeftShift;
-    inputState.onKeyEvent(keyEventShiftUp);
-    EXPECT_FALSE(inputState.isModifierPressed(ModifierFlags::Shift));
+    mouseEvent.pos  = {10, 20};
+    mouseEvent.type = MouseEvent::Type::Move;
+    mouseInput.onMouseEvent(mouseEvent);
+    mouseInput.tick();
+
+    auto delta = mouseInput.screenPosDelta();
+    EXPECT_TRUE(delta);
+    EXPECT_EQ(delta.value(), vec2(0.0f, 0.0f));
 }
 
-TEST_F(InputStateTest, ModifierReleasedTest)
+TEST(KeyboardEventTest, EqualityOperator)
 {
-    // Press Shift
-    KeyboardEvent keyEventShiftDown;
-    keyEventShiftDown.type = KeyboardEvent::Type::KeyPressed;
-    keyEventShiftDown.key  = Key::LeftShift;
-    inputState.onKeyEvent(keyEventShiftDown);
-    inputState.tick();
+    KeyboardEvent event1;
+    event1.type = KeyboardEvent::Type::Pressed;
+    event1.key  = KeyboardEvent::Key::A;
 
-    // Release Shift in the next frame
-    KeyboardEvent keyEventShiftUp;
-    keyEventShiftUp.type = KeyboardEvent::Type::KeyReleased;
-    keyEventShiftUp.key  = Key::LeftShift;
-    inputState.onKeyEvent(keyEventShiftUp);
-    EXPECT_TRUE(inputState.isModifierReleased(ModifierFlags::Shift));
+    KeyboardEvent event2 = event1; // Copy constructor should make them equal
+    EXPECT_TRUE(event1 == event2); // Both events should be equal
 }
 
-TEST(MouseEventHashTest, DifferentEventsHaveDifferentHashes) {
-    bee::MouseEvent event1{bee::MouseEvent::Type::ButtonDown, {0.5, 0.5}, {100, 100}, {0, 0}, bee::ModifierFlags::None, bee::MouseButton::Left};
-    bee::MouseEvent event2{bee::MouseEvent::Type::ButtonUp, {0.5, 0.5}, {100, 100}, {0, 0}, bee::ModifierFlags::None, bee::MouseButton::Left};
-    
-    std::hash<bee::MouseEvent> hasher;
-    EXPECT_NE(hasher(event1), hasher(event2));
-}
-
-TEST(MouseEventHashTest, SameEventsHaveSameHashes) {
-    bee::MouseEvent event1{bee::MouseEvent::Type::ButtonDown, {0.5, 0.5}, {100, 100}, {0, 0}, bee::ModifierFlags::None, bee::MouseButton::Left};
-    bee::MouseEvent event2{bee::MouseEvent::Type::ButtonDown, {0.5, 0.5}, {100, 100}, {0, 0}, bee::ModifierFlags::None, bee::MouseButton::Left};
-
-    std::hash<bee::MouseEvent> hasher;
-    EXPECT_EQ(hasher(event1), hasher(event2));
-}
-
-TEST(KeyboardEventHashTest, DifferentEventsHaveDifferentHashes) {
-    bee::KeyboardEvent event1{bee::KeyboardEvent::Type::KeyPressed, bee::Key::A, bee::ModifierFlags::None, 0};
-    bee::KeyboardEvent event2{bee::KeyboardEvent::Type::KeyReleased, bee::Key::A, bee::ModifierFlags::None, 0};
+TEST(KeyboardEventHashTest, DifferentEventsHaveDifferentHashes)
+{
+    bee::KeyboardEvent event1{bee::KeyboardEvent::Type::Pressed, KeyboardEvent::Key::A};
+    bee::KeyboardEvent event2{bee::KeyboardEvent::Type::Released, KeyboardEvent::Key::A};
 
     std::hash<bee::KeyboardEvent> hasher;
     EXPECT_NE(hasher(event1), hasher(event2));
 }
 
-TEST(KeyboardEventHashTest, SameEventsHaveSameHashes) {
-    bee::KeyboardEvent event1{bee::KeyboardEvent::Type::KeyPressed, bee::Key::A, bee::ModifierFlags::None, 65};
-    bee::KeyboardEvent event2{bee::KeyboardEvent::Type::KeyPressed, bee::Key::A, bee::ModifierFlags::None, 65};
+TEST(KeyboardEventHashTest, SameEventsHaveSameHashes)
+{
+    bee::KeyboardEvent event1{bee::KeyboardEvent::Type::Pressed, bee::KeyboardEvent::Key::A};
+    bee::KeyboardEvent event2{bee::KeyboardEvent::Type::Pressed, bee::KeyboardEvent::Key::A};
 
     std::hash<bee::KeyboardEvent> hasher;
     EXPECT_EQ(hasher(event1), hasher(event2));
+}
+
+TEST(KeyboardInputTest, KeyPressed)
+{
+    KeyboardInput keyboardInput;
+    KeyboardEvent event;
+    event.type = KeyboardEvent::Type::Pressed;
+    event.key  = KeyboardEvent::Key::A;
+
+    keyboardInput.onKeyboardEvent(event);
+    keyboardInput.tick();
+
+    EXPECT_TRUE(keyboardInput.isKeyPressed(KeyboardEvent::Key::A));
+    EXPECT_FALSE(keyboardInput.isKeyReleased(KeyboardEvent::Key::A));
+}
+
+TEST(KeyboardInputTest, KeyReleased)
+{
+    KeyboardInput keyboardInput;
+    KeyboardEvent event;
+    event.type = KeyboardEvent::Type::Released;
+    event.key  = KeyboardEvent::Key::B;
+
+    keyboardInput.onKeyboardEvent(event);
+    keyboardInput.tick();
+
+    EXPECT_TRUE(keyboardInput.isKeyReleased(KeyboardEvent::Key::B));
+    EXPECT_FALSE(keyboardInput.isKeyPressed(KeyboardEvent::Key::B));
+}
+
+TEST(KeyboardInputTest, KeyRepeated)
+{
+    KeyboardInput keyboardInput;
+    KeyboardEvent event;
+    event.type = KeyboardEvent::Type::Repeated;
+    event.key  = KeyboardEvent::Key::C;
+
+    keyboardInput.onKeyboardEvent(event);
+    keyboardInput.tick();
+
+    EXPECT_TRUE(keyboardInput.isKeyRepeated(KeyboardEvent::Key::C));
+}
+
+TEST(KeyboardInputTest, KeyInput)
+{
+    KeyboardInput keyboardInput;
+    KeyboardEvent event;
+    event.type = KeyboardEvent::Type::Input;
+    event.key  = KeyboardEvent::Key::D;
+
+    keyboardInput.onKeyboardEvent(event);
+    keyboardInput.tick();
+
+    EXPECT_TRUE(keyboardInput.isKeyInput(KeyboardEvent::Key::D));
+}
+
+TEST(KeyboardInputTest, Modifiers)
+{
+    KeyboardInput keyboardInput;
+    keyboardInput.onKeyboardEvent({KeyboardEvent::Type::Pressed, KeyboardEvent::Key::LeftShift});
+    keyboardInput.onKeyboardEvent({KeyboardEvent::Type::Pressed, KeyboardEvent::Key::LeftControl});
+    keyboardInput.tick();
+
+    EXPECT_TRUE(keyboardInput.hasModifier());
+    EXPECT_TRUE(keyboardInput.hasModifier(KeyboardEvent::ModifierFlags::Shift));
+    EXPECT_TRUE(keyboardInput.hasModifier(KeyboardEvent::ModifierFlags::Ctrl));
+}
+
+TEST(KeyboardInputTest, HasKeyPressedAfterTick)
+{
+    KeyboardInput keyboardInput;
+    KeyboardEvent event;
+    event.type = KeyboardEvent::Type::Pressed;
+    event.key  = KeyboardEvent::Key::E;
+
+    keyboardInput.onKeyboardEvent(event);
+    keyboardInput.tick();
+
+    EXPECT_TRUE(keyboardInput.wasKeyPressed(KeyboardEvent::Key::E));
+}
+
+TEST(KeyboardInputTest, NoKeyPressedAfterTick)
+{
+    KeyboardInput keyboardInput;
+    KeyboardEvent event;
+    event.type = KeyboardEvent::Type::Released;
+    event.key  = KeyboardEvent::Key::F;
+
+    keyboardInput.onKeyboardEvent(event);
+    keyboardInput.tick();
+
+    EXPECT_FALSE(keyboardInput.wasKeyPressed(KeyboardEvent::Key::F));
+}
+
+TEST(KeyboardInputTest, TestKeyTypeAnyKeyPressed)
+{
+    KeyboardInput keyboardInput;
+    KeyboardEvent event;
+    event.type = KeyboardEvent::Type::Pressed;
+    event.key  = KeyboardEvent::Key::G;
+
+    keyboardInput.onKeyboardEvent(event);
+    keyboardInput.tick();
+
+    EXPECT_TRUE(keyboardInput.hasKeyPressed());
+}
+
+TEST(KeyboardInputTest, TestKeyTypeAnyKeyReleased)
+{
+    KeyboardInput keyboardInput;
+    KeyboardEvent event;
+    event.type = KeyboardEvent::Type::Released;
+    event.key  = KeyboardEvent::Key::H;
+
+    keyboardInput.onKeyboardEvent(event);
+    keyboardInput.tick();
+
+    EXPECT_TRUE(keyboardInput.hasKeyReleased());
+}
+
+TEST(InputManagerTest, Subscribe)
+{
+    InputManager inputManager;
+
+    MouseEvent me;
+    me.button = MouseEvent::Button::Left;
+    me.type   = MouseEvent::Type::ButtonDown;
+
+    int cnt = 0;
+    auto id = inputManager.subscribe([&](const MouseInput& mi, const KeyboardInput& ki) {
+        if (mi.isButtonDown(MouseEvent::Button::Left))
+            cnt += 1;
+    });
+
+    EXPECT_EQ(cnt, 0);
+    for (int i = 0; i < 3; ++i) {
+        inputManager.onMouseEvent(me);
+        inputManager.tick();
+    }
+    EXPECT_EQ(cnt, 3);
+
+    inputManager.unsubscribe(id);
+
+    EXPECT_EQ(cnt, 3);
+    for (int i = 0; i < 3; ++i) {
+        inputManager.onMouseEvent(me);
+        inputManager.tick();
+    }
+    EXPECT_EQ(cnt, 3);
 }

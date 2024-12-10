@@ -48,6 +48,8 @@ protected:
     virtual void onResize(u32 width, u32 height);
     virtual bool onMouseEvent(const MouseEvent& mouseEvent);
     virtual bool onKeyEvent(const KeyboardEvent& keyEvent);
+    
+    virtual bool onMouseKeyboardEvent(const MouseInput& mouse, const KeyboardInput& keyboard);
 
     virtual RenderDeviceConfig createDevices() const;
 
@@ -56,6 +58,8 @@ private:
     void handleKeyboardEvent(const KeyboardEvent& keyEvent) override;
     void handleMouseEvent(const MouseEvent& mouseEvent) override;
 
+    void handleMouseKeyboardEvent(const MouseInput& mouse, const KeyboardInput& keyboard);
+
 private:
     AppConfig _config;
     UniquePtr<Window> _pWindow;
@@ -63,7 +67,7 @@ private:
     // TODO: 支持多个渲染设备？
     UniquePtr<RenderDevice> _pRenderDevice;
 
-    InputState _inputState;
+    InputManager _inputManager;
     bool _shouldTerminate = false;
 };
 } // namespace bee

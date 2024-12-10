@@ -38,6 +38,8 @@ int Application::init()
     auto res       = _pRenderDevice->create(createDevices());
     BEE_ASSERT(res == Error::Ok, "渲染设备创建失败");
 
+    _inputManager.subscribe([this](const MouseInput& mouse, const KeyboardInput& keyboard) { handleMouseKeyboardEvent(mouse, keyboard); });
+
     return onInit();
 }
 
@@ -50,7 +52,7 @@ void Application::tick()
 
     onTick();
 
-    _inputState.tick();
+    _inputManager.tick();
 }
 
 void Application::shutdown()
@@ -97,6 +99,11 @@ bool Application::onKeyEvent(const KeyboardEvent& keyEvent)
     return false;
 }
 
+bool Application::onMouseKeyboardEvent(const MouseInput& mouse, const KeyboardInput& keyboard)
+{
+    return false;
+}
+
 void Application::handleWindowSizeChange(u32 width, u32 height)
 {
     onResize(width, height);
@@ -104,27 +111,22 @@ void Application::handleWindowSizeChange(u32 width, u32 height)
 
 void Application::handleKeyboardEvent(const KeyboardEvent& keyEvent)
 {
-    _inputState.onKeyEvent(keyEvent);
-    if (onKeyEvent(keyEvent))
-        return;
-
-    if (keyEvent.type == KeyboardEvent::Type::KeyPressed) {
-        if (keyEvent.hasModifier(ModifierFlags::Ctrl) && keyEvent.hasModifier(ModifierFlags::Alt)) {
-        }
-        else if (keyEvent.noneModifier()) {
-            switch (keyEvent.key) {
-            case Key::Escape : _shouldTerminate = true; break;
-            default          : break;
-            }
-        }
-    }
+    _inputManager.onKeyboardEvent(keyEvent);
 }
 
 void Application::handleMouseEvent(const MouseEvent& mouseEvent)
 {
-    _inputState.onMouseEvent(mouseEvent);
-    if (onMouseEvent(mouseEvent))
+    _inputManager.onMouseEvent(mouseEvent);
+}
+
+void Application::handleMouseKeyboardEvent(const MouseInput& mouse, const KeyboardInput& keyboard)
+{
+    if (onMouseKeyboardEvent(mouse, keyboard))
         return;
+
+    if (keyboard.isKeyPressed(KeyboardEvent::Key::Escape)) {
+        _shouldTerminate = true;
+    }
 }
 
 bool Application::shouldTerminate() const
