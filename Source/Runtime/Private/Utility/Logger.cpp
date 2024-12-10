@@ -6,7 +6,7 @@
  */
 
 #include "Utility/Logger.hpp"
-#include "Utility/Assert.hpp"
+#include "Utility/Error.hpp"
 
 #include <fmt/format.h>
 #include <fmt/color.h>

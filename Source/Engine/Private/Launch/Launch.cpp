@@ -18,7 +18,6 @@ namespace bee {
 int GuardedMain(const BeeLaunchParam& launchParam)
 {
     LogInfo("Bee Engine({}.{}.{})", BEE_VERSION_MAJOR, BEE_VERSION_MINOR, BEE_VERSION_PATCH);
-    BEE_SET_ASSERT_FAILURE_HANDLER;
 
     struct EngineLoopCleanupGuard
     {

@@ -9,39 +9,39 @@
 
 #include "Math/Setup.hpp"
 #include "Math/Constant.hpp"
-#include "Utility/Assert.hpp"
+#include "Utility/Error.hpp"
 
 namespace bee {
 
-#define XIHE_DEFINE_COMMON_FUNC(Type, Name, Func)                                                                                                    \
+#define BEE_DEFINE_COMMON_FUNC(Type, Name, Func)                                                                                                     \
     template<Type T> BEE_FUNC BEE_CONSTEXPR T Name(T x) noexcept                                                                                     \
     {                                                                                                                                                \
         return glm::Func(x);                                                                                                                         \
     }
 
-XIHE_DEFINE_COMMON_FUNC(FloatType, Floor, floor)
-XIHE_DEFINE_COMMON_FUNC(FloatType, Ceil, ceil)
-XIHE_DEFINE_COMMON_FUNC(FloatType, Trunc, trunc)
-XIHE_DEFINE_COMMON_FUNC(FloatType, Round, round)
-XIHE_DEFINE_COMMON_FUNC(FloatType, Sqrt, sqrt)
-XIHE_DEFINE_COMMON_FUNC(FloatType, Exp, exp)
-XIHE_DEFINE_COMMON_FUNC(FloatType, Exp2, exp2)
-XIHE_DEFINE_COMMON_FUNC(FloatType, Log, log)
-XIHE_DEFINE_COMMON_FUNC(FloatType, Log2, log2)
-XIHE_DEFINE_COMMON_FUNC(FloatType, Sin, sin)
-XIHE_DEFINE_COMMON_FUNC(FloatType, Cos, cos)
-XIHE_DEFINE_COMMON_FUNC(FloatType, Tan, tan)
-XIHE_DEFINE_COMMON_FUNC(FloatType, Sinh, sinh)
-XIHE_DEFINE_COMMON_FUNC(FloatType, Cosh, cosh)
-XIHE_DEFINE_COMMON_FUNC(FloatType, Tanh, tanh)
-XIHE_DEFINE_COMMON_FUNC(FloatType, ASin, asin)
-XIHE_DEFINE_COMMON_FUNC(FloatType, ACos, acos)
-XIHE_DEFINE_COMMON_FUNC(FloatType, ATan, atan)
-XIHE_DEFINE_COMMON_FUNC(FloatType, ASinh, asinh)
-XIHE_DEFINE_COMMON_FUNC(FloatType, ACosh, acosh)
-XIHE_DEFINE_COMMON_FUNC(FloatType, ATanh, atanh)
+BEE_DEFINE_COMMON_FUNC(FloatType, Floor, floor)
+BEE_DEFINE_COMMON_FUNC(FloatType, Ceil, ceil)
+BEE_DEFINE_COMMON_FUNC(FloatType, Trunc, trunc)
+BEE_DEFINE_COMMON_FUNC(FloatType, Round, round)
+BEE_DEFINE_COMMON_FUNC(FloatType, Sqrt, sqrt)
+BEE_DEFINE_COMMON_FUNC(FloatType, Exp, exp)
+BEE_DEFINE_COMMON_FUNC(FloatType, Exp2, exp2)
+BEE_DEFINE_COMMON_FUNC(FloatType, Log, log)
+BEE_DEFINE_COMMON_FUNC(FloatType, Log2, log2)
+BEE_DEFINE_COMMON_FUNC(FloatType, Sin, sin)
+BEE_DEFINE_COMMON_FUNC(FloatType, Cos, cos)
+BEE_DEFINE_COMMON_FUNC(FloatType, Tan, tan)
+BEE_DEFINE_COMMON_FUNC(FloatType, Sinh, sinh)
+BEE_DEFINE_COMMON_FUNC(FloatType, Cosh, cosh)
+BEE_DEFINE_COMMON_FUNC(FloatType, Tanh, tanh)
+BEE_DEFINE_COMMON_FUNC(FloatType, ASin, asin)
+BEE_DEFINE_COMMON_FUNC(FloatType, ACos, acos)
+BEE_DEFINE_COMMON_FUNC(FloatType, ATan, atan)
+BEE_DEFINE_COMMON_FUNC(FloatType, ASinh, asinh)
+BEE_DEFINE_COMMON_FUNC(FloatType, ACosh, acosh)
+BEE_DEFINE_COMMON_FUNC(FloatType, ATanh, atanh)
 
-#undef XIHE_DEFINE_COMMON_FUNC
+#undef BEE_DEFINE_COMMON_FUNC
 
 template<FloatType T> BEE_INLINE BEE_CONSTEXPR T Log10(T x) noexcept
 {
@@ -140,7 +140,7 @@ template<FloatType T> BEE_FUNC BEE_CONSTEXPR T FMA(T a, T b, T c)
 
 BEE_FUNC BEE_CONSTEXPR f32 ApproxSqrt(f32 x0)
 {
-    BEE_ASSERT(x0 >= 0);
+    BEE_DEBUG_ASSERT(x0 >= 0);
 
     union
     {
@@ -157,7 +157,7 @@ BEE_FUNC BEE_CONSTEXPR f32 ApproxSqrt(f32 x0)
 
 BEE_FUNC BEE_CONSTEXPR f32 ApproxCbrt(f32 x0)
 {
-    BEE_ASSERT(x0 >= 0);
+    BEE_DEBUG_ASSERT(x0 >= 0);
 
     union
     {
@@ -177,7 +177,7 @@ BEE_FUNC BEE_CONSTEXPR f32 ApproxCbrt(f32 x0)
 
 template<FloatType T> BEE_FUNC BEE_CONSTEXPR T RecipSqrtFast(T x0)
 {
-    XIHE_ASSERT(x0 > 0);
+    BEE_DEBUG_ASSERT(x0 > 0);
 
     if constexpr (sizeof(T) == 4) {
         union

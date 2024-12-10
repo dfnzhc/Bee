@@ -7,7 +7,6 @@
 
 #include <gtest/gtest.h>
 #include <Core/Object.hpp>
-#include "Utility/Assert.hpp"
 
 using namespace bee;
 

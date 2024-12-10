@@ -7,12 +7,12 @@
 
 #pragma once
 
+#include <filesystem>
 #include <Core/Defines.hpp>
 #include <Utility/Macros.hpp>
 #include <Math/Math.hpp>
 #include <Platform/Handles.hpp>
 #include <IO/Inputs.hpp>
-#include <functional>
 #include <Memory/Memory.hpp>
 
 namespace bee {

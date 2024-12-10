@@ -14,11 +14,18 @@ void bee::ThrowException(const std::source_location& loc, StringView msg)
 {
     std::string fullMsg  = std::format("{}\n\n{}:{} ({})", msg.data(), loc.file_name(), loc.line(), loc.function_name());
     fullMsg             += std::format("\n\nStacktrace:\n{}", std::stacktrace::current(1));
-    
+
     throw bee::RuntimeError(fullMsg);
 }
 
-void bee::AssertHandler(const libassert::assertion_info& assertion)
+void bee::ReportAssertion(const std::source_location& loc, std::string_view cond, std::string_view msg)
 {
-    throw bee::AssertionError(assertion.to_string());
+    // clang-format off
+    std::string fullMsg = std::format("断言失败: {}\n{}{}\n{}:{} ({})",
+                                      cond, msg, msg.empty() ? "" : "\n",
+                                      loc.file_name(), loc.line(), loc.function_name());
+    // clang-format on
+    fullMsg += std::format("\n\nStacktrace:\n{}", std::stacktrace::current(1));
+
+    throw bee::AssertionError(fullMsg);
 }

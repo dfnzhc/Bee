@@ -108,6 +108,8 @@ function(BeeDefaultSettings ProjectName)
     SetCompilerFlags(${ProjectName})
     SetDefaultCompileDefinitions(${ProjectName})
 
+    target_compile_features(${ProjectName} PUBLIC cxx_std_23)
+
     add_custom_command(TARGET ${ProjectName} POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "$<TARGET_FILE_DIR:${ProjectName}>/${ProjectName}.dll"

@@ -7,10 +7,6 @@ set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 find_package(GTest CONFIG REQUIRED)
 #find_package(benchmark CONFIG REQUIRED)
 
-if (MSVC)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX_STANDARD} /Zc:preprocessor")
-endif()
-
 set(${CMAKE_CURRENT_BINARY_DIR})
 
 AddTestProgram(Runtime/LoggerTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Runtime")
@@ -28,4 +24,6 @@ set_target_properties(EngineLaunchTest
         WORKING_DIRECTORY ${${PROJECT_NAME_UPPERCASE}_BINARY_DIR}
 )
 
-target_link_libraries(EngineLaunchTest PRIVATE Bee::Engine -mwindows Vulkan::Vulkan)
+target_compile_features(EngineLaunchTest PUBLIC cxx_std_23)
+
+target_link_libraries(EngineLaunchTest PRIVATE Bee::Engine Vulkan::Vulkan)

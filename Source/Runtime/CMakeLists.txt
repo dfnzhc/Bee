@@ -27,6 +27,11 @@ target_compile_options(${BEE_TARGET}
         $<$<CXX_COMPILER_ID:MSVC>:/DEBUG>
 )
 
+target_compile_definitions(${BEE_TARGET} 
+        PUBLIC 
+        "$<$<CONFIG:RelWithDebInfo>:BEE_ENABLE_DEBUG_ASSERTS>"
+)
+
 target_include_directories(${BEE_TARGET} 
         PUBLIC 
         ${CMAKE_CURRENT_SOURCE_DIR}/Public
