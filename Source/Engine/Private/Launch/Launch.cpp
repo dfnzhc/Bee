@@ -17,8 +17,14 @@ namespace bee {
 // TODO：命令行支持
 int GuardedMain(const BeeLaunchParam& launchParam)
 {
-    LogInfo("Bee Engine({}.{}.{})", BEE_VERSION_MAJOR, BEE_VERSION_MINOR, BEE_VERSION_PATCH);
-
+    LogInfo(R"(
+,-----.                    ,------.               ,--.                
+|  |) /_  ,---.  ,---.     |  .---',--,--,  ,---. `--',--,--,  ,---.  
+|  .-.  \| .-. :| .-. :    |  `--, |      \| .-. |,--.|      \| .-. : 
+|  '--' /\   --.\   --.    |  `---.|  ||  |' '-' '|  ||  ||  |\   --. 
+`------'  `----' `----'    `------'`--''--'.`-  / `--'`--''--' `----' 
+                                           `---'           Ver. {}.{}.{})", BEE_VERSION_MAJOR, BEE_VERSION_MINOR, BEE_VERSION_PATCH);
+    
     struct EngineLoopCleanupGuard
     {
         ~EngineLoopCleanupGuard() { LaunchLoop::Instance().shutdown(); }

@@ -16,7 +16,7 @@ std::vector<StringView> bee::SurfaceExtensions()
     u32 extCount = 0;
     const char** glfwExtensions;
     glfwExtensions = glfwGetRequiredInstanceExtensions(&extCount);
-    
+
     return std::vector<StringView>{glfwExtensions, glfwExtensions + extCount};
 }
 

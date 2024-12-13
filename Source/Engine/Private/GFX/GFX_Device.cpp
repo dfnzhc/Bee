@@ -9,15 +9,15 @@
 
 using namespace bee;
 
-Error GFX_Device::create(const RenderDeviceConfig& config)
+Error GFX_Device::create(const GFX_Desc& desc)
 {
-    _context = CreateRenderContext(config.deviceType);
+    _context = CreateRenderContext(desc.gfxApi);
     GFX_Context::Config ctxConfig{};
-    ctxConfig.headless = config.headless;
+    ctxConfig.headless = false;
     BEE_REPORT_IF_FAILED(_context->create(ctxConfig));
-
-    _driver = _context->createDriver();
-    BEE_REPORT_IF_FAILED(_driver->create(0, 4));
+    
+    // _driver = _context->createDriver();
+    // BEE_REPORT_IF_FAILED(_driver->create(0, 4));
 
     return Error::Ok;
 }

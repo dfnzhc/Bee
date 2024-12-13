@@ -156,7 +156,7 @@ struct UniformBufferObject
 class TestApp : public Application
 {
 public:
-    explicit TestApp(const AppConfig& config) : Application(config) { }
+    explicit TestApp(const AppSettings& config) : Application(config) { }
 
     ~TestApp() override { }
 
@@ -1768,7 +1768,7 @@ BeeLaunchParam bee::LaunchParamSetup(_In_ HINSTANCE hInInstance, _In_opt_ HINSTA
 {
     BeeLaunchParam param;
     param.createFunc = [] {
-        AppConfig config;
+        AppSettings config;
         config.windowDesc.title = "Launch Test";
         config.appName          = "Launch Test App";
 

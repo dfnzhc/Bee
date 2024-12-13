@@ -6,20 +6,19 @@
  */
 
 #include "Base/Application.hpp"
+#include "Base/Common.hpp"
+#include "GFX/GFX.hpp"
 #include <Utility/Logger.hpp>
-#include "GFX/GFX_Device.hpp"
 
 using namespace bee;
 
-Application::Application(const AppConfig& config) : _config(config)
+Application::Application(const AppSettings& config) : _config(config)
 {
-    LogInfo("{} 正在创建...", config.appName);
+    LogVerbose("Creating '{}'...", config.appName);
 
     if (!config.headless) {
         _pWindow = std::make_unique<Window>(config.windowDesc, this);
     }
-
-    LogInfo("{} 创建完成.", config.appName);
 }
 
 Application::~Application()
@@ -29,14 +28,14 @@ Application::~Application()
 
 int Application::preInit()
 {
+    LogVerbose("'{}' preInit", _config.appName);
     return 0;
 }
 
 int Application::init()
 {
-    _pRenderDevice = std::make_unique<GFX_Device>();
-    auto res       = _pRenderDevice->create(createDevices());
-    BEE_ASSERT(res == Error::Ok, "渲染设备创建失败");
+    LogVerbose("'{}' init", _config.appName);
+    GFX_TEST();
 
     _inputManager.subscribe([this](const MouseInput& mouse, const KeyboardInput& keyboard) { handleMouseKeyboardEvent(mouse, keyboard); });
 
@@ -59,12 +58,10 @@ void Application::shutdown()
 {
     onShutdown();
 
-    _pRenderDevice->destroy();
-
     if (_pWindow)
         _pWindow->shutdown();
 
-    LogInfo("{} 已关闭.", _config.appName);
+    LogVerbose("'{}' terminated.", _config.appName);
 }
 
 Window* Application::window() const
@@ -74,6 +71,7 @@ Window* Application::window() const
 
 int Application::onInit()
 {
+    LogVerbose("'{}' onInit.", _config.appName);
     return 0;
 }
 
@@ -83,10 +81,12 @@ void Application::onTick()
 
 void Application::onShutdown()
 {
+    LogVerbose("'{}' onShutdown.", _config.appName);
 }
 
 void Application::onResize(u32 width, u32 height)
 {
+    LogVerbose("'{}' onResize({}, {}).", _config.appName, width, height);
 }
 
 bool Application::onMouseEvent(const MouseEvent& mouseEvent)
@@ -132,13 +132,4 @@ void Application::handleMouseKeyboardEvent(const MouseInput& mouse, const Keyboa
 bool Application::shouldTerminate() const
 {
     return _shouldTerminate;
-}
-
-RenderDeviceConfig Application::createDevices() const
-{
-    RenderDeviceConfig rdc{};
-    rdc.deviceType = RenderDeviceType::Vulkan;
-    rdc.headless   = _config.headless;
-
-    return rdc;
 }

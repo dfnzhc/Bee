@@ -19,10 +19,10 @@ namespace {
 constexpr inline const char* logLevelString(Logger::Level level)
 {
     switch (level) {
-    case Logger::Level::Fatal   : return "灾难";
-    case Logger::Level::Error   : return "错误";
-    case Logger::Level::Warning : return "警告";
-    case Logger::Level::Info    : return "信息";
+    case Logger::Level::Fatal   : return "Fatal";
+    case Logger::Level::Error   : return "Error";
+    case Logger::Level::Warning : return " Warn";
+    case Logger::Level::Info    : return " Info";
     }
     BEE_UNREACHABLE();
 }

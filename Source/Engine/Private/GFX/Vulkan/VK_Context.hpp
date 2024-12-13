@@ -12,7 +12,6 @@
 #include <vulkan/vulkan.hpp>
 
 namespace bee {
-
 class BEE_API VK_Context final : public GFX_Context
 {
 public:
@@ -58,6 +57,8 @@ private:
     std::vector<DeviceInfo> _devices;
     std::vector<vk::PhysicalDevice> _physicalDevices;
     std::vector<DeviceQueueFamilies> _deviceQueueFamilies;
-};
 
+    vk::DebugUtilsMessengerEXT _debugMessenger = nullptr;
+    vk::DebugReportCallbackEXT _debugReport    = nullptr;
+};
 } // namespace bee

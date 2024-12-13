@@ -13,41 +13,19 @@
 #include <Utility/String.hpp>
 #include <Memory/Memory.hpp>
 
-namespace bee {
+#include "GFX/RHI/RHI_Enum.hpp"
 
+namespace bee {
 class GFX_DeviceDriver;
 
 class BEE_API GFX_Context
 {
 public:
-    enum Vendor
-    {
-        Vendor_Unknown   = 0x0,
-        Vendor_AMD       = 0x1002,
-        Vendor_IMGTEC    = 0x1010,
-        Vendor_APPLE     = 0x106B,
-        Vendor_NVIDIA    = 0x10DE,
-        Vendor_ARM       = 0x13B5,
-        Vendor_MICROSOFT = 0x1414,
-        Vendor_QUALCOMM  = 0x5143,
-        Vendor_INTEL     = 0x8086
-    };
-    
-    enum DeviceType
-    {
-        DeviceType_Other         = 0x0,
-        DeviceType_IntegratedGPU = 0x1,
-        DeviceType_DiscreteGPU   = 0x2,
-        DeviceType_VirtualGPU    = 0x3,
-        DeviceType_CPU           = 0x4,
-        DeviceType_MAX           = 0x5
-    };
-
     struct DeviceInfo
     {
         String name     = "Unknown";
-        Vendor vendor   = Vendor_Unknown;
-        DeviceType type = DeviceType_Other;
+        Vendor vendor   = Vendor::Unknown;
+        DeviceType type = DeviceType::Other;
     };
 
     struct Config
@@ -68,5 +46,4 @@ public:
     BEE_NODISCARD virtual UniquePtr<GFX_DeviceDriver> createDriver() = 0;
     // clang-format on
 };
-
 } // namespace bee

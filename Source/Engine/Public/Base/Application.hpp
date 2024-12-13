@@ -10,10 +10,9 @@
 #include <Core/Defines.hpp>
 #include "Base/Window.hpp"
 
-#include "GFX/GFX.hpp"
-
 namespace bee {
-struct AppConfig
+
+struct AppSettings
 {
     Window::Desc windowDesc;
     std::string_view appName;
@@ -26,7 +25,7 @@ class GFX_Device;
 class BEE_API Application : public Window::ICallbacks
 {
 public:
-    explicit Application(const AppConfig& config);
+    explicit Application(const AppSettings& config);
     ~Application() override;
 
     BEE_CLASS_DELETE_MOVE(Application);
@@ -48,10 +47,8 @@ protected:
     virtual void onResize(u32 width, u32 height);
     virtual bool onMouseEvent(const MouseEvent& mouseEvent);
     virtual bool onKeyEvent(const KeyboardEvent& keyEvent);
-    
-    virtual bool onMouseKeyboardEvent(const MouseInput& mouse, const KeyboardInput& keyboard);
 
-    virtual RenderDeviceConfig createDevices() const;
+    virtual bool onMouseKeyboardEvent(const MouseInput& mouse, const KeyboardInput& keyboard);
 
 private:
     void handleWindowSizeChange(u32 width, u32 height) override;
@@ -61,11 +58,8 @@ private:
     void handleMouseKeyboardEvent(const MouseInput& mouse, const KeyboardInput& keyboard);
 
 private:
-    AppConfig _config;
+    AppSettings _config;
     UniquePtr<Window> _pWindow;
-
-    // TODO: 支持多个渲染设备？
-    UniquePtr<GFX_Device> _pRenderDevice;
 
     InputManager _inputManager;
     bool _shouldTerminate = false;
