@@ -9,18 +9,5 @@
 
 namespace bee {
 
-void SetWindowIcon(const std::filesystem::path& path, WindowHandle windowHandle)
-{
-    // TODO
-}
-
-std::vector<StringView> SurfaceExtensions()
-{
-    u32 extCount = 0;
-    const char** glfwExtensions;
-    glfwExtensions = glfwGetRequiredInstanceExtensions(&extCount);
-    
-    return std::vector<StringView>{glfwExtensions, glfwExtensions + extCount};
-}
 
 } // namespace bee

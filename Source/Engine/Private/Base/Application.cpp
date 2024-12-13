@@ -7,7 +7,7 @@
 
 #include "Base/Application.hpp"
 #include <Utility/Logger.hpp>
-#include "Render/RenderDevice.hpp"
+#include "GFX/GFX_Device.hpp"
 
 using namespace bee;
 
@@ -34,7 +34,7 @@ int Application::preInit()
 
 int Application::init()
 {
-    _pRenderDevice = std::make_unique<RenderDevice>();
+    _pRenderDevice = std::make_unique<GFX_Device>();
     auto res       = _pRenderDevice->create(createDevices());
     BEE_ASSERT(res == Error::Ok, "渲染设备创建失败");
 

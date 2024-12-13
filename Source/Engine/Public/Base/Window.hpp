@@ -11,9 +11,10 @@
 #include <Core/Defines.hpp>
 #include <Utility/Macros.hpp>
 #include <Math/Math.hpp>
-#include <Platform/Handles.hpp>
 #include <IO/Inputs.hpp>
 #include <Memory/Memory.hpp>
+
+#include "Base/Handles.hpp"
 
 namespace bee {
 

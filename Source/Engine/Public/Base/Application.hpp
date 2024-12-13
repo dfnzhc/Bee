@@ -10,7 +10,7 @@
 #include <Core/Defines.hpp>
 #include "Base/Window.hpp"
 
-#include "Render/RenderCommon.hpp"
+#include "GFX/GFX.hpp"
 
 namespace bee {
 struct AppConfig
@@ -21,7 +21,7 @@ struct AppConfig
     bool headless = false;
 };
 
-class RenderDevice;
+class GFX_Device;
 
 class BEE_API Application : public Window::ICallbacks
 {
@@ -65,7 +65,7 @@ private:
     UniquePtr<Window> _pWindow;
 
     // TODO: 支持多个渲染设备？
-    UniquePtr<RenderDevice> _pRenderDevice;
+    UniquePtr<GFX_Device> _pRenderDevice;
 
     InputManager _inputManager;
     bool _shouldTerminate = false;

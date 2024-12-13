@@ -7,12 +7,14 @@ add_library(${BEE_TARGET} SHARED ${SOURCE_FILES})
 BeeDefaultSettings(${BEE_TARGET})
 
 find_package(volk CONFIG REQUIRED)
+find_package(glfw3 CONFIG REQUIRED)
 find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 
 target_link_libraries(${BEE_TARGET}
         #    PRIVATE
         PUBLIC
         Bee::Runtime
+        glfw
         Vulkan::Headers
         volk::volk_headers
         GPUOpen::VulkanMemoryAllocator
@@ -24,4 +26,9 @@ target_compile_options(${BEE_TARGET}
         $<$<CXX_COMPILER_ID:MSVC>:/DEBUG>
 )
 
-target_include_directories(${BEE_TARGET} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/Public)
+target_include_directories(${BEE_TARGET} 
+    PUBLIC 
+    ${CMAKE_CURRENT_SOURCE_DIR}/Public
+    PRIVATE 
+    ${CMAKE_CURRENT_SOURCE_DIR}/PRIVATE
+)

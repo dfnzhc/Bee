@@ -1,5 +1,5 @@
 /**
- * @File RenderContext.hpp
+ * @File GFX_Context.hpp
  * @Author dfnzhc (https://github.com/dfnzhc)
  * @Date 2024/11/25
  * @Brief This file is part of Bee.
@@ -15,9 +15,9 @@
 
 namespace bee {
 
-class RenderDriver;
+class GFX_DeviceDriver;
 
-class BEE_API RenderContext
+class BEE_API GFX_Context
 {
 public:
     enum Vendor
@@ -55,7 +55,7 @@ public:
         bool headless = false;
     };
 
-    virtual ~RenderContext() = default;
+    virtual ~GFX_Context() = default;
 
     // clang-format off
     virtual Error create(const Config&) = 0;
@@ -65,7 +65,7 @@ public:
     BEE_NODISCARD virtual u32 deviceCount() const                        = 0;
     BEE_NODISCARD virtual bool deviceSupportsPresent(u32 devIdx) const   = 0;
 
-    BEE_NODISCARD virtual UniquePtr<RenderDriver> createDriver() = 0;
+    BEE_NODISCARD virtual UniquePtr<GFX_DeviceDriver> createDriver() = 0;
     // clang-format on
 };
 

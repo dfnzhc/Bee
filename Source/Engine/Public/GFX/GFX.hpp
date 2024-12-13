@@ -1,5 +1,5 @@
 /**
- * @File RenderCommon.hpp
+ * @File GFX.hpp
  * @Author dfnzhc (https://github.com/dfnzhc)
  * @Date 2024/11/27
  * @Brief This file is part of Bee.
@@ -7,8 +7,8 @@
 
 #pragma once
 
-#include "RenderContext.hpp"
-#include "RenderDriver.hpp"
+#include "GFX_Context.hpp"
+#include "GFX_DeviceDriver.hpp"
 
 #include <Platform/Platform.hpp>
 
@@ -60,6 +60,6 @@ struct RenderHandle
 /// 方法
 /// ================================================================================
 
-BEE_API UniquePtr<RenderContext> CreateRenderContext(RenderDeviceType type);
+BEE_API UniquePtr<GFX_Context> CreateRenderContext(RenderDeviceType type);
 
 } // namespace bee

@@ -1,5 +1,5 @@
 /**
- * @File RenderContextVulkan.cpp
+ * @File VK_Context.cpp
  * @Author dfnzhc (https://github.com/dfnzhc)
  * @Date 2024/11/27
  * @Brief This file is part of Bee.
@@ -11,12 +11,12 @@
 #ifndef VOLK_IMPLEMENTATION
 #  define VOLK_IMPLEMENTATION
 #endif
-#include "Render/Vulkan/VulkanCommon.hpp"
-#include "Render/Vulkan/RenderContextVulkan.hpp"
+#include "GFX/Vulkan/VK_Common.hpp"
+#include "GFX/Vulkan/VK_Context.hpp"
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
-#include "Render/Vulkan/RenderDriverVulkan.hpp"
-#include "Render/RenderCommon.hpp"
+#include "GFX/Vulkan/VK_DeviceDriver.hpp"
+#include "GFX/GFX.hpp"
 #include "Base/Globals.hpp"
 #include "Base/Common.hpp"
 #include <Core/Version.hpp>
@@ -24,11 +24,11 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
 using namespace bee;
 
-RenderContextVulkan::~RenderContextVulkan()
+VK_Context::~VK_Context()
 {
 }
 
-Error RenderContextVulkan::create(const Config& config)
+Error VK_Context::create(const Config& config)
 {
     LogInfo("创建 Vulkan 渲染上下文...");
 
@@ -45,33 +45,33 @@ Error RenderContextVulkan::create(const Config& config)
     return Error::Ok;
 }
 
-void RenderContextVulkan::destroy()
+void VK_Context::destroy()
 {
     LogInfo("Vulkan 渲染上下文已销毁");
 }
 
-const RenderContext::DeviceInfo& RenderContextVulkan::deviceInfo(u32 devIdx) const
+const GFX_Context::DeviceInfo& VK_Context::deviceInfo(u32 devIdx) const
 {
     static DeviceInfo info;
     return info;
 }
 
-u32 RenderContextVulkan::deviceCount() const
+u32 VK_Context::deviceCount() const
 {
     return 0;
 }
 
-bool RenderContextVulkan::deviceSupportsPresent(u32 devIdx) const
+bool VK_Context::deviceSupportsPresent(u32 devIdx) const
 {
     return false;
 }
 
-UniquePtr<RenderDriver> RenderContextVulkan::createDriver()
+UniquePtr<GFX_DeviceDriver> VK_Context::createDriver()
 {
-    return std::make_unique<RenderDriverVulkan>(this);
+    return std::make_unique<VK_DeviceDriver>(this);
 }
 
-Error RenderContextVulkan::_initVulkanAPI()
+Error VK_Context::_initVulkanAPI()
 {
     if (volkInitialize() != VK_SUCCESS) {
         LogError("Volk 初始化失败");
@@ -89,7 +89,7 @@ Error RenderContextVulkan::_initVulkanAPI()
     return Error::Ok;
 }
 
-Error RenderContextVulkan::_initInstanceExtensions(const Config& config)
+Error VK_Context::_initInstanceExtensions(const Config& config)
 {
     _enabledInstanceExtensions.clear();
 
@@ -137,7 +137,7 @@ Error RenderContextVulkan::_initInstanceExtensions(const Config& config)
     return Error::Ok;
 }
 
-Error RenderContextVulkan::_initInstance()
+Error VK_Context::_initInstance()
 {
     vk::ApplicationInfo appInfo = {};
     appInfo.pApplicationName    = "Bee";
@@ -207,7 +207,7 @@ Error RenderContextVulkan::_initInstance()
     return Error::Ok;
 }
 
-Error RenderContextVulkan::_initPhysicalDevice()
+Error VK_Context::_initPhysicalDevice()
 {
     const auto physicalDevices = _instance.enumeratePhysicalDevices();
     if (physicalDevices.empty()) {
@@ -240,7 +240,7 @@ Error RenderContextVulkan::_initPhysicalDevice()
     return Error::Ok;
 }
 
-void RenderContextVulkan::_registerInstanceExtension(StringView extName, bool required)
+void VK_Context::_registerInstanceExtension(StringView extName, bool required)
 {
     // 如果扩展不是必要的，仅当未注册过该扩展，或之前注册的也是非必要的，该扩展才会被标记为非必要
     if (_requestedInstanceExtensions.contains(extName)) {
@@ -253,7 +253,7 @@ void RenderContextVulkan::_registerInstanceExtension(StringView extName, bool re
     _requestedInstanceExtensions.emplace(extName, required);
 }
 
-VKAPI_ATTR VkBool32 VKAPI_CALL RenderContextVulkan::_debugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT pMessageSeverity,
+VKAPI_ATTR VkBool32 VKAPI_CALL VK_Context::_debugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT pMessageSeverity,
                                                                             VkDebugUtilsMessageTypeFlagsEXT pMessageType,
                                                                             const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
                                                                             void* pUserData)
@@ -340,7 +340,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL RenderContextVulkan::_debugMessengerCallback(VkDe
     return VK_FALSE;
 }
 
-VKAPI_ATTR VkBool32 VKAPI_CALL RenderContextVulkan::_debugReportCallback(VkDebugReportFlagsEXT pFlags,
+VKAPI_ATTR VkBool32 VKAPI_CALL VK_Context::_debugReportCallback(VkDebugReportFlagsEXT pFlags,
                                                                          VkDebugReportObjectTypeEXT pObjectType,
                                                                          u64 pObject,
                                                                          size_t pLocation,

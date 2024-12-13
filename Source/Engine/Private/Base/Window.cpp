@@ -7,9 +7,18 @@
 
 #include "Base/Window.hpp"
 #include <Utility/Logger.hpp>
-//#include <Platform/Platform.hpp>
+#include <Platform/Platform.hpp>
 
 using namespace bee;
+
+std::vector<StringView> bee::SurfaceExtensions()
+{
+    u32 extCount = 0;
+    const char** glfwExtensions;
+    glfwExtensions = glfwGetRequiredInstanceExtensions(&extCount);
+    
+    return std::vector<StringView>{glfwExtensions, glfwExtensions + extCount};
+}
 
 class bee::ApiCallbacks
 {

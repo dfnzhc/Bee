@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include "Core/Portability.hpp"
+#include <Core/Portability.hpp>
 
 #define GLFW_INCLUDE_NONE
 

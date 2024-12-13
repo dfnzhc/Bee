@@ -1,5 +1,5 @@
 /**
- * @File RenderDriverVulkan.hpp
+ * @File VK_DeviceDriver.hpp
  * @Author dfnzhc (https://github.com/dfnzhc)
  * @Date 2024/11/25
  * @Brief This file is part of Bee.
@@ -7,18 +7,18 @@
 
 #pragma once
 
-#include "Render/RenderDriver.hpp"
+#include "GFX/GFX_DeviceDriver.hpp"
 
 namespace bee {
 
-class RenderContextVulkan;
+class VK_Context;
 
-class BEE_API RenderDriverVulkan final : public RenderDriver
+class BEE_API VK_DeviceDriver final : public GFX_DeviceDriver
 {
 public:
-    RenderDriverVulkan(RenderContextVulkan* context);
+    VK_DeviceDriver(VK_Context* context);
     
-    ~RenderDriverVulkan() override;
+    ~VK_DeviceDriver() override;
     Error create(u32 deviceIndex, u32 frameCount) override;
     void destroy() override;
     
@@ -146,7 +146,7 @@ public:
     BEE_NODISCARD bool isCompositeAlphaSupported() const override;
     
 private:
-    RenderContextVulkan* _context = nullptr;
+    VK_Context* _context = nullptr;
 };
 
 } // namespace bee

@@ -1,5 +1,5 @@
 /**
- * @File RenderDriver.hpp
+ * @File GFX_DeviceDriver.hpp
  * @Author dfnzhc (https://github.com/dfnzhc)
  * @Date 2024/11/21
  * @Brief This file is part of Bee.
@@ -21,10 +21,10 @@ using TextureID = int;
 
 template<typename T> using Vector = std::vector<T>;
 
-class BEE_API RenderDriver
+class BEE_API GFX_DeviceDriver
 {
 public:
-    virtual ~RenderDriver() = default;
+    virtual ~GFX_DeviceDriver() = default;
 
     virtual Error create(u32 deviceIndex, u32 frameCount) = 0;
     virtual void destroy()                                = 0;

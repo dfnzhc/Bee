@@ -1,5 +1,5 @@
 /**
- * @File RenderContextVulkan.hpp
+ * @File VK_Context.hpp
  * @Author dfnzhc (https://github.com/dfnzhc)
  * @Date 2024/11/25
  * @Brief This file is part of Bee.
@@ -7,16 +7,16 @@
 
 #pragma once
 
-#include "Render/RenderContext.hpp"
+#include "GFX/GFX_Context.hpp"
 #include <unordered_set>
 #include <vulkan/vulkan.hpp>
 
 namespace bee {
 
-class BEE_API RenderContextVulkan final : public RenderContext
+class BEE_API VK_Context final : public GFX_Context
 {
 public:
-    ~RenderContextVulkan() override;
+    ~VK_Context() override;
 
     // clang-format off
     Error create(const Config& config) override;
@@ -26,7 +26,7 @@ public:
     BEE_NODISCARD u32 deviceCount() const override;
     BEE_NODISCARD bool deviceSupportsPresent(u32 devIdx) const override;
 
-    BEE_NODISCARD UniquePtr<RenderDriver> createDriver() override;
+    BEE_NODISCARD UniquePtr<GFX_DeviceDriver> createDriver() override;
     // clang-format on
 
 private:

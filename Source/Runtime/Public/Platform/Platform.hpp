@@ -8,7 +8,6 @@
 #pragma once
 
 #include "Core/Defines.hpp"
-#include "Platform/Handles.hpp"
 #include "Utility/String.hpp"
 
 #include "Platform/Components/MessageBox.hpp"
@@ -21,9 +20,7 @@
 
 namespace bee {
 
-BEE_API void SetWindowIcon(const std::filesystem::path& path, WindowHandle windowHandle);
-
-BEE_API std::vector<StringView> SurfaceExtensions();
+extern std::vector<StringView> SurfaceExtensions();
 
 class BEE_API Platform
 {
@@ -76,10 +73,10 @@ public:
     static uint32_t BitScanForward(uint32_t a);
     static uint32_t Popcount(uint32_t a);
 
-    static SharedLibraryHandle LoadSharedLibrary(const std::filesystem::path& path);
-    static void ReleaseSharedLibrary(SharedLibraryHandle library);
-
-    static void* GetProcAddress(SharedLibraryHandle library, const std::string& funcName);
+    // static SharedLibraryHandle LoadSharedLibrary(const std::filesystem::path& path);
+    // static void ReleaseSharedLibrary(SharedLibraryHandle library);
+    //
+    // static void* GetProcAddress(SharedLibraryHandle library, const std::string& funcName);
 };
 
 } // namespace bee

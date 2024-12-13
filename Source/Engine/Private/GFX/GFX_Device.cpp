@@ -1,18 +1,18 @@
 /**
- * @File RenderDevice.cpp
+ * @File GFX_Device.cpp
  * @Author dfnzhc (https://github.com/dfnzhc)
  * @Date 2024/11/27
  * @Brief This file is part of Bee.
  */
 
-#include "Render/RenderDevice.hpp"
+#include "GFX/GFX_Device.hpp"
 
 using namespace bee;
 
-Error RenderDevice::create(const RenderDeviceConfig& config)
+Error GFX_Device::create(const RenderDeviceConfig& config)
 {
     _context = CreateRenderContext(config.deviceType);
-    RenderContext::Config ctxConfig{};
+    GFX_Context::Config ctxConfig{};
     ctxConfig.headless = config.headless;
     BEE_REPORT_IF_FAILED(_context->create(ctxConfig));
 
@@ -22,7 +22,7 @@ Error RenderDevice::create(const RenderDeviceConfig& config)
     return Error::Ok;
 }
 
-void RenderDevice::destroy()
+void GFX_Device::destroy()
 {
     if (_driver)
         _driver->destroy();
