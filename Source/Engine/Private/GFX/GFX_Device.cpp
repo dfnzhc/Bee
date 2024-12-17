@@ -11,13 +11,21 @@ using namespace bee;
 
 Error GFX_Device::create(const GFX_Desc& desc)
 {
-    _context = CreateRenderContext(desc.gfxApi);
     GFX_Context::Config ctxConfig{};
     ctxConfig.headless = false;
+
+    _context = CreateRenderContext(desc.gfxApi);
     BEE_REPORT_IF_FAILED(_context->create(ctxConfig));
-    
-    // _driver = _context->createDriver();
-    // BEE_REPORT_IF_FAILED(_driver->create(0, 4));
+
+    // TODO: 根据上下文信息选择更好的设备
+    GFX_DeviceDriver::Config driverConfig{};
+    driverConfig.deviceIndex = 0;
+    driverConfig.frameCount  = 3;
+    driverConfig.headless    = ctxConfig.headless;
+    driverConfig.raytracing  = false;
+
+    _driver = _context->createDriver();
+    BEE_REPORT_IF_FAILED(_driver->create(driverConfig));
 
     return Error::Ok;
 }
@@ -26,7 +34,7 @@ void GFX_Device::destroy()
 {
     if (_driver)
         _driver->destroy();
-    
+
     if (_context)
         _context->destroy();
 }

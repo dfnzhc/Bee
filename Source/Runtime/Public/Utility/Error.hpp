@@ -12,6 +12,7 @@
 #include "Utility/Enum.hpp"
 #include "Utility/Logger.hpp"
 #include "Utility/String.hpp"
+#include <expected>
 
 namespace bee {
 
@@ -33,12 +34,24 @@ inline constexpr std::string_view ErrorName(Error err)
     do {                                                                                                                                             \
         auto err = expr;                                                                                                                             \
         if (err != Error::Ok) [[unlikely]] {                                                                                                         \
-            LogError("调用失败：'{}' = {}", #expr, ErrorName(err));                                                                                  \
+            LogError("Failed：'{}' = {}", #expr, ErrorName(err));                                                                                  \
             return err;                                                                                                                              \
         }                                                                                                                                            \
         else                                                                                                                                         \
             ((void)0);                                                                                                                               \
     } while (false)
+
+template<typename T> using Result = std::expected<T, StringView>;
+
+inline std::unexpected<StringView> Unexpected(StringView msg)
+{
+    return std::unexpected{msg};
+}
+
+template<typename... Args> std::unexpected<StringView> Unexpected(fmt::format_string<Args...> fmt, Args&&... args)
+{
+    return std::unexpected{fmt::format(fmt, std::forward<Args>(args)...)};
+}
 
 // clang-format off
 #ifdef _MSC_VER
@@ -128,14 +141,14 @@ template<typename... Args>
             BEE_THROW(__VA_ARGS__);                                                                                                                  \
     } while (0)
 
-#define BEE_UNIMPLEMENTED() BEE_THROW("还未实现的部分")
+#define BEE_UNIMPLEMENTED() BEE_THROW("Not Implemented!!")
 
 #define BEE_UNREACHABLE() BEE_THROW("You shall not PASS!!!")
 
 #define BEE_ASSERT(cond, ...)                                                                                                                        \
     do {                                                                                                                                             \
         if (!(cond)) {                                                                                                                               \
-            ::bee::internal::ReportAssertion(std::source_location::current(), #cond __VA_OPT__(,) __VA_ARGS__);                                                   \
+            ::bee::internal::ReportAssertion(std::source_location::current(), #cond __VA_OPT__(, ) __VA_ARGS__);                                     \
         }                                                                                                                                            \
     } while (0)
 
@@ -194,11 +207,11 @@ template<typename CallbackT, typename ResultT = int> inline int CatchAndReportAl
     try {
         result = callback();
     } catch (const AssertionError& e) {
-        fmt::println("断言错误:\n\n{}", e.what());
+        fmt::println("Assertion Failed:\n{}", e.what());
     } catch (const std::exception& e) {
-        LogFatal("发生异常:\n\n{}", e.what());
+        LogFatal("Exception:\n\n{}", e.what());
     } catch (...) {
-        LogFatal("未知异常发生");
+        LogFatal("Unknown Exception");
     }
     return result;
 }

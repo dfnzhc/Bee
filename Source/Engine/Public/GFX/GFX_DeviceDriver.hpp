@@ -24,10 +24,19 @@ template<typename T> using Vector = std::vector<T>;
 class BEE_API GFX_DeviceDriver
 {
 public:
+    struct Config
+    {
+        u32 deviceIndex = ~0;
+        u32 frameCount  = 1;
+
+        bool headless = false;
+        bool raytracing = false;
+    };
+
     virtual ~GFX_DeviceDriver() = default;
 
-    virtual Error create(u32 deviceIndex, u32 frameCount) = 0;
-    virtual void destroy()                                = 0;
+    virtual Error create(const Config& config) = 0;
+    virtual void destroy()                     = 0;
 };
 
 } // namespace bee

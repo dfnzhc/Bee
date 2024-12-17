@@ -60,23 +60,45 @@ void VK_Context::destroy()
 
 const GFX_Context::DeviceInfo& VK_Context::deviceInfo(u32 devIdx) const
 {
-    static DeviceInfo info;
-    return info;
+    BEE_DEBUG_ASSERT(devIdx < _physicalDevices.size());
+    return _devices[devIdx];
 }
 
 u32 VK_Context::deviceCount() const
 {
-    return 0;
+    return static_cast<u32>(_devices.size());
 }
 
 bool VK_Context::deviceSupportsPresent(u32 devIdx) const
 {
-    return false;
+    return {};
 }
 
 UniquePtr<GFX_DeviceDriver> VK_Context::createDriver()
 {
     return std::make_unique<VK_DeviceDriver>(this);
+}
+
+vk::Instance VK_Context::instance() const
+{
+    return _instance;
+}
+
+vk::PhysicalDevice VK_Context::physicalDevice(u32 devIdx) const
+{
+    BEE_DEBUG_ASSERT(devIdx < _physicalDevices.size());
+
+    return _physicalDevices[devIdx];
+}
+
+u32 VK_Context::apiVersion() const
+{
+    return _apiVersion;
+}
+
+std::vector<const char*> VK_Context::enabledLayers() const
+{
+    return _enabledLayers;
 }
 
 Error VK_Context::_initVulkanAPI()
@@ -106,8 +128,9 @@ Error VK_Context::_initInstanceExtensions(const Config& config)
     if (!config.headless) {
         _registerInstanceExtension(VK_KHR_SURFACE_EXTENSION_NAME, true);
 
-        for (auto ext : SurfaceExtensions())
-            _registerInstanceExtension(ext, true);
+        // TODO: window api extensions
+        // for (auto ext : SurfaceExtensions())
+            // _registerInstanceExtension(ext, true);
     }
 
     if (Globals::EnableValidationLayer()) {
@@ -138,9 +161,8 @@ Error VK_Context::_initInstanceExtensions(const Config& config)
                 LogError("\t\tNot Found[Req]：{}.", extName);
                 return Error::CheckError;
             }
-            else {
-                LogVerbose("\t\tNot Found[Opt]：{}.", extName);
-            }
+
+            LogVerbose("\t\tNot Found[Opt]：{}.", extName);
         }
     }
 
@@ -161,7 +183,7 @@ Error VK_Context::_initInstance()
         enabledExtensions.emplace_back(ext.data());
     }
 
-    std::vector<const char*> enabledLayers;
+    std::vector<const char*>().swap(_enabledLayers);
     if (Globals::EnableValidationLayer()) {
         const auto& layers = vk::enumerateInstanceLayerProperties();
 
@@ -169,12 +191,12 @@ Error VK_Context::_initInstance()
                 return std::strcmp(props.layerName, "VK_LAYER_KHRONOS_validation") == 0;
             }) != layers.end())
         {
-            enabledLayers.emplace_back("VK_LAYER_KHRONOS_validation");
+            _enabledLayers.emplace_back("VK_LAYER_KHRONOS_validation");
         }
     }
 
     LogVerbose("\tEnabled Vulkan layers：");
-    for (const auto& layer : enabledLayers) {
+    for (const auto& layer : _enabledLayers) {
         LogVerbose("\t\tEnabled：{}.", layer);
     }
 
@@ -182,8 +204,8 @@ Error VK_Context::_initInstance()
     instanceInfo.pApplicationInfo        = &appInfo;
     instanceInfo.enabledExtensionCount   = enabledExtensions.size();
     instanceInfo.ppEnabledExtensionNames = enabledExtensions.data();
-    instanceInfo.enabledLayerCount       = enabledLayers.size();
-    instanceInfo.ppEnabledLayerNames     = enabledLayers.data();
+    instanceInfo.enabledLayerCount       = _enabledLayers.size();
+    instanceInfo.ppEnabledLayerNames     = _enabledLayers.data();
 
     vk::DebugUtilsMessengerCreateInfoEXT debugMessengerInfo      = {};
     vk::DebugReportCallbackCreateInfoEXT debugReportCallbackInfo = {};
@@ -247,7 +269,6 @@ Error VK_Context::_initPhysicalDevice()
 
     std::vector<DeviceInfo>(devCount).swap(_devices);
     std::vector<vk::PhysicalDevice>(devCount).swap(_physicalDevices);
-    std::vector<DeviceQueueFamilies>(devCount).swap(_deviceQueueFamilies);
 
     LogVerbose("\t'{}' physical devices founded：", devCount);
     for (size_t i = 0u; i < devCount; ++i) {
@@ -259,10 +280,9 @@ Error VK_Context::_initPhysicalDevice()
         devInfo.vendor = me::enum_cast<Vendor>(props.vendorID).value_or(Vendor::Unknown);
         devInfo.type   = me::enum_cast<DeviceType>(me::enum_integer(props.deviceType)).value_or(DeviceType::Other);
 
-        LogVerbose("\t\t [{}]: {}.", i + 1, devInfo.name);
+        _physicalDevices[i] = dev;
 
-        _deviceQueueFamilies[i].properties = dev.getQueueFamilyProperties();
-        _physicalDevices[i]                = dev;
+        LogVerbose("\t\t [{}]: {}.", i + 1, devInfo.name);
     }
 
     return Error::Ok;
@@ -385,7 +405,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL VK_Context::_debugReportCallback(VkDebugReportFla
     case VK_DEBUG_REPORT_WARNING_BIT_EXT             :
     case VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT : LogWarn(dbgMsg); break;
     case VK_DEBUG_REPORT_ERROR_BIT_EXT               : LogError(dbgMsg); break;
-    default: BEE_UNREACHABLE();
+    default                                          : BEE_UNREACHABLE();
         break;
     }
 

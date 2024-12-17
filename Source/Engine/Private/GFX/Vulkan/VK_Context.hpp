@@ -28,6 +28,14 @@ public:
     BEE_NODISCARD UniquePtr<GFX_DeviceDriver> createDriver() override;
     // clang-format on
 
+    BEE_NODISCARD vk::Instance instance() const;
+
+public:
+    BEE_NODISCARD vk::PhysicalDevice physicalDevice(u32 devIdx) const;
+    BEE_NODISCARD u32 apiVersion() const;
+    BEE_NODISCARD std::vector<const char*> enabledLayers() const;
+    
+    
 private:
     Error _initVulkanAPI();
     Error _initInstanceExtensions(const Config& config);
@@ -42,21 +50,16 @@ private:
     // clang-format on
 
 private:
-    struct DeviceQueueFamilies
-    {
-        std::vector<vk::QueueFamilyProperties> properties;
-    };
-
-private:
     vk::Instance _instance = {};
     uint32_t _apiVersion   = vk::ApiVersion10;
 
     std::unordered_set<String> _enabledInstanceExtensions;
     std::unordered_map<StringView, bool> _requestedInstanceExtensions;
 
+    std::vector<const char*> _enabledLayers;
+    
     std::vector<DeviceInfo> _devices;
     std::vector<vk::PhysicalDevice> _physicalDevices;
-    std::vector<DeviceQueueFamilies> _deviceQueueFamilies;
 
     vk::DebugUtilsMessengerEXT _debugMessenger = nullptr;
     vk::DebugReportCallbackEXT _debugReport    = nullptr;
