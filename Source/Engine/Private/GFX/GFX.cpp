@@ -30,6 +30,5 @@ std::unique_ptr<GFX_Context> CreateRenderContext(GraphicsAPI api)
         return std::make_unique<VK_Context>();
 
     BEE_UNIMPLEMENTED();
-    return nullptr;
 }
 } // namespace bee

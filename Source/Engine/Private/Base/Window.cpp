@@ -172,8 +172,8 @@ public:
     static void HandleWindowEvents(Window* pWindow, const SDL_WindowEvent& event)
     {
         if (event.type == SDL_EVENT_WINDOW_RESIZED) {
-            const auto width  = event.data1;
-            const auto height = event.data2;
+            const auto width  = static_cast<u32>(event.data1);
+            const auto height = static_cast<u32>(event.data2);
 
             pWindow->resize(width, height);
         }
@@ -285,7 +285,7 @@ Window::Window(const Window::Desc& desc, Window::ICallbacks* pCallbacks)
     SDL_CHECK(SDL_SetWindowFocusable(_apiHandle, desc.mode != Window::Mode::Minimized));
 
 #ifdef BEE_IN_WINDOWS
-    _handle = (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(_apiHandle), SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
+    _handle = (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(_apiHandle), SDL_PROP_WINDOW_WIN32_HWND_POINTER, nullptr);
     BEE_ASSERT(_handle, "Failed to get Win32 window handle");
 #endif
 

@@ -13,11 +13,23 @@
 
 #include <glm/gtx/hash.hpp>
 
+BEE_PUSH_WARNING
+BEE_CLANG_DISABLE_WARNING("-Wunsafe-buffer-usage")
+BEE_CLANG_DISABLE_WARNING("-Wreserved-identifier")
+BEE_CLANG_DISABLE_WARNING("-Wsign-conversion")
+BEE_CLANG_DISABLE_WARNING("-Wzero-as-null-pointer-constant")
+BEE_CLANG_DISABLE_WARNING("-Wdisabled-macro-expansion")
+BEE_CLANG_DISABLE_WARNING("-Wcast-qual")
+BEE_CLANG_DISABLE_WARNING("-Wcast-align")
+BEE_CLANG_DISABLE_WARNING("-Wextra-semi-stmt")
+BEE_CLANG_DISABLE_WARNING("-Wimplicit-fallthrough")
+BEE_CLANG_DISABLE_WARNING("-Wimplicit-int-conversion")
 #define STB_IMAGE_IMPLEMENTATION
 #include "../stb_image.h"
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "../tiny_obj_loader.h"
+BEE_POP_WARNING
 
 #include <iostream>
 #include <fstream>
@@ -57,6 +69,14 @@ const bool enableValidationLayers = false;
 //#else
 //const bool enableValidationLayers = true;
 //#endif
+
+BEE_PUSH_WARNING
+BEE_CLANG_DISABLE_WARNING("-Wcast-function-type-strict")
+BEE_CLANG_DISABLE_WARNING("-Wunused-parameter")
+BEE_CLANG_DISABLE_WARNING("-Wshadow")
+BEE_CLANG_DISABLE_WARNING("-Wsign-conversion")
+BEE_CLANG_DISABLE_WARNING("-Wimplicit-int-float-conversion")
+BEE_CLANG_DISABLE_WARNING("-Wunsafe-buffer-usage")
 
 VkResult CreateDebugUtilsMessengerEXT(VkInstance instance,
                                       const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
@@ -183,7 +203,7 @@ private:
     VkSurfaceKHR surface;
 
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
-    VkDevice device = VK_NULL_HANDLE;;
+    VkDevice device                 = VK_NULL_HANDLE;
 
     VkQueue graphicsQueue;
     VkQueue presentQueue;
@@ -268,9 +288,9 @@ private:
             vkDestroyImageView(device, depthImageView, nullptr);
             vkDestroyImage(device, depthImage, nullptr);
             vkFreeMemory(device, depthImageMemory, nullptr);
-            
-            depthImageView = VK_NULL_HANDLE;
-            depthImage = VK_NULL_HANDLE;
+
+            depthImageView   = VK_NULL_HANDLE;
+            depthImage       = VK_NULL_HANDLE;
             depthImageMemory = VK_NULL_HANDLE;
         }
 
@@ -284,8 +304,7 @@ private:
             imageView = VK_NULL_HANDLE;
         }
 
-        if (swapChain)
-        {
+        if (swapChain) {
             vkDestroySwapchainKHR(device, swapChain, nullptr);
             swapChain = VK_NULL_HANDLE;
         }
@@ -295,73 +314,66 @@ private:
     {
         if (!device)
             return;
-        
+
         cleanupSwapChain();
 
-        if (graphicsPipeline)
-        {
+        if (graphicsPipeline) {
             vkDestroyPipeline(device, graphicsPipeline, nullptr);
             graphicsPipeline = VK_NULL_HANDLE;
         }
-    
-        if (pipelineLayout)
-        {
+
+        if (pipelineLayout) {
             vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
             pipelineLayout = VK_NULL_HANDLE;
         }
-        if (renderPass)
-        {
+        if (renderPass) {
             vkDestroyRenderPass(device, renderPass, nullptr);
             renderPass = VK_NULL_HANDLE;
         }
 
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            if (uniformBuffers[i])
-            {
-                vkDestroyBuffer(device, uniformBuffers[i], nullptr);
-                vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
-                uniformBuffers[i] = VK_NULL_HANDLE;
-                uniformBuffersMemory[i] = VK_NULL_HANDLE;
+        if (!uniformBuffers.empty()) {
+            for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+                if (uniformBuffers[i]) {
+                    vkDestroyBuffer(device, uniformBuffers[i], nullptr);
+                    vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
+                    uniformBuffers[i]       = VK_NULL_HANDLE;
+                    uniformBuffersMemory[i] = VK_NULL_HANDLE;
+                }
             }
         }
-        
-        if (descriptorPool)
-        {
+
+        if (descriptorPool) {
             vkDestroyDescriptorPool(device, descriptorPool, nullptr);
             descriptorPool = VK_NULL_HANDLE;
         }
 
-        if (textureSampler)
-        {
+        if (textureSampler) {
             vkDestroySampler(device, textureSampler, nullptr);
             vkDestroyImageView(device, textureImageView, nullptr);
             vkDestroyImage(device, textureImage, nullptr);
             vkFreeMemory(device, textureImageMemory, nullptr);
-            textureSampler = VK_NULL_HANDLE;
-            textureImageView = VK_NULL_HANDLE;
-            textureImage = VK_NULL_HANDLE;
+            textureSampler     = VK_NULL_HANDLE;
+            textureImageView   = VK_NULL_HANDLE;
+            textureImage       = VK_NULL_HANDLE;
             textureImageMemory = VK_NULL_HANDLE;
         }
 
-        if (descriptorSetLayout)
-        {
+        if (descriptorSetLayout) {
             vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
             descriptorSetLayout = VK_NULL_HANDLE;
         }
 
-        if (indexBuffer)
-        {
+        if (indexBuffer) {
             vkDestroyBuffer(device, indexBuffer, nullptr);
             vkFreeMemory(device, indexBufferMemory, nullptr);
-            indexBuffer = VK_NULL_HANDLE;
+            indexBuffer       = VK_NULL_HANDLE;
             indexBufferMemory = VK_NULL_HANDLE;
         }
 
-        if (vertexBuffer)
-        {
+        if (vertexBuffer) {
             vkDestroyBuffer(device, vertexBuffer, nullptr);
             vkFreeMemory(device, vertexBufferMemory, nullptr);
-            vertexBuffer = VK_NULL_HANDLE;
+            vertexBuffer       = VK_NULL_HANDLE;
             vertexBufferMemory = VK_NULL_HANDLE;
         }
 
@@ -372,12 +384,11 @@ private:
                 vkDestroyFence(device, inFlightFences[i], nullptr);
                 renderFinishedSemaphores[i] = VK_NULL_HANDLE;
                 imageAvailableSemaphores[i] = VK_NULL_HANDLE;
-                inFlightFences[i] = VK_NULL_HANDLE;
+                inFlightFences[i]           = VK_NULL_HANDLE;
             }
         }
 
-        if (commandPool)
-        {
+        if (commandPool) {
             vkDestroyCommandPool(device, commandPool, nullptr);
             commandPool = VK_NULL_HANDLE;
         }
@@ -395,8 +406,8 @@ private:
         if (surface) {
             vkDestroySurfaceKHR(instance, surface, nullptr);
             vkDestroyInstance(instance, nullptr);
-            
-            surface = VK_NULL_HANDLE;
+
+            surface  = VK_NULL_HANDLE;
             instance = VK_NULL_HANDLE;
         }
     }
@@ -480,13 +491,12 @@ private:
 
     void createSurface()
     {
-
         VkWin32SurfaceCreateInfoKHR surfaceCreateInfo{};
-        surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
-        surfaceCreateInfo.hwnd = window()->handle();
+        surfaceCreateInfo.sType     = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+        surfaceCreateInfo.hwnd      = window()->handle();
         surfaceCreateInfo.hinstance = GetModuleHandle(nullptr);
-        
-        if(vkCreateWin32SurfaceKHR(instance, &surfaceCreateInfo, nullptr, &surface) != VK_SUCCESS) {
+
+        if (vkCreateWin32SurfaceKHR(instance, &surfaceCreateInfo, nullptr, &surface) != VK_SUCCESS) {
             throw std::runtime_error("failed to create window surface!");
         }
     }
@@ -503,9 +513,9 @@ private:
         std::vector<VkPhysicalDevice> devices(deviceCount);
         vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
 
-        for (const auto& device : devices) {
-            if (isDeviceSuitable(device)) {
-                physicalDevice = device;
+        for (const auto& dev : devices) {
+            if (isDeviceSuitable(dev)) {
+                physicalDevice = dev;
                 break;
             }
         }
@@ -1701,10 +1711,9 @@ private:
 
     std::vector<const char*> getRequiredExtensions()
     {
-        std::vector<const char*> extensions
-        {
-            VK_KHR_SURFACE_EXTENSION_NAME,
-            VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
+        std::vector<const char*> extensions{
+          VK_KHR_SURFACE_EXTENSION_NAME,
+          VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
         };
 
         if (enableValidationLayers) {
@@ -1783,3 +1792,5 @@ BeeLaunchParam bee::LaunchParamSetup(_In_ HINSTANCE hInInstance, _In_opt_ HINSTA
 
     return param;
 }
+
+BEE_POP_WARNING

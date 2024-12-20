@@ -90,16 +90,20 @@ void Application::onResize(u32 width, u32 height)
 
 bool Application::onMouseEvent(const MouseEvent& mouseEvent)
 {
+    BEE_UNUSED(mouseEvent);
     return false;
 }
 
 bool Application::onKeyEvent(const KeyboardEvent& keyEvent)
 {
+    BEE_UNUSED(keyEvent);
     return false;
 }
 
 bool Application::onMouseKeyboardEvent(const MouseInput& mouse, const KeyboardInput& keyboard)
 {
+    BEE_UNUSED(mouse);
+    BEE_UNUSED(keyboard);
     return false;
 }
 

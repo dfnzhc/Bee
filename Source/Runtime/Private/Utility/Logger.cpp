@@ -45,7 +45,7 @@ void Logger::log(Level level, std::string_view msg)
     }
 
     const auto s = fmt::format(fmt::fg(color), "[{}]: {}", logLevelString(level), msg);
-    auto& os     = std::cout;//level > Logger::Level::Error ? std::cout : std::cerr;
+    auto& os     = std::cout; //level > Logger::Level::Error ? std::cout : std::cerr;
     os << s << std::endl;
     //    std::flush(os);
 

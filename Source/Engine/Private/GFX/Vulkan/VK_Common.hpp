@@ -18,11 +18,13 @@
 
 namespace bee {
 
-template<size_t N = 15> class VulkanChainList
+template<int N = 15> class VulkanChainList
 {
 public:
     VulkanChainList() = default;
-
+    
+    BEE_PUSH_WARNING
+    BEE_CLANG_DISABLE_WARNING("-Wsign-conversion")
     auto& insert(auto nextStruct)
     {
         BEE_DEBUG_ASSERT(_currentIndex < N, "VulkanChainList is full");
@@ -35,8 +37,9 @@ public:
 
         return next;
     }
+    BEE_POP_WARNING
 
-    [[nodiscard]] void* head() const { return _head; };
+    [[nodiscard]] void* head() const { return _head; }
 
 private:
     std::array<std::any, N> _data;

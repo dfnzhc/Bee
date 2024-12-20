@@ -197,7 +197,7 @@ template<typename... Args>
 #  define BEE_DEBUG_ASSERT_LE(a, b) BEE_DEBUG_ASSERT_OP(a, b, <=)
 #  define BEE_DEBUG_ASSERT_LT(a, b) BEE_DEBUG_ASSERT_OP(a, b, <)
 
-#endif // BEE_ENABLE_ASSERTS
+#endif // BEE_ENABLE_DEBUG_ASSERTS
 
 /// 异常处理
 // TODO: 目前只做报告，考虑支持恢复？

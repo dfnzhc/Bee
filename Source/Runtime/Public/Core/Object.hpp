@@ -39,7 +39,7 @@ public:
 
     virtual std::string_view className() const { return "Object"; }
 
-    int refCount() const { return _refCount; };
+    u32 refCount() const { return _refCount; }
 
     void incRef() const;
 
@@ -57,12 +57,12 @@ public:
 #endif
 
 private:
-    mutable std::atomic<uint32_t> _refCount{0};
+    mutable std::atomic<u32> _refCount{0};
 
 #if BEE_ENABLE_REF_TRACKING
     struct RefTracker
     {
-        uint32_t count;
+        u32 count;
         std::string origin;
 
         RefTracker(std::string origin_) : count(1), origin(std::move(origin_)) { }

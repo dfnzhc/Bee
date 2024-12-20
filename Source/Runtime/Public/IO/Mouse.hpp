@@ -63,17 +63,16 @@ struct MouseEvent
         case Type::Wheel      : typeName = "滚轮"; break;
         }
 
-        std::string_view button;
+        std::string_view btn;
         switch (me.button) {
-        case Button::Left   : button = "左键"; break;
-        case Button::Middle : button = "中建"; break;
-        case Button::Right  : button = "右键"; break;
-        case Button::Unknown: button = "未知"; break;
-        default: break;
+        case Button::Left   : btn = "左键"; break;
+        case Button::Middle : btn = "中建"; break;
+        case Button::Right  : btn = "右键"; break;
+        case Button::Unknown: btn = "未知"; break;
         }
 
         return fmt::format("鼠标 [\"{}{}\" - {},{}({:.3f},{:.3f})|{:.3f}/{:.3f}]",
-                           typeName, button, static_cast<int>(me.screenPos.x), static_cast<int>(me.screenPos.y),
+                           typeName, btn, static_cast<int>(me.screenPos.x), static_cast<int>(me.screenPos.y),
                            me.pos.x, me.pos.y, me.wheelDelta.x, me.wheelDelta.y);
     }
 

@@ -26,7 +26,7 @@ class BEE_API GFX_DeviceDriver
 public:
     struct Config
     {
-        u32 deviceIndex = ~0;
+        u32 deviceIndex = ~0u;
         u32 frameCount  = 1;
 
         bool headless = false;

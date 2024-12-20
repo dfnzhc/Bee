@@ -30,7 +30,6 @@ function(SetCompilerFlags ProjectName)
 
     set(CLANG_GCC_FLAGS
             -fms-extensions                 # enable MS extensions (among other things allow anonymous structs)
-            -fvisibility=hidden             # hide symbols by default
             -Wall                           # set warning level
             -Wno-unused-function
             -Wno-unused-variable
@@ -41,9 +40,23 @@ function(SetCompilerFlags ProjectName)
     )
 
     set(CLANG_FLAGS
+            -Wno-deprecated
+            -Wno-newline-eof
+            -Wno-c++98-compat
+            -Wno-c++98-compat-pedantic
+            -Wno-old-style-cast
+            -Wno-unused-function
+            -Wno-double-promotion
+            -Wno-builtin-macro-redefined
+            -Wno-deprecated-declarations
             -Wno-unused-private-field
             -Wno-braced-scalar-init
+            -Wno-switch-default
+            -Wno-global-constructors
+            -Wno-missing-prototypes
+            -Wno-exit-time-destructors
             -Wno-self-assign-overloaded
+            -Wno-ctad-maybe-unsupported
     )
 
     set(GCC_FLAGS
@@ -120,7 +133,7 @@ function(BeeDefaultSettings ProjectName)
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "$<TARGET_FILE_DIR:${ProjectName}>/${ProjectName}.dll"
             ${CMAKE_BINARY_DIR}/Tests)
-    
+
     add_library(Bee::${ProjectBriefName} ALIAS ${ProjectName})
 endfunction(BeeDefaultSettings)
 
@@ -146,11 +159,11 @@ function(AddTestProgram TestFile Libraries)
     set_target_properties(${FILE_NAME}
             PROPERTIES
             FOLDER "Tests")
-    
-    foreach(Lib ${Libraries})
+
+    foreach (Lib ${Libraries})
         target_link_libraries(${FILE_NAME}
                 PUBLIC ${Lib})
-    endforeach()
+    endforeach ()
 
     add_test(NAME "${FILE_NAME}Test"
             COMMAND ${FILE_NAME}

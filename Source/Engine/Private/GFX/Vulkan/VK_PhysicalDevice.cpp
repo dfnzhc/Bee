@@ -1,6 +1,7 @@
 #include "GFX/Vulkan/VK_PhysicalDevice.hpp"
 #include "VK_Context.hpp"
 #include "Base/Common.hpp"
+#include <Core/Version.hpp>
 
 using namespace bee;
 
@@ -9,7 +10,7 @@ VK_PhysicalDevice::VK_PhysicalDevice(u32 apiVersion, vk::PhysicalDevice physical
     _memoryProperties = physicalDevice.getMemoryProperties2();
     _queueProperties  = physicalDevice.getQueueFamilyProperties2();
 
-    const auto apiMajor = apiVersion, apiMinor = apiVersion;
+    const auto apiMajor = BEE_GET_VERSION_MAJOR(apiVersion), apiMinor = BEE_GET_VERSION_MINOR(apiVersion);
 
     // properties
     {

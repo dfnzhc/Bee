@@ -64,10 +64,6 @@ if (WIN32)
     set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${${PROJECT_NAME_UPPERCASE}_BINARY_DIR}/Libs)
 endif ()
 
-if (MSVC)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX_STANDARD} /Zc:preprocessor")
-endif()
-
 include(HelperFunctions)
 include(Commands)
 

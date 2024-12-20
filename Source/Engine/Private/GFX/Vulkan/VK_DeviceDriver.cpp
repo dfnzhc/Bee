@@ -93,12 +93,13 @@ Error VK_DeviceDriver::_initDevice()
     const auto& extensions = _physicalDevice->enabledExtensions();
     const auto& layers     = _context->enabledLayers();
 
-    vk::DeviceCreateInfo deviceInfo = {};
-    deviceInfo.pNext = _physicalDevice->featureList(), deviceInfo.queueCreateInfoCount = queueCreateInfos.size();
+    vk::DeviceCreateInfo deviceInfo    = {};
+    deviceInfo.pNext                   = _physicalDevice->featureList();
+    deviceInfo.queueCreateInfoCount    = static_cast<u32>(queueCreateInfos.size());
     deviceInfo.pQueueCreateInfos       = queueCreateInfos.data();
-    deviceInfo.enabledLayerCount       = layers.size();
+    deviceInfo.enabledLayerCount       = static_cast<u32>(layers.size());
     deviceInfo.ppEnabledLayerNames     = layers.data();
-    deviceInfo.enabledExtensionCount   = extensions.size();
+    deviceInfo.enabledExtensionCount   = static_cast<u32>(extensions.size());
     deviceInfo.ppEnabledExtensionNames = extensions.data();
 
     _device = _physicalDevice->handle().createDevice(deviceInfo);

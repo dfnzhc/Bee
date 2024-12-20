@@ -53,3 +53,37 @@ static_assert(BEE_CPLUSPLUS >= 202'002L, "__cplusplus >= 202002L: C++20 at least
 
 #define BEE_NODISCARD       [[nodiscard]]
 #define BEE_DEPRECATED(...) [[deprecated(__VA_ARGS__)]]
+
+#define BEE_UNUSED(...) void(0)
+
+// Generalize warning push/pop.
+#if defined(__GNUC__) || defined(__clang__)
+// Clang & GCC
+#  define BEE_PUSH_WARNING                               _Pragma("GCC diagnostic push")
+#  define BEE_POP_WARNING                                _Pragma("GCC diagnostic pop")
+#  define BEE_GNU_DISABLE_WARNING_INTERNAL2(warningName) #warningName
+#  define BEE_GNU_DISABLE_WARNING(warningName)           _Pragma(BEE_GNU_DISABLE_WARNING_INTERNAL2(GCC diagnostic ignored warningName))
+#  ifdef __clang__
+#    define BEE_CLANG_DISABLE_WARNING(warningName) BEE_GNU_DISABLE_WARNING(warningName)
+#    define BEE_GCC_DISABLE_WARNING(warningName)
+#  else
+#    define BEE_CLANG_DISABLE_WARNING(warningName)
+#    define BEE_GCC_DISABLE_WARNING(warningName) BEE_GNU_DISABLE_WARNING(warningName)
+#  endif
+#  define BEE_MSVC_DISABLE_WARNING(warningNumber)
+#elif defined(_MSC_VER)
+#  define BEE_PUSH_WARNING __pragma(warning(push))
+#  define BEE_POP_WARNING  __pragma(warning(pop))
+// Disable the GCC warnings.
+#  define BEE_GNU_DISABLE_WARNING(warningName)
+#  define BEE_GCC_DISABLE_WARNING(warningName)
+#  define BEE_CLANG_DISABLE_WARNING(warningName)
+#  define BEE_MSVC_DISABLE_WARNING(warningNumber) __pragma(warning(disable : warningNumber))
+#else
+#  define BEE_PUSH_WARNING
+#  define BEE_POP_WARNING
+#  define BEE_GNU_DISABLE_WARNING(warningName)
+#  define BEE_GCC_DISABLE_WARNING(warningName)
+#  define BEE_CLANG_DISABLE_WARNING(warningName)
+#  define BEE_MSVC_DISABLE_WARNING(warningNumber)
+#endif
