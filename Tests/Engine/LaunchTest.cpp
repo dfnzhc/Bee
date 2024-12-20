@@ -5,11 +5,11 @@
  * @Brief This file is part of Bee.
  */
 
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
-
 #include <Launch/EntryPoint.hpp>
 #include <Math/Math.hpp>
+
+#define VK_USE_PLATFORM_WIN32_KHR
+#include <vulkan/vulkan.hpp>
 
 #include <glm/gtx/hash.hpp>
 
@@ -480,7 +480,13 @@ private:
 
     void createSurface()
     {
-        if (glfwCreateWindowSurface(instance, window()->apiHandle(), nullptr, &surface) != VK_SUCCESS) {
+
+        VkWin32SurfaceCreateInfoKHR surfaceCreateInfo{};
+        surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+        surfaceCreateInfo.hwnd = window()->handle();
+        surfaceCreateInfo.hinstance = GetModuleHandle(nullptr);
+        
+        if(vkCreateWin32SurfaceKHR(instance, &surfaceCreateInfo, nullptr, &surface) != VK_SUCCESS) {
             throw std::runtime_error("failed to create window surface!");
         }
     }
@@ -1695,11 +1701,11 @@ private:
 
     std::vector<const char*> getRequiredExtensions()
     {
-        uint32_t glfwExtensionCount = 0;
-        const char** glfwExtensions;
-        glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-
-        std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+        std::vector<const char*> extensions
+        {
+            VK_KHR_SURFACE_EXTENSION_NAME,
+            VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
+        };
 
         if (enableValidationLayers) {
             extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);

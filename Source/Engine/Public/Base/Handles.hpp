@@ -12,9 +12,8 @@
 #define GLFW_INCLUDE_NONE
 
 #ifdef BEE_IN_WINDOWS
-#  define GLFW_EXPOSE_NATIVE_WIN32
-#  include <GLFW/glfw3.h>
-#  include <GLFW/glfw3native.h>
+#  define SDL_MAIN_HANDLED
+#  include <SDL3/SDL.h>
 #endif
 
 namespace bee {
@@ -22,7 +21,7 @@ namespace bee {
 #ifdef BEE_IN_WINDOWS
 using SharedLibraryHandle = HANDLE;
 using WindowHandle        = HWND;
-using WindowApiHandle     = GLFWwindow*;
+using WindowApiHandle     = SDL_Window*;
 #endif
 
 } // namespace bee

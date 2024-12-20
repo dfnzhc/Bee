@@ -20,8 +20,6 @@
 
 namespace bee {
 
-extern std::vector<StringView> SurfaceExtensions();
-
 class BEE_API Platform
 {
 public:

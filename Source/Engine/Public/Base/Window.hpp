@@ -71,7 +71,7 @@ public:
     void setPos(vec2i pos) { setPos(pos.x, pos.y); }
 
     void setTitle(std::string_view title);
-    void setIcon(const std::filesystem::path& path);
+    void setIcon(std::string_view path);
 
     BEE_NODISCARD vec2u extent() const { return _desc.extent; }
     BEE_NODISCARD   u32 width()  const { return _desc.extent.x; }
@@ -93,12 +93,14 @@ private:
     friend class ApiCallbacks;
 
 private:
-    Desc _desc              = {};
-    Handle _handle          = {};
-    ApiHandle _apiHandle    = {};
+    Desc _desc                     = {};
+    Handle _handle                 = {};
+    ApiHandle _apiHandle           = {};
     RawPtr<ICallbacks> _pCallbacks = nullptr;
 
     vec2 _mouseScale;
+
+    bool _bIsRunning = false;
 };
 
 } // namespace bee

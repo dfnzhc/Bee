@@ -7,7 +7,7 @@
 
 #include "Base/Application.hpp"
 #include "Base/Common.hpp"
-#include "GFX/GFX.hpp"
+// #include "GFX/GFX.hpp"
 #include <Utility/Logger.hpp>
 
 using namespace bee;
@@ -15,10 +15,6 @@ using namespace bee;
 Application::Application(const AppSettings& config) : _config(config)
 {
     LogVerbose("Creating '{}'...", config.appName);
-
-    if (!config.headless) {
-        _pWindow = std::make_unique<Window>(config.windowDesc, this);
-    }
 }
 
 Application::~Application()
@@ -35,8 +31,11 @@ int Application::preInit()
 int Application::init()
 {
     LogVerbose("'{}' init", _config.appName);
-    GFX_TEST();
-
+    // GFX_TEST();
+    
+    if (!_config.headless) {
+        _pWindow = std::make_unique<Window>(_config.windowDesc, this);
+    }
     _inputManager.subscribe([this](const MouseInput& mouse, const KeyboardInput& keyboard) { handleMouseKeyboardEvent(mouse, keyboard); });
 
     return onInit();

@@ -6,240 +6,237 @@
  */
 
 #include "Base/Window.hpp"
+
+#include <volk.h>
 #include <Utility/Logger.hpp>
 #include <Platform/Platform.hpp>
+#include <SDL3/SDL_vulkan.h>
 
 using namespace bee;
 
-std::vector<StringView> bee::SurfaceExtensions()
-{
-    u32 extCount = 0;
-    const char** glfwExtensions;
-    glfwExtensions = glfwGetRequiredInstanceExtensions(&extCount);
+#define SDL_CHECK(expr)                                                                                                                              \
+    do {                                                                                                                                             \
+        if (!(expr)) {                                                                                                                               \
+            BEE_ASSERT(false, "SDL_Error: {}", SDL_GetError());                                                                                      \
+        }                                                                                                                                            \
+    } while (false)
 
-    return std::vector<StringView>{glfwExtensions, glfwExtensions + extCount};
+// std::vector<StringView> bee::SurfaceExtensions()
+// {
+//     SDL_GetExtension
+//     u32 extCount = 0;
+//     const char** glfwExtensions;
+//     // glfwExtensions = glfwGetRequiredInstanceExtensions(&extCount);
+//
+//     return std::vector<StringView>{glfwExtensions, glfwExtensions + extCount};
+// }
+
+namespace bee {
+namespace {
+
+KeyboardEvent::Key SDLToBeeKey(SDL_Keycode sdlKey)
+{
+    switch (sdlKey) {
+    case SDLK_SPACE        : return KeyboardEvent::Key::Space;
+    case SDLK_APOSTROPHE   : return KeyboardEvent::Key::Apostrophe;
+    case SDLK_COMMA        : return KeyboardEvent::Key::Comma;
+    case SDLK_MINUS        : return KeyboardEvent::Key::Minus;
+    case SDLK_PERIOD       : return KeyboardEvent::Key::Period;
+    case SDLK_SLASH        : return KeyboardEvent::Key::Slash;
+    case SDLK_0            : return KeyboardEvent::Key::Key0;
+    case SDLK_1            : return KeyboardEvent::Key::Key1;
+    case SDLK_2            : return KeyboardEvent::Key::Key2;
+    case SDLK_3            : return KeyboardEvent::Key::Key3;
+    case SDLK_4            : return KeyboardEvent::Key::Key4;
+    case SDLK_5            : return KeyboardEvent::Key::Key5;
+    case SDLK_6            : return KeyboardEvent::Key::Key6;
+    case SDLK_7            : return KeyboardEvent::Key::Key7;
+    case SDLK_8            : return KeyboardEvent::Key::Key8;
+    case SDLK_9            : return KeyboardEvent::Key::Key9;
+    case SDLK_SEMICOLON    : return KeyboardEvent::Key::Semicolon;
+    case SDLK_EQUALS       : return KeyboardEvent::Key::Equal;
+    case SDLK_A            : return KeyboardEvent::Key::A;
+    case SDLK_B            : return KeyboardEvent::Key::B;
+    case SDLK_C            : return KeyboardEvent::Key::C;
+    case SDLK_D            : return KeyboardEvent::Key::D;
+    case SDLK_E            : return KeyboardEvent::Key::E;
+    case SDLK_F            : return KeyboardEvent::Key::F;
+    case SDLK_G            : return KeyboardEvent::Key::G;
+    case SDLK_H            : return KeyboardEvent::Key::H;
+    case SDLK_I            : return KeyboardEvent::Key::I;
+    case SDLK_J            : return KeyboardEvent::Key::J;
+    case SDLK_K            : return KeyboardEvent::Key::K;
+    case SDLK_L            : return KeyboardEvent::Key::L;
+    case SDLK_M            : return KeyboardEvent::Key::M;
+    case SDLK_N            : return KeyboardEvent::Key::N;
+    case SDLK_O            : return KeyboardEvent::Key::O;
+    case SDLK_P            : return KeyboardEvent::Key::P;
+    case SDLK_Q            : return KeyboardEvent::Key::Q;
+    case SDLK_R            : return KeyboardEvent::Key::R;
+    case SDLK_S            : return KeyboardEvent::Key::S;
+    case SDLK_T            : return KeyboardEvent::Key::T;
+    case SDLK_U            : return KeyboardEvent::Key::U;
+    case SDLK_V            : return KeyboardEvent::Key::V;
+    case SDLK_W            : return KeyboardEvent::Key::W;
+    case SDLK_X            : return KeyboardEvent::Key::X;
+    case SDLK_Y            : return KeyboardEvent::Key::Y;
+    case SDLK_Z            : return KeyboardEvent::Key::Z;
+    case SDLK_LEFTBRACKET  : return KeyboardEvent::Key::LeftBracket;
+    case SDLK_BACKSLASH    : return KeyboardEvent::Key::Backslash;
+    case SDLK_RIGHTBRACKET : return KeyboardEvent::Key::RightBracket;
+    case SDLK_GRAVE        : return KeyboardEvent::Key::GraveAccent;
+    case SDLK_ESCAPE       : return KeyboardEvent::Key::Escape;
+    case SDLK_TAB          : return KeyboardEvent::Key::Tab;
+    case SDLK_RETURN       : return KeyboardEvent::Key::Enter;
+    case SDLK_BACKSPACE    : return KeyboardEvent::Key::Backspace;
+    case SDLK_INSERT       : return KeyboardEvent::Key::Insert;
+    case SDLK_DELETE       : return KeyboardEvent::Key::Del;
+    case SDLK_RIGHT        : return KeyboardEvent::Key::Right;
+    case SDLK_LEFT         : return KeyboardEvent::Key::Left;
+    case SDLK_DOWN         : return KeyboardEvent::Key::Down;
+    case SDLK_UP           : return KeyboardEvent::Key::Up;
+    case SDLK_PAGEUP       : return KeyboardEvent::Key::PageUp;
+    case SDLK_PAGEDOWN     : return KeyboardEvent::Key::PageDown;
+    case SDLK_HOME         : return KeyboardEvent::Key::Home;
+    case SDLK_END          : return KeyboardEvent::Key::End;
+    case SDLK_CAPSLOCK     : return KeyboardEvent::Key::CapsLock;
+    case SDLK_SCROLLLOCK   : return KeyboardEvent::Key::ScrollLock;
+    case SDLK_NUMLOCKCLEAR : return KeyboardEvent::Key::NumLock;
+    case SDLK_PRINTSCREEN  : return KeyboardEvent::Key::PrintScreen;
+    case SDLK_PAUSE        : return KeyboardEvent::Key::Pause;
+    case SDLK_F1           : return KeyboardEvent::Key::F1;
+    case SDLK_F2           : return KeyboardEvent::Key::F2;
+    case SDLK_F3           : return KeyboardEvent::Key::F3;
+    case SDLK_F4           : return KeyboardEvent::Key::F4;
+    case SDLK_F5           : return KeyboardEvent::Key::F5;
+    case SDLK_F6           : return KeyboardEvent::Key::F6;
+    case SDLK_F7           : return KeyboardEvent::Key::F7;
+    case SDLK_F8           : return KeyboardEvent::Key::F8;
+    case SDLK_F9           : return KeyboardEvent::Key::F9;
+    case SDLK_F10          : return KeyboardEvent::Key::F10;
+    case SDLK_F11          : return KeyboardEvent::Key::F11;
+    case SDLK_F12          : return KeyboardEvent::Key::F12;
+    case SDLK_KP_0         : return KeyboardEvent::Key::Keypad0;
+    case SDLK_KP_1         : return KeyboardEvent::Key::Keypad1;
+    case SDLK_KP_2         : return KeyboardEvent::Key::Keypad2;
+    case SDLK_KP_3         : return KeyboardEvent::Key::Keypad3;
+    case SDLK_KP_4         : return KeyboardEvent::Key::Keypad4;
+    case SDLK_KP_5         : return KeyboardEvent::Key::Keypad5;
+    case SDLK_KP_6         : return KeyboardEvent::Key::Keypad6;
+    case SDLK_KP_7         : return KeyboardEvent::Key::Keypad7;
+    case SDLK_KP_8         : return KeyboardEvent::Key::Keypad8;
+    case SDLK_KP_9         : return KeyboardEvent::Key::Keypad9;
+    case SDLK_KP_DECIMAL   : return KeyboardEvent::Key::KeypadDel;
+    case SDLK_KP_DIVIDE    : return KeyboardEvent::Key::KeypadDivide;
+    case SDLK_KP_MULTIPLY  : return KeyboardEvent::Key::KeypadMultiply;
+    case SDLK_KP_MINUS     : return KeyboardEvent::Key::KeypadSubtract;
+    case SDLK_KP_PLUS      : return KeyboardEvent::Key::KeypadAdd;
+    case SDLK_KP_ENTER     : return KeyboardEvent::Key::KeypadEnter;
+    case SDLK_KP_EQUALS    : return KeyboardEvent::Key::KeypadEqual;
+    case SDLK_LSHIFT       : return KeyboardEvent::Key::LeftShift;
+    case SDLK_LCTRL        : return KeyboardEvent::Key::LeftControl;
+    case SDLK_LALT         : return KeyboardEvent::Key::LeftAlt;
+    case SDLK_LGUI         : return KeyboardEvent::Key::LeftSuper;
+    case SDLK_RSHIFT       : return KeyboardEvent::Key::RightShift;
+    case SDLK_RCTRL        : return KeyboardEvent::Key::RightControl;
+    case SDLK_RALT         : return KeyboardEvent::Key::RightAlt;
+    case SDLK_RGUI         : return KeyboardEvent::Key::RightSuper;
+    case SDLK_MENU         : return KeyboardEvent::Key::Menu;
+    default                : return KeyboardEvent::Key::Unknown;
+    }
 }
+
+KeyboardEvent::ModifierFlags SDLToBeeModifier(SDL_Keymod sdlMod)
+{
+    BEE_USE_MAGIC_ENUM_BIT_OPERATOR;
+    KeyboardEvent::ModifierFlags mod = {};
+
+    if (sdlMod & SDL_KMOD_SHIFT)
+        mod |= KeyboardEvent::ModifierFlags::Shift;
+
+    if (sdlMod & SDL_KMOD_ALT)
+        mod |= KeyboardEvent::ModifierFlags::Alt;
+
+    if (sdlMod & SDL_KMOD_CTRL)
+        mod |= KeyboardEvent::ModifierFlags::Ctrl;
+
+    return mod;
+}
+
+} // namespace
+} // namespace bee
 
 class bee::ApiCallbacks
 {
 public:
-    static void ErrorCallback(int errorCode, const char* pDescription) { LogError("GLFW 错误{}: '{}'", errorCode, pDescription); }
-
-    static void WindowSizeCallback(GLFWwindow* pGlfwWindow, int width, int height)
+    static void HandleWindowEvents(Window* pWindow, const SDL_WindowEvent& event)
     {
-        // We also get here in case the window was minimized, so we need to ignore it
-        if (width == 0 || height == 0) {
-            return;
-        }
+        if (event.type == SDL_EVENT_WINDOW_RESIZED) {
+            const auto width  = event.data1;
+            const auto height = event.data2;
 
-        auto* pWindow = (Window*)glfwGetWindowUserPointer(pGlfwWindow);
-        if (pWindow != nullptr) {
-            pWindow->resize(width, height); // Window callback is handled in here
+            pWindow->resize(width, height);
         }
     }
 
-    static void KeyboardCallback(GLFWwindow* pGlfwWindow, int key, int /*scanCode*/, int action, int modifiers)
+    static void HandleKeyboardEvent(Window* pWindow, const SDL_KeyboardEvent& event)
     {
-        KeyboardEvent event;
-        if (PrepareKeyboardEvent(key, action, modifiers, event)) {
-            auto* pWindow = (Window*)glfwGetWindowUserPointer(pGlfwWindow);
-            if (pWindow != nullptr) {
-                pWindow->_pCallbacks->handleKeyboardEvent(event);
-            }
-        }
+        KeyboardEvent ke{};
+        ke.key = SDLToBeeKey(event.key);
+
+        if (event.type == SDL_EVENT_KEY_DOWN)
+            ke.type = KeyboardEvent::Type::Pressed;
+        else if (event.type == SDL_EVENT_KEY_UP)
+            ke.type = KeyboardEvent::Type::Released;
+
+        if (event.repeat)
+            ke.type = KeyboardEvent::Type::Repeated;
+
+        if (ke.key != KeyboardEvent::Key::Unknown)
+            pWindow->_pCallbacks->handleKeyboardEvent(ke);
     }
 
-    static void CharInputCallback(GLFWwindow* pGlfwWindow, u32 input)
+    static void HandleMouseButtonEvent(Window* pWindow, const SDL_MouseButtonEvent& event)
     {
-        KeyboardEvent event;
-        event.type = KeyboardEvent::Type::Input;
-
-        auto* pWindow = (Window*)glfwGetWindowUserPointer(pGlfwWindow);
-        if (pWindow != nullptr) {
-            pWindow->_pCallbacks->handleKeyboardEvent(event);
+        MouseEvent me;
+        switch (event.button) {
+        case SDL_BUTTON_LEFT   : me.button = MouseEvent::Button::Left; break;
+        case SDL_BUTTON_MIDDLE : me.button = MouseEvent::Button::Middle; break;
+        case SDL_BUTTON_RIGHT  : me.button = MouseEvent::Button::Right; break;
+        default                : return;
         }
+
+        if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
+            me.type = MouseEvent::Type::ButtonDown;
+        else if (event.type == SDL_EVENT_MOUSE_BUTTON_UP)
+            me.type = MouseEvent::Type::ButtonUp;
+
+        me.screenPos  = {event.x, event.y};
+        me.pos        = me.pos * pWindow->_getMouseScale();
+        me.wheelDelta = {};
+        pWindow->_pCallbacks->handleMouseEvent(me);
     }
 
-    static void MouseButtonCallback(GLFWwindow* pGlfwWindow, int button, int action, int modifiers)
+    static void HandleMouseMotionEvent(Window* pWindow, const SDL_MouseMotionEvent& event)
     {
-        MouseEvent event;
-        switch (button) {
-        case GLFW_MOUSE_BUTTON_LEFT   : event.button = MouseEvent::Button::Left; break;
-        case GLFW_MOUSE_BUTTON_MIDDLE : event.button = MouseEvent::Button::Middle; break;
-        case GLFW_MOUSE_BUTTON_RIGHT  : event.button = MouseEvent::Button::Right; break;
-        default                       : return;
-        }
+        MouseEvent me;
+        me.type = MouseEvent::Type::Move;
 
-        event.type = (action == GLFW_PRESS) ? MouseEvent::Type::ButtonDown : MouseEvent::Type::ButtonUp;
-
-        auto* pWindow = (Window*)glfwGetWindowUserPointer(pGlfwWindow);
-        if (pWindow != nullptr) {
-            // Modifiers
-            double x, y;
-            glfwGetCursorPos(pGlfwWindow, &x, &y);
-            event.pos = CalcMousePos(x, y, pWindow->_getMouseScale());
-
-            pWindow->_pCallbacks->handleMouseEvent(event);
-        }
+        me.screenPos  = {event.x, event.y};
+        me.pos        = me.pos * pWindow->_getMouseScale();
+        me.wheelDelta = {};
+        pWindow->_pCallbacks->handleMouseEvent(me);
     }
 
-    static void MouseMoveCallback(GLFWwindow* pGlfwWindow, double mouseX, double mouseY)
+    static void HandleMouseWheelEvent(Window* pWindow, const SDL_MouseWheelEvent& event)
     {
-        auto* pWindow = (Window*)glfwGetWindowUserPointer(pGlfwWindow);
-        if (pWindow != nullptr) {
-            MouseEvent event;
-            event.type       = MouseEvent::Type::Move;
-            event.pos        = CalcMousePos(mouseX, mouseY, pWindow->_getMouseScale());
-            event.screenPos  = {mouseX, mouseY};
-            event.wheelDelta = vec2f(0, 0);
+        MouseEvent me;
+        me.type = MouseEvent::Type::Wheel;
 
-            pWindow->_pCallbacks->handleMouseEvent(event);
-        }
-    }
-
-    static void MouseWheelCallback(GLFWwindow* pGlfwWindow, double scrollX, double scrollY)
-    {
-        auto* pWindow = (Window*)glfwGetWindowUserPointer(pGlfwWindow);
-        if (pWindow != nullptr) {
-            MouseEvent event;
-            event.type = MouseEvent::Type::Wheel;
-            double x, y;
-            glfwGetCursorPos(pGlfwWindow, &x, &y);
-            event.pos        = CalcMousePos(x, y, pWindow->_getMouseScale());
-            event.wheelDelta = (vec2f(float(scrollX), float(scrollY)));
-
-            pWindow->_pCallbacks->handleMouseEvent(event);
-        }
-    }
-
-private:
-    inline static KeyboardEvent::Key GLFWToBeeKey(int glfwKey)
-    {
-        static_assert(GLFW_KEY_ESCAPE == 256, "GLFW_KEY_ESCAPE 需要是 256");
-        static_assert((u32)KeyboardEvent::Key::Escape >= 256, "Key::Escape 至少需要是 256");
-
-        if (glfwKey < GLFW_KEY_ESCAPE) {
-            // 与定义相同，直接返回
-            return (KeyboardEvent::Key)glfwKey;
-        }
-
-        switch (glfwKey) {
-        case GLFW_KEY_ESCAPE        : return KeyboardEvent::Key::Escape;
-        case GLFW_KEY_ENTER         : return KeyboardEvent::Key::Enter;
-        case GLFW_KEY_TAB           : return KeyboardEvent::Key::Tab;
-        case GLFW_KEY_BACKSPACE     : return KeyboardEvent::Key::Backspace;
-        case GLFW_KEY_INSERT        : return KeyboardEvent::Key::Insert;
-        case GLFW_KEY_DELETE        : return KeyboardEvent::Key::Del;
-        case GLFW_KEY_RIGHT         : return KeyboardEvent::Key::Right;
-        case GLFW_KEY_LEFT          : return KeyboardEvent::Key::Left;
-        case GLFW_KEY_DOWN          : return KeyboardEvent::Key::Down;
-        case GLFW_KEY_UP            : return KeyboardEvent::Key::Up;
-        case GLFW_KEY_PAGE_UP       : return KeyboardEvent::Key::PageUp;
-        case GLFW_KEY_PAGE_DOWN     : return KeyboardEvent::Key::PageDown;
-        case GLFW_KEY_HOME          : return KeyboardEvent::Key::Home;
-        case GLFW_KEY_END           : return KeyboardEvent::Key::End;
-        case GLFW_KEY_CAPS_LOCK     : return KeyboardEvent::Key::CapsLock;
-        case GLFW_KEY_SCROLL_LOCK   : return KeyboardEvent::Key::ScrollLock;
-        case GLFW_KEY_NUM_LOCK      : return KeyboardEvent::Key::NumLock;
-        case GLFW_KEY_PRINT_SCREEN  : return KeyboardEvent::Key::PrintScreen;
-        case GLFW_KEY_PAUSE         : return KeyboardEvent::Key::Pause;
-        case GLFW_KEY_F1            : return KeyboardEvent::Key::F1;
-        case GLFW_KEY_F2            : return KeyboardEvent::Key::F2;
-        case GLFW_KEY_F3            : return KeyboardEvent::Key::F3;
-        case GLFW_KEY_F4            : return KeyboardEvent::Key::F4;
-        case GLFW_KEY_F5            : return KeyboardEvent::Key::F5;
-        case GLFW_KEY_F6            : return KeyboardEvent::Key::F6;
-        case GLFW_KEY_F7            : return KeyboardEvent::Key::F7;
-        case GLFW_KEY_F8            : return KeyboardEvent::Key::F8;
-        case GLFW_KEY_F9            : return KeyboardEvent::Key::F9;
-        case GLFW_KEY_F10           : return KeyboardEvent::Key::F10;
-        case GLFW_KEY_F11           : return KeyboardEvent::Key::F11;
-        case GLFW_KEY_F12           : return KeyboardEvent::Key::F12;
-        case GLFW_KEY_KP_0          : return KeyboardEvent::Key::Keypad0;
-        case GLFW_KEY_KP_1          : return KeyboardEvent::Key::Keypad1;
-        case GLFW_KEY_KP_2          : return KeyboardEvent::Key::Keypad2;
-        case GLFW_KEY_KP_3          : return KeyboardEvent::Key::Keypad3;
-        case GLFW_KEY_KP_4          : return KeyboardEvent::Key::Keypad4;
-        case GLFW_KEY_KP_5          : return KeyboardEvent::Key::Keypad5;
-        case GLFW_KEY_KP_6          : return KeyboardEvent::Key::Keypad6;
-        case GLFW_KEY_KP_7          : return KeyboardEvent::Key::Keypad7;
-        case GLFW_KEY_KP_8          : return KeyboardEvent::Key::Keypad8;
-        case GLFW_KEY_KP_9          : return KeyboardEvent::Key::Keypad9;
-        case GLFW_KEY_KP_DECIMAL    : return KeyboardEvent::Key::KeypadDel;
-        case GLFW_KEY_KP_DIVIDE     : return KeyboardEvent::Key::KeypadDivide;
-        case GLFW_KEY_KP_MULTIPLY   : return KeyboardEvent::Key::KeypadMultiply;
-        case GLFW_KEY_KP_SUBTRACT   : return KeyboardEvent::Key::KeypadSubtract;
-        case GLFW_KEY_KP_ADD        : return KeyboardEvent::Key::KeypadAdd;
-        case GLFW_KEY_KP_ENTER      : return KeyboardEvent::Key::KeypadEnter;
-        case GLFW_KEY_KP_EQUAL      : return KeyboardEvent::Key::KeypadEqual;
-        case GLFW_KEY_LEFT_SHIFT    : return KeyboardEvent::Key::LeftShift;
-        case GLFW_KEY_LEFT_CONTROL  : return KeyboardEvent::Key::LeftControl;
-        case GLFW_KEY_LEFT_ALT      : return KeyboardEvent::Key::LeftAlt;
-        case GLFW_KEY_LEFT_SUPER    : return KeyboardEvent::Key::LeftSuper;
-        case GLFW_KEY_RIGHT_SHIFT   : return KeyboardEvent::Key::RightShift;
-        case GLFW_KEY_RIGHT_CONTROL : return KeyboardEvent::Key::RightControl;
-        case GLFW_KEY_RIGHT_ALT     : return KeyboardEvent::Key::RightAlt;
-        case GLFW_KEY_RIGHT_SUPER   : return KeyboardEvent::Key::RightSuper;
-        case GLFW_KEY_MENU          : return KeyboardEvent::Key::Menu;
-        default                     : return KeyboardEvent::Key::Unknown;
-        }
-    }
-
-    inline static KeyboardEvent::ModifierFlags GetModifierFlags(int modifiers)
-    {
-        KeyboardEvent::ModifierFlags flags = KeyboardEvent::ModifierFlags::None;
-        BEE_USE_MAGIC_ENUM_BIT_OPERATOR;
-        if (modifiers & GLFW_MOD_ALT)
-            flags |= KeyboardEvent::ModifierFlags::Alt;
-        if (modifiers & GLFW_MOD_CONTROL)
-            flags |= KeyboardEvent::ModifierFlags::Ctrl;
-        if (modifiers & GLFW_MOD_SHIFT)
-            flags |= KeyboardEvent::ModifierFlags::Shift;
-
-        if (static_cast<int>(flags) == 6) {
-            int a = 0;
-        }
-
-        return flags;
-    }
-
-    int static FixGLFWModifiers(int modifiers, int key, int action)
-    {
-        int bit = 0;
-        if (key == GLFW_KEY_LEFT_SHIFT || key == GLFW_KEY_RIGHT_SHIFT)
-            bit = GLFW_MOD_SHIFT;
-        if (key == GLFW_KEY_LEFT_CONTROL || key == GLFW_KEY_RIGHT_CONTROL)
-            bit = GLFW_MOD_CONTROL;
-        if (key == GLFW_KEY_LEFT_ALT || key == GLFW_KEY_RIGHT_ALT)
-            bit = GLFW_MOD_ALT;
-        return (action == GLFW_RELEASE) ? modifiers & (~bit) : modifiers | bit;
-    }
-
-    inline static vec2 CalcMousePos(double xPos, double yPos, vec2 mouseScale)
-    {
-        auto pos  = vec2(float(xPos), float(yPos));
-        pos      *= mouseScale;
-        return pos;
-    }
-
-    inline static bool PrepareKeyboardEvent(int key, int action, int modifiers, KeyboardEvent& event)
-    {
-        if (key == GLFW_KEY_UNKNOWN) {
-            return false;
-        }
-
-        // modifiers = FixGLFWModifiers(modifiers, key, action);
-
-        switch (action) {
-        case GLFW_RELEASE : event.type = KeyboardEvent::Type::Released; break;
-        case GLFW_PRESS   : event.type = KeyboardEvent::Type::Pressed; break;
-        case GLFW_REPEAT  : event.type = KeyboardEvent::Type::Repeated; break;
-        default           : BEE_UNREACHABLE();
-        }
-        event.key = GLFWToBeeKey(key);
-        // event.mods = GetModifierFlags(modifiers);
-
-        return true;
+        me.screenPos  = {event.mouse_x, event.mouse_y};
+        me.pos        = me.pos * pWindow->_getMouseScale();
+        me.wheelDelta = {event.x, event.y};
+        pWindow->_pCallbacks->handleMouseEvent(me);
     }
 };
 
@@ -250,90 +247,77 @@ std::atomic<u16> sWindowCount = {0};
 } // namespace
 
 Window::Window(const Window::Desc& desc, Window::ICallbacks* pCallbacks)
-: _desc(desc), _pCallbacks(pCallbacks), _mouseScale(1.0f / (float)desc.extent.x, 1.0f / (float)desc.extent.y)
+: _desc(desc), _pCallbacks(pCallbacks), _mouseScale(1.0f / (float)desc.extent.x, 1.0f / (float)desc.extent.y), _bIsRunning(true)
 {
-    LogInfo("创建窗口 '{}'({}x{})", desc.title, desc.extent.x, desc.extent.y);
+    LogInfo("Create window '{}'({}x{}).", desc.title, desc.extent.x, desc.extent.y);
 
+    volkInitialize();
     if (sWindowCount.fetch_add(1) == 0) {
-        BEE_ASSERT(glfwInit() == GLFW_TRUE, "GLFW 初始化失败");
+        SDL_CHECK(SDL_Init(SDL_INIT_VIDEO));
     }
 
-    glfwSetErrorCallback(ApiCallbacks::ErrorCallback);
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    if (!desc.resizable) {
-        glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-        LogInfo("\t-- 不可缩放.");
-    }
+    // TODO: Handle errors
+    vec2i extent = {static_cast<int>(desc.extent.x), static_cast<int>(desc.extent.y)};
 
-    vec2i extent = {(int)desc.extent.x, (int)desc.extent.y};
+    SDL_PropertiesID props{SDL_CreateProperties()};
+    SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, extent.x);
+    SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, extent.y);
+    SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_FULLSCREEN_BOOLEAN, desc.mode == Window::Mode::Fullscreen);
+    SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_MINIMIZED_BOOLEAN, desc.mode == Window::Mode::Minimized);
+    SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_BORDERLESS_BOOLEAN, false);
+    SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_RESIZABLE_BOOLEAN, desc.resizable);
+    SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_HIDDEN_BOOLEAN, desc.mode == Window::Mode::Minimized);
+    SDL_SetStringProperty(props, SDL_PROP_WINDOW_CREATE_TITLE_STRING, desc.title.c_str());
+    _apiHandle = SDL_CreateWindowWithProperties(props);
+
+    BEE_ASSERT(_apiHandle, "Failed to create SDL window: {}", SDL_GetError());
+
+    SDL_CHECK(SDL_SetWindowResizable(_apiHandle, desc.resizable));
 
     if (desc.mode == Window::Mode::Fullscreen) {
-        glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
-        auto mon = glfwGetPrimaryMonitor();
-        auto mod = glfwGetVideoMode(mon);
-        extent   = {mod->width, mod->height};
+        SDL_CHECK(SDL_SetWindowFullscreen(_apiHandle, true));
+        SDL_CHECK(SDL_GetWindowSize(_apiHandle, &extent.x, &extent.y));
     }
     else if (desc.mode == Window::Mode::Minimized) {
-        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
-        glfwWindowHint(GLFW_FOCUS_ON_SHOW, GLFW_FALSE);
-        glfwWindowHint(GLFW_FOCUSED, GLFW_FALSE);
+        SDL_CHECK(SDL_MinimizeWindow(_apiHandle));
     }
 
-    _apiHandle = glfwCreateWindow(extent.x, extent.y, desc.title.c_str(), nullptr, nullptr);
-    BEE_ASSERT(_apiHandle, "创建 GLFW 窗口失败");
+    SDL_CHECK(SDL_SetWindowFocusable(_apiHandle, desc.mode != Window::Mode::Minimized));
 
 #ifdef BEE_IN_WINDOWS
-    _handle = glfwGetWin32Window(_apiHandle);
-    BEE_ASSERT(_handle, "获取 Win32 窗口 Handle 失败");
+    _handle = (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(_apiHandle), SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
+    BEE_ASSERT(_handle, "Failed to get Win32 window handle");
 #endif
 
     setPos(_desc.pos);
     _updateWindowSize();
-    glfwSetWindowUserPointer(_apiHandle, this);
 
-    if (desc.mode == Window::Mode::Minimized) {
-        glfwIconifyWindow(_apiHandle);
-        glfwShowWindow(_apiHandle);
-    }
-    else {
-        glfwShowWindow(_apiHandle);
-        glfwFocusWindow(_apiHandle);
-    }
-
-    // 设置回调
-    glfwSetWindowSizeCallback(_apiHandle, ApiCallbacks::WindowSizeCallback);
-
-    glfwSetKeyCallback(_apiHandle, ApiCallbacks::KeyboardCallback);
-    glfwSetCharCallback(_apiHandle, ApiCallbacks::CharInputCallback);
-
-    glfwSetMouseButtonCallback(_apiHandle, ApiCallbacks::MouseButtonCallback);
-    glfwSetCursorPosCallback(_apiHandle, ApiCallbacks::MouseMoveCallback);
-    glfwSetScrollCallback(_apiHandle, ApiCallbacks::MouseWheelCallback);
+    SDL_CHECK(SDL_ShowWindow(_apiHandle));
 }
 
 Window::~Window()
 {
-    glfwDestroyWindow(_apiHandle);
+    SDL_DestroyWindow(_apiHandle);
 
     if (sWindowCount.fetch_sub(1) == 1)
-        glfwTerminate();
+        SDL_Quit();
 }
 
 void Window::shutdown()
 {
-    glfwSetWindowShouldClose(_apiHandle, 1);
+    _bIsRunning = false;
+    SDL_CHECK(SDL_HideWindow(_apiHandle));
 }
 
 bool Window::shouldClose() const
 {
-    return glfwWindowShouldClose(_apiHandle);
+    return !_bIsRunning;
 }
 
 void Window::resize(u32 width, u32 height)
 {
-    glfwSetWindowSize(_apiHandle, (int)width, (int)height);
+    SDL_CHECK(SDL_SetWindowSize(_apiHandle, static_cast<int>(width), static_cast<int>(height)));
 
-    // In minimized mode GLFW reports incorrect window size
     if (_desc.mode == Window::Mode::Minimized) {
         _setWindowSize(width, height);
     }
@@ -347,32 +331,53 @@ void Window::resize(u32 width, u32 height)
 
 void Window::pollForEvents()
 {
-    glfwPollEvents();
+    SDL_Event event;
+    while (SDL_PollEvent(&event)) {
+        switch (event.type) {
+        case SDL_EVENT_KEY_UP :
+        case SDL_EVENT_KEY_DOWN          : ApiCallbacks::HandleKeyboardEvent(this, event.key); break;
+
+        case SDL_EVENT_MOUSE_BUTTON_UP   :
+        case SDL_EVENT_MOUSE_BUTTON_DOWN : ApiCallbacks::HandleMouseButtonEvent(this, event.button); break;
+        case SDL_EVENT_MOUSE_MOTION      : ApiCallbacks::HandleMouseMotionEvent(this, event.motion); break;
+        case SDL_EVENT_MOUSE_WHEEL       : ApiCallbacks::HandleMouseWheelEvent(this, event.wheel); break;
+
+        case SDL_EVENT_WINDOW_RESIZED    : ApiCallbacks::HandleWindowEvents(this, event.window); break;
+        default                          : break;
+        }
+    }
 }
 
 void Window::setPos(int x, int y)
 {
-    glfwSetWindowPos(_apiHandle, x, y);
+    SDL_CHECK(SDL_SetWindowPosition(_apiHandle, x, y));
 }
 
 void Window::setTitle(std::string_view title)
 {
-    glfwSetWindowTitle(_apiHandle, title.data());
+    SDL_CHECK(SDL_SetWindowTitle(_apiHandle, title.data()));
 }
 
-void Window::setIcon(const std::filesystem::path& path)
+void Window::setIcon(std::string_view path)
 {
-    //    SetWindowIcon(path, _handle);
+    SDL_Surface* icon = SDL_LoadBMP(path.data());
+    if (icon == nullptr) {
+        LogWarn("Failed to load icon from {}, SDL Error: {}", path, SDL_GetError());
+        return;
+    }
+
+    SDL_CHECK(SDL_SetWindowIcon(_apiHandle, icon));
 }
 
 void Window::_updateWindowSize()
 {
     int width, height;
-    glfwGetWindowSize(_apiHandle, &width, &height);
-    _setWindowSize((u32)width, (u32)height);
 
-    _mouseScale.x = 1.0f / (float)width;
-    _mouseScale.y = 1.0f / (float)height;
+    SDL_CHECK(SDL_GetWindowSize(_apiHandle, &width, &height));
+    _setWindowSize(static_cast<u32>(width), static_cast<u32>(height));
+
+    _mouseScale.x = 1.0f / static_cast<float>(width);
+    _mouseScale.y = 1.0f / static_cast<float>(height);
 }
 
 void Window::_setWindowSize(u32 width, u32 height)
