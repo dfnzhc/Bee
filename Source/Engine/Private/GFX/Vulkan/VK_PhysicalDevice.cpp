@@ -5,8 +5,9 @@
 
 using namespace bee;
 
-VK_PhysicalDevice::VK_PhysicalDevice(u32 apiVersion, vk::PhysicalDevice physicalDevice) : _handle(physicalDevice)
+Error VK_PhysicalDevice::setup(u32 apiVersion, vk::PhysicalDevice physicalDevice)
 {
+    _handle = physicalDevice;
     _memoryProperties = physicalDevice.getMemoryProperties2();
     _queueProperties  = physicalDevice.getQueueFamilyProperties2();
 
@@ -53,14 +54,16 @@ VK_PhysicalDevice::VK_PhysicalDevice(u32 apiVersion, vk::PhysicalDevice physical
                 .setShaderSampledImageArrayNonUniformIndexing(true)
                 .setBufferDeviceAddress(_bufferDeviceAddressFeatures.bufferDeviceAddress);
 
-            _featureList.insert(_properties12);
+            _featureList.insert(_features12);
         }
 
         if (apiMajor == 1 && apiMinor >= 3) {
             _features13.setMaintenance4(_maintenance4Features.maintenance4);
-            _featureList.insert(_properties13);
+            _featureList.insert(_features13);
         }
     }
+    
+    return Error::Ok;
 }
 
 const vk::PhysicalDeviceFeatures& VK_PhysicalDevice::features() const
@@ -152,7 +155,8 @@ std::vector<const char*> VK_PhysicalDevice::enabledExtensions()
         setupFeatures();
     }
 
-    std::vector<const char*> extensions(_enabledDeviceExtensions.size());
+    std::vector<const char*> extensions;
+    extensions.reserve(_enabledDeviceExtensions.size());
     for (auto& extension : _enabledDeviceExtensions) {
         extensions.push_back(extension.c_str());
     }

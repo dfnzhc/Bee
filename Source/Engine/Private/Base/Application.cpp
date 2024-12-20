@@ -7,7 +7,7 @@
 
 #include "Base/Application.hpp"
 #include "Base/Common.hpp"
-// #include "GFX/GFX.hpp"
+#include "GFX/GFX.hpp"
 #include <Utility/Logger.hpp>
 
 using namespace bee;
@@ -31,8 +31,8 @@ int Application::preInit()
 int Application::init()
 {
     LogVerbose("'{}' init", _config.appName);
-    // GFX_TEST();
-    
+    GFX_TEST();
+
     if (!_config.headless) {
         _pWindow = std::make_unique<Window>(_config.windowDesc, this);
     }
@@ -88,22 +88,18 @@ void Application::onResize(u32 width, u32 height)
     LogVerbose("'{}' onResize({}, {}).", _config.appName, width, height);
 }
 
-bool Application::onMouseEvent(const MouseEvent& mouseEvent)
+bool Application::onMouseEvent(BEE_UNUSED const MouseEvent& mouseEvent)
 {
-    BEE_UNUSED(mouseEvent);
     return false;
 }
 
-bool Application::onKeyEvent(const KeyboardEvent& keyEvent)
+bool Application::onKeyEvent(BEE_UNUSED const KeyboardEvent& keyEvent)
 {
-    BEE_UNUSED(keyEvent);
     return false;
 }
 
-bool Application::onMouseKeyboardEvent(const MouseInput& mouse, const KeyboardInput& keyboard)
+bool Application::onMouseKeyboardEvent(BEE_UNUSED const MouseInput& mouse, BEE_UNUSED const KeyboardInput& keyboard)
 {
-    BEE_UNUSED(mouse);
-    BEE_UNUSED(keyboard);
     return false;
 }
 

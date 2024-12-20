@@ -15,8 +15,11 @@ namespace bee {
 class BEE_API VK_PhysicalDevice final
 {
 public:
-    VK_PhysicalDevice(u32 apiVersion, vk::PhysicalDevice physicalDevice);
+    VK_PhysicalDevice()  = default;
+    ~VK_PhysicalDevice() = default;
     BEE_CLASS_MOVABLE_ONLY(VK_PhysicalDevice);
+
+    BEE_NODISCARD Error setup(u32 apiVersion, vk::PhysicalDevice physicalDevice);
 
     // physical device capabilities
     BEE_NODISCARD const vk::PhysicalDeviceFeatures& features() const;
@@ -37,7 +40,7 @@ public:
     // queues
     void requestQueues(vk::QueueFlags flags, vk::SurfaceKHR surface = VK_NULL_HANDLE);
     BEE_NODISCARD std::vector<std::pair<u32, u32>> availableQueueFamily() const;
-    
+
     BEE_NODISCARD std::optional<u32> graphicsFamilyIndex() const;
     BEE_NODISCARD std::optional<u32> computeFamilyIndex() const;
     BEE_NODISCARD std::optional<u32> transferFamilyIndex() const;
@@ -80,11 +83,11 @@ private:
     std::unordered_map<StringView, bool> _requestedDeviceExtensions{};
 
     // Properties
-    VkPhysicalDeviceRayTracingPipelinePropertiesKHR _rayTracingPipelineProperties{};
-    VkPhysicalDeviceFragmentDensityMapPropertiesEXT _fragmentDensityMapProperties{};
-    VkPhysicalDeviceFragmentDensityMapOffsetPropertiesQCOM _fragmentDensityMapOffsetProperties{};
+    vk::PhysicalDeviceRayTracingPipelinePropertiesKHR _rayTracingPipelineProperties{};
+    vk::PhysicalDeviceFragmentDensityMapPropertiesEXT _fragmentDensityMapProperties{};
+    vk::PhysicalDeviceFragmentDensityMapOffsetPropertiesQCOM _fragmentDensityMapOffsetProperties{};
 
-    VulkanChainList<20> _featureList;
+    VulkanChainList _featureList;
     // Features
     vk::PhysicalDeviceMultiviewFeatures _multiviewFeatures{};
     vk::PhysicalDeviceRayQueryFeaturesKHR _rayQueryFeatures{};

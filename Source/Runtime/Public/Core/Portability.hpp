@@ -51,10 +51,9 @@
 
 static_assert(BEE_CPLUSPLUS >= 202'002L, "__cplusplus >= 202002L: C++20 at least");
 
+#define BEE_UNUSED          [[maybe_unused]]
 #define BEE_NODISCARD       [[nodiscard]]
 #define BEE_DEPRECATED(...) [[deprecated(__VA_ARGS__)]]
-
-#define BEE_UNUSED(...) void(0)
 
 // Generalize warning push/pop.
 #if defined(__GNUC__) || defined(__clang__)

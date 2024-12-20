@@ -69,7 +69,7 @@ u32 VK_Context::deviceCount() const
     return static_cast<u32>(_devices.size());
 }
 
-bool VK_Context::deviceSupportsPresent(u32 devIdx) const
+bool VK_Context::deviceSupportsPresent(BEE_UNUSED u32 devIdx) const
 {
     return {};
 }
@@ -110,11 +110,15 @@ Error VK_Context::_initVulkanAPI()
 
     VULKAN_HPP_DEFAULT_DISPATCHER.init(vk::DynamicLoader().getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr"));
 
+    BEE_PUSH_WARNING
+    BEE_CLANG_DISABLE_WARNING("-Wcast-function-type-strict")
     auto FN_vkEnumerateInstanceVersion = PFN_vkEnumerateInstanceVersion(vkGetInstanceProcAddr(nullptr, "vkEnumerateInstanceVersion"));
     if (!FN_vkEnumerateInstanceVersion || VK_SUCCESS != FN_vkEnumerateInstanceVersion(&_apiVersion)) {
         _apiVersion = VK_API_VERSION_1_0;
         LogWarn("'vkEnumerateInstanceVersion' not available，default Vulkan version is '1.0'.");
     }
+
+    BEE_POP_WARNING
 
     LogVerbose("\tSelected Vulkan version: '{}.{}.{}'.", VK_VERSION_MAJOR(_apiVersion), VK_VERSION_MINOR(_apiVersion), VK_VERSION_PATCH(_apiVersion));
 
@@ -130,7 +134,7 @@ Error VK_Context::_initInstanceExtensions(const Config& config)
 
         // TODO: window api extensions
         // for (auto ext : SurfaceExtensions())
-            // _registerInstanceExtension(ext, true);
+        // _registerInstanceExtension(ext, true);
     }
 
     if (Globals::EnableValidationLayer()) {
@@ -202,9 +206,9 @@ Error VK_Context::_initInstance()
 
     vk::InstanceCreateInfo instanceInfo  = {};
     instanceInfo.pApplicationInfo        = &appInfo;
-    instanceInfo.enabledExtensionCount   = enabledExtensions.size();
+    instanceInfo.enabledExtensionCount   = static_cast<u32>(enabledExtensions.size());
     instanceInfo.ppEnabledExtensionNames = enabledExtensions.data();
-    instanceInfo.enabledLayerCount       = _enabledLayers.size();
+    instanceInfo.enabledLayerCount       = static_cast<u32>(_enabledLayers.size());
     instanceInfo.ppEnabledLayerNames     = _enabledLayers.data();
 
     vk::DebugUtilsMessengerCreateInfoEXT debugMessengerInfo      = {};
@@ -275,10 +279,13 @@ Error VK_Context::_initPhysicalDevice()
         const auto& dev = physicalDevices[i];
         auto props      = dev.getProperties();
 
+        BEE_PUSH_WARNING
+        BEE_CLANG_DISABLE_WARNING("-Wimplicit-int-conversion")
         auto& devInfo  = _devices[i];
         devInfo.name   = props.deviceName.data();
         devInfo.vendor = me::enum_cast<Vendor>(props.vendorID).value_or(Vendor::Unknown);
         devInfo.type   = me::enum_cast<DeviceType>(me::enum_integer(props.deviceType)).value_or(DeviceType::Other);
+        BEE_POP_WARNING
 
         _physicalDevices[i] = dev;
 
@@ -304,7 +311,7 @@ void VK_Context::_registerInstanceExtension(StringView extName, bool required)
 VKAPI_ATTR VkBool32 VKAPI_CALL VK_Context::_debugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT pMessageSeverity,
                                                                    VkDebugUtilsMessageTypeFlagsEXT pMessageType,
                                                                    const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-                                                                   void* pUserData)
+                                                                   void* /*pUserData*/)
 {
     String msg{pCallbackData->pMessage};
 
@@ -325,20 +332,23 @@ VKAPI_ATTR VkBool32 VKAPI_CALL VK_Context::_debugMessengerCallback(VkDebugUtilsM
         return VK_FALSE;
     }
 
+    BEE_PUSH_WARNING
+    BEE_CLANG_DISABLE_WARNING("-Wcovered-switch-default")
+    BEE_CLANG_DISABLE_WARNING("-Wunsafe-buffer-usage")
     String type;
     switch (pMessageType) {
     case (VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT)                                                      : type = "General"; break;
     case (VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT)                                                   : type = "Validation"; break;
     case (VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT)                                                  : type = "Performance"; break;
     case (VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT & VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT) : type = "Validation|Performance"; break;
-    default                                                                                                 : BEE_UNREACHABLE(); break;
+    default                                                                                                 : BEE_UNREACHABLE();
     }
 
     String objects;
     if (pCallbackData->objectCount > 0) {
         objects = fmt::format("\n\t'{}' Objects：", pCallbackData->objectCount);
         for (u32 object = 0; object < pCallbackData->objectCount; ++object) {
-            objects += fmt::format("\n\t\tObject[{}] - {}, Handle {}",
+            objects += fmt::format("\n\t\t[{}]: {}, Handle {}",
                                    object,
                                    me::enum_name(vk::ObjectType(pCallbackData->pObjects[object].objectType)),
                                    fmt::to_string(pCallbackData->pObjects[object].objectHandle));
@@ -353,7 +363,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL VK_Context::_debugMessengerCallback(VkDebugUtilsM
     if (pCallbackData->cmdBufLabelCount > 0) {
         labels = fmt::format("\n\t'{}' Command Buffer Labels：", pCallbackData->cmdBufLabelCount);
         for (u32 label = 0; label < pCallbackData->cmdBufLabelCount; ++label) {
-            labels += fmt::format("\n\t\tLabel[{}] - {}{{ ", label, pCallbackData->pCmdBufLabels[label].pLabelName);
+            labels += fmt::format("\n\t\t[{}]: {}{{ ", label, pCallbackData->pCmdBufLabels[label].pLabelName);
             for (int idx = 0; idx < 4; ++idx) {
                 labels += fmt::format("{}", pCallbackData->pCmdBufLabels[label].color[idx]);
                 if (idx < 3) {
@@ -364,9 +374,9 @@ VKAPI_ATTR VkBool32 VKAPI_CALL VK_Context::_debugMessengerCallback(VkDebugUtilsM
         }
     }
 
-    const auto errMsg = std::format("{} - Message ID：number-'{}' | name-'{}'\n\t{}{}{}",
+    const auto errMsg = std::format("({}) - Message ID：'0x{:x}'|'{}'\n\t\"{}\"{}{}",
                                     type.data(),
-                                    pCallbackData->messageIdNumber,
+                                    static_cast<u32>(pCallbackData->messageIdNumber),
                                     pCallbackData->pMessageIdName,
                                     pCallbackData->pMessage,
                                     objects.data(),
@@ -382,20 +392,21 @@ VKAPI_ATTR VkBool32 VKAPI_CALL VK_Context::_debugMessengerCallback(VkDebugUtilsM
         // TODO：aborting？
         break;
     case VK_DEBUG_UTILS_MESSAGE_SEVERITY_FLAG_BITS_MAX_ENUM_EXT : break;
-    default                                                     : BEE_UNREACHABLE(); break;
+    default                                                     : BEE_UNREACHABLE();
     }
+    BEE_POP_WARNING
 
     return VK_FALSE;
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL VK_Context::_debugReportCallback(VkDebugReportFlagsEXT pFlags,
-                                                                VkDebugReportObjectTypeEXT pObjectType,
+                                                                VkDebugReportObjectTypeEXT /*pObjectType*/,
                                                                 u64 pObject,
-                                                                size_t pLocation,
-                                                                i32 pMessageCode,
-                                                                const char* pLayerPrefix,
+                                                                size_t /*pLocation*/,
+                                                                i32 /*pMessageCode*/,
+                                                                const char* /*pLayerPrefix*/,
                                                                 const char* pMessage,
-                                                                void* pUserData)
+                                                                void* /*pUserData*/)
 {
     const auto dbgMsg = std::format("Vulkan Debug Report：'{}' Objects：\n{}", pObject, pMessage);
 
@@ -406,7 +417,6 @@ VKAPI_ATTR VkBool32 VKAPI_CALL VK_Context::_debugReportCallback(VkDebugReportFla
     case VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT : LogWarn(dbgMsg); break;
     case VK_DEBUG_REPORT_ERROR_BIT_EXT               : LogError(dbgMsg); break;
     default                                          : BEE_UNREACHABLE();
-        break;
     }
 
     return VK_FALSE;

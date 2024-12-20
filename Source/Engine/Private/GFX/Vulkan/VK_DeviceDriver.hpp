@@ -31,7 +31,6 @@ public:
 
 private:
     Error _initDeviceExtensions(const Config& config);
-    Error _checkDeviceCapabilities();
     Error _initDevice();
     Error _initAllocator();
     Error _initPipelineCache();
