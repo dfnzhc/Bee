@@ -41,7 +41,6 @@ public:
 
     BEE_NODISCARD virtual const DeviceInfo& deviceInfo(u32 devIdx) const = 0;
     BEE_NODISCARD virtual u32 deviceCount() const                        = 0;
-    BEE_NODISCARD virtual bool deviceSupportsPresent(u32 devIdx) const   = 0;
 
     BEE_NODISCARD virtual UniquePtr<GFX_DeviceDriver> createDriver() = 0;
     // clang-format on

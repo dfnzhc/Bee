@@ -21,10 +21,9 @@ public:
     Error create(const Config& config) override;
     void destroy() override;
     
-    BEE_NODISCARD const DeviceInfo& deviceInfo(u32 devIdx) const override;
     BEE_NODISCARD u32 deviceCount() const override;
-    BEE_NODISCARD bool deviceSupportsPresent(u32 devIdx) const override;
-
+    BEE_NODISCARD const DeviceInfo& deviceInfo(u32 devIdx) const override;
+    
     BEE_NODISCARD UniquePtr<GFX_DeviceDriver> createDriver() override;
     // clang-format on
 
@@ -34,7 +33,7 @@ public:
     BEE_NODISCARD vk::PhysicalDevice physicalDevice(u32 devIdx) const;
     BEE_NODISCARD u32 apiVersion() const;
     BEE_NODISCARD std::vector<const char*> enabledLayers() const;
-    
+    BEE_NODISCARD std::vector<const char*> enabledExtensions() const;
     
 private:
     Error _initVulkanAPI();
@@ -57,6 +56,7 @@ private:
     std::unordered_map<StringView, bool> _requestedInstanceExtensions;
 
     std::vector<const char*> _enabledLayers;
+    std::vector<const char*> _enabledExtensions;
     
     std::vector<DeviceInfo> _devices;
     std::vector<vk::PhysicalDevice> _physicalDevices;

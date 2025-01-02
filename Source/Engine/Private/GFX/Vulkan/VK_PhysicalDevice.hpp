@@ -34,7 +34,8 @@ public:
 
     // extensions
     void registerExtension(StringView extName, bool required = true);
-    BEE_NODISCARD std::vector<const char*> enabledExtensions();
+    void finalizeRegister();
+    BEE_NODISCARD std::vector<const char*> enabledExtensions() const;
     BEE_NODISCARD bool isExtensionEnabled(StringView extName) const;
 
     // queues
@@ -52,6 +53,8 @@ public:
     BEE_NODISCARD u32 transferFamilyCount() const;
     BEE_NODISCARD u32 sparseFamilyCount() const;
     BEE_NODISCARD u32 presentationFamilyCount() const;
+    
+    BEE_NODISCARD bool isSupportPresent(vk::SurfaceKHR surface) const;
 
     //
     vk::PhysicalDevice handle() const;

@@ -11,6 +11,9 @@
 #ifndef VOLK_IMPLEMENTATION
 #  define VOLK_IMPLEMENTATION
 #endif
+#ifndef VK_USE_PLATFORM_WIN32_KHR
+#  define VK_USE_PLATFORM_WIN32_KHR
+#endif
 #include "GFX/Vulkan/VK_Common.hpp"
 #include "GFX/Vulkan/VK_Context.hpp"
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
@@ -58,20 +61,15 @@ void VK_Context::destroy()
     LogInfo("Vulkan has been destroyed.");
 }
 
-const GFX_Context::DeviceInfo& VK_Context::deviceInfo(u32 devIdx) const
-{
-    BEE_DEBUG_ASSERT(devIdx < _physicalDevices.size());
-    return _devices[devIdx];
-}
-
 u32 VK_Context::deviceCount() const
 {
     return static_cast<u32>(_devices.size());
 }
 
-bool VK_Context::deviceSupportsPresent(BEE_UNUSED u32 devIdx) const
+const GFX_Context::DeviceInfo& VK_Context::deviceInfo(u32 devIdx) const
 {
-    return {};
+    BEE_DEBUG_ASSERT(devIdx < _physicalDevices.size());
+    return _devices[devIdx];
 }
 
 UniquePtr<GFX_DeviceDriver> VK_Context::createDriver()
@@ -99,6 +97,11 @@ u32 VK_Context::apiVersion() const
 std::vector<const char*> VK_Context::enabledLayers() const
 {
     return _enabledLayers;
+}
+
+std::vector<const char*> VK_Context::enabledExtensions() const
+{
+    return _enabledExtensions;
 }
 
 Error VK_Context::_initVulkanAPI()
@@ -131,10 +134,7 @@ Error VK_Context::_initInstanceExtensions(const Config& config)
 
     if (!config.headless) {
         _registerInstanceExtension(VK_KHR_SURFACE_EXTENSION_NAME, true);
-
-        // TODO: window api extensions
-        // for (auto ext : SurfaceExtensions())
-        // _registerInstanceExtension(ext, true);
+        _registerInstanceExtension(VK_KHR_WIN32_SURFACE_EXTENSION_NAME, true);
     }
 
     if (Globals::EnableValidationLayer()) {
@@ -181,10 +181,10 @@ Error VK_Context::_initInstance()
     appInfo.engineVersion       = VK_MAKE_VERSION(BEE_VERSION_MAJOR, BEE_VERSION_MINOR, BEE_VERSION_PATCH);
     appInfo.apiVersion          = _apiVersion;
 
-    std::vector<const char*> enabledExtensions;
-    enabledExtensions.reserve(_enabledInstanceExtensions.size());
+    std::vector<const char*>().swap(_enabledExtensions);
+    _enabledExtensions.reserve(_enabledInstanceExtensions.size());
     for (const auto& ext : _enabledInstanceExtensions) {
-        enabledExtensions.emplace_back(ext.data());
+        _enabledExtensions.emplace_back(ext.data());
     }
 
     std::vector<const char*>().swap(_enabledLayers);
@@ -206,8 +206,8 @@ Error VK_Context::_initInstance()
 
     vk::InstanceCreateInfo instanceInfo  = {};
     instanceInfo.pApplicationInfo        = &appInfo;
-    instanceInfo.enabledExtensionCount   = static_cast<u32>(enabledExtensions.size());
-    instanceInfo.ppEnabledExtensionNames = enabledExtensions.data();
+    instanceInfo.enabledExtensionCount   = static_cast<u32>(_enabledExtensions.size());
+    instanceInfo.ppEnabledExtensionNames = _enabledExtensions.data();
     instanceInfo.enabledLayerCount       = static_cast<u32>(_enabledLayers.size());
     instanceInfo.ppEnabledLayerNames     = _enabledLayers.data();
 

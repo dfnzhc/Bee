@@ -123,38 +123,39 @@ void VK_PhysicalDevice::registerExtension(StringView extName, bool required)
     _requestedDeviceExtensions.emplace(extName, required);
 }
 
-std::vector<const char*> VK_PhysicalDevice::enabledExtensions()
+void VK_PhysicalDevice::finalizeRegister()
 {
-    if (_enabledDeviceExtensions.empty()) {
-        auto extensions = _handle.enumerateDeviceExtensionProperties();
+    auto extensions = _handle.enumerateDeviceExtensionProperties();
 
-        for (const auto& ext : extensions) {
-            const auto* extName = ext.extensionName.data();
-            if (_requestedDeviceExtensions.contains(extName)) {
-                _enabledDeviceExtensions.emplace(extName);
-            }
+    for (const auto& ext : extensions) {
+        const auto* extName = ext.extensionName.data();
+        if (_requestedDeviceExtensions.contains(extName)) {
+            _enabledDeviceExtensions.emplace(extName);
         }
-
-        LogVerbose("\tRequested Vulkan device extensions：");
-        for (const auto& ext : _requestedDeviceExtensions) {
-            const auto extName     = ext.first.data();
-            const auto isRequested = ext.second;
-
-            if (_enabledDeviceExtensions.contains(extName)) {
-                LogVerbose("\t\tEnabled：{}.", extName);
-            }
-            else {
-                if (isRequested) {
-                    LogError("\t\tNot Found[Req]：{}.", extName);
-                }
-
-                LogVerbose("\t\tNot Found[Opt]：{}.", extName);
-            }
-        }
-
-        setupFeatures();
     }
 
+    LogVerbose("\tRequested Vulkan device extensions：");
+    for (const auto& ext : _requestedDeviceExtensions) {
+        const auto extName     = ext.first.data();
+        const auto isRequested = ext.second;
+
+        if (_enabledDeviceExtensions.contains(extName)) {
+            LogVerbose("\t\tEnabled：{}.", extName);
+        }
+        else {
+            if (isRequested) {
+                LogError("\t\tNot Found[Req]：{}.", extName);
+            }
+
+            LogVerbose("\t\tNot Found[Opt]：{}.", extName);
+        }
+    }
+
+    setupFeatures();
+}
+
+std::vector<const char*> VK_PhysicalDevice::enabledExtensions() const
+{
     std::vector<const char*> extensions;
     extensions.reserve(_enabledDeviceExtensions.size());
     for (auto& extension : _enabledDeviceExtensions) {
@@ -303,6 +304,21 @@ u32 VK_PhysicalDevice::sparseFamilyCount() const
 u32 VK_PhysicalDevice::presentationFamilyCount() const
 {
     return _presentationQueueCount;
+}
+
+bool VK_PhysicalDevice::isSupportPresent(vk::SurfaceKHR surface) const
+{
+    BEE_DEBUG_ASSERT(surface != VK_NULL_HANDLE, "Invalid surface");
+    
+    const auto& size = static_cast<u32>(_queueProperties.size());
+    for (u32 queueFamilyIndex = 0; queueFamilyIndex < size; ++queueFamilyIndex) {
+        const auto& props = _queueProperties[queueFamilyIndex].queueFamilyProperties;
+        if (!_presentationFamilyIndex.has_value() && _handle.getSurfaceSupportKHR(queueFamilyIndex, surface) == VK_TRUE) {
+                return true;
+        }
+    }
+
+    return false;
 }
 
 vk::PhysicalDevice VK_PhysicalDevice::handle() const
