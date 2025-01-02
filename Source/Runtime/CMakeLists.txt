@@ -22,7 +22,7 @@ target_link_libraries(${BEE_TARGET}
 target_compile_options(${BEE_TARGET}
         PUBLIC
         # MSVC
-        $<$<CXX_COMPILER_ID:MSVC>:/DEBUG>
+        $<$<CXX_COMPILER_ID:MSVC>:/DEBUG /Zc:preprocessor>
 )
 
 target_compile_definitions(${BEE_TARGET} 
@@ -31,9 +31,9 @@ target_compile_definitions(${BEE_TARGET}
 )
 
 target_include_directories(${BEE_TARGET} 
-        PUBLIC 
+        PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/Public
         ${STRINGZILLA_INCLUDE_DIRS}
-        PRIVATE 
-        ${CMAKE_CURRENT_SOURCE_DIR}/PRIVATE
+        PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/Private
 )

@@ -27,8 +27,8 @@ target_compile_options(${BEE_TARGET}
 )
 
 target_include_directories(${BEE_TARGET} 
-    PUBLIC 
+    PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/Public
-    PRIVATE 
-    ${CMAKE_CURRENT_SOURCE_DIR}/PRIVATE
+    PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/Private
 )
