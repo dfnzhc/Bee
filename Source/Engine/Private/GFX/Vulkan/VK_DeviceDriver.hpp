@@ -30,7 +30,7 @@ public:
     void destroy() override;
 
 private:
-    Error _initDeviceExtensions(const Config& config);
+    Error _initDeviceExtensions(const Config& config) const;
     Error _initDevice();
     Error _initAllocator();
     Error _initPipelineCache();

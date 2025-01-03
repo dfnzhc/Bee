@@ -5,75 +5,13 @@
 
 using namespace bee;
 
-Error VK_PhysicalDevice::setup(u32 apiVersion, vk::PhysicalDevice physicalDevice)
+Error VK_PhysicalDevice::setup(vk::PhysicalDevice physicalDevice)
 {
     _handle = physicalDevice;
     _memoryProperties = physicalDevice.getMemoryProperties2();
-    _queueProperties  = physicalDevice.getQueueFamilyProperties2();
+    _queueProperties = physicalDevice.getQueueFamilyProperties2();
 
-    const auto apiMajor = BEE_GET_VERSION_MAJOR(apiVersion), apiMinor = BEE_GET_VERSION_MINOR(apiVersion);
-
-    // properties
-    {
-        VulkanChainList list;
-        list.insert(_rayTracingPipelineProperties);
-        list.insert(_fragmentDensityMapProperties);
-        list.insert(_fragmentDensityMapOffsetProperties);
-        list.insert(_properties11);
-
-        if (apiMajor == 1 && apiMinor >= 2) {
-            _properties12.driverID                     = vk::DriverId::eNvidiaProprietary;
-            _properties12.supportedDepthResolveModes   = vk::ResolveModeFlagBits::eMax;
-            _properties12.supportedStencilResolveModes = vk::ResolveModeFlagBits::eMax;
-            list.insert(_properties12);
-        }
-
-        if (apiMajor == 1 && apiMinor >= 3) {
-            list.insert(_properties13);
-        }
-        _properties.pNext = list.head();
-        physicalDevice.getProperties2(&_properties);
-    }
-
-    // features
-    {
-        VulkanChainList list;
-        list.insert(_bufferDeviceAddressFeatures);
-        list.insert(_maintenance4Features);
-        _features.pNext = list.head();
-        physicalDevice.getFeatures2(&_features);
-
-        _featureList.insert(_features11);
-
-        if (apiMajor == 1 && apiMinor >= 2) {
-            _features12.setDescriptorIndexing(true)
-                .setRuntimeDescriptorArray(true)
-                .setDescriptorBindingPartiallyBound(true)
-                .setDescriptorBindingVariableDescriptorCount(true)
-                .setTimelineSemaphore(true)
-                .setShaderSampledImageArrayNonUniformIndexing(true)
-                .setBufferDeviceAddress(_bufferDeviceAddressFeatures.bufferDeviceAddress);
-
-            _featureList.insert(_features12);
-        }
-
-        if (apiMajor == 1 && apiMinor >= 3) {
-            _features13.setMaintenance4(_maintenance4Features.maintenance4);
-            _featureList.insert(_features13);
-        }
-    }
-    
     return Error::Ok;
-}
-
-const vk::PhysicalDeviceFeatures& VK_PhysicalDevice::features() const
-{
-    return _requestedFeatures.features;
-}
-
-const vk::PhysicalDeviceProperties& VK_PhysicalDevice::properties() const
-{
-    return _properties.properties;
 }
 
 const std::vector<vk::QueueFamilyProperties2>& VK_PhysicalDevice::queueFamilyProperties() const
@@ -101,22 +39,12 @@ Result<u32> VK_PhysicalDevice::memoryType(u32 bits, vk::MemoryPropertyFlags prop
     return Unexpected("No matching memory type found");
 }
 
-vk::PhysicalDeviceFeatures VK_PhysicalDevice::requestedFeatures() const
-{
-    return _requestedFeatures.features;
-}
-
-void* VK_PhysicalDevice::featureList() const
-{
-    return _featureList.head();
-}
-
 void VK_PhysicalDevice::registerExtension(StringView extName, bool required)
 {
     // 如果扩展不是必要的，仅当未注册过该扩展，或之前注册的也是非必要的，该扩展才会被标记为非必要
     if (_requestedDeviceExtensions.contains(extName)) {
-        auto& val  = _requestedDeviceExtensions.at(extName);
-        val       |= required;
+        auto& val = _requestedDeviceExtensions.at(extName);
+        val |= required;
 
         return;
     }
@@ -136,7 +64,7 @@ void VK_PhysicalDevice::finalizeRegister()
 
     LogVerbose("\tRequested Vulkan device extensions：");
     for (const auto& ext : _requestedDeviceExtensions) {
-        const auto extName     = ext.first.data();
+        const auto extName = ext.first.data();
         const auto isRequested = ext.second;
 
         if (_enabledDeviceExtensions.contains(extName)) {
@@ -150,8 +78,6 @@ void VK_PhysicalDevice::finalizeRegister()
             LogVerbose("\t\tNot Found[Opt]：{}.", extName);
         }
     }
-
-    setupFeatures();
 }
 
 std::vector<const char*> VK_PhysicalDevice::enabledExtensions() const
@@ -181,34 +107,34 @@ void VK_PhysicalDevice::requestQueues(vk::QueueFlags flags, vk::SurfaceKHR surfa
         if (!_presentationFamilyIndex.has_value() && surface != VK_NULL_HANDLE) {
             if (_handle.getSurfaceSupportKHR(queueFamilyIndex, surface) == VK_TRUE) {
                 _presentationFamilyIndex = queueFamilyIndex;
-                _presentationQueueCount  = props.queueCount;
+                _presentationQueueCount = props.queueCount;
             }
         }
         if (!_graphicsFamilyIndex.has_value() && (flags & props.queueFlags) & vk::QueueFlagBits::eGraphics) {
-            _graphicsFamilyIndex  = queueFamilyIndex;
-            _graphicsQueueCount   = props.queueCount;
-            flags                &= ~vk::QueueFlagBits::eGraphics;
+            _graphicsFamilyIndex = queueFamilyIndex;
+            _graphicsQueueCount = props.queueCount;
+            flags &= ~vk::QueueFlagBits::eGraphics;
             continue;
         }
 
         if (!_computeFamilyIndex.has_value() && (flags & props.queueFlags) & vk::QueueFlagBits::eCompute) {
-            _computeFamilyIndex  = queueFamilyIndex;
-            _computeQueueCount   = props.queueCount;
-            flags               &= ~vk::QueueFlagBits::eCompute;
+            _computeFamilyIndex = queueFamilyIndex;
+            _computeQueueCount = props.queueCount;
+            flags &= ~vk::QueueFlagBits::eCompute;
             continue;
         }
 
         if (!_transferFamilyIndex.has_value() && (flags & props.queueFlags) & vk::QueueFlagBits::eTransfer) {
-            _transferFamilyIndex  = queueFamilyIndex;
-            _transferQueueCount   = props.queueCount;
-            flags                &= ~vk::QueueFlagBits::eTransfer;
+            _transferFamilyIndex = queueFamilyIndex;
+            _transferQueueCount = props.queueCount;
+            flags &= ~vk::QueueFlagBits::eTransfer;
             continue;
         }
 
         if (!_sparseFamilyIndex.has_value() && (flags & props.queueFlags) & vk::QueueFlagBits::eSparseBinding) {
-            _sparseFamilyIndex  = queueFamilyIndex;
-            _sparseQueueCount   = props.queueCount;
-            flags              &= ~vk::QueueFlagBits::eSparseBinding;
+            _sparseFamilyIndex = queueFamilyIndex;
+            _sparseQueueCount = props.queueCount;
+            flags &= ~vk::QueueFlagBits::eSparseBinding;
             continue;
         }
     }
@@ -309,12 +235,11 @@ u32 VK_PhysicalDevice::presentationFamilyCount() const
 bool VK_PhysicalDevice::isSupportPresent(vk::SurfaceKHR surface) const
 {
     BEE_DEBUG_ASSERT(surface != VK_NULL_HANDLE, "Invalid surface");
-    
+
     const auto& size = static_cast<u32>(_queueProperties.size());
     for (u32 queueFamilyIndex = 0; queueFamilyIndex < size; ++queueFamilyIndex) {
-        const auto& props = _queueProperties[queueFamilyIndex].queueFamilyProperties;
-        if (!_presentationFamilyIndex.has_value() && _handle.getSurfaceSupportKHR(queueFamilyIndex, surface) == VK_TRUE) {
-                return true;
+        if (_handle.getSurfaceSupportKHR(queueFamilyIndex, surface)) {
+            return true;
         }
     }
 
@@ -331,46 +256,106 @@ VK_PhysicalDevice::operator vk::PhysicalDevice() const
     return _handle;
 }
 
-void VK_PhysicalDevice::setupFeatures()
+void VK_PhysicalDevice::checkDeviceCapabilities()
 {
-    const auto accelStructSupported         = _enabledDeviceExtensions.contains(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
-    const auto rayPipelineSupported         = _enabledDeviceExtensions.contains(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
-    const auto rayQuerySupported            = _enabledDeviceExtensions.contains(VK_KHR_RAY_QUERY_EXTENSION_NAME);
-    const auto meshSupported                = _enabledDeviceExtensions.contains(VK_NV_MESH_SHADER_EXTENSION_NAME);
-    const auto fragmentShadingRateSupported = _enabledDeviceExtensions.contains(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
-    const auto synchronization2Supported    = _enabledDeviceExtensions.contains(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
-    const auto maintenance4Supported        = _enabledDeviceExtensions.contains(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
+    const auto apiVersion = _handle.getProperties().apiVersion;
 
-    if (accelStructSupported) {
-        _accelStructFeatures.setAccelerationStructure(true);
-        _featureList.insert(_accelStructFeatures);
+    const bool use13 = apiVersion >= VK_API_VERSION_1_3;
+    const bool use12 = apiVersion >= VK_API_VERSION_1_2;
+    const bool use11 = apiVersion >= VK_API_VERSION_1_1;
+
+    // features
+    {
+        LogVerbose("\tCheck Vulkan device features：");
+
+        VulkanChainList list;
+
+        vk::PhysicalDeviceVulkan11Features features_11 = {};
+        vk::PhysicalDeviceVulkan12Features features_12 = {};
+        vk::PhysicalDeviceVulkan13Features features_13 = {};
+        vk::PhysicalDeviceMultiviewFeatures multiviewFeatures = {};
+
+        if (use11) {
+            LogVerbose("\t\tAdd 'Vulkan11' Features.");
+            list.insert(features_11);
+        }
+        if (use12) {
+            LogVerbose("\t\tAdd 'Vulkan12' Features.");
+            list.insert(features_12);
+        }
+        if (use13) {
+            LogVerbose("\t\tAdd 'Vulkan13' Features.");
+            list.insert(features_13);
+        }
+
+        if (isExtensionEnabled(VK_KHR_MULTIVIEW_EXTENSION_NAME)) {
+            LogVerbose("\t\tAdd 'Multiview' Features.");
+            list.insert(multiviewFeatures);
+        }
+
+        vk::PhysicalDeviceFeatures2 features2 = {};
+        features2.pNext = list.head();
+        _handle.getFeatures2(&features2);
+
+        if (use12) {
+            _shaderCaps.f16Supported = features_12.shaderFloat16;
+            _shaderCaps.i8Supported = features_12.shaderInt8;
+        }
+
+        if (isExtensionEnabled(VK_KHR_MULTIVIEW_EXTENSION_NAME)) {
+            _multiviewCaps.isSupported = multiviewFeatures.multiview;
+            _multiviewCaps.geometryShaderSupported = multiviewFeatures.multiviewGeometryShader;
+            _multiviewCaps.tessellationShaderSupported = multiviewFeatures.multiviewTessellationShader;
+        }
+    }
+    
+    LogVerbose("\t===============================");
+
+    // properties
+    {
+        LogVerbose("\tCheck Vulkan device properties：");
+        
+        VulkanChainList list;
+        vk::PhysicalDeviceMultiviewProperties multiviewProps = {};
+        vk::PhysicalDeviceProperties2 properties2 = {};
+
+        if (_multiviewCaps.isSupported) {
+            LogVerbose("\t\tAdd 'Multiview' Properties.");
+            list.insert(multiviewProps);
+        }
+
+        properties2.pNext = list.head();
+        _handle.getProperties2(&properties2);
+
+        if (_multiviewCaps.isSupported) {
+            _multiviewCaps.maxViewCount = multiviewProps.maxMultiviewViewCount;
+            _multiviewCaps.maxInstanceCount = multiviewProps.maxMultiviewInstanceIndex;
+        }
     }
 
-    if (rayPipelineSupported) {
-        _rayTracingPipelineFeatures.setRayTracingPipeline(true).setRayTraversalPrimitiveCulling(true);
-        _featureList.insert(_rayTracingPipelineFeatures);
-    }
+    // print verbose information
+    {
+        LogVerbose("\t\tShader Capabilities:");
+        LogVerbose("\t\t  float 16:\t\t{}", _shaderCaps.f16Supported ? "Support" : "Not Support");
+        LogVerbose("\t\t  int 8:\t\t{}", _shaderCaps.i8Supported ? "Support" : "Not Support");
 
-    if (rayQuerySupported) {
-        _rayQueryFeatures.setRayQuery(true);
-        _featureList.insert(_rayQueryFeatures);
+        LogVerbose("\t\tMultiview Capabilities: {}", _multiviewCaps.isSupported ? "Support" : "Not Support");
+        if (_multiviewCaps.isSupported) {
+            LogVerbose("\t\t  supported:\t\t{}", _multiviewCaps.isSupported ? "True" : "False");
+            LogVerbose("\t\t  geometry shader:\t\t{}", _multiviewCaps.geometryShaderSupported ? "Support" : "Not Support");
+            LogVerbose("\t\t  tessellation shader:\t\t{}", _multiviewCaps.tessellationShaderSupported ? "Support" : "Not Support");
+            LogVerbose("\t\t  max view count:\t\t{}", _multiviewCaps.maxViewCount);
+            LogVerbose("\t\t  max instance count:\t\t{}", _multiviewCaps.maxInstanceCount);
+        }
     }
+}
 
-    if (meshSupported) {
-        _meshShaderFeature.setTaskShader(true).setMeshShader(true);
-        _featureList.insert(_meshShaderFeature);
-    }
+const VK_PhysicalDevice::MultiviewCapabilities& VK_PhysicalDevice::multiviewCapabilities() const
+{
+    return _multiviewCaps;
+}
 
-    if (fragmentShadingRateSupported) {
-        _fragmentShadingRateFeature.setPipelineFragmentShadingRate(true).setPrimitiveFragmentShadingRate(true).setAttachmentFragmentShadingRate(true);
-        _featureList.insert(_fragmentShadingRateFeature);
-    }
-
-    if (synchronization2Supported) {
-        _features13.setSynchronization2(synchronization2Supported);
-    }
-
-    if (maintenance4Supported && _features13.maintenance4) {
-        _featureList.insert(_maintenance4Features);
-    }
+const VK_PhysicalDevice::ShaderCapabilities& VK_PhysicalDevice::shaderCapabilities() const
+{
+    return _shaderCaps;
 }

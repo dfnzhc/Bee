@@ -87,7 +87,7 @@ TEST(GFX_Vulkan, PhysicalDevice)
 
     u32 devId = 0;
     auto physicalDevice = std::make_unique<VK_PhysicalDevice>();
-    EXPECT_EQ(physicalDevice->setup(ctx->apiVersion(), ctx->physicalDevice(devId)), Error::Ok);
+    EXPECT_EQ(physicalDevice->setup(ctx->physicalDevice(devId)), Error::Ok);
 
     // extensions
     {

@@ -29,7 +29,7 @@ Error VK_DeviceDriver::create(const Config& config)
     _frameCount = config.frameCount;
     
     _physicalDevice = std::make_unique<VK_PhysicalDevice>();
-    BEE_REPORT_IF_FAILED(_physicalDevice->setup(_context->apiVersion(), _context->physicalDevice(devIdx)));
+    BEE_REPORT_IF_FAILED(_physicalDevice->setup(_context->physicalDevice(devIdx)));
 
     BEE_REPORT_IF_FAILED(_initDeviceExtensions(config));
     BEE_REPORT_IF_FAILED(_initDevice());
@@ -48,7 +48,7 @@ void VK_DeviceDriver::destroy()
     LogInfo("Vulkan device driver destroyed.");
 }
 
-Error VK_DeviceDriver::_initDeviceExtensions(const Config& config)
+Error VK_DeviceDriver::_initDeviceExtensions(const Config& config) const
 {
     // extensions
     if (!config.headless) {
@@ -68,6 +68,9 @@ Error VK_DeviceDriver::_initDeviceExtensions(const Config& config)
             _physicalDevice->registerExtension(ext, true);
         }
     }
+    
+    _physicalDevice->finalizeRegister();
+    _physicalDevice->checkDeviceCapabilities();
 
     return Error::Ok;
 }
@@ -95,7 +98,7 @@ Error VK_DeviceDriver::_initDevice()
     const auto& layers     = _context->enabledLayers();
 
     vk::DeviceCreateInfo deviceInfo    = {};
-    deviceInfo.pNext                   = _physicalDevice->featureList();
+    deviceInfo.pNext                   = nullptr;
     deviceInfo.queueCreateInfoCount    = static_cast<u32>(queueCreateInfos.size());
     deviceInfo.pQueueCreateInfos       = queueCreateInfos.data();
     deviceInfo.enabledLayerCount       = static_cast<u32>(layers.size());

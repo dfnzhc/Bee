@@ -11,26 +11,20 @@
 #include <GFX/Vulkan/VK_Common.hpp>
 
 namespace bee {
-
 class BEE_API VK_PhysicalDevice final
 {
 public:
-    VK_PhysicalDevice()  = default;
+    VK_PhysicalDevice() = default;
     ~VK_PhysicalDevice() = default;
     BEE_CLASS_MOVABLE_ONLY(VK_PhysicalDevice);
 
-    BEE_NODISCARD Error setup(u32 apiVersion, vk::PhysicalDevice physicalDevice);
+    BEE_NODISCARD Error setup(vk::PhysicalDevice physicalDevice);
 
-    // physical device capabilities
-    BEE_NODISCARD const vk::PhysicalDeviceFeatures& features() const;
-    BEE_NODISCARD const vk::PhysicalDeviceProperties& properties() const;
+    // physical device capabilities;
     BEE_NODISCARD const std::vector<vk::QueueFamilyProperties2>& queueFamilyProperties() const;
 
     BEE_NODISCARD const vk::PhysicalDeviceMemoryProperties& memoryProperties() const;
     BEE_NODISCARD Result<u32> memoryType(uint32_t bits, vk::MemoryPropertyFlags properties) const;
-
-    BEE_NODISCARD vk::PhysicalDeviceFeatures requestedFeatures() const;
-    BEE_NODISCARD void* featureList() const;
 
     // extensions
     void registerExtension(StringView extName, bool required = true);
@@ -53,57 +47,46 @@ public:
     BEE_NODISCARD u32 transferFamilyCount() const;
     BEE_NODISCARD u32 sparseFamilyCount() const;
     BEE_NODISCARD u32 presentationFamilyCount() const;
-    
+
     BEE_NODISCARD bool isSupportPresent(vk::SurfaceKHR surface) const;
 
     //
     vk::PhysicalDevice handle() const;
     BEE_NODISCARD operator vk::PhysicalDevice() const;
 
-private:
-    void setupFeatures();
+    // device capabilities
+    struct MultiviewCapabilities
+    {
+        bool isSupported = false;
+        bool geometryShaderSupported = false;
+        bool tessellationShaderSupported = false;
+        uint32_t maxViewCount = 0;
+        uint32_t maxInstanceCount = 0;
+    };
+
+    struct ShaderCapabilities
+    {
+        bool f16Supported = false;
+        bool i8Supported = false;
+    };
+    
+    void checkDeviceCapabilities();
+
+    const MultiviewCapabilities& multiviewCapabilities() const;
+    const ShaderCapabilities& shaderCapabilities() const;
 
 private:
     vk::PhysicalDevice _handle = VK_NULL_HANDLE;
 
-    vk::PhysicalDeviceFeatures2 _features{};
-    vk::PhysicalDeviceFeatures2 _requestedFeatures{};
-
-    vk::PhysicalDeviceProperties2 _properties{};
     vk::PhysicalDeviceMemoryProperties2 _memoryProperties{};
     std::vector<vk::ExtensionProperties> _deviceExtensions{};
     std::vector<vk::QueueFamilyProperties2> _queueProperties{};
 
-    vk::PhysicalDeviceVulkan11Features _features11{};
-    vk::PhysicalDeviceVulkan12Features _features12{};
-    vk::PhysicalDeviceVulkan13Features _features13{};
-
-    vk::PhysicalDeviceVulkan11Properties _properties11{};
-    vk::PhysicalDeviceVulkan12Properties _properties12{};
-    vk::PhysicalDeviceVulkan13Properties _properties13{};
-
     std::unordered_set<String> _enabledDeviceExtensions{};
     std::unordered_map<StringView, bool> _requestedDeviceExtensions{};
 
-    // Properties
-    vk::PhysicalDeviceRayTracingPipelinePropertiesKHR _rayTracingPipelineProperties{};
-    vk::PhysicalDeviceFragmentDensityMapPropertiesEXT _fragmentDensityMapProperties{};
-    vk::PhysicalDeviceFragmentDensityMapOffsetPropertiesQCOM _fragmentDensityMapOffsetProperties{};
-
-    VulkanChainList _featureList;
-    // Features
-    vk::PhysicalDeviceMultiviewFeatures _multiviewFeatures{};
-    vk::PhysicalDeviceRayQueryFeaturesKHR _rayQueryFeatures{};
-    vk::PhysicalDeviceMeshShaderFeaturesNV _meshShaderFeature{};
-    vk::PhysicalDeviceMaintenance4Features _maintenance4Features{};
-    vk::PhysicalDeviceDescriptorIndexingFeatures _descIndexFeature{};
-    vk::PhysicalDeviceTimelineSemaphoreFeatures _timelineSemaphoreFeature{};
-    vk::PhysicalDeviceAccelerationStructureFeaturesKHR _accelStructFeatures{};
-    vk::PhysicalDeviceBufferDeviceAddressFeatures _bufferDeviceAddressFeatures{};
-    vk::PhysicalDeviceFragmentDensityMapFeaturesEXT _fragmentDensityMapFeature{};
-    vk::PhysicalDeviceRayTracingPipelineFeaturesKHR _rayTracingPipelineFeatures{};
-    vk::PhysicalDeviceFragmentShadingRateFeaturesKHR _fragmentShadingRateFeature{};
-    vk::PhysicalDeviceFragmentDensityMapOffsetFeaturesQCOM _fragmentDensityMapOffsetFeature{};
+    MultiviewCapabilities _multiviewCaps{};
+    ShaderCapabilities _shaderCaps{};
 
     // Queues
     std::optional<u32> _graphicsFamilyIndex;
@@ -112,11 +95,10 @@ private:
     std::optional<u32> _sparseFamilyIndex;
     std::optional<u32> _presentationFamilyIndex;
 
-    u32 _graphicsQueueCount     = 0;
-    u32 _computeQueueCount      = 0;
-    u32 _transferQueueCount     = 0;
-    u32 _sparseQueueCount       = 0;
+    u32 _graphicsQueueCount = 0;
+    u32 _computeQueueCount = 0;
+    u32 _transferQueueCount = 0;
+    u32 _sparseQueueCount = 0;
     u32 _presentationQueueCount = 0;
 };
-
 } // namespace bee
