@@ -6,7 +6,6 @@ AssignSourceGroup(${SOURCE_FILES})
 add_library(${BEE_TARGET} SHARED ${SOURCE_FILES})
 BeeDefaultSettings(${BEE_TARGET})
 
-find_package(volk CONFIG REQUIRED)
 find_package(SDL3 CONFIG REQUIRED)
 find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 
@@ -15,8 +14,7 @@ target_link_libraries(${BEE_TARGET}
         PUBLIC
         Bee::Runtime
         SDL3::SDL3
-        Vulkan::Headers
-        volk::volk_headers
+        volk
         GPUOpen::VulkanMemoryAllocator
 )
 
