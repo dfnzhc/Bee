@@ -8,6 +8,7 @@
 #include "GFX/Vulkan/VK_DeviceDriver.hpp"
 #include "GFX/Vulkan/VK_Context.hpp"
 #include "GFX/Vulkan/VK_PhysicalDevice.hpp"
+#include "GFX/Vulkan/VK_Debug.hpp"
 #include "Base/Common.hpp"
 
 using namespace bee;
@@ -27,7 +28,7 @@ Error VK_DeviceDriver::create(const Config& config)
 
     _deviceInfo = _context->deviceInfo(devIdx);
     _frameCount = config.frameCount;
-    
+
     _physicalDevice = std::make_unique<VK_PhysicalDevice>();
     BEE_REPORT_IF_FAILED(_physicalDevice->setup(_context->physicalDevice(devIdx)));
 
@@ -57,18 +58,18 @@ Error VK_DeviceDriver::_initDeviceExtensions(const Config& config) const
 
     if (config.raytracing) {
         const auto RayTracingExtensions = std::vector<std::string>{
-          VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
-          VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
-          VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME,
-          VK_KHR_RAY_QUERY_EXTENSION_NAME,
-          VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
+            VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
+            VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
+            VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME,
+            VK_KHR_RAY_QUERY_EXTENSION_NAME,
+            VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
         };
 
         for (const auto& ext : RayTracingExtensions) {
             _physicalDevice->registerExtension(ext, true);
         }
     }
-    
+
     _physicalDevice->finalizeRegister();
     _physicalDevice->checkDeviceCapabilities();
 
@@ -107,7 +108,13 @@ Error VK_DeviceDriver::_initDevice()
     deviceInfo.ppEnabledExtensionNames = extensions.data();
 
     _device = _physicalDevice->handle().createDevice(deviceInfo);
-    // TODO: set device object name
+
+    VULKAN_HPP_DEFAULT_DISPATCHER.init(_device);
+    volkLoadDevice(_device);
+
+    _debug = std::make_unique<VK_Debug>();
+    _debug->setup(_device);
+    _debug->setObjectName(_device, "Bee Device");
 
     return {};
 }

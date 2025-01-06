@@ -16,7 +16,7 @@
 // TODO: 创建 Vulkan RHI 的单元测试
 
 namespace bee {
-
+class VK_Debug;
 class VK_Context;
 class VK_PhysicalDevice;
 
@@ -36,13 +36,14 @@ private:
     Error _initPipelineCache();
 
 private:
-    VK_Context* _context                         = nullptr;
-    vk::Device _device                           = VK_NULL_HANDLE;
+    VK_Context* _context = nullptr;
+    vk::Device _device   = VK_NULL_HANDLE;
+
     UniquePtr<VK_PhysicalDevice> _physicalDevice;
+    UniquePtr<VK_Debug> _debug;
 
     GFX_Context::DeviceInfo _deviceInfo = {};
 
     uint32_t _frameCount = 1;
 };
-
 } // namespace bee
