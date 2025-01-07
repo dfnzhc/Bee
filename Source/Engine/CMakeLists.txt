@@ -10,12 +10,12 @@ find_package(SDL3 CONFIG REQUIRED)
 find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 
 target_link_libraries(${BEE_TARGET}
-        #    PRIVATE
         PUBLIC
         Bee::Runtime
         SDL3::SDL3
         volk
         GPUOpen::VulkanMemoryAllocator
+        # PRIVATE
 )
 
 target_compile_options(${BEE_TARGET}

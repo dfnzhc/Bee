@@ -7,16 +7,15 @@ add_library(${BEE_TARGET} SHARED ${SOURCE_FILES})
 BeeDefaultSettings(${BEE_TARGET})
 
 find_package(fmt CONFIG REQUIRED)
-find_package(libassert CONFIG REQUIRED)
 find_package(magic_enum CONFIG REQUIRED)
 find_path(STRINGZILLA_INCLUDE_DIRS "stringzilla/drafts.h")
 
 target_link_libraries(${BEE_TARGET}
-        #    PRIVATE
         PUBLIC
         fmt::fmt
-        libassert::assert
         magic_enum::magic_enum
+        PRIVATE
+        ${Slang_LIBRARY}
 )
 
 target_compile_options(${BEE_TARGET}
@@ -36,4 +35,5 @@ target_include_directories(${BEE_TARGET}
         ${STRINGZILLA_INCLUDE_DIRS}
         PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/Private
+        ${SLANG_SDK_INCLUDES_DIR}
 )

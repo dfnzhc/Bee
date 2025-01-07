@@ -67,6 +67,10 @@ endif ()
 include(HelperFunctions)
 include(Commands)
 
+# Slang
+find_package(Slang)
+include(Slang)
+
 # --------------------------------------------------------------
 # Sources
 # --------------------------------------------------------------
@@ -74,6 +78,7 @@ include(Commands)
 ######################################
 # Extern libraries
 add_subdirectory(External)
+
 
 ######################################
 # Project

@@ -8,7 +8,6 @@
 #include <gtest/gtest.h>
 #include <Math/Math.hpp>
 #include <Math/Polynomial.hpp>
-#include <libassert/assert-gtest.hpp>
 
 using namespace bee;
 

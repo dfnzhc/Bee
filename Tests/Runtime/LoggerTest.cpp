@@ -8,7 +8,6 @@
 
 #include <gtest/gtest.h>
 #include <Utility/Logger.hpp>
-#include <libassert/assert-gtest.hpp>
 
 using namespace bee;
 
