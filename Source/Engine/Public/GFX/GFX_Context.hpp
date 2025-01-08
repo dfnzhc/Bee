@@ -13,7 +13,7 @@
 #include <Utility/String.hpp>
 #include <Memory/Memory.hpp>
 
-#include "GFX/RHI/RHI_Enum.hpp"
+#include <RHI/RHI_Enum.hpp>
 
 namespace bee {
 class GFX_DeviceDriver;

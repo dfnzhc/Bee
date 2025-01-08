@@ -7,8 +7,8 @@
 
 #pragma once
 
-#include <Utility/Enum.hpp>
-#include <Platform/Platform.hpp>
+#include "Utility/Enum.hpp"
+#include "Platform/Platform.hpp"
 
 namespace bee {
 

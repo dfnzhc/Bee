@@ -9,9 +9,9 @@ find_package(GTest CONFIG REQUIRED)
 
 set(${CMAKE_CURRENT_BINARY_DIR})
 
-AddTestProgram(Runtime/LoggerTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Runtime")
+AddTestProgram(Runtime/UtilityTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Runtime")
 AddTestProgram(Runtime/MathTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Runtime")
-AddTestProgram(Runtime/InputsTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Runtime")
+AddTestProgram(Runtime/IOTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Runtime")
 AddTestProgram(Runtime/ObjectTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Runtime")
 AddTestProgram(Runtime/GraphTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Runtime")
 AddTestProgram(GFX/VulkanTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Engine")
