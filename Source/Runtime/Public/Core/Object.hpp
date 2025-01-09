@@ -14,21 +14,30 @@
 #include <cstdint>
 #include <fmt/core.h>
 
+#ifdef BEE_ENABLE_DEBUG
 #define BEE_ENABLE_REF_TRACKING 1
+#endif
 
 #if BEE_ENABLE_REF_TRACKING
 #  include <map>
 #  include <mutex>
 #endif
 
-namespace bee {
+#if BEE_ENABLE_REF_TRACKING
+#define BEE_REF_CONST
+#else
+#define BEE_REF_CONST const
+#endif
 
+namespace bee {
 class BEE_API Object
 {
 public:
     Object() = default;
 
-    Object(const Object&) { }
+    Object(const Object&)
+    {
+    }
 
     Object& operator=(const Object&) { return *this; }
 
@@ -89,42 +98,43 @@ public:                                                                         
         return #class_;                                                                                                                              \
     }
 
-template<typename T> class ref
+template<typename T> class Ref
 {
 public:
-    static_assert(std::derived_from<T, Object>, "需要是 Object 的派生类型.");
+    static_assert(std::derived_from<T, Object>, "Must derived from class [Object].");
 
-    ref() = default;
+    Ref() = default;
 
-    ref(std::nullptr_t) { }
-
-    template<typename U = T>
-        requires std::derived_from<U, Object> and std::convertible_to<U*, T*>
-    ref(U* ptr) : _ptr(ptr)
+    Ref(std::nullptr_t)
     {
-        if (_ptr)
-            incRef((const Object*)(_ptr));
-    }
-
-    ref(const ref& r) : _ptr(r._ptr)
-    {
-        if (_ptr)
-            incRef((const Object*)(_ptr));
     }
 
     template<typename U = T>
         requires std::derived_from<U, Object> and std::convertible_to<U*, T*>
-    ref(const ref<U>& r) : _ptr(r._ptr)
+    Ref(U* ptr) : _ptr(ptr)
     {
         if (_ptr)
-            incRef((const Object*)(_ptr));
+            incRef(reinterpret_cast<const Object*>(_ptr));
     }
 
-    ref(ref&& r) noexcept
-    : _ptr(r._ptr)
+    Ref(const Ref& r) : _ptr(r._ptr)
+    {
+        if (_ptr)
+            incRef(reinterpret_cast<const Object*>(_ptr));
+    }
+
+    template<typename U = T>
+        requires std::derived_from<U, Object> and std::convertible_to<U*, T*>
+    Ref(const Ref<U>& r) : _ptr(r._ptr)
+    {
+        if (_ptr)
+            incRef(reinterpret_cast<const Object*>(_ptr));
+    }
+
+    Ref(Ref&& r) noexcept
+        : _ptr(r._ptr)
 #if BEE_ENABLE_REF_TRACKING
-      ,
-      _refId(r._refId)
+      , _refId(r._refId)
 #endif
     {
         r._ptr = nullptr;
@@ -135,11 +145,10 @@ public:
 
     template<typename U>
         requires std::derived_from<U, Object> and std::convertible_to<U*, T*>
-    ref(ref<U>&& r) noexcept
-    : _ptr(r._ptr)
+    Ref(Ref<U>&& r) noexcept
+        : _ptr(r._ptr)
 #if BEE_ENABLE_REF_TRACKING
-      ,
-      _refId(r._refId)
+      , _refId(r._refId)
 #endif
     {
         r._ptr = nullptr;
@@ -148,45 +157,45 @@ public:
 #endif
     }
 
-    ~ref()
+    ~Ref()
     {
         if (_ptr)
             decRef((const Object*)(_ptr));
     }
 
-    ref& operator=(const ref& r) noexcept
+    Ref& operator=(const Ref& r) noexcept
     {
         if (r != *this) {
             if (r._ptr)
-                incRef((const Object*)(r._ptr));
+                incRef(reinterpret_cast<const Object*>(r._ptr));
             T* prevPtr = _ptr;
             _ptr       = r._ptr;
             if (prevPtr)
-                decRef((const Object*)(prevPtr));
+                decRef(reinterpret_cast<const Object*>(prevPtr));
         }
         return *this;
     }
 
     template<typename U>
         requires std::convertible_to<U*, T*>
-    ref& operator=(const ref<U>& r) noexcept
+    Ref& operator=(const Ref<U>& r) noexcept
     {
         if (r != *this) {
             if (r._ptr)
-                incRef((const Object*)(r._ptr));
+                incRef(reinterpret_cast<const Object*>(r._ptr));
             T* prevPtr = _ptr;
             _ptr       = r._ptr;
             if (prevPtr)
-                decRef((const Object*)(prevPtr));
+                decRef(reinterpret_cast<const Object*>(prevPtr));
         }
         return *this;
     }
 
-    ref& operator=(ref&& r) noexcept
+    Ref& operator=(Ref&& r) noexcept
     {
         if (static_cast<void*>(&r) != this) {
             if (_ptr)
-                decRef((const Object*)(_ptr));
+                decRef(reinterpret_cast<const Object*>(_ptr));
             _ptr   = r._ptr;
             r._ptr = nullptr;
 #if BEE_ENABLE_REF_TRACKING
@@ -199,11 +208,11 @@ public:
 
     template<typename U>
         requires std::convertible_to<U*, T*>
-    ref& operator=(ref<U>&& r) noexcept
+    Ref& operator=(Ref<U>&& r) noexcept
     {
         if (static_cast<void*>(&r) != this) {
             if (_ptr)
-                decRef((const Object*)(_ptr));
+                decRef(reinterpret_cast<const Object*>(_ptr));
             _ptr   = r._ptr;
             r._ptr = nullptr;
 #if BEE_ENABLE_REF_TRACKING
@@ -220,31 +229,31 @@ public:
     {
         if (ptr != _ptr) {
             if (ptr)
-                incRef((const Object*)(ptr));
+                incRef(reinterpret_cast<const Object*>(ptr));
             T* prevPtr = _ptr;
             _ptr       = ptr;
             if (prevPtr)
-                decRef((const Object*)(prevPtr));
+                decRef(reinterpret_cast<const Object*>(prevPtr));
         }
     }
 
     template<typename U = T>
         requires std::convertible_to<U*, T*> || std::convertible_to<T*, U*>
-    bool operator==(const ref<U>& r) const
+    bool operator==(const Ref<U>& r) const
     {
         return _ptr == r._ptr;
     }
 
     template<typename U = T>
         requires std::convertible_to<U*, T*> || std::convertible_to<T*, U*>
-    bool operator!=(const ref<U>& r) const
+    bool operator!=(const Ref<U>& r) const
     {
         return _ptr != r._ptr;
     }
 
     template<typename U = T>
         requires std::convertible_to<U*, T*> || std::convertible_to<T*, U*>
-    bool operator<(const ref<U>& r) const
+    bool operator<(const Ref<U>& r) const
     {
         return _ptr < r._ptr;
     }
@@ -277,7 +286,7 @@ public:
 
     // clang-format on
 
-    void swap(ref& r) noexcept
+    void swap(Ref& r) noexcept
     {
         std::swap(_ptr, r._ptr);
 #if BEE_ENABLE_REF_TRACKING
@@ -286,7 +295,7 @@ public:
     }
 
 private:
-    inline void incRef(const Object* object)
+    inline void incRef(const Object* object) BEE_REF_CONST
     {
 #if BEE_ENABLE_REF_TRACKING
         object->incRef(_refId);
@@ -295,7 +304,7 @@ private:
 #endif
     }
 
-    inline void decRef(const Object* object)
+    inline void decRef(const Object* object) BEE_REF_CONST
     {
 #if BEE_ENABLE_REF_TRACKING
         object->decRef(_refId);
@@ -311,41 +320,41 @@ private:
 #endif
 
 private:
-    template<typename U> friend class ref;
+    template<typename U> friend class Ref;
 };
 
-template<class T, class... Args> ref<T> make_ref(Args&&... args)
+template<class T, class... Args> Ref<T> make_ref(Args&&... args)
 {
-    return ref<T>(new T(std::forward<Args>(args)...));
+    return Ref<T>(new T(std::forward<Args>(args)...));
 }
 
-template<class T, class U> ref<T> static_ref_cast(const ref<U>& r) noexcept
+template<class T, class U> Ref<T> static_ref_cast(const Ref<U>& r) noexcept
 {
-    return ref<T>(static_cast<T*>(r.get()));
+    return Ref<T>(static_cast<T*>(r.get()));
 }
 
-template<class T, class U> ref<T> dynamic_ref_cast(const ref<U>& r) noexcept
+template<class T, class U> Ref<T> dynamic_ref_cast(const Ref<U>& r) noexcept
 {
-    return ref<T>(dynamic_cast<T*>(r.get()));
+    return Ref<T>(dynamic_cast<T*>(r.get()));
 }
 
-template<typename T> class BreakableReference
+template<typename T> class WeakRef
 {
 public:
     // clang-format off
-    BreakableReference(const ref<T>& r) : mStrongRef(r), mWeakRef(mStrongRef.get()) { }
-    BreakableReference(ref<T>&& r) : mStrongRef(r), mWeakRef(mStrongRef.get()) { }
+    WeakRef(const Ref<T>& r) : mStrongRef(r), mWeakRef(mStrongRef.get()) { }
+    WeakRef(Ref<T>&& r) : mStrongRef(r), mWeakRef(mStrongRef.get()) { }
 
-    BreakableReference()                         = delete;
-    BreakableReference& operator=(const ref<T>&) = delete;
-    BreakableReference& operator=(ref<T>&&)      = delete;
+    WeakRef()                         = delete;
+    WeakRef& operator=(const Ref<T>&) = delete;
+    WeakRef& operator=(Ref<T>&&)      = delete;
 
     T* get() const { return mWeakRef; }
 
     T* operator->() const { return get(); }
     T& operator*() const { return *get(); }
 
-    operator ref<T>() const { return ref<T>(get()); }
+    operator Ref<T>() const { return Ref<T>(get()); }
     operator T*() const { return get(); }
     operator bool() const { return get() != nullptr; }
 
@@ -354,38 +363,35 @@ public:
     // clang-format on
 
 private:
-    ref<T> mStrongRef;
+    Ref<T> mStrongRef;
     T* mWeakRef = nullptr;
 };
-
 } // namespace bee
 
-template<typename T> struct fmt::formatter<bee::ref<T>> : formatter<const void*>
+template<typename T> struct fmt::formatter<bee::Ref<T>> : formatter<const void*>
 {
-    template<typename FormatContext> auto format(const bee::ref<T>& ref, FormatContext& ctx) const
+    template<typename FormatContext> auto format(const bee::Ref<T>& ref, FormatContext& ctx) const
     {
         return formatter<const void*>::format(ref.get(), ctx);
     }
 };
 
-template<typename T> struct fmt::formatter<bee::BreakableReference<T>> : formatter<const void*>
+template<typename T> struct fmt::formatter<bee::WeakRef<T>> : formatter<const void*>
 {
-    template<typename FormatContext> auto format(const bee::BreakableReference<T>& ref, FormatContext& ctx) const
+    template<typename FormatContext> auto format(const bee::WeakRef<T>& ref, FormatContext& ctx) const
     {
         return formatter<const void*>::format(ref.get(), ctx);
     }
 };
 
 namespace std {
-
-template<typename T> void swap(::bee::ref<T>& x, ::bee::ref<T>& y) noexcept
+template<typename T> void swap(::bee::Ref<T>& x, ::bee::Ref<T>& y) noexcept
 {
     return x.swap(y);
 }
 
-template<typename T> struct hash<::bee::ref<T>>
+template<typename T> struct hash<::bee::Ref<T>>
 {
-    constexpr size_t operator()(const ::bee::ref<T>& r) const { return std::hash<T*>()(r.get()); }
+    constexpr size_t operator()(const ::bee::Ref<T>& r) const { return std::hash<T*>()(r.get()); }
 };
-
 } // namespace std

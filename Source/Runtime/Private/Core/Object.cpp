@@ -19,10 +19,8 @@ using namespace bee;
 #  include "Utility/Graph/Graph.hpp"
 
 namespace {
-
 std::mutex sTrackedObjectsMutex;
 std::set<const Object*> sTrackedObjects;
-
 } // namespace
 #endif
 
@@ -40,7 +38,7 @@ void Object::incRef() const
 void Object::decRef(bool dealloc) const noexcept
 {
     uint32_t refCount = _refCount.fetch_sub(1);
-    BEE_ASSERT(refCount > 0, "无效的对象引用数量: {} {}", className(), refCount);
+    BEE_ASSERT(refCount > 0, "Invalid object reference count: {} {}", className(), refCount);
 
     if (refCount == 1) {
 #if BEE_ENABLE_REF_TRACKING
@@ -59,7 +57,7 @@ void Object::decRef(bool dealloc) const noexcept
 void Object::dumpAliveObjects()
 {
     std::lock_guard<std::mutex> lock(sTrackedObjectsMutex);
-    LogInfo("共 '{}' 个存活对象:", sTrackedObjects.size());
+    LogInfo("'{}' Objects alive:", sTrackedObjects.size());
     for (const auto* object : sTrackedObjects)
         object->dumpRefs();
 
@@ -68,21 +66,21 @@ void Object::dumpAliveObjects()
     for (const auto* object : sTrackedObjects) {
         auto va = graph.addVertex(std::format("{}({})", object->className(), fmt::ptr(object)));
         for (const auto& it : object->_refTrackers) {
-            auto vb = graph.addVertex(std::format("{}", it.first));
+            auto vb = graph.addVertex(std::format("ref '{}'", it.first));
             graph.addEdge(vb, va, 1);
         }
     }
 
     Dump(std::cout, graph);
-    std::cout << std::endl;
+    std::cout << '\n';
 }
 
 void Object::dumpRefs() const
 {
-    LogInfo("对象 (类为\"{}\", 地址 = {}) 存在 '{}' 个引用", className(), fmt::ptr(this), refCount());
+    LogInfo("Object (Class \"{}\", Addr = {}) exits '{}' reference", className(), fmt::ptr(this), refCount());
     std::lock_guard<std::mutex> lock(_refTrackerMutex);
     for (const auto& it : _refTrackers) {
-        LogInfo("\t[{}] 数量 = {}\t{}", it.first, it.second.count, it.second.origin);
+        LogInfo("\t[{}] Count = {}\t{}", it.first, it.second.count, it.second.origin);
     }
 }
 

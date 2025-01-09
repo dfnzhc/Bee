@@ -54,10 +54,6 @@ template<typename... Args> std::unexpected<StringView> Unexpected(fmt::format_st
 }
 
 // clang-format off
-#ifdef _MSC_VER
-#  pragma warning(push)
-#  pragma warning(disable:4'275) // allow dllexport on classes dervied from STL
-#endif
 
 class BEE_API Exception : public std::exception
 {
@@ -73,10 +69,6 @@ public:
 protected:
     std::shared_ptr<String> _pWhat;
 };
-
-#ifdef _MSC_VER
-#  pragma warning(pop)
-#endif
 
 class BEE_API RuntimeError : public Exception
 {
@@ -166,7 +158,7 @@ template<typename... Args>
 #define BEE_ASSERT_LE(a, b) BEE_ASSERT_OP(a, b, <=)
 #define BEE_ASSERT_LT(a, b) BEE_ASSERT_OP(a, b, <)
 
-#ifdef BEE_ENABLE_DEBUG_ASSERTS
+#ifdef BEE_ENABLE_DEBUG
 
 #  define BEE_DEBUG_ASSERT(cond, ...)   BEE_ASSERT(cond, __VA_ARGS__)
 #  define BEE_DEBUG_ASSERT_OP(a, b, OP) BEE_ASSERT_OP(a, b, OP)
@@ -178,7 +170,7 @@ template<typename... Args>
 #  define BEE_DEBUG_ASSERT_LE(a, b) BEE_DEBUG_ASSERT_OP(a, b, <=)
 #  define BEE_DEBUG_ASSERT_LT(a, b) BEE_DEBUG_ASSERT_OP(a, b, <)
 
-#else // BEE_ENABLE_DEBUG_ASSERTS
+#else // BEE_ENABLE_DEBUG
 
 #  define BEE_DEBUG_ASSERT(cond, ...)                                                                                                                \
       do {                                                                                                                                           \
@@ -197,7 +189,7 @@ template<typename... Args>
 #  define BEE_DEBUG_ASSERT_LE(a, b) BEE_DEBUG_ASSERT_OP(a, b, <=)
 #  define BEE_DEBUG_ASSERT_LT(a, b) BEE_DEBUG_ASSERT_OP(a, b, <)
 
-#endif // BEE_ENABLE_DEBUG_ASSERTS
+#endif // BEE_ENABLE_DEBUG
 
 /// 异常处理
 // TODO: 目前只做报告，考虑支持恢复？

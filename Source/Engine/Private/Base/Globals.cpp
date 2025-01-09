@@ -16,9 +16,6 @@ class GlobalState
 public:
     bool IsRequestingExit = false;
     
-    // TODO：添加控制
-    bool IsVerbosePrintEnable = true;
-    
     bool IsValidationLayerEnable = true;
 };
 
@@ -35,11 +32,6 @@ bool Globals::IsEngineExitRequested()
 void Globals::RequestEngineExit()
 {
     globals.IsRequestingExit = true;
-}
-
-bool Globals::IsPrintVerboseEnabled()
-{
-    return globals.IsVerbosePrintEnable;
 }
 
 bool Globals::EnableValidationLayer()

@@ -39,12 +39,12 @@ class ObjectRefTest : public ::testing::Test
 protected:
 
     Object* raw_obj = new Object();
-    ref<Object> ref_obj = raw_obj;
+    Ref<Object> ref_obj = raw_obj;
 };
 
 TEST_F(ObjectRefTest, DefaultCtor)
 {
-    ref<Object> empty;
+    Ref<Object> empty;
     EXPECT_EQ(empty.get(), nullptr);
 }
 
@@ -56,14 +56,14 @@ TEST_F(ObjectRefTest, PtrCtor)
 
 TEST_F(ObjectRefTest, CopyCtor)
 {
-    ref<Object> copy(ref_obj);
+    Ref<Object> copy(ref_obj);
     EXPECT_EQ(copy.get(), raw_obj);
     EXPECT_EQ(raw_obj->refCount(), 2);
 }
 
 TEST_F(ObjectRefTest, MoveCtor)
 {
-    ref<Object> moved(std::move(ref_obj));
+    Ref<Object> moved(std::move(ref_obj));
     EXPECT_EQ(moved.get(), raw_obj);
     EXPECT_EQ(ref_obj.get(), nullptr);
     EXPECT_EQ(raw_obj->refCount(), 1);
@@ -71,7 +71,7 @@ TEST_F(ObjectRefTest, MoveCtor)
 
 TEST_F(ObjectRefTest, CopyAssignment)
 {
-    ref<Object> copy;
+    Ref<Object> copy;
     copy = ref_obj;
     EXPECT_EQ(copy.get(), raw_obj);
     EXPECT_EQ(raw_obj->refCount(), 2);
@@ -79,7 +79,7 @@ TEST_F(ObjectRefTest, CopyAssignment)
 
 TEST_F(ObjectRefTest, MoveAssignment)
 {
-    ref<Object> moved;
+    Ref<Object> moved;
     moved = std::move(ref_obj);
     EXPECT_EQ(moved.get(), raw_obj);
     EXPECT_EQ(ref_obj.get(), nullptr);
@@ -89,7 +89,7 @@ TEST_F(ObjectRefTest, MoveAssignment)
 TEST_F(ObjectRefTest, Reset)
 {
     auto* new_obj = new Object();
-    ref<Object> new_ref(new_obj);
+    Ref<Object> new_ref(new_obj);
     ref_obj.reset(new_obj);
     EXPECT_EQ(ref_obj.get(), new_ref.get());
     EXPECT_EQ(new_obj->refCount(), 2);
@@ -97,16 +97,16 @@ TEST_F(ObjectRefTest, Reset)
 
 TEST_F(ObjectRefTest, Equality)
 {
-    ref<Object> ref1 = raw_obj;
-    ref<Object> ref2 = raw_obj;
+    Ref<Object> ref1 = raw_obj;
+    Ref<Object> ref2 = raw_obj;
     EXPECT_TRUE(ref1 == ref2);
 }
 
 TEST_F(ObjectRefTest, Inequality)
 {
     auto* another_obj = new Object();
-    ref<Object> ref1    = raw_obj;
-    ref<Object> ref2    = another_obj;
+    Ref<Object> ref1    = raw_obj;
+    Ref<Object> ref2    = another_obj;
     EXPECT_TRUE(ref1 != ref2);
 }
 
@@ -122,17 +122,17 @@ TEST_F(ObjectRefTest, ArrowOperator)
 
 TEST_F(ObjectRefTest, BoolConversion)
 {
-    ref<Object> empty;
+    Ref<Object> empty;
     EXPECT_FALSE(empty);
-    ref<Object> non_empty = raw_obj;
+    Ref<Object> non_empty = raw_obj;
     EXPECT_TRUE(non_empty);
 }
 
 TEST_F(ObjectRefTest, Swap)
 {
     auto* another_obj = new Object();
-    ref<Object> ref1    = raw_obj;
-    ref<Object> ref2    = another_obj;
+    Ref<Object> ref1    = raw_obj;
+    Ref<Object> ref2    = another_obj;
     ref1.swap(ref2);
     EXPECT_EQ(ref1.get(), another_obj);
     EXPECT_EQ(ref2.get(), raw_obj);
@@ -145,7 +145,7 @@ TEST_F(ObjectRefTest, Destructor)
     auto* temp_obj = new Object();
     EXPECT_EQ(temp_obj->refCount(), 0);
     {
-        ref<Object> temp_ref = temp_obj;
+        Ref<Object> temp_ref = temp_obj;
         EXPECT_EQ(temp_obj->refCount(), 1);
     }
     EXPECT_EQ(temp_obj->refCount(), 0);

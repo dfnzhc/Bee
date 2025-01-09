@@ -28,6 +28,7 @@ public:
         Error,
         Warning,
         Info,
+        Debug,
     };
 
     static Logger& Instance()
@@ -49,7 +50,12 @@ private:
     ~Logger() = default;
 
     std::mutex _mutex    = {};
-    Logger::Level _level = Logger::Level::Info;
+    Logger::Level _level =
+#ifdef BEE_ENABLE_DEBUG
+        Logger::Level::Debug;
+#else
+        Logger::Level::Info;
+#endif
     
     std::unordered_map<std::string_view, LogNotifyType> _subscribers = {};
 };
@@ -61,6 +67,16 @@ inline auto operator<=>(Logger::Level lhs, Logger::Level rhs)
 
 // @formatter:off
 
+inline void LogDebug(std::string_view msg)
+{
+    Logger::Instance().log(Logger::Level::Debug, msg);
+}
+
+template<typename... Args> inline void LogDebug(fmt::format_string<Args...> format, Args&&... args)
+{
+    Logger::Instance().log(Logger::Level::Debug, fmt::format(format, std::forward<Args>(args)...));
+}
+
 inline void LogInfo(std::string_view msg)
 {
     Logger::Instance().log(Logger::Level::Info, msg);
@@ -69,6 +85,20 @@ inline void LogInfo(std::string_view msg)
 template<typename... Args> inline void LogInfo(fmt::format_string<Args...> format, Args&&... args)
 {
     Logger::Instance().log(Logger::Level::Info, fmt::format(format, std::forward<Args>(args)...));
+}
+
+inline void LogVerbose(std::string_view msg)
+{
+#ifdef BEE_ENABLE_DEBUG
+    Logger::Instance().log(Logger::Level::Info, msg);
+#endif
+}
+
+template<typename... Args> inline void LogVerbose(fmt::format_string<Args...> format, Args&&... args)
+{
+#ifdef BEE_ENABLE_DEBUG
+    Logger::Instance().log(Logger::Level::Info, fmt::format(format, std::forward<Args>(args)...));
+#endif
 }
 
 inline void LogWarn(std::string_view msg)

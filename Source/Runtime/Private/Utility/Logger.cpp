@@ -23,6 +23,7 @@ constexpr inline const char* logLevelString(Logger::Level level)
     case Logger::Level::Error   : return "Error";
     case Logger::Level::Warning : return " Warn";
     case Logger::Level::Info    : return " Info";
+    case Logger::Level::Debug   : return "Debug";
     }
     BEE_UNREACHABLE();
 }
@@ -42,12 +43,13 @@ void Logger::log(Level level, std::string_view msg)
     case Logger::Level::Error   : color = fmt::color::magenta; break;
     case Logger::Level::Warning : color = fmt::color::coral; break;
     case Logger::Level::Info    : color = fmt::color::green_yellow; break;
+    case Logger::Level::Debug   : color = fmt::color::white_smoke; break;
     }
 
     const auto s = fmt::format(fmt::fg(color), "[{}]: {}", logLevelString(level), msg);
     auto& os     = std::cout; //level > Logger::Level::Error ? std::cout : std::cerr;
-    os << s << std::endl;
-    //    std::flush(os);
+    os << s << '\n';
+    std::flush(os);
 
     if (!_subscribers.empty()) {
         for (const auto& notify : _subscribers | std::views::values) {

@@ -26,7 +26,7 @@ target_compile_options(${BEE_TARGET}
 
 target_compile_definitions(${BEE_TARGET} 
         PUBLIC 
-        "$<$<CONFIG:RelWithDebInfo>:BEE_ENABLE_DEBUG_ASSERTS>"
+        "$<$<CONFIG:Debug,RelWithDebInfo>:BEE_ENABLE_DEBUG>"
 )
 
 target_include_directories(${BEE_TARGET} 

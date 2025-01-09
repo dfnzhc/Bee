@@ -22,8 +22,6 @@ public:
     static bool IsEngineExitRequested();
     static void RequestEngineExit();
     
-    static bool IsPrintVerboseEnabled();
-
     // -------------------------
     // 渲染相关
     // -------------------------

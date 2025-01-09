@@ -19,6 +19,9 @@ TEST(LoggerTest, BasicOutput)
     float b       = 2.f;
     std::string c = "3.0";
 
+    LogDebug("Hello from info");
+    LogDebug("Hello from info: {} {} {}", a, b, c);
+    
     LogInfo("Hello from info");
     LogInfo("Hello from info: {} {} {}", a, b, c);
 

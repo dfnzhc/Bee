@@ -12,11 +12,4 @@
 
 namespace bee {
 
-#define LogVerbose(...)                                                                                                                              \
-    do {                                                                                                                                             \
-        if (Globals::IsPrintVerboseEnabled()) {                                                                                                      \
-            LogInfo(__VA_ARGS__);                                                                                                                    \
-        }                                                                                                                                            \
-    } while (false)
-
 } // namespace bee
