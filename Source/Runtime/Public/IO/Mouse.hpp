@@ -48,31 +48,14 @@ struct MouseEvent
 
     friend BEE_CONSTEXPR bool operator==(const MouseEvent& lhs, const MouseEvent& rhs)
     {
-        return lhs.type == rhs.type && lhs.pos == rhs.pos && lhs.screenPos == rhs.screenPos && lhs.wheelDelta == rhs.wheelDelta &&
-               lhs.button == rhs.button;
+        return lhs.type == rhs.type && lhs.pos == rhs.pos && lhs.screenPos == rhs.screenPos && lhs.wheelDelta == rhs.wheelDelta && lhs.button == rhs.button;
     }
 
     // clang-format off
     BEE_NODISCARD friend std::string ToString(const MouseEvent& me)
     {
-        std::string_view typeName;
-        switch (me.type) {
-        case Type::ButtonDown : typeName = "按下"; break;
-        case Type::ButtonUp   : typeName = "松开"; break;
-        case Type::Move       : typeName = "移动"; break;
-        case Type::Wheel      : typeName = "滚轮"; break;
-        }
-
-        std::string_view btn;
-        switch (me.button) {
-        case Button::Left   : btn = "左键"; break;
-        case Button::Middle : btn = "中建"; break;
-        case Button::Right  : btn = "右键"; break;
-        case Button::Unknown: btn = "未知"; break;
-        }
-
-        return fmt::format("鼠标 [\"{}{}\" - {},{}({:.3f},{:.3f})|{:.3f}/{:.3f}]",
-                           typeName, btn, static_cast<int>(me.screenPos.x), static_cast<int>(me.screenPos.y),
+        return fmt::format("Mouse [\"{}{}\" - {},{}({:.3f},{:.3f})|{:.3f}/{:.3f}]",
+                           me::enum_name(me.type), me::enum_name(me.button), static_cast<int>(me.screenPos.x), static_cast<int>(me.screenPos.y),
                            me.pos.x, me.pos.y, me.wheelDelta.x, me.wheelDelta.y);
     }
 

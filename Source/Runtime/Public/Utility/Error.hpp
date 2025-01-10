@@ -19,10 +19,10 @@ namespace bee {
 enum class Error
 {
     Ok = 0,
-    Failed,          // 通常意义的失败
-    InitializeError, // 初始化失败
-    VulkanError,     // Vulkan 调用失败
-    CheckError,      // 当不满足预定条件
+    Failed,          ///> general failure
+    InitializeError, ///>
+    VulkanError,     ///>
+    CheckError,      ///> predetermined condition not met
 };
 
 inline constexpr std::string_view ErrorName(Error err)
@@ -34,7 +34,7 @@ inline constexpr std::string_view ErrorName(Error err)
     do {                                                                                                                                             \
         auto err = expr;                                                                                                                             \
         if (err != Error::Ok) [[unlikely]] {                                                                                                         \
-            LogError("Failed：'{}' = {}", #expr, ErrorName(err));                                                                                  \
+            LogError("Failed: '{}' = {}", #expr, ErrorName(err));                                                                                    \
             return err;                                                                                                                              \
         }                                                                                                                                            \
         else                                                                                                                                         \
@@ -191,7 +191,6 @@ template<typename... Args>
 
 #endif // BEE_ENABLE_DEBUG
 
-/// 异常处理
 // TODO: 目前只做报告，考虑支持恢复？
 template<typename CallbackT, typename ResultT = int> inline int CatchAndReportAllExceptions(CallbackT callback, ResultT errorResult = 1)
 {

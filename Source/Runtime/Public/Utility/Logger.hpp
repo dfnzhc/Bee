@@ -21,7 +21,6 @@ using LogNotifyType = std::function<void(const std::string&)>;
 class BEE_API Logger
 {
 public:
-    /// 日志等级
     enum class Level
     {
         Fatal,

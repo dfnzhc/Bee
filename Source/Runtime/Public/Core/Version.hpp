@@ -11,8 +11,7 @@
 #define BEE_VERSION_MINOR 0
 #define BEE_VERSION_PATCH 1
 
-#define BEE_MAKE_VERSION(variant, major, minor, patch)                                                                                           \
-    ((((uint32_t)(variant)) << 29U) | (((uint32_t)(major)) << 22U) | (((uint32_t)(minor)) << 12U) | ((uint32_t)(patch)))
+#define BEE_MAKE_VERSION(variant, major, minor, patch) ((((uint32_t)(variant)) << 29U) | (((uint32_t)(major)) << 22U) | (((uint32_t)(minor)) << 12U) | ((uint32_t)(patch)))
 
 #define BEE_VERSION BEE_MAKE_VERSION(0, BEE_VERSION_MAJOR, BEE_VERSION_MINOR, BEE_VERSION_PATCH)
 

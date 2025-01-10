@@ -58,7 +58,7 @@ struct EdgeIdHash
 };
 
 // -------------------------
-// 边
+// Edge
 // -------------------------
 
 template<typename Weight = int> class WeightedEdge
@@ -89,12 +89,12 @@ BEE_NODISCARD E EdgeWeight(const E& edge)
 
 template<typename E> BEE_NODISCARD int EdgeWeight(const E&)
 {
-    // 默认权重都是 1
+    // default weight always 1
     return 1;
 }
 
 // -------------------------
-// 图
+// graph
 // -------------------------
 
 enum class GraphType
@@ -120,7 +120,7 @@ public:
     BEE_NODISCARD constexpr bool isUndirected() const { return T == GraphType::Undirected; }
 
     // -------------------------
-    // 顶点
+    // vertex
     // -------------------------
 
     BEE_NODISCARD std::size_t        vertexCount() const noexcept;
@@ -141,7 +141,7 @@ public:
     void removeVertex(VertexId vid);
 
     // -------------------------
-    // 边
+    // edge
     // -------------------------
     BEE_NODISCARD std::size_t     edgeCount() const noexcept;
     BEE_NODISCARD const EdgesMap& edges()  const noexcept { return _edges; }
@@ -184,7 +184,7 @@ template<typename V, typename E, GraphType T> V& Graph<V, E, T>::vertex(VertexId
 
 template<typename V, typename E, GraphType T> const V& Graph<V, E, T>::vertex(VertexId vid) const
 {
-    BEE_ASSERT(hasVertex(vid), "没有在图中发现顶点 [{}]", vid);
+    BEE_DEBUG_ASSERT(hasVertex(vid), "No vertex [{}] in the graph.", vid);
     return _vertices.at(vid);
 }
 
@@ -208,7 +208,7 @@ template<typename V, typename E, GraphType T> VertexId Graph<V, E, T>::addVertex
 
 template<typename V, typename E, GraphType T> VertexId Graph<V, E, T>::addVertex(auto&& vertex, VertexId vid)
 {
-    BEE_ASSERT(!hasVertex(vid), "顶点 [{}] 已经存在", vid);
+    BEE_DEBUG_ASSERT(!hasVertex(vid), "Vertex [{}] already exists.", vid);
     _vertices.emplace(vid, std::forward<decltype(vertex)>(vertex));
     return vid;
 }
@@ -286,7 +286,7 @@ template<typename V, typename E, GraphType T> typename Graph<V, E, T>::EdgeType&
 
 template<typename V, typename E, GraphType T> const typename Graph<V, E, T>::EdgeType& Graph<V, E, T>::edge(VertexId va, VertexId vb) const
 {
-    BEE_ASSERT(hasEdge(va, vb), "顶点 [{}] -> [{}] 不存在边", va, vb);
+    BEE_DEBUG_ASSERT(hasEdge(va, vb), "No edge between v[{}] -> v[{}].", va, vb);
 
     if constexpr (T == GraphType::Directed) {
         return _edges.at({va, vb});
@@ -312,8 +312,8 @@ template<typename V, typename E, GraphType T> const typename Graph<V, E, T>::Edg
 
 template<typename V, typename E, GraphType T> void Graph<V, E, T>::addEdge(VertexId va, VertexId vb, auto&& edge)
 {
-    BEE_ASSERT(hasVertex(va), "顶点 [{}] 不存在", va);
-    BEE_ASSERT(hasVertex(vb), "顶点 [{}] 不存在", vb);
+    BEE_DEBUG_ASSERT(hasVertex(va), "Vertex [{}] not exists.", va);
+    BEE_DEBUG_ASSERT(hasVertex(vb), "Vertex [{}] not exists.", vb);
 
     if constexpr (T == GraphType::Directed) {
         _adjacencyList[va].insert(vb);

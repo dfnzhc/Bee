@@ -156,15 +156,7 @@ struct KeyboardEvent
     
     BEE_NODISCARD friend std::string ToString(const KeyboardEvent& ke)
     {
-        std::string_view typeName;
-        switch (ke.type) {
-        case Type::Pressed  : typeName = "按下"; break;
-        case Type::Released : typeName = "松开"; break;
-        case Type::Repeated : typeName = "重复"; break;
-        case Type::Input    : typeName = "输入"; break;
-        }
-
-        return fmt::format("键盘 [\"{}:{}\"]", typeName, me::enum_name(ke.key));
+        return fmt::format("Keyboard [\"{}:{}\"]", me::enum_name(ke.type), me::enum_name(ke.key));
     }
 };
 

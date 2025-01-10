@@ -11,5 +11,5 @@
 #include "Core/Defines.hpp"
 #include "Core/Portability.hpp"
 
-#include "Utility/Assert.hpp"
+#include "Utility/Error.hpp"
 #include "Utility/Logger.hpp"

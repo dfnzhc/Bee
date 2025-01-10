@@ -15,7 +15,7 @@
 #include <fmt/core.h>
 
 #ifdef BEE_ENABLE_DEBUG
-#define BEE_ENABLE_REF_TRACKING 1
+#  define BEE_ENABLE_REF_TRACKING 1
 #endif
 
 #if BEE_ENABLE_REF_TRACKING
@@ -24,9 +24,9 @@
 #endif
 
 #if BEE_ENABLE_REF_TRACKING
-#define BEE_REF_CONST
+#  define BEE_REF_CONST
 #else
-#define BEE_REF_CONST const
+#  define BEE_REF_CONST const
 #endif
 
 namespace bee {
@@ -35,9 +35,7 @@ class BEE_API Object
 public:
     Object() = default;
 
-    Object(const Object&)
-    {
-    }
+    Object(const Object&) { }
 
     Object& operator=(const Object&) { return *this; }
 
@@ -91,11 +89,11 @@ static u64 NextRefId()
 }
 #endif
 
-#define BEE_OBJECT(class_)                                                                                                                           \
-public:                                                                                                                                              \
-    std::string_view className() const override                                                                                                      \
-    {                                                                                                                                                \
-        return #class_;                                                                                                                              \
+#define BEE_OBJECT(class_)                                                                                                                                                                             \
+public:                                                                                                                                                                                                \
+    std::string_view className() const override                                                                                                                                                        \
+    {                                                                                                                                                                                                  \
+        return #class_;                                                                                                                                                                                \
     }
 
 template<typename T> class Ref
@@ -105,9 +103,7 @@ public:
 
     Ref() = default;
 
-    Ref(std::nullptr_t)
-    {
-    }
+    Ref(std::nullptr_t) { }
 
     template<typename U = T>
         requires std::derived_from<U, Object> and std::convertible_to<U*, T*>
@@ -132,9 +128,10 @@ public:
     }
 
     Ref(Ref&& r) noexcept
-        : _ptr(r._ptr)
+    : _ptr(r._ptr)
 #if BEE_ENABLE_REF_TRACKING
-      , _refId(r._refId)
+      ,
+      _refId(r._refId)
 #endif
     {
         r._ptr = nullptr;
@@ -146,9 +143,10 @@ public:
     template<typename U>
         requires std::derived_from<U, Object> and std::convertible_to<U*, T*>
     Ref(Ref<U>&& r) noexcept
-        : _ptr(r._ptr)
+    : _ptr(r._ptr)
 #if BEE_ENABLE_REF_TRACKING
-      , _refId(r._refId)
+      ,
+      _refId(r._refId)
 #endif
     {
         r._ptr = nullptr;
@@ -323,17 +321,17 @@ private:
     template<typename U> friend class Ref;
 };
 
-template<class T, class... Args> Ref<T> make_ref(Args&&... args)
+template<class T, class... Args> Ref<T> MakeRef(Args&&... args)
 {
     return Ref<T>(new T(std::forward<Args>(args)...));
 }
 
-template<class T, class U> Ref<T> static_ref_cast(const Ref<U>& r) noexcept
+template<class T, class U> Ref<T> StaticRefCast(const Ref<U>& r) noexcept
 {
     return Ref<T>(static_cast<T*>(r.get()));
 }
 
-template<class T, class U> Ref<T> dynamic_ref_cast(const Ref<U>& r) noexcept
+template<class T, class U> Ref<T> DynamicRefCast(const Ref<U>& r) noexcept
 {
     return Ref<T>(dynamic_cast<T*>(r.get()));
 }
@@ -342,14 +340,14 @@ template<typename T> class WeakRef
 {
 public:
     // clang-format off
-    WeakRef(const Ref<T>& r) : mStrongRef(r), mWeakRef(mStrongRef.get()) { }
-    WeakRef(Ref<T>&& r) : mStrongRef(r), mWeakRef(mStrongRef.get()) { }
+    WeakRef(const Ref<T>& r) : _ref(r), _weakRef(_ref.get()) { }
+    WeakRef(Ref<T>&& r) : _ref(r), _weakRef(_ref.get()) { }
 
     WeakRef()                         = delete;
     WeakRef& operator=(const Ref<T>&) = delete;
     WeakRef& operator=(Ref<T>&&)      = delete;
 
-    T* get() const { return mWeakRef; }
+    T* get() const { return _weakRef; }
 
     T* operator->() const { return get(); }
     T& operator*() const { return *get(); }
@@ -358,30 +356,24 @@ public:
     operator T*() const { return get(); }
     operator bool() const { return get() != nullptr; }
 
-    void breakStrongReference() { mStrongRef.reset(); }
+    void breakRef() { _ref.reset(); }
 
     // clang-format on
 
 private:
-    Ref<T> mStrongRef;
-    T* mWeakRef = nullptr;
+    Ref<T> _ref;
+    T* _weakRef = nullptr;
 };
 } // namespace bee
 
 template<typename T> struct fmt::formatter<bee::Ref<T>> : formatter<const void*>
 {
-    template<typename FormatContext> auto format(const bee::Ref<T>& ref, FormatContext& ctx) const
-    {
-        return formatter<const void*>::format(ref.get(), ctx);
-    }
+    template<typename FormatContext> auto format(const bee::Ref<T>& ref, FormatContext& ctx) const { return formatter<const void*>::format(ref.get(), ctx); }
 };
 
 template<typename T> struct fmt::formatter<bee::WeakRef<T>> : formatter<const void*>
 {
-    template<typename FormatContext> auto format(const bee::WeakRef<T>& ref, FormatContext& ctx) const
-    {
-        return formatter<const void*>::format(ref.get(), ctx);
-    }
+    template<typename FormatContext> auto format(const bee::WeakRef<T>& ref, FormatContext& ctx) const { return formatter<const void*>::format(ref.get(), ctx); }
 };
 
 namespace std {

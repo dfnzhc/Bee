@@ -382,7 +382,7 @@ void Window::_updateWindowSize()
 
 void Window::_setWindowSize(u32 width, u32 height)
 {
-    BEE_CHECK(width > 0 && height > 0, "有效的窗口大小应该大于零");
+    BEE_CHECK(width > 0 && height > 0, "Valid extent must > 0.");
 
     _desc.extent.x = width;
     _desc.extent.y = height;

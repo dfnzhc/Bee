@@ -1,5 +1,5 @@
 /**
-* @File RHI_Format.hpp
+* @File Format.hpp
 * @Author dfnzhc (https://github.com/dfnzhc)
 * @Date 2025/1/7
 * @Brief This file is part of Bee.

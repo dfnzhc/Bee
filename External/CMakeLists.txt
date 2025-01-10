@@ -4,7 +4,7 @@ if(NOT DEFINED CMAKE_TOOLCHAIN_FILE AND DEFINED ENV{CMAKE_TOOLCHAIN_FILE})
 endif()
 
 # vulkan
-find_package(vulkan REQUIRED)
+find_package(Vulkan REQUIRED)
 
 # volk
 set(VOLK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/volk")
