@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include "RHI/RHI_Enum.hpp"
+#include "RHI/RHI_Common.hpp"
 
 namespace bee {
 

@@ -12,7 +12,7 @@
 #include <vulkan/vulkan.hpp>
 
 #include <Utility/Error.hpp>
-#include <Utility/Macros.hpp>
+#include <Utility/ClassTools.hpp>
 
 #include <any>
 

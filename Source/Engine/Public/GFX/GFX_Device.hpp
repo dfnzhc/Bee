@@ -11,7 +11,7 @@
 #include "GFX/GFX_Context.hpp"
 #include "GFX/GFX_DeviceDriver.hpp"
 #include <Memory/Memory.hpp>
-#include <Utility/Macros.hpp>
+#include <Utility/ClassTools.hpp>
 
 namespace bee {
 

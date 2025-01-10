@@ -1,5 +1,5 @@
 /**
- * @File RHI_Enums.hpp
+ * @File RHI_Common.hpp
  * @Author dfnzhc (https://github.com/dfnzhc)
  * @Date 2024/11/27
  * @Brief This file is part of Bee.
@@ -38,6 +38,6 @@ enum class GraphicsAPI : u8
 {
     Unknown = 0x0,
     Vulkan  = 0x1,
+    D3D12   = 0x2,
 };
-
 } // namespace bee

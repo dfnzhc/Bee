@@ -9,7 +9,7 @@
 
 #include <filesystem>
 #include <Core/Defines.hpp>
-#include <Utility/Macros.hpp>
+#include <Utility/ClassTools.hpp>
 #include <Math/Math.hpp>
 #include <IO/Inputs.hpp>
 #include <Memory/Memory.hpp>
