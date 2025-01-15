@@ -9,25 +9,26 @@ find_package(GTest CONFIG REQUIRED)
 
 set(${CMAKE_CURRENT_BINARY_DIR})
 
-AddTestProgram(Runtime/UtilityTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Runtime")
-AddTestProgram(Runtime/MathTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Runtime")
-AddTestProgram(Runtime/IOTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Runtime")
-AddTestProgram(Runtime/ObjectTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Runtime")
-AddTestProgram(Runtime/GraphTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Runtime")
-AddTestProgram(GFX/VulkanTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Engine")
+AddTestProgram(Core/ObjectTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Bee")
+AddTestProgram(Graphics/VulkanTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Bee")
+AddTestProgram(Math/MathTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Bee")
+AddTestProgram(Utility/UtilityTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Bee")
+AddTestProgram(Utility/IOTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Bee")
+AddTestProgram(Utility/GraphTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Bee")
+
 target_include_directories(VulkanTest
         PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/../Source/Engine/Private
+        ${CMAKE_CURRENT_SOURCE_DIR}/../Source/Bee/Private
 )
 
 find_package (Vulkan REQUIRED)
 # Launch Test
-add_executable(EngineLaunchTest WIN32 Engine/LaunchTest.cpp)
-set_target_properties(EngineLaunchTest
+add_executable(LaunchTest WIN32 Utility/LaunchTest.cpp)
+set_target_properties(LaunchTest
         PROPERTIES
         FOLDER "Tests"
         WORKING_DIRECTORY ${${PROJECT_NAME_UPPERCASE}_BINARY_DIR}
 )
 
-target_compile_features(EngineLaunchTest PUBLIC cxx_std_23)
-target_link_libraries(EngineLaunchTest PRIVATE Bee::Engine Vulkan::Vulkan)
+target_compile_features(LaunchTest PUBLIC cxx_std_23)
+target_link_libraries(LaunchTest PRIVATE Bee::Bee Vulkan::Vulkan)
