@@ -23,6 +23,8 @@
 #include <utility>
 #include <ranges>
 #include <any>
+#include <queue>
+#include <variant>
 
 #include <fmt/format.h>
 #include <fmt/color.h>

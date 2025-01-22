@@ -24,11 +24,11 @@ using namespace bee;
 #define isCompressed 1
 
 // clang-format off
-#define BF_Unorm   isNorm,      BN_1 ,           BN_1 ,          BN_1 
-#define BF_Int       BN_1 ,       isSigned,   isInteger,     BN_1 
-#define BF_Uint      BN_1 ,         BN_1 ,        isInteger,     BN_1 
-#define BF_Snorm   isNorm,    isSigned,      BN_1 ,          BN_1 
-#define BF_Float     BN_1 ,       isSigned,      BN_1 ,       isFloat
+#define BF_Unorm   isNorm,       BN_1,        BN_1,     BN_1 
+#define BF_Int       BN_1,   isSigned,   isInteger,     BN_1 
+#define BF_Uint      BN_1,       BN_1,   isInteger,     BN_1 
+#define BF_Snorm   isNorm,   isSigned,        BN_1,     BN_1 
+#define BF_Float     BN_1,   isSigned,        BN_1,  isFloat
 // clang-format on
 
 namespace {
@@ -111,17 +111,17 @@ const FormatDesc kFormatDesc[] = {
     {Format::BGRX8_Srgb,    8, 8, 8, 8, 4, 1, 1, BF_Unorm, isSrgb, isBgr, BN_4 },
     {Format::RGB9E5_Float,  9, 9, 9, 5, 4, 1, 1, BF_Float, BN_6 },
 
-    {Format::D16_Unorm,         16, 0, 0, 0, 2, 1, 1, BF_Unorm, BN_2,                            isDepth, BN_3 },
-    {Format::D24_Unorm_S8_Uint, 24, 8, 0, 0, 4, 1, 1, isNorm,   BN_1,  isInteger, BN_3,          isDepth, isStencil, BN_2 },
-    {Format::D32_Float,         32, 0, 0, 0, 4, 1, 1, BF_Float, BN_2,                            isDepth, BN_3 },
+    {Format::D16_Unorm,         16, 0, 0, 0, 2, 1, 1, BF_Unorm, BN_2,                            isDepth,            BN_3 },
+    {Format::D24_Unorm_S8_Uint, 24, 8, 0, 0, 4, 1, 1, isNorm,   BN_1,  isInteger,          BN_3, isDepth, isStencil, BN_2 },
+    {Format::D32_Float,         32, 0, 0, 0, 4, 1, 1, BF_Float, BN_2,                            isDepth,            BN_3 },
     {Format::D32_Float_S8_Uint, 32, 8, 0, 0, 8, 1, 1, BN_1 , isSigned, isInteger, isFloat, BN_2, isDepth, isStencil, BN_2 },
     
     {Format::BC1_Unorm,  5,  6,  5, 1,  8, 4, 4, BF_Unorm,  BN_4,          isCompressed, BN_1 },
-    {Format::BC1_Srgb,   5,  6,  5, 1,  8, 4, 4, BN_4,      isSrgb, BN_3,  isCompressed, BN_1 },
+    {Format::BC1_Srgb,   5,  6,  5, 1,  8, 4, 4, BN_4,      isSrgb,  BN_3, isCompressed, BN_1 },
     {Format::BC2_Unorm,  5,  6,  5, 4, 16, 4, 4, BF_Unorm,  BN_4,          isCompressed, BN_1 },
-    {Format::BC2_Srgb,   5,  6,  5, 4, 16, 4, 4, BN_4,      isSrgb, BN_3,  isCompressed, BN_1 },
+    {Format::BC2_Srgb,   5,  6,  5, 4, 16, 4, 4, BN_4,      isSrgb,  BN_3, isCompressed, BN_1 },
     {Format::BC3_Unorm,  5,  6,  5, 8, 16, 4, 4, BF_Unorm,  BN_4,          isCompressed, BN_1 },
-    {Format::BC3_Srgb,   5,  6,  5, 8, 16, 4, 4, BN_4,      isSrgb, BN_3,  isCompressed, BN_1 },
+    {Format::BC3_Srgb,   5,  6,  5, 8, 16, 4, 4, BN_4,      isSrgb,  BN_3, isCompressed, BN_1 },
     {Format::BC4_Unorm,  8,  0,  0, 0,  8, 4, 4, BF_Unorm,  BN_4,          isCompressed, BN_1 },
     {Format::BC4_Snorm,  8,  0,  0, 0,  8, 4, 4, BF_Snorm,  BN_4,          isCompressed, BN_1 },
     {Format::BC5_Unorm,  8,  8,  0, 0, 16, 4, 4, BF_Unorm,  BN_4,          isCompressed, BN_1 },
@@ -129,7 +129,7 @@ const FormatDesc kFormatDesc[] = {
     {Format::BC6H_UF16, 16, 16, 16, 0, 16, 4, 4, BN_3,      isFloat, BN_4, isCompressed, BN_1 },
     {Format::BC6H_SF16, 16, 16, 16, 0, 16, 4, 4, isFloat,   BN_4,          isCompressed, BN_1 },
     {Format::BC7_Unorm,  8,  8,  8, 8, 16, 4, 4, BF_Unorm,  BN_4,          isCompressed, BN_1 },
-    {Format::BC7_Srgb,   8,  8,  8, 8, 16, 4, 4, BN_4,      isSrgb, BN_3,  isCompressed, BN_1 },
+    {Format::BC7_Srgb,   8,  8,  8, 8, 16, 4, 4, BN_4,      isSrgb,  BN_3, isCompressed, BN_1 },
   // clang-format on
 };
 
