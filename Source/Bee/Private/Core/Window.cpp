@@ -169,8 +169,8 @@ public:
     static void HandleWindowEvents(Window* pWindow, const SDL_WindowEvent& event)
     {
         if (event.type == SDL_EVENT_WINDOW_RESIZED) {
-            const auto width  = static_cast<u32>(event.data1);
-            const auto height = static_cast<u32>(event.data2);
+            const auto width  = cast_to<u32>(event.data1);
+            const auto height = cast_to<u32>(event.data2);
 
             pWindow->resize(width, height);
         }
@@ -244,7 +244,7 @@ std::atomic<u16> sWindowCount = {0};
 } // namespace
 
 Window::Window(const Window::Desc& desc, Window::ICallbacks* pCallbacks)
-: _desc(desc), _pCallbacks(pCallbacks), _mouseScale(1.0f / (float)desc.extent.x, 1.0f / (float)desc.extent.y), _bIsRunning(true)
+: _desc(desc), _pCallbacks(pCallbacks), _mouseScale(1.0f / cast_to<f32>(desc.extent.x), 1.0f / cast_to<f32>(desc.extent.y)), _bIsRunning(true)
 {
     LogInfo("Create window '{}'({}x{}).", desc.title, desc.extent.x, desc.extent.y);
 
@@ -253,7 +253,7 @@ Window::Window(const Window::Desc& desc, Window::ICallbacks* pCallbacks)
     }
 
     // TODO: Handle errors
-    vec2i extent = {static_cast<int>(desc.extent.x), static_cast<int>(desc.extent.y)};
+    vec2i extent = {cast_to<int>(desc.extent.x), cast_to<int>(desc.extent.y)};
 
     SDL_PropertiesID props{SDL_CreateProperties()};
     SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, extent.x);
@@ -312,7 +312,7 @@ bool Window::shouldClose() const
 
 void Window::resize(u32 width, u32 height)
 {
-    SDL_CHECK(SDL_SetWindowSize(_apiHandle, static_cast<int>(width), static_cast<int>(height)));
+    SDL_CHECK(SDL_SetWindowSize(_apiHandle, cast_to<int>(width), cast_to<int>(height)));
 
     if (_desc.mode == Window::Mode::Minimized) {
         _setWindowSize(width, height);
@@ -370,10 +370,10 @@ void Window::_updateWindowSize()
     int width, height;
 
     SDL_CHECK(SDL_GetWindowSize(_apiHandle, &width, &height));
-    _setWindowSize(static_cast<u32>(width), static_cast<u32>(height));
+    _setWindowSize(cast_to<u32>(width), cast_to<u32>(height));
 
-    _mouseScale.x = 1.0f / static_cast<float>(width);
-    _mouseScale.y = 1.0f / static_cast<float>(height);
+    _mouseScale.x = 1.0f / cast_to<f32>(width);
+    _mouseScale.y = 1.0f / cast_to<f32>(height);
 }
 
 void Window::_setWindowSize(u32 width, u32 height)

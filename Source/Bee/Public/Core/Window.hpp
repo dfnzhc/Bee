@@ -77,9 +77,9 @@ public:
     BEE_NODISCARD   u32 height() const { return _desc.extent.y; }
     BEE_NODISCARD vec2u pos()    const { return _desc.pos; }
     
-    BEE_NODISCARD const Handle&     handle()    const { return _handle; }
-    BEE_NODISCARD const ApiHandle&  apiHandle() const { return _apiHandle; }
-    BEE_NODISCARD const Desc&       desc()      const { return _desc; }
+    BEE_NODISCARD const Handle&    handle()    const { return _handle; }
+    BEE_NODISCARD const ApiHandle& apiHandle() const { return _apiHandle; }
+    BEE_NODISCARD const Desc&      desc()      const { return _desc; }
 
     // clang-format on
 

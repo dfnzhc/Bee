@@ -11,6 +11,7 @@ set(${CMAKE_CURRENT_BINARY_DIR})
 
 AddTestProgram(Core/ObjectTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Bee")
 AddTestProgram(Graphics/VulkanTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Bee")
+AddTestProgram(Graphics/GraphicsTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Bee")
 AddTestProgram(Math/MathTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Bee")
 AddTestProgram(Utility/UtilityTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Bee")
 AddTestProgram(Utility/IOTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Bee")

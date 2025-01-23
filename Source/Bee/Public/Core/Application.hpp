@@ -20,8 +20,6 @@ struct AppSettings
     bool headless = false;
 };
 
-class GFX_Device;
-
 class BEE_API Application : public Window::ICallbacks
 {
 public:

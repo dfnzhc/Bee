@@ -55,7 +55,7 @@ struct MouseEvent
     BEE_NODISCARD friend std::string ToString(const MouseEvent& me)
     {
         return fmt::format("Mouse [\"{}{}\" - {},{}({:.3f},{:.3f})|{:.3f}/{:.3f}]",
-                           me::enum_name(me.type), me::enum_name(me.button), static_cast<int>(me.screenPos.x), static_cast<int>(me.screenPos.y),
+                           me::enum_name(me.type), me::enum_name(me.button), cast_to<int>(me.screenPos.x), cast_to<int>(me.screenPos.y),
                            me.pos.x, me.pos.y, me.wheelDelta.x, me.wheelDelta.y);
     }
 

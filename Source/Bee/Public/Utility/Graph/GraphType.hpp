@@ -14,7 +14,7 @@
 namespace bee {
 
 using VertexId                  = std::size_t;
-constexpr auto kInvalidVertexId = static_cast<VertexId>(~0ull);
+constexpr auto kInvalidVertexId = cast_to<VertexId>(~0ull);
 
 struct EdgeId
 {

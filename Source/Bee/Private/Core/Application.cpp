@@ -7,7 +7,6 @@
 
 #include "Core/Application.hpp"
 #include "Core/Common.hpp"
-#include "Graphics/GFX.hpp"
 #include "Utility/Logger.hpp"
 
 using namespace bee;
@@ -31,7 +30,6 @@ int Application::preInit()
 int Application::init()
 {
     LogVerbose("'{}' init", _config.appName);
-    GFX_TEST();
 
     if (!_config.headless) {
         _pWindow = std::make_unique<Window>(_config.windowDesc, this);
