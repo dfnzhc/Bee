@@ -1,0 +1,14 @@
+/**
+ * @File Config.hpp
+ * @Author dfnzhc (https://github.com/dfnzhc)
+ * @Date 2025/3/28
+ * @Brief This file is part of Bee.
+ */
+
+#pragma once
+
+#cmakedefine BEE_DATA_DIR "@BEE_DATA_DIR@"
+
+#define BEE_VERSION_MAJOR @BEE_VERSION_MAJOR@
+#define BEE_VERSION_MINOR @BEE_VERSION_MINOR@
+#define BEE_VERSION_PATCH @BEE_VERSION_PATCH@
