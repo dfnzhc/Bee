@@ -41,3 +41,6 @@
 #include "Math/Common.hpp"
 #include "Math/Hash.hpp"
 #include "Math/Polynomial.hpp"
+
+#include "Core/Launch.hpp"
+#include "Core/Application.hpp"

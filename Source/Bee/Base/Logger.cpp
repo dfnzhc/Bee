@@ -30,8 +30,6 @@ void bee::Logger::Setup(bool buildFileLogger)
 
         gConsoleLogger = quill::Frontend::create_or_get_logger("Console", std::move(sink), formatterOps);
         gConsoleLogger->set_log_level(quill::LogLevel::TraceL3);
-
-        LogInfo("Console Logger has been setup.");
     }
 
     if (buildFileLogger)
@@ -52,8 +50,6 @@ void bee::Logger::Setup(bool buildFileLogger)
 
         gFileLogger = quill::Frontend::create_or_get_logger("File", std::move(sink), formatterOps);
         gFileLogger->set_log_level(quill::LogLevel::TraceL3);
-
-        LogInfo("File Logger has been setup.");
     }
 }
 

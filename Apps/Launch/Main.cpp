@@ -5,18 +5,17 @@
  * @Brief This file is part of Bee.
  */
 
-#include "Bee.hpp"
+#include <Core/EntryPoint.hpp>
+#include <Bee.hpp>
 
 using namespace bee;
 
-int Run(int argc, char** argv)
+bee::LaunchParam LaunchParamSetup(int argc, char** argv)
 {
-    std::cout << "Hello Bee" << std::endl;
-    // TODO: return App.Run(argc, argv);
-    return 0;
-}
+    LaunchParam param;
+    param.appCreator = [] {
+        return std::make_unique<Application>();
+    };
 
-int main(int argc, char** argv)
-{
-    return Guardian([&] { return Run(argc, argv); });
+    return param;
 }
