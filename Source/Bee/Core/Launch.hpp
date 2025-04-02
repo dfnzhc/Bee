@@ -13,12 +13,12 @@
 
 namespace bee {
 
-class Application;
-using ApplicationCreator = std::function<std::unique_ptr<Application>()>;
+class Engine;
+using EngineCreator = std::function<std::unique_ptr<Engine>()>;
 
 struct LaunchParam
 {
-    ApplicationCreator appCreator;
+    EngineCreator engineCreator;
 
     // TODO: Add program execution params?
 };

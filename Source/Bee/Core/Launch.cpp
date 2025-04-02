@@ -7,6 +7,7 @@
 
 #include "Core/Launch.hpp"
 
+#include "Engine.hpp"
 #include "Config.hpp"
 #include "Base/Logger.hpp"
 
@@ -29,15 +30,10 @@ _____________________________________________________________________
                                            `---'           Ver. {}.{}.{}
 _____________________________________________________________________)", BEE_VERSION_MAJOR, BEE_VERSION_MINOR, BEE_VERSION_PATCH);
     // clang-format on
+    
+    auto engine = launchParam.engineCreator();
 
-    struct EngineLoopCleanupGuard
-    {
-        ~EngineLoopCleanupGuard()
-        {
-        }
-    } CleanupGuard;
-
-    return 0;
+    return engine->execute();
 }
 } // namespace 
 

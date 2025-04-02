@@ -13,8 +13,8 @@ using namespace bee;
 bee::LaunchParam LaunchParamSetup(int argc, char** argv)
 {
     LaunchParam param;
-    param.appCreator = [] {
-        return std::make_unique<Application>();
+    param.engineCreator = [] {
+        return std::make_unique<Engine>();
     };
 
     return param;
