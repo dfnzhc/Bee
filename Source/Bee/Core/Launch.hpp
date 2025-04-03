@@ -8,13 +8,14 @@
 #pragma once
 
 #include "Base/Error.hpp"
+#include "Base/Memory.hpp"
 
 #include <functional>
 
 namespace bee {
 
 class Engine;
-using EngineCreator = std::function<std::unique_ptr<Engine>()>;
+using EngineCreator = std::function<UniquePtr<Engine>()>;
 
 struct LaunchParam
 {

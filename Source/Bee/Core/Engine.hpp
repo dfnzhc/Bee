@@ -14,13 +14,11 @@
 
 namespace bee {
 
-class BEE_API Engine final : public IWindowCallbacks
+class BEE_API Engine final : public IWindowCallbacks, public NonCopyable
 {
 public:
     Engine();
     ~Engine() override;
-
-    BEE_CLASS_DELETE_COPY(Engine);
 
     /// ==========================
     /// behaviours
@@ -32,6 +30,13 @@ public:
     /// window callbacks
     /// ==========================
     void onWindowSizeChanged(int width, int height) override;
+
+private:
+    bool _initialize();
+    void _shutdown();
+
+private:
+    UniquePtr<Window> _window = nullptr;
 };
 
 } // namespace bee

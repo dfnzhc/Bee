@@ -19,18 +19,8 @@ namespace {
 // ==================
 static int BeeMain(const LaunchParam& launchParam)
 {
-    // clang-format off
-    LogInfo(R"(
-_____________________________________________________________________
-,-----.                    ,------.               ,--.                
-|  |) /_  ,---.  ,---.     |  .---',--,--,  ,---. `--',--,--,  ,---.  
-|  .-.  \| .-. :| .-. :    |  `--, |      \| .-. |,--.|      \| .-. : 
-|  '--' /\   --.\   --.    |  `---.|  ||  |' '-' '|  ||  ||  |\   --. 
-`------'  `----' `----'    `------'`--''--'.`-  / `--'`--''--' `----' 
-                                           `---'           Ver. {}.{}.{}
-_____________________________________________________________________)", BEE_VERSION_MAJOR, BEE_VERSION_MINOR, BEE_VERSION_PATCH);
-    // clang-format on
-    
+    LogInfo("Bee Engine | Ver. {}.{}.{}", BEE_VERSION_MAJOR, BEE_VERSION_MINOR, BEE_VERSION_PATCH);
+
     auto engine = launchParam.engineCreator();
 
     return engine->execute();
@@ -38,7 +28,6 @@ _____________________________________________________________________)", BEE_VER
 } // namespace 
 
 namespace bee {
-
 BEE_API int Launch(const LaunchParam& launchParam)
 {
     Logger::Setup(true);
@@ -54,5 +43,4 @@ BEE_API void Shutdown()
 {
     LogInfo("Shutdown.");
 }
-
 } // namespace bee

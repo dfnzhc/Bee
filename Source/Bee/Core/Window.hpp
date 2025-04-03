@@ -8,10 +8,16 @@
 #pragma once
 
 #include "Base/Defines.hpp"
+#include "Base/Error.hpp"
+#include "Base/Memory.hpp"
 #include "Base/Macros.hpp"
+#include "Base/Object.hpp"
 #include "Base/Thirdparty.hpp"
 
 #include "Math/Math.hpp"
+
+class SDL_Window;
+class SDL_Renderer;
 
 namespace bee {
 class BEE_API IWindowCallbacks
@@ -24,13 +30,11 @@ public:
     // ...
 };
 
-class BEE_API Window
+class BEE_API Window : public NonCopyable
 {
 public:
     Window(IWindowCallbacks* pCallbacks);
-    ~Window();
-
-    BEE_CLASS_DELETE_COPY(Window);
+    ~Window() override;
 
     // clang-format off
 
@@ -42,39 +46,42 @@ public:
     void shutdown();
     void pollForEvents();
 
-    void show();
-    void hide();
-    void focus();
-    
-    void fullScreen();
-    void windowed();
-    void fullScreenBorderless();
-    
-    void minimize();
-    void maximize();
+    void show() const;
+    void hide() const;
 
     void resize(int width, int height);
     void resize(vec2i extent) { resize(extent.x, extent.y); }
 
-    void setPos(int posX, int posY);
-    void setPos(vec2i pos) { setPos(pos.x, pos.y); }
+    void setPos(int posX, int posY) const;
+    void setPos(vec2i pos) const { setPos(pos.x, pos.y); }
 
-    void setTitle(StringView title);
-    void setIcon(StringView path);
+    void setTitle(StringView title) const;
+    void setIcon(StringView path) const;
+    void setVSync(bool enabled) const;
     
     // window properties
     BEE_NODISCARD vec2u extent()   const;
     BEE_NODISCARD u32   width()    const;
     BEE_NODISCARD u32   height()   const;
-    BEE_NODISCARD vec2u pos()      const;
-    BEE_NODISCARD f32   dpiScale() const;
+    
+    BEE_NODISCARD Result<vec2i> pos()      const;
+    BEE_NODISCARD Result<f32>   dpiScale() const;
 
-    BEE_NODISCARD bool IsMinimized()   const;
-    BEE_NODISCARD bool IsFullScreen()  const;
     BEE_NODISCARD bool isRequestExit() const;
     
-    BEE_NODISCARD void* handleSDL() const;
-    BEE_NODISCARD void* handleRaw() const;
+    BEE_NODISCARD VoidPtr         handleSDL() const;
+    BEE_NODISCARD Result<VoidPtr> handleRaw() const;
     // clang-format on
+
+private:
+    SDL_Window* _pWindow     = nullptr;
+    SDL_Renderer* _pRenderer = nullptr; ///< Default renderer
+
+    IWindowCallbacks* _pCallbacks = nullptr;
+
+    int _width = 1920, _height = 1080;
+
+    bool _isRequestExit = false;
 };
+
 } // namespace bee

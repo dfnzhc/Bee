@@ -10,21 +10,9 @@
 #include "Base/Defines.hpp"
 #include "Base/Portability.hpp"
 
-#define BEE_CLASS_DELETE_COPY(ClassName)                                                                                                                                                               \
-    ClassName(const ClassName&)            = delete;                                                                                                                                                   \
-    ClassName& operator=(const ClassName&) = delete
-
-#define BEE_CLASS_DELETE_MOVE(ClassName)                                                                                                                                                               \
-    ClassName(ClassName&&)            = delete;                                                                                                                                                        \
-    ClassName& operator=(ClassName&&) = delete
-
-#define BEE_CLASS_MOVABLE_ONLY(ClassName)                                                                                                                                                              \
-    ClassName(const ClassName&)                = delete;                                                                                                                                               \
-    ClassName& operator=(const ClassName&)     = delete;                                                                                                                                               \
-    ClassName(ClassName&&) noexcept            = default;                                                                                                                                              \
-    ClassName& operator=(ClassName&&) noexcept = default
-
 #undef RGB
 #undef ERROR
 
 #define BEE_BIT(bit) (1 << (bit))
+
+#define SimpleCheckAndReturn(expr) do { if (!(expr)) { return false; } } while(false)
