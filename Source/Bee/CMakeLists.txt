@@ -19,6 +19,7 @@ target_link_libraries(${BEE_TARGET}
         SDL3::SDL3
         GPUOpen::VulkanMemoryAllocator
         PRIVATE
+        Imgui
         #${Slang_LIBRARY}
 )
 

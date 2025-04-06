@@ -63,14 +63,16 @@ public:
     BEE_NODISCARD vec2u extent()   const;
     BEE_NODISCARD u32   width()    const;
     BEE_NODISCARD u32   height()   const;
+    BEE_NODISCARD f32   dpiScale() const;
     
-    BEE_NODISCARD Result<vec2i> pos()      const;
-    BEE_NODISCARD Result<f32>   dpiScale() const;
+    BEE_NODISCARD Result<vec2i> pos() const;
 
     BEE_NODISCARD bool isRequestExit() const;
     
     BEE_NODISCARD VoidPtr         handleSDL() const;
     BEE_NODISCARD Result<VoidPtr> handleRaw() const;
+    
+    BEE_NODISCARD VoidPtr         rendererSDL() const;
     // clang-format on
 
 private:

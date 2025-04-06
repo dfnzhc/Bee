@@ -371,3 +371,4 @@ MigrationBackup/
 /build/
 /Bin/
 /Tools/tracy/
+cmake-build-*

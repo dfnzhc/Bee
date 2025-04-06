@@ -167,11 +167,11 @@ Result<vec2i> Window::pos() const
     return SDL_UNEXPECTED("Failed to get windows position.");
 }
 
-Result<f32> Window::dpiScale() const
+f32 Window::dpiScale() const
 {
-    const auto dpi = SDL_GetWindowDisplayScale(_pWindow);
+    auto dpi = SDL_GetWindowDisplayScale(_pWindow);
     if (dpi == 0.f) {
-        return SDL_UNEXPECTED("Failed to get windows position.");
+        dpi = 1.f;
     }
 
     return dpi;
@@ -192,13 +192,16 @@ Result<VoidPtr> Window::handleRaw() const
     VoidPtr handle = nullptr;
 
 #ifdef BEE_IN_WINDOWS
-    handle = SDL_GetPointerProperty(SDL_GetWindowProperties(_pWindow),
-                                    SDL_PROP_WINDOW_WIN32_HWND_POINTER,
-                                    nullptr);
+    handle = SDL_GetPointerProperty(SDL_GetWindowProperties(_pWindow), SDL_PROP_WINDOW_WIN32_HWND_POINTER, nullptr);
 #endif
 
     if (handle)
         return handle;
 
     return SDL_UNEXPECTED("Failed to get native window handle.");
+}
+
+VoidPtr Window::rendererSDL() const
+{
+    return _pRenderer;
 }

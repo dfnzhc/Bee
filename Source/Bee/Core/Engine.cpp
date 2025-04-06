@@ -5,19 +5,18 @@
  * @Brief This file is part of Bee.
  */
 
-
 #include "Core/Engine.hpp"
+#include "Core/UI/Gui.hpp"
 
 using namespace bee;
 
 Engine::Engine()
 {
-    
 }
 
 Engine::~Engine()
 {
-    _window.reset();
+    _shutdown();
 }
 
 int Engine::execute()
@@ -27,10 +26,13 @@ int Engine::execute()
         return EXIT_FAILURE;
     }
 
-    while (!_window->isRequestExit()) {
-        _window->pollForEvents();
+    while (!_pWindow->isRequestExit()) {
+        _pWindow->pollForEvents();
+
+        _update();
+        _renderFrame();
     }
-    
+
     _shutdown();
 
     return EXIT_SUCCESS;
@@ -38,25 +40,66 @@ int Engine::execute()
 
 void Engine::onWindowSizeChanged(int width, int height)
 {
-    // 
+    _pGui->onWindowResize(width, height);
 }
 
 bool Engine::_initialize()
 {
-    _window = std::make_unique<Window>(this);
-    SimpleCheckAndReturn(_window);
+    _initializeWindow();
+    SimpleCheckAndReturn(_pWindow);
 
-    // TODO: Is an elegant way to handle exceptions?
-    try {
-        _window->initialize();
-    } catch (...) {
-        return false;
-    }
+    _initializeGui();
+    SimpleCheckAndReturn(_pGui);
 
     return true;
 }
 
 void Engine::_shutdown()
 {
-    _window->shutdown();
+    _shutdownWindow();
+
+    _shutdownGui();
+}
+
+void Engine::_initializeWindow()
+{
+    _pWindow = std::make_unique<Window>(this);
+
+    if (_pWindow) {
+        _pWindow->initialize();
+    }
+}
+
+void Engine::_shutdownWindow()
+{
+    _pWindow->shutdown();
+    if (_pWindow) {
+        _pWindow.reset();
+        _pWindow = nullptr;
+    }
+}
+
+void Engine::_initializeGui()
+{
+    _pGui = std::make_unique<Gui>(_pWindow->handleSDL(), _pWindow->rendererSDL(), _pWindow->dpiScale());
+
+    // register input events
+}
+
+void Engine::_shutdownGui()
+{
+    if (_pGui) {
+        _pGui.reset();
+        _pGui = nullptr;
+    }
+}
+
+void Engine::_update()
+{
+    
+}
+
+void Engine::_renderFrame()
+{
+    
 }
