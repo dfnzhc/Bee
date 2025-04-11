@@ -30,7 +30,6 @@
 #include <cstddef>
 
 namespace bee {
-
 // -------------------------
 // Aliases
 
@@ -64,5 +63,15 @@ static constexpr u8 kU8Max   = UINT8_MAX;
 static constexpr u16 kU16Max = UINT16_MAX;
 static constexpr u32 kU32Max = UINT32_MAX;
 static constexpr u64 kU64Max = UINT64_MAX;
+} // namespace bee
 
+
+#include <optional>
+
+namespace bee {
+template<typename T>
+using Opt = std::optional<T>;
+
+template<typename A, typename B>
+using OptPair = Opt<std::pair<A, B>>;
 } // namespace bee

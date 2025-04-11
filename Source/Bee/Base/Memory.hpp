@@ -22,4 +22,18 @@ template<class T> using StdRef      = std::reference_wrapper<T>;
 
 using VoidPtr = RawPtr<void>;
 
+template<typename T, typename... Args>
+requires std::is_constructible_v<T, Args...>
+auto MakePtr(Args&&... args) -> Ptr<T>
+{
+    return std::make_shared<T>(std::forward<Args>(args)...);
+}
+
+template<typename T, typename... Args>
+requires std::is_constructible_v<T, Args...>
+auto MakeUnique(Args&&... args) -> Ptr<T>
+{
+    return std::make_unique<T>(std::forward<Args>(args)...);
+}
+
 } // namespace bee

@@ -9,14 +9,14 @@
 
 #include "Base/Defines.hpp"
 #include "Base/Macros.hpp"
-
-#include "Core/Window.hpp"
+#include "Base/Object.hpp"
+#include "Base/Memory.hpp"
 
 namespace bee {
-
 class Gui;
+class Window;
 
-class BEE_API Engine final : public IWindowCallbacks, public NonCopyable
+class BEE_API Engine final : public NonCopyable
 {
 public:
     Engine();
@@ -27,13 +27,13 @@ public:
     /// ==========================
     int execute();
 
+private:
     /// ==========================
-    /// window callbacks
+    /// events handle
     /// ==========================
-    void onWindowSizeChanged(int width, int height) override;
+    void _onWindowSizeChanged(int width, int height);
 
 private:
-
     bool _initialize();
     void _shutdown();
 
@@ -44,11 +44,9 @@ private:
     void _shutdownGui();
 
     void _update();
-    void _renderFrame();
 
 private:
-    UniquePtr<Window> _pWindow = nullptr;
-    UniquePtr<Gui> _pGui       = nullptr;
+    UniquePtr<Window> _pWindow;
+    UniquePtr<Gui> _pGui;
 };
-
 } // namespace bee

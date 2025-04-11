@@ -44,3 +44,6 @@
 
 #include "Core/Launch.hpp"
 #include "Core/Engine.hpp"
+#include "Core/Window.hpp"
+#include "Core/Events/Event.hpp"
+#include "Core/Events/EventManager.hpp"

@@ -6,7 +6,10 @@
  */
 
 #include "Core/Engine.hpp"
+#include "Core/Window.hpp"
+
 #include "Core/UI/Gui.hpp"
+#include "Events/EventManager.hpp"
 
 using namespace bee;
 
@@ -30,7 +33,8 @@ int Engine::execute()
         _pWindow->pollForEvents();
 
         _update();
-        _renderFrame();
+
+        EventManager::Instance().Process();
     }
 
     _shutdown();
@@ -38,7 +42,7 @@ int Engine::execute()
     return EXIT_SUCCESS;
 }
 
-void Engine::onWindowSizeChanged(int width, int height)
+void Engine::_onWindowSizeChanged(int width, int height)
 {
     _pGui->onWindowResize(width, height);
 }
@@ -63,7 +67,7 @@ void Engine::_shutdown()
 
 void Engine::_initializeWindow()
 {
-    _pWindow = std::make_unique<Window>(this);
+    _pWindow = std::make_unique<Window>();
 
     if (_pWindow) {
         _pWindow->initialize();
@@ -72,8 +76,8 @@ void Engine::_initializeWindow()
 
 void Engine::_shutdownWindow()
 {
-    _pWindow->shutdown();
     if (_pWindow) {
+        _pWindow->shutdown();
         _pWindow.reset();
         _pWindow = nullptr;
     }
@@ -96,10 +100,4 @@ void Engine::_shutdownGui()
 
 void Engine::_update()
 {
-    
-}
-
-void Engine::_renderFrame()
-{
-    
 }

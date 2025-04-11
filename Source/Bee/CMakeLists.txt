@@ -10,6 +10,7 @@ find_package(magic_enum CONFIG REQUIRED)
 find_package(SDL3 CONFIG REQUIRED)
 find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 find_package(quill CONFIG REQUIRED)
+find_package(eventpp CONFIG REQUIRED)
 find_path(STRINGZILLA_INCLUDE_DIRS "stringzilla/drafts.h")
 
 target_link_libraries(${BEE_TARGET}
@@ -17,6 +18,7 @@ target_link_libraries(${BEE_TARGET}
         quill::quill
         magic_enum::magic_enum
         SDL3::SDL3
+        eventpp::eventpp
         GPUOpen::VulkanMemoryAllocator
         PRIVATE
         Imgui

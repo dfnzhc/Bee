@@ -20,20 +20,10 @@ class SDL_Window;
 class SDL_Renderer;
 
 namespace bee {
-class BEE_API IWindowCallbacks
-{
-public:
-    virtual ~IWindowCallbacks() = default;
-
-    virtual void onWindowSizeChanged(int width, int height) = 0;
-
-    // ...
-};
-
 class BEE_API Window : public NonCopyable
 {
 public:
-    Window(IWindowCallbacks* pCallbacks);
+    Window();
     ~Window() override;
 
     // clang-format off
@@ -60,10 +50,10 @@ public:
     void setVSync(bool enabled) const;
     
     // window properties
-    BEE_NODISCARD vec2u extent()   const;
-    BEE_NODISCARD u32   width()    const;
-    BEE_NODISCARD u32   height()   const;
-    BEE_NODISCARD f32   dpiScale() const;
+    BEE_NODISCARD vec2u extent()     const;
+    BEE_NODISCARD u32   width()      const;
+    BEE_NODISCARD u32   height()     const;
+    BEE_NODISCARD f32   dpiScale()   const;
     
     BEE_NODISCARD Result<vec2i> pos() const;
 
@@ -75,15 +65,19 @@ public:
     BEE_NODISCARD VoidPtr         rendererSDL() const;
     // clang-format on
 
+    vec2i clampPos(int xPos, int yPos) const;
+    vec2i clampPos(vec2i pos) const { return clampPos(pos.x, pos.y); }
+
+    vec2f clampPosNormalized(int xPos, int yPos) const;
+    vec2f clampPosNormalized(vec2i pos) const { return clampPosNormalized(pos.x, pos.y); }
+
 private:
     SDL_Window* _pWindow     = nullptr;
     SDL_Renderer* _pRenderer = nullptr; ///< Default renderer
 
-    IWindowCallbacks* _pCallbacks = nullptr;
-
-    int _width = 1920, _height = 1080;
+    vec2f _mouseScale = {};
+    int _width        = 1920, _height = 1080;
 
     bool _isRequestExit = false;
 };
-
 } // namespace bee

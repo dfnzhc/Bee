@@ -19,13 +19,13 @@ class BEE_API Gui
 {
 public:
     Gui(void* pWindowSDL, void* pRendererSDL, f32 dpiScale);
-    ~Gui() = default;
+    ~Gui();
 
     void onWindowResize(int width, int height);
 
     void render();
 private:
-    class GuiImpl;
-    UniquePtr<GuiImpl> _impl;
+    class Impl;
+    UniquePtr<Impl> _impl;
 };
 } // namespace bee

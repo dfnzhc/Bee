@@ -13,11 +13,12 @@
 
 using namespace bee;
 
-class bee::Gui::GuiImpl
+class bee::Gui::Impl
 {
 public:
     friend class Gui;
-    GuiImpl(SDL_Window* pWindow, SDL_Renderer* pRenderer, f32 dpiScale);
+    Impl(SDL_Window* pWindow, SDL_Renderer* pRenderer, f32 dpiScale);
+    ~Impl();
 
 private:
     void init();
@@ -39,7 +40,7 @@ private:
     bool _bMouseCanReportHoveredViewport = false;
 };
 
-Gui::GuiImpl::GuiImpl(SDL_Window* pWindow, SDL_Renderer* pRenderer, f32 dpiScale) : _pWindow(pWindow), _pRenderer(pRenderer), _dpiScale(dpiScale)
+Gui::Impl::Impl(SDL_Window* pWindow, SDL_Renderer* pRenderer, f32 dpiScale) : _pWindow(pWindow), _pRenderer(pRenderer), _dpiScale(dpiScale)
 {
     BEE_ASSERT(_pWindow, "SDL_Window is invalid.");
     BEE_ASSERT(_pRenderer, "SDL_Renderer is invalid.");
@@ -67,7 +68,12 @@ Gui::GuiImpl::GuiImpl(SDL_Window* pWindow, SDL_Renderer* pRenderer, f32 dpiScale
     style.ScaleAllSizes(dpiScale);
 }
 
-void Gui::GuiImpl::init()
+Gui::Impl::~Impl()
+{
+    
+}
+
+void Gui::Impl::init()
 {
     // init sdl3 for imgui
     ImGuiIO& io = ImGui::GetIO();
@@ -94,5 +100,18 @@ void Gui::GuiImpl::init()
 
 Gui::Gui(void* pWindowSDL, void* pRendererSDL, f32 dpiScale)
 {
-    _impl = std::make_unique<GuiImpl>(static_cast<SDL_Window*>(pWindowSDL), static_cast<SDL_Renderer*>(pRendererSDL), dpiScale);
+    _impl = std::make_unique<Impl>(static_cast<SDL_Window*>(pWindowSDL), static_cast<SDL_Renderer*>(pRendererSDL), dpiScale);
+}
+
+Gui::~Gui()
+{
+    
+}
+
+void Gui::onWindowResize(int width, int height)
+{
+}
+
+void Gui::render()
+{
 }
