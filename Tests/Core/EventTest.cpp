@@ -7,7 +7,7 @@
 
 #include <gtest/gtest.h>
 #include <Core/Events/EventManager.hpp>
-#include <Core/Events/InputEvent.hpp>
+#include <Core/Events/InputEvents.hpp>
 
 using namespace bee;
 

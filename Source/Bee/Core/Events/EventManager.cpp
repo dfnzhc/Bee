@@ -5,7 +5,6 @@
  * @Brief This file is part of Bee.
  */
 
-
 #include "Core/Events/EventManager.hpp"
 #include "Base/Error.hpp"
 
@@ -19,15 +18,12 @@
 
 using namespace bee;
 
-namespace  {
+namespace {
 struct EventPolicy
 {
-    static EventType getEvent(const EventPtr& event)
-    {
-        return event->type();
-    }
+    static EventType getEvent(const EventPtr& event) { return event->type(); }
 };
-} // namespace 
+} // namespace
 
 class bee::EventManager::Impl
 {
@@ -38,9 +34,9 @@ public:
 
     Handle Register(EventType type, CallbackType&& callback)
     {
-        const auto h = nextHandle();
-        const auto qh = queue.appendListener(type, std::move(callback));
-        
+        const auto h  = nextHandle();
+        const auto qh = queue.appendListener(type, callback);
+
         handles.emplace(h, qh);
         types.emplace(h, type);
 
@@ -56,35 +52,27 @@ public:
 
         const auto qh = handles.extract(handle).mapped();
         const auto type = types.extract(handle).mapped();
-            
+        
         if (!queue.removeListener(type, qh)) {
             LogWarn("Unregister from event system failed: '{}'.", handle);
         }
     }
 
-    void Enqueue(const EventPtr& event)
-    {
-        queue.enqueue(event);
-    }
+    void Enqueue(const EventPtr& event) { queue.enqueue(event); }
 
-    void Process()
-    {
-        queue.process();
-    }
+    void Process() { queue.process(); }
 
-    void Dispatch(const EventPtr& event) const
-    {
-        queue.dispatch(event);
-    }
+    void Dispatch(const EventPtr& event) const { queue.dispatch(event); }
 
-    Handle nextHandle()
-    {
-        return currentHandle++;
-    }
-    
+    void DispatchSDL(VoidPtr event) const { dispatchCallbackList(event); }
+
+    Handle nextHandle() { return currentHandle++; }
+
     EventQueueType queue;
     std::unordered_map<Handle, QueueHandle> handles;
     std::unordered_map<Handle, EventType> types;
+
+    eventpp::CallbackList<void(VoidPtr)> dispatchCallbackList;
 
     Handle currentHandle = 0;
 };

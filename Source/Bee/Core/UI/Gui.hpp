@@ -11,9 +11,6 @@
 #include "Base/Memory.hpp"
 #include "Math/Math.hpp"
 
-class SDL_Window;
-class SDL_Renderer;
-
 namespace bee {
 
 class BEE_API Gui
@@ -22,10 +19,10 @@ public:
     Gui(void* pWindowSDL, void* pRendererSDL, f32 dpiScale);
     ~Gui();
 
-    void onWindowResize(int width, int height);
-    void onWindowResize(vec2i extent) { onWindowResize(extent.x, extent.y); }
+    void beginFrame() const;
+    void present() const;
 
-    void render();
+    bool handleEvents(void* pEventSDL) const;
 
 private:
     class Impl;

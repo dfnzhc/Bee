@@ -16,6 +16,8 @@
 
 #include "Math/Math.hpp"
 
+#include <SDL3/SDL_events.h>
+
 class SDL_Window;
 class SDL_Renderer;
 

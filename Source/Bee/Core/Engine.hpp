@@ -34,6 +34,7 @@ private:
     /// ==========================
     /// events handle
     /// ==========================
+    void _onDispatchEvent(const EventPtr& event) const;
     void _onKeyboardEvent(const EventPtr& event);
     void _onMouseEvent(const EventPtr& event);
     void _onWindowSizeChanged(const EventPtr& event);
@@ -49,6 +50,7 @@ private:
     void _shutdownGui();
 
     void _update();
+    void _drawFrame();
 
 private:
     UniquePtr<Window> _pWindow;

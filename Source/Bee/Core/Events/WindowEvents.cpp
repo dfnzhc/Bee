@@ -1,11 +1,11 @@
 /**
- * @File WindowEvent.cpp
+ * @File WindowEvents.cpp
  * @Author dfnzhc (https://github.com/dfnzhc)
  * @Date 2025/4/11
  * @Brief This file is part of Bee.
  */
 
-#include "Core/Events/WindowEvent.hpp"
+#include "Core/Events/WindowEvents.hpp"
 
 using namespace bee;
 

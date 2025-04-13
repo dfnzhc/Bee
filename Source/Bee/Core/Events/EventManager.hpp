@@ -28,15 +28,16 @@ public:
 
     using Handle       = u64;
     using CallbackType = std::function<void(const EventPtr&)>;
-
+    
     /// ==========================
     Handle Register(EventType type, CallbackType&& callback) const;
+    
     void Unregister(Handle handle) const;
 
     // Asynchronously
     void Push(const EventPtr& event) const;
     void Process() const;
-    
+
     // Synchronously
     void Dispatch(const EventPtr& event) const;
 

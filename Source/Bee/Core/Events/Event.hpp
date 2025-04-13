@@ -18,6 +18,7 @@ enum class EventType
     Mouse,
     DragFile,
     WindowResize,
+    Dispatch,
     Unknown
 };
 

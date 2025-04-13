@@ -13,6 +13,7 @@
 #include "Base/Thirdparty.hpp"
 
 #include <expected>
+#include <iostream>
 
 namespace bee {
 // ==================
@@ -218,12 +219,16 @@ template<typename F, class... Args> inline int Guardian(F callback, Args&&... ar
     try {
         result = std::invoke(callback, std::forward<Args>(args)...);
     } catch (const AssertionError& e) {
-        LogFatal("Assertion Failed:\n{}", e.what());
+        std::cerr << "Assertion Failed: " <<  e.what();
+        // LogFatal("Assertion Failed:\n{}", e.what()); // FIXME: logger not working
     } catch (const std::exception& e) {
-        LogFatal("Exception:\n{}", e.what());
+        std::cerr << "Exception: " <<  e.what();
+        // LogFatal("Exception:\n{}", e.what());
     } catch (...) {
-        LogFatal("Unknown Exception");
+        std::cerr << "Unknown Exception";
+        // LogFatal("Unknown Exception");
     }
+    
     return result;
 }
 } // namespace bee

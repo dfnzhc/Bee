@@ -10,21 +10,25 @@
 #ifdef BEE_IN_WINDOWS
 #  define SDL_MAIN_HANDLED
 #endif
+
+#include "Property.hpp"
+
 #include <SDL3/SDL.h>
 
 #include "Events/EventManager.hpp"
-#include "Events/InputEvent.hpp"
-#include "Events/FileEvent.hpp"
-#include "Events/WindowEvent.hpp"
+#include "Events/InputEvents.hpp"
+#include "Events/FileEvents.hpp"
+#include "Events/WindowEvents.hpp"
+#include "Events/DispatchEvents.hpp"
 #include "Math/Constant.hpp"
 
 using namespace bee;
 
-#define SDL_CHECK(expr)                                                                                                                              \
-    do {                                                                                                                                             \
-        if (!(expr)) {                                                                                                                               \
-            BEE_THROW("SDL_Error: {}", SDL_GetError());                                                                                      \
-        }                                                                                                                                            \
+#define SDL_CHECK(expr)                                                                                                                                                                                \
+    do {                                                                                                                                                                                               \
+        if (!(expr)) {                                                                                                                                                                                 \
+            BEE_THROW("SDL_Error: {}", SDL_GetError());                                                                                                                                                \
+        }                                                                                                                                                                                              \
     } while (false)
 
 #define SDL_UNEXPECTED(msg) Unexpected("{}\nSDL_Error: {}", msg, SDL_GetError())
@@ -164,9 +168,7 @@ ModifierKeysState SDLCurrentModifier()
 {
     const auto* keyStates = SDL_GetKeyboardState(nullptr);
 
-    return {keyStates[SDL_SCANCODE_LSHIFT], keyStates[SDL_SCANCODE_RSHIFT],
-            keyStates[SDL_SCANCODE_LCTRL], keyStates[SDL_SCANCODE_RCTRL],
-            keyStates[SDL_SCANCODE_LALT], keyStates[SDL_SCANCODE_RALT]};
+    return {keyStates[SDL_SCANCODE_LSHIFT], keyStates[SDL_SCANCODE_RSHIFT], keyStates[SDL_SCANCODE_LCTRL], keyStates[SDL_SCANCODE_RCTRL], keyStates[SDL_SCANCODE_LALT], keyStates[SDL_SCANCODE_RALT]};
 }
 
 void HandleWindowEvents(const SDL_WindowEvent& event)
@@ -299,6 +301,8 @@ void Window::pollForEvents()
     SDL_Event event;
     // clang-format off
     while (SDL_PollEvent(&event)) {
+        EventManager::Instance().Dispatch(MakePtr<DispatchEvent>(DispatchEventType::Gui, static_cast<VoidPtr>(&event)));
+        
         switch (event.type) {
         case SDL_EVENT_KEY_UP:
         case SDL_EVENT_KEY_DOWN          : HandleKeyboardEvent(event.key); break;
@@ -312,15 +316,11 @@ void Window::pollForEvents()
 
         case SDL_EVENT_WINDOW_RESIZED    : HandleWindowEvents(event.window); break;
 
-        case SDL_EVENT_QUIT: _isRequestExit = true; break;
+        case SDL_EVENT_QUIT              : Property::RequestEngineExit(); break;
         default: break;
         }
     }
     // clang-format on
-
-    SDL_SetRenderDrawColorFloat(_pRenderer, 0.2f, 0.3f, 0.7f, 1.0f);
-    SDL_RenderClear(_pRenderer);
-    SDL_RenderPresent(_pRenderer);
 }
 
 void Window::show() const
@@ -393,7 +393,9 @@ Result<vec2i> Window::pos() const
 {
     int posX, posY;
     if (SDL_GetWindowPosition(_pWindow, &posX, &posY))
-        return {{posX, posY}};
+        return {
+          {posX, posY}
+        };
 
     return SDL_UNEXPECTED("Failed to get windows position.");
 }

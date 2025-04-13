@@ -11,16 +11,16 @@ using namespace bee;
 
 namespace  {
 
-bool bIsEngineRunning = false;
+bool bIsEngineRunning = true;
 
 } // namespace 
-
-void Property::SetEngineRunning(bool bIsRunning)
-{
-    bIsEngineRunning = bIsRunning;
-}
 
 bool Property::IsEngineRunning()
 {
     return bIsEngineRunning;
+}
+
+void Property::RequestEngineExit()
+{
+    bIsEngineRunning = false;
 }

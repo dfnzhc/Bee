@@ -11,9 +11,10 @@
 #include "Core/Window.hpp"
 
 #include "Core/UI/Gui.hpp"
+#include "Events/DispatchEvents.hpp"
 #include "Events/EventManager.hpp"
-#include "Events/InputEvent.hpp"
-#include "Events/WindowEvent.hpp"
+#include "Events/InputEvents.hpp"
+#include "Events/WindowEvents.hpp"
 
 using namespace bee;
 
@@ -37,6 +38,7 @@ int Engine::execute()
         _pWindow->pollForEvents();
 
         _update();
+        _drawFrame();
 
         EventManager::Instance().Process();
     }
@@ -51,31 +53,42 @@ void Engine::_registerInputEvent()
     const auto& em = EventManager::Instance();
 
     // clang-format off
+    em.Register(EventType::Dispatch, [this](const EventPtr& event) { BEE_ASSERT(event->type() == EventType::Dispatch); _onDispatchEvent(event); });
     em.Register(EventType::keyboard, [this](const EventPtr& event) { BEE_ASSERT(event->type() == EventType::keyboard); _onKeyboardEvent(event); });
     em.Register(EventType::Mouse, [this](const EventPtr& event) { BEE_ASSERT(event->type() == EventType::Mouse); _onMouseEvent(event); });
     em.Register(EventType::WindowResize, [this](const EventPtr& event) { BEE_ASSERT(event->type() == EventType::WindowResize); _onWindowSizeChanged(event); });
     // clang-format on
 }
 
+void Engine::_onDispatchEvent(const EventPtr& event) const
+{
+    const auto* dispatchEvent = dynamic_cast<const DispatchEvent*>(event.get());
+
+    if (dispatchEvent->dispatchType() == DispatchEventType::Gui) {
+        if (_pGui)
+            _pGui->handleEvents(dispatchEvent->event());
+    }
+}
+
 void Engine::_onWindowSizeChanged(const EventPtr& event)
 {
-    const auto* mouseEvent = static_cast<const WindowResizeEvent*>(event.get());
+    const auto* winEvent = dynamic_cast<const WindowResizeEvent*>(event.get());
 
-    _pGui->onWindowResize(mouseEvent->extent());
 }
 
 void Engine::_onKeyboardEvent(const EventPtr& event)
 {
-    const auto* keyEvent = static_cast<const KeyboardEvent*>(event.get());
+    const auto* keyEvent = dynamic_cast<const KeyboardEvent*>(event.get());
 
     const auto key = keyEvent->key();
 
     if (key == Keys::Escape)
-        Property::SetEngineRunning(false);
+        Property::RequestEngineExit();
 }
 
 void Engine::_onMouseEvent(const EventPtr& event)
 {
+    const auto* mouseEvent = dynamic_cast<const MouseEvent*>(event.get());
 }
 
 bool Engine::_initialize()
@@ -87,8 +100,6 @@ bool Engine::_initialize()
     SimpleCheckAndReturn(_pGui);
 
     _registerInputEvent();
-
-    Property::SetEngineRunning(true);
 
     return true;
 }
@@ -121,8 +132,6 @@ void Engine::_shutdownWindow()
 void Engine::_initializeGui()
 {
     _pGui = std::make_unique<Gui>(_pWindow->handleSDL(), _pWindow->rendererSDL(), _pWindow->dpiScale());
-
-    // register input events
 }
 
 void Engine::_shutdownGui()
@@ -135,4 +144,13 @@ void Engine::_shutdownGui()
 
 void Engine::_update()
 {
+}
+
+void Engine::_drawFrame()
+{
+    _pGui->beginFrame();
+
+    // gui test demo
+
+    _pGui->present();
 }

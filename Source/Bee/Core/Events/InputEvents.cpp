@@ -1,11 +1,11 @@
 /**
- * @File InputEvent.cpp
+ * @File InputEvents.cpp
  * @Author dfnzhc (https://github.com/dfnzhc)
  * @Date 2025/4/10
  * @Brief This file is part of Bee.
  */
 
-#include "Core/Events/InputEvent.hpp"
+#include "Core/Events/InputEvents.hpp"
 
 using namespace bee;
 
@@ -93,22 +93,22 @@ String KeyboardEvent::toString() const
     return std::format("Event - Key: {}({}) [{}] {}", ToString(_key), ToString(_inputType), _modifierKeys.toString(), _bIsRepeat ? "+repeat" : "-");
 }
 
-MouseEvent::MouseEvent() : Event(EventType::Mouse), InputEvent(ModifierKeysState(), false, InputType::Unknown)
+MouseEvent::MouseEvent() : Event(EventType::Mouse), InputEvents(ModifierKeysState(), false, InputType::Unknown)
 {
 }
 
 MouseEvent::MouseEvent(f32 x, f32 y, MouseButton btn, InputType mouseType, u8 clicks, const ModifierKeysState& modifierKeys, bool bIsRepeat)
-    : Event(EventType::Mouse), InputEvent(modifierKeys, bIsRepeat, mouseType), _posX(x), _posY(y), _button(btn), _clicks(clicks)
+    : Event(EventType::Mouse), InputEvents(modifierKeys, bIsRepeat, mouseType), _posX(x), _posY(y), _button(btn), _clicks(clicks)
 {
 }
 
 MouseEvent::MouseEvent(f32 x, f32 y, f32 relX, f32 relY, const ModifierKeysState& modifierKeys)
-    : Event(EventType::Mouse), InputEvent(modifierKeys, false, InputType::MouseMotion), _posX(x), _posY(y), _relX(relX), _relY(relY)
+    : Event(EventType::Mouse), InputEvents(modifierKeys, false, InputType::MouseMotion), _posX(x), _posY(y), _relX(relX), _relY(relY)
 {
 }
 
 MouseEvent::MouseEvent(f32 h, f32 v, const ModifierKeysState& modifierKeys)
-    : Event(EventType::Mouse), InputEvent(modifierKeys, false, InputType::MouseWheel), _posX(h), _posY(v)
+    : Event(EventType::Mouse), InputEvents(modifierKeys, false, InputType::MouseWheel), _posX(h), _posY(v)
 {
 }
 

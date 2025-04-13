@@ -14,8 +14,8 @@ namespace bee {
 class BEE_API Property final
 {
 public:
-    static void SetEngineRunning(bool bIsRunning);
     static bool IsEngineRunning();
+    static void RequestEngineExit();
     
 };
 

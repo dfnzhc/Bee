@@ -1,5 +1,5 @@
 /**
- * @File InputEvent.hpp
+ * @File InputEvents.hpp
  * @Author dfnzhc (https://github.com/dfnzhc)
  * @Date 2025/4/9
  * @Brief This file is part of Bee.
@@ -197,14 +197,14 @@ private:
     u16 _bIsRightAltDown : 1;
 };
 
-class BEE_API InputEvent
+class BEE_API InputEvents
 {
 public:
     // clang-format off
-    InputEvent() = default;
-    InputEvent(const ModifierKeysState& modifierKeys, bool bInIsRepeat, InputType inputType) : _modifierKeys(modifierKeys), _inputType(inputType), _bIsRepeat(bInIsRepeat) { }
+    InputEvents() = default;
+    InputEvents(const ModifierKeysState& modifierKeys, bool bInIsRepeat, InputType inputType) : _modifierKeys(modifierKeys), _inputType(inputType), _bIsRepeat(bInIsRepeat) { }
     
-    virtual ~InputEvent() = default;
+    virtual ~InputEvents() = default;
 
     bool isRepeat() const { return _bIsRepeat; }
 
@@ -231,14 +231,14 @@ protected:
     bool _bIsRepeat      = false;
 };
 
-class BEE_API KeyboardEvent final : public Event, public InputEvent
+class BEE_API KeyboardEvent final : public Event, public InputEvents
 {
 public:
-    KeyboardEvent() : Event(EventType::keyboard), InputEvent()
+    KeyboardEvent() : Event(EventType::keyboard), InputEvents()
     {
     }
 
-    KeyboardEvent(Keys key, InputType keyType, const ModifierKeysState& modifierKeys, bool bIsRepeat) : Event(EventType::keyboard), InputEvent(modifierKeys, bIsRepeat, keyType), _key(key)
+    KeyboardEvent(Keys key, InputType keyType, const ModifierKeysState& modifierKeys, bool bIsRepeat) : Event(EventType::keyboard), InputEvents(modifierKeys, bIsRepeat, keyType), _key(key)
     {
     }
 
@@ -252,7 +252,7 @@ private:
     // Keycode?
 };
 
-class BEE_API MouseEvent final : public Event, public InputEvent
+class BEE_API MouseEvent final : public Event, public InputEvents
 {
 public:
     MouseEvent();

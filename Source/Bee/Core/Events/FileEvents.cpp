@@ -1,11 +1,11 @@
 /**
- * @File FileEvent.cpp
+ * @File FileEvents.cpp
  * @Author dfnzhc (https://github.com/dfnzhc)
  * @Date 2025/4/11
  * @Brief This file is part of Bee.
  */
 
-#include "Core/Events/FileEvent.hpp"
+#include "Core/Events/FileEvents.hpp"
 
 namespace bee {
 DropFileEvent::DropFileEvent() : Event(EventType::DragFile)
