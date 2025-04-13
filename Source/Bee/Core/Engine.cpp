@@ -6,10 +6,14 @@
  */
 
 #include "Core/Engine.hpp"
+
+#include "Property.hpp"
 #include "Core/Window.hpp"
 
 #include "Core/UI/Gui.hpp"
 #include "Events/EventManager.hpp"
+#include "Events/InputEvent.hpp"
+#include "Events/WindowEvent.hpp"
 
 using namespace bee;
 
@@ -29,7 +33,7 @@ int Engine::execute()
         return EXIT_FAILURE;
     }
 
-    while (!_pWindow->isRequestExit()) {
+    while (Property::IsEngineRunning()) {
         _pWindow->pollForEvents();
 
         _update();
@@ -42,9 +46,36 @@ int Engine::execute()
     return EXIT_SUCCESS;
 }
 
-void Engine::_onWindowSizeChanged(int width, int height)
+void Engine::_registerInputEvent()
 {
-    _pGui->onWindowResize(width, height);
+    const auto& em = EventManager::Instance();
+
+    // clang-format off
+    em.Register(EventType::keyboard, [this](const EventPtr& event) { BEE_ASSERT(event->type() == EventType::keyboard); _onKeyboardEvent(event); });
+    em.Register(EventType::Mouse, [this](const EventPtr& event) { BEE_ASSERT(event->type() == EventType::Mouse); _onMouseEvent(event); });
+    em.Register(EventType::WindowResize, [this](const EventPtr& event) { BEE_ASSERT(event->type() == EventType::WindowResize); _onWindowSizeChanged(event); });
+    // clang-format on
+}
+
+void Engine::_onWindowSizeChanged(const EventPtr& event)
+{
+    const auto* mouseEvent = static_cast<const WindowResizeEvent*>(event.get());
+
+    _pGui->onWindowResize(mouseEvent->extent());
+}
+
+void Engine::_onKeyboardEvent(const EventPtr& event)
+{
+    const auto* keyEvent = static_cast<const KeyboardEvent*>(event.get());
+
+    const auto key = keyEvent->key();
+
+    if (key == Keys::Escape)
+        Property::SetEngineRunning(false);
+}
+
+void Engine::_onMouseEvent(const EventPtr& event)
+{
 }
 
 bool Engine::_initialize()
@@ -54,6 +85,10 @@ bool Engine::_initialize()
 
     _initializeGui();
     SimpleCheckAndReturn(_pGui);
+
+    _registerInputEvent();
+
+    Property::SetEngineRunning(true);
 
     return true;
 }

@@ -88,7 +88,7 @@ String ModifierKeysState::toString() const
     return str;
 }
 
-String KeyEvent::toString() const
+String KeyboardEvent::toString() const
 {
     return std::format("Event - Key: {}({}) [{}] {}", ToString(_key), ToString(_inputType), _modifierKeys.toString(), _bIsRepeat ? "+repeat" : "-");
 }

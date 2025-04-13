@@ -11,6 +11,7 @@
 #include "Base/Macros.hpp"
 #include "Base/Object.hpp"
 #include "Base/Memory.hpp"
+#include "Events/Event.hpp"
 
 namespace bee {
 class Gui;
@@ -28,10 +29,14 @@ public:
     int execute();
 
 private:
+    void _registerInputEvent();
+    
     /// ==========================
     /// events handle
     /// ==========================
-    void _onWindowSizeChanged(int width, int height);
+    void _onKeyboardEvent(const EventPtr& event);
+    void _onMouseEvent(const EventPtr& event);
+    void _onWindowSizeChanged(const EventPtr& event);
 
 private:
     bool _initialize();

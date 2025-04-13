@@ -9,6 +9,7 @@
 
 #include "Base/Defines.hpp"
 #include "Base/Memory.hpp"
+#include "Math/Math.hpp"
 
 class SDL_Window;
 class SDL_Renderer;
@@ -22,8 +23,10 @@ public:
     ~Gui();
 
     void onWindowResize(int width, int height);
+    void onWindowResize(vec2i extent) { onWindowResize(extent.x, extent.y); }
 
     void render();
+
 private:
     class Impl;
     UniquePtr<Impl> _impl;

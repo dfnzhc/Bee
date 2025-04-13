@@ -231,18 +231,18 @@ protected:
     bool _bIsRepeat      = false;
 };
 
-class BEE_API KeyEvent final : public Event, public InputEvent
+class BEE_API KeyboardEvent final : public Event, public InputEvent
 {
 public:
-    KeyEvent() : Event(EventType::keyboard), InputEvent()
+    KeyboardEvent() : Event(EventType::keyboard), InputEvent()
     {
     }
 
-    KeyEvent(Keys key, InputType keyType, const ModifierKeysState& modifierKeys, bool bIsRepeat) : Event(EventType::keyboard), InputEvent(modifierKeys, bIsRepeat, keyType), _key(key)
+    KeyboardEvent(Keys key, InputType keyType, const ModifierKeysState& modifierKeys, bool bIsRepeat) : Event(EventType::keyboard), InputEvent(modifierKeys, bIsRepeat, keyType), _key(key)
     {
     }
 
-    ~KeyEvent() override = default;
+    ~KeyboardEvent() override = default;
 
     Keys key() const { return _key; }
     String toString() const override;

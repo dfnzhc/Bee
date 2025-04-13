@@ -192,7 +192,7 @@ void HandleKeyboardEvent(const SDL_KeyboardEvent& event)
     const auto bIsRepeat = event.repeat;
     const auto modifiers = SDLCurrentModifier();
 
-    em.Push(MakePtr<KeyEvent>(key, type, modifiers, bIsRepeat));
+    em.Push(MakePtr<KeyboardEvent>(key, type, modifiers, bIsRepeat));
 }
 
 void HandleMouseButtonEvent(const SDL_MouseButtonEvent& event)
