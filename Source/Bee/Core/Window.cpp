@@ -11,7 +11,7 @@
 #  define SDL_MAIN_HANDLED
 #endif
 
-#include "Property.hpp"
+#include "Utils/Property.hpp"
 
 #include <SDL3/SDL.h>
 

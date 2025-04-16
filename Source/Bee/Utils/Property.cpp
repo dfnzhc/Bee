@@ -5,7 +5,7 @@
  * @Brief This file is part of Bee.
  */
 
-#include "Core/Property.hpp"
+#include "Utils/Property.hpp"
 
 #include "Base/Error.hpp"
 #include "Base/Logger.hpp"

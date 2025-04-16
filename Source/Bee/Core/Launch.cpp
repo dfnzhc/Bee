@@ -7,10 +7,10 @@
 
 #include "Core/Launch.hpp"
 
-#include "Engine.hpp"
 #include "Config.hpp"
-#include "Property.hpp"
 #include "Base/Logger.hpp"
+#include "Core/Engine.hpp"
+#include "Utils/Property.hpp"
 
 using namespace bee;
 

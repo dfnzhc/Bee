@@ -7,14 +7,15 @@
 
 #include "Core/Engine.hpp"
 
-#include "Property.hpp"
 #include "Core/Window.hpp"
 
-#include "Core/UI/Gui.hpp"
 #include "Events/DispatchEvents.hpp"
 #include "Events/EventManager.hpp"
 #include "Events/InputEvents.hpp"
 #include "Events/WindowEvents.hpp"
+
+#include "Utils/UI/Gui.hpp"
+#include "Utils/Property.hpp"
 
 using namespace bee;
 

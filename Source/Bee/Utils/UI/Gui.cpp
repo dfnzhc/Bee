@@ -5,7 +5,7 @@
  * @Brief This file is part of Bee.
  */
 
-#include "Core/UI/Gui.hpp"
+#include "Utils/UI/Gui.hpp"
 #include "Base/Error.hpp"
 
 #include <imgui.h>
