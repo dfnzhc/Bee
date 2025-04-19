@@ -3,20 +3,9 @@ if (NOT DEFINED CMAKE_TOOLCHAIN_FILE AND DEFINED ENV{CMAKE_TOOLCHAIN_FILE})
     set(CMAKE_TOOLCHAIN_FILE $ENV{CMAKE_TOOLCHAIN_FILE})
 endif ()
 
-
-find_package(SDL3 CONFIG REQUIRED)
-# imgui
-set(IMGUI_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Imgui")
-file(GLOB_RECURSE IMGUI_FILES ./*.h ./*.cpp)
-
-add_library(Imgui STATIC ${IMGUI_FILES})
-target_link_libraries(Imgui PRIVATE SDL3::SDL3)
-target_include_directories(Imgui PUBLIC ${IMGUI_DIR})
-
-set_property(TARGET Imgui PROPERTY FOLDER "External")
-
 # vulkan
 find_package(Vulkan REQUIRED)
+
 
 # volk
 # set(VOLK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/volk")

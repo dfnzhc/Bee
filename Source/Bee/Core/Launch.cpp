@@ -8,9 +8,8 @@
 #include "Core/Launch.hpp"
 
 #include "Config.hpp"
-#include "Base/Logger.hpp"
-#include "Core/Engine.hpp"
-#include "Utils/Property.hpp"
+#include "App/Application.hpp"
+#include "Core/Logger.hpp"
 
 using namespace bee;
 
@@ -23,7 +22,6 @@ static int BeeMain(const LaunchParam& launchParam)
     LogInfo("Bee Engine | Ver. {}.{}.{}", BEE_VERSION_MAJOR, BEE_VERSION_MINOR, BEE_VERSION_PATCH);
 
     auto engine = launchParam.engineCreator();
-    Property::SetBool(Property_EngineRunningName, true);
 
     return engine->execute();
 }

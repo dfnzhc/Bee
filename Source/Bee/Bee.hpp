@@ -28,22 +28,20 @@
 
 #include "Config.hpp"
 
-#include "Base/Defines.hpp"
-#include "Base/Error.hpp"
-#include "Base/Macros.hpp"
-#include "Base/Portability.hpp"
-#include "Base/Thirdparty.hpp"
-#include "Base/Version.hpp"
-#include "Base/Logger.hpp"
+#include "Core/Defines.hpp"
+#include "Core/Error.hpp"
+#include "Core/Macros.hpp"
+#include "Core/Portability.hpp"
+#include "Core/Thirdparty.hpp"
+#include "Core/Version.hpp"
+#include "Core/Logger.hpp"
+
+#include "Core/App/Application.hpp"
+#include "Core/App/Property.hpp"
+#include "Core/Concepts/NonCopyable.hpp"
 
 #include "Math/Math.hpp"
 #include "Math/Constant.hpp"
 #include "Math/Common.hpp"
 #include "Math/Hash.hpp"
 #include "Math/Polynomial.hpp"
-
-#include "Core/Launch.hpp"
-#include "Core/Engine.hpp"
-#include "Core/Window.hpp"
-#include "Core/Events/Event.hpp"
-#include "Core/Events/EventManager.hpp"

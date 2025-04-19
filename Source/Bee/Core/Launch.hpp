@@ -7,15 +7,15 @@
  
 #pragma once
 
-#include "Base/Error.hpp"
-#include "Base/Memory.hpp"
+#include "Core/Error.hpp"
+#include "Memory/Memory.hpp"
 
 #include <functional>
 
 namespace bee {
 
-class Engine;
-using EngineCreator = std::function<UniquePtr<Engine>()>;
+class Application;
+using EngineCreator = std::function<UniquePtr<Application>()>;
 
 struct LaunchParam
 {

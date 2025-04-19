@@ -7,7 +7,7 @@ add_library(${BEE_TARGET} SHARED ${SOURCE_FILES})
 BeeDefaultSettings(${BEE_TARGET})
 
 find_package(magic_enum CONFIG REQUIRED)
-find_package(SDL3 CONFIG REQUIRED)
+#find_package(SDL3 CONFIG REQUIRED)
 find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 find_package(quill CONFIG REQUIRED)
 find_package(eventpp CONFIG REQUIRED)
@@ -17,11 +17,10 @@ target_link_libraries(${BEE_TARGET}
         PUBLIC
         quill::quill
         magic_enum::magic_enum
-        SDL3::SDL3
+#        SDL3::SDL3
         eventpp::eventpp
         GPUOpen::VulkanMemoryAllocator
         PRIVATE
-        Imgui
         #${Slang_LIBRARY}
 )
 
