@@ -36,4 +36,7 @@ auto MakeUnique(Args&&... args) -> Ptr<T>
     return std::make_unique<T>(std::forward<Args>(args)...);
 }
 
+BEE_API void MemoryReset();
+BEE_API void MemoryPrintStats();
+
 } // namespace bee

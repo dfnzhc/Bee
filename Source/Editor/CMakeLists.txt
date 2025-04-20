@@ -3,7 +3,7 @@ set(BEE_TARGET Editor)
 file(GLOB_RECURSE SOURCE_FILES ./*.hpp ./*.cpp ./*.ui)
 AssignSourceGroup(${SOURCE_FILES})
 
-find_package(Qt6 REQUIRED COMPONENTS Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Core Widgets)
 qt_standard_project_setup()
 
 qt_add_executable(${BEE_TARGET} ${SOURCE_FILES})
@@ -11,11 +11,10 @@ qt_add_executable(${BEE_TARGET} ${SOURCE_FILES})
 SetCompilerFlags(${BEE_TARGET})
 SetDefaultCompileDefinitions(${BEE_TARGET})
 
-target_compile_features(${BEE_TARGET} PUBLIC cxx_std_23)
-
 target_link_libraries(${BEE_TARGET}
         PRIVATE
-#        Bee::Bee
+        Bee::Bee
+        Qt6::Core
         Qt6::Widgets
 )
 

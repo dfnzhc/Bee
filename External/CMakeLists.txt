@@ -3,9 +3,15 @@ if (NOT DEFINED CMAKE_TOOLCHAIN_FILE AND DEFINED ENV{CMAKE_TOOLCHAIN_FILE})
     set(CMAKE_TOOLCHAIN_FILE $ENV{CMAKE_TOOLCHAIN_FILE})
 endif ()
 
+# mimalloc
+find_package(mimalloc CONFIG REQUIRED)
+
+add_library(Mimalloc INTERFACE)
+target_link_libraries(Mimalloc INTERFACE mimalloc)
+set_property(TARGET Mimalloc PROPERTY FOLDER "External")
+
 # vulkan
 find_package(Vulkan REQUIRED)
-
 
 # volk
 # set(VOLK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/volk")
