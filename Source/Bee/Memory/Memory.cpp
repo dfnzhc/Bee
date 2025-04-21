@@ -7,10 +7,7 @@
 
 #include <mimalloc.h>
 #include <mimalloc-override.h>
-#ifdef _WIN32
 #include <mimalloc-new-delete.h>
-#pragma comment(linker, "/include:mi_version")
-#endif
 
 #include "Memory/Memory.hpp"
 
