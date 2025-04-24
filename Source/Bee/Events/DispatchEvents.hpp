@@ -17,6 +17,8 @@ enum class DispatchEventType
     Unknown
 };
 
+using VoidPtr = void*;
+
 class BEE_API DispatchEvent final : public Event
 {
 public:
