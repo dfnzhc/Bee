@@ -1,5 +1,5 @@
 [Bb]uild/*
-[Dd]ocs/*
+# [Dd]ocs/*
 CMakeCache.*
 CMakeFiles/*
 [Tt]esting/*
