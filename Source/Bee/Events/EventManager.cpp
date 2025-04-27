@@ -16,6 +16,8 @@
 #include <eventpp/eventdispatcher.h>
 #include <eventpp/eventqueue.h>
 
+#include "DispatchEvents.hpp"
+
 using namespace bee;
 
 namespace {

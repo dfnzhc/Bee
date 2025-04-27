@@ -60,7 +60,7 @@ BEE_API constexpr Size MemorySize(Size sz)
     if constexpr (Level == 0)
         return sz;
     else {
-        return Mul * MemorySize<Level - 1>(sz);
+        return Mul * MemorySize<Level - 1, Mul>(sz);
     }
 }
 
@@ -79,8 +79,8 @@ BEE_API constexpr Size GiB(Size sz) { return MemorySize<3, 1024z>(sz); }
 
 /// ==========================
 
-BEE_API constexpr Size kMaxAllocationSize = GiB(16);
-BEE_API constexpr Size kMaxDynamicSize    = MiB(32);
+constexpr Size kMaxAllocationSize = GiB(16);
+constexpr Size kMaxDynamicSize    = MiB(32);
 
 
 /// ==========================
