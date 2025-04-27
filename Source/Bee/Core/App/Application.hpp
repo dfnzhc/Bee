@@ -8,13 +8,13 @@
 #pragma once
 
 #include "Core/Defines.hpp"
-#include "Core/Concepts/NonCopyable.hpp"
+#include "Core/Concepts/ClassTypes.hpp"
 #include "Events/Event.hpp"
 
 namespace bee {
 class Gui;
 
-class BEE_API Application final : public NonCopyable
+class BEE_API Application final : public CMoveable
 {
 public:
     Application();

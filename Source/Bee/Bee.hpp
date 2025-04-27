@@ -38,7 +38,7 @@
 
 #include "Core/App/Application.hpp"
 #include "Core/App/Property.hpp"
-#include "Core/Concepts/NonCopyable.hpp"
+#include "Core/Concepts/ClassTypes.hpp"
 
 #include "Math/Math.hpp"
 #include "Math/Constant.hpp"

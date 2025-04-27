@@ -7,14 +7,14 @@
 
 #pragma once
 
-#include "Core/Concepts/NonCopyable.hpp"
+#include "Core/Concepts/ClassTypes.hpp"
 #include "Events/Event.hpp"
 
 #include <functional>
 
 namespace bee {
 
-class BEE_API EventManager final : public NonCopyable
+class BEE_API EventManager final : public CMoveable
 {
 public:
     static EventManager& Instance()
