@@ -7,13 +7,7 @@
 
 #include "Memory/Memory.hpp"
 
-#include <mimalloc.h>
-#include <mimalloc-override.h>
-#include <mimalloc-new-delete.h>
-#include <mimalloc-stats.h>
-
 using namespace bee;
-
 
 void* bee::Malloc(Size size)
 {

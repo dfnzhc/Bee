@@ -12,3 +12,5 @@ set(${CMAKE_CURRENT_BINARY_DIR})
 AddTestProgram(Base/ErrorTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Bee")
 AddTestProgram(Core/EventTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Bee")
 AddTestProgram(Math/MathTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Bee")
+
+AddTestProgram(Memory/PlainAllocatorTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Bee")

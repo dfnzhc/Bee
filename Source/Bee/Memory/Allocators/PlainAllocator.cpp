@@ -20,8 +20,10 @@ void* PlainAllocator::allocate(Size size, Size alignment)
 
 void PlainAllocator::deallocate(void* ptr)
 {
-    if (owns(ptr))
+    if (owns(ptr)) {
         mi_free_size(ptr, mi_usable_size(ptr));
+        ptr = nullptr;
+    }
 }
 
 Size PlainAllocator::usableSize(void* ptr)

@@ -8,6 +8,14 @@
 #pragma once
 
 #include "Core/Defines.hpp"
+#include "Core/Portability.hpp"
+
+#include <mimalloc.h>
+#ifndef BEE_IN_WINDOWS
+#include <mimalloc-override.h>
+#include <mimalloc-new-delete.h>
+#endif
+
 #include <memory>
 
 namespace bee {
