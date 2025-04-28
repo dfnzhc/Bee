@@ -38,3 +38,10 @@ qt_generate_deploy_app_script(
 )
 
 install(SCRIPT ${DeployScript})
+
+if (WIN32)
+     add_custom_command(TARGET ${BEE_TARGET} 
+             POST_BUILD COMMAND
+            "${${PROJECT_NAME_UPPERCASE}_TOOLS_DIR}/minject.exe" --force --inplace $<$<CONFIG:Debug>:--postfix=debug> ${${PROJECT_NAME_UPPERCASE}_BINARY_DIR}/${BEE_TARGET}.exe
+     )
+endif (WIN32)

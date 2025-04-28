@@ -6,9 +6,10 @@ AssignSourceGroup(${SOURCE_FILES})
 add_library(${BEE_TARGET} SHARED ${SOURCE_FILES})
 BeeDefaultSettings(${BEE_TARGET})
 
-target_link_libraries(${BEE_TARGET} 
-        PRIVATE 
+target_link_libraries(${BEE_TARGET}
+        PUBLIC 
         Mimalloc
+        PRIVATE 
         Stringzilla
         Eventpp
 )
@@ -38,3 +39,10 @@ target_include_directories(${BEE_TARGET}
         ${CMAKE_CURRENT_SOURCE_DIR}
         PRIVATE
 )
+
+if (WIN32)
+     add_custom_command(TARGET ${BEE_TARGET} 
+             POST_BUILD COMMAND
+            "${${PROJECT_NAME_UPPERCASE}_TOOLS_DIR}/minject.exe" --force --inplace $<$<CONFIG:Debug>:--postfix=debug> ${${PROJECT_NAME_UPPERCASE}_BINARY_DIR}/${BEE_TARGET}.dll
+     )
+endif (WIN32)

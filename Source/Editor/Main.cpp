@@ -7,10 +7,12 @@
 
 // #include <Bee.hpp>
 
+#include <mimalloc.h>
 
 #include <QApplication>
 #include <QSurfaceFormat>
 
+#include "Core/Logger.hpp"
 #include "Core/Version.hpp"
 #include "Widgets/MainWindow.hpp"
 
@@ -18,6 +20,11 @@ using namespace bee;
 
 int main(int argc, char* argv[])
 {
+    if (mi_is_redirected()) {
+        LogInfo("mimalloc is redirected!");
+    }
+    {
+        
     QSurfaceFormat surfaceFormat;
     surfaceFormat.setVersion(4, 6);
     surfaceFormat.setProfile(QSurfaceFormat::CoreProfile);
@@ -34,6 +41,7 @@ int main(int argc, char* argv[])
 
     // TODO: handle exceptions.
     auto ret = app.exec();
+    }
     
     return 0;
 }
