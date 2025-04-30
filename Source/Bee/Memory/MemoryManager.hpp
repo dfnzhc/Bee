@@ -10,7 +10,7 @@
 #include "Memory/Memory.hpp"
 #include "Memory/Allocator.hpp"
 #include "Memory/MemoryPool.hpp"
-#include "Memory/MemoryStatistics.hpp"
+#include "Memory/AllocStats.hpp"
 
 #include "Core/Concepts/ClassTypes.hpp"
 

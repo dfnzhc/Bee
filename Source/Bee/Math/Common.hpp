@@ -11,7 +11,6 @@
 #include "Math/Constant.hpp"
 
 namespace bee {
-
 #define BEE_DEFINE_COMMON_FUNC(Type, Name, Func)                                                                                                     \
     template<Type T> BEE_FUNC BEE_CONSTEXPR T Name(T x) noexcept                                                                                     \
     {                                                                                                                                                \
@@ -210,7 +209,12 @@ BEE_FUNC BEE_CONSTEXPR u32 RoundUp(u32 x, u32 y)
     if (x == 0)
         return y;
     return ((x + y - 1) / y) * y;
-    //    return (x + (y - 1)) & ~(y - 1);
+}
+
+BEE_FUNC BEE_CONSTEXPR Size AlignUp(Size value, Size alignment)
+{
+    // Assumes alignment is a power of two
+    return (value + alignment - 1) & ~(alignment - 1);
 }
 
 BEE_FUNC BEE_CONSTEXPR u32 Parity(u32 x)
@@ -255,6 +259,12 @@ BEE_FUNC BEE_CONSTEXPR u32 ClosestPowerOfTwo(u32 x)
     return (nx - x) > (x - px) ? px : nx;
 }
 
+template<IntegralType I>
+BEE_FUNC BEE_CONSTEXPR bool IsPowerOfTwo(I x)
+{
+    return (x > 0) && ((x & (x - 1)) == 0);
+}
+
 template<std::unsigned_integral T> BEE_FUNC BEE_CONSTEXPR T BitSwap(T x)
 {
     if constexpr (sizeof(T) == 1) {
@@ -273,5 +283,4 @@ template<std::unsigned_integral T> BEE_FUNC BEE_CONSTEXPR T BitSwap(T x)
         return x;
     }
 }
-
 } // namespace bee

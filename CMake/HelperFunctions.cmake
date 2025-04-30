@@ -144,9 +144,11 @@ endfunction(AssignSourceGroup)
 function(AddTestProgram TestFile Libraries)
     get_filename_component(FILE_NAME ${TestFile} NAME_WE)
     add_executable(${FILE_NAME} ${TestFile})
+    
+    get_filename_component(FilePath "${TestFile}" PATH)
     set_target_properties(${FILE_NAME}
             PROPERTIES
-            FOLDER "Tests")
+            FOLDER "Tests/${FilePath}")
 
     foreach (Lib ${Libraries})
         target_link_libraries(${FILE_NAME}
