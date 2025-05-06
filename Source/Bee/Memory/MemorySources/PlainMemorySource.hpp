@@ -11,13 +11,13 @@
 
 namespace bee {
 /**
- * @brief An IMemorySource implementation that uses the mimalloc 's functionalities
+ * @brief Basically a wrapper for mimalloc.
  */
-class BEE_API MallocMemorySource : public IMemorySource
+class BEE_API PlainMemorySource : public IMemorySource
 {
 public:
-    MallocMemorySource()           = default;
-    ~MallocMemorySource() override = default;
+    PlainMemorySource()           = default;
+    ~PlainMemorySource() override = default;
 
     void* allocate(Size size, Size alignment) override;
     void deallocate(void* ptr, Size size) noexcept override;

@@ -14,7 +14,7 @@
 
 using namespace bee;
 
-void* MallocMemorySource::allocate(Size size, Size alignment)
+void* PlainMemorySource::allocate(Size size, Size alignment)
 {
     if (!IsPowerOfTwo(alignment)) {
         // TODO: ToNextPowerOfTwo
@@ -33,7 +33,7 @@ void* MallocMemorySource::allocate(Size size, Size alignment)
     return ptr;
 }
 
-void MallocMemorySource::deallocate(void* ptr, Size size) noexcept
+void PlainMemorySource::deallocate(void* ptr, Size size) noexcept
 {
     // pointer must not null and allocated from this memory source.
     if (ptr == nullptr || !mi_check_owned(ptr)) {
@@ -46,7 +46,7 @@ void MallocMemorySource::deallocate(void* ptr, Size size) noexcept
     mi_free_size(ptr, size);
 }
 
-AllocStats MallocMemorySource::stats() const noexcept
+AllocStats PlainMemorySource::stats() const noexcept
 {
     return _stats;
 }
