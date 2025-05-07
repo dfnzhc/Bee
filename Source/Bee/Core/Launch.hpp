@@ -14,8 +14,8 @@
 
 namespace bee {
 
-class Application;
-using EngineCreator = std::function<UniquePtr<Application>()>;
+class Engine;
+using EngineCreator = std::function<UniquePtr<Engine>()>;
 
 struct LaunchParam
 {

@@ -8,7 +8,7 @@
 #include <gtest/gtest.h>
 #include <Bee.hpp>
 
-#include <Memory/MemorySource.hpp>
+#include <Core/Memory/MemorySource.hpp>
 
 using namespace bee;
 

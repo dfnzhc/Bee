@@ -36,12 +36,12 @@
 #include "Core/Version.hpp"
 #include "Core/Logger.hpp"
 
-#include "Core/App/Application.hpp"
-#include "Core/App/Property.hpp"
-#include "Core/Concepts/ClassTypes.hpp"
+#include "Core/Utility/Property.hpp"
 
-#include "Math/Math.hpp"
-#include "Math/Constant.hpp"
-#include "Math/Common.hpp"
-#include "Math/Hash.hpp"
-#include "Math/Polynomial.hpp"
+#include "Core/Math/Math.hpp"
+#include "Core/Math/Constant.hpp"
+#include "Core/Math/Common.hpp"
+#include "Core/Math/Hash.hpp"
+#include "Core/Math/Polynomial.hpp"
+
+#include "Core/Utility/ClassTypes.hpp"

@@ -8,7 +8,7 @@
 #include "Core/Launch.hpp"
 
 #include "Config.hpp"
-#include "App/Application.hpp"
+#include "Engine/Engine.hpp"
 #include "Core/Logger.hpp"
 
 using namespace bee;
