@@ -8,6 +8,7 @@
 #include "Engine/Events/DispatchEvents.hpp"
 
 using namespace bee;
+#if 0
 
 DispatchEvent::DispatchEvent() : Event(EventType::Dispatch)
 {
@@ -31,3 +32,4 @@ String DispatchEvent::toString() const
 {
     return std::format("Event - Dispatch: {}", ToString(_type));
 }
+#endif

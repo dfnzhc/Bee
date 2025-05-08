@@ -10,6 +10,7 @@
 #include "Engine/Events/Event.hpp"
 #include "Core/Math/Math.hpp"
 
+#if 0
 namespace bee {
 
 class BEE_API WindowResizeEvent final : public Event
@@ -32,3 +33,5 @@ private:
 
 
 } // namespace bee
+
+#endif

@@ -11,40 +11,52 @@
 #include "Core/Memory/Memory.hpp"
 #include "Core/Thirdparty.hpp"
 
-namespace bee {
-enum class EventType
-{
-    keyboard,
-    Mouse,
-    DragFile,
-    WindowResize,
-    Dispatch,
-    Unknown
-};
+#include <typeindex>
 
-// clang-format off
-class BEE_API Event
+namespace bee {
+
+/**
+ * @class IEventBase
+ * @brief Base interface for all event types within the event system.
+ */
+class IEventBase
 {
 public:
-    explicit Event(EventType inType) : _type(inType) { }
-    virtual ~Event() = default;
+    virtual ~IEventBase() = default;
 
-    EventType type() const { return _type; }
-    
-    virtual String toString() const { return "Unknown Event"; } 
+    /**
+     * @brief Retrieves the runtime type index of this event instance.
+     * @return std::type_index representing the concrete type of the event.
+     */
+    virtual std::type_index typeId() const = 0;
 
-private:
-    EventType _type;
+    /**
+     * @brief Converts the event's information into a human-readable string.
+     * @return A string representing the event's data. Useful for logging and debugging.
+     */
+    virtual String toString() const { return "Unknown Event"; }
+
+protected:
+    IEventBase() = default;
 };
-// clang-format on
 
-template<typename T>
-concept cIsEvent = requires(T t)
+using EventPtr = Ptr<IEventBase>;
+
+template<typename E>
+concept cEventType = requires(E t)
 {
-    { t.type() } -> std::convertible_to<EventType>;
-    std::is_base_of_v<Event, T>;
+    { t.typeId() } -> std::convertible_to<std::type_index>;
+    std::is_base_of_v<IEventBase, E>;
 };
 
-using EventPtr = Ptr<Event>;
-
+/**
+ * @brief Helper template function to get the static type_id for any event type E.
+ * @tparam E The event type, must be derived from IEventBase.
+ * @return The std::type_index for event type E.
+ */
+template<cEventType E>
+constexpr std::type_index EventTypeId()
+{
+    return std::type_index(typeid(E));
+}
 } // namespace bee

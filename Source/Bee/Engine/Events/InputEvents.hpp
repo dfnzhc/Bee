@@ -13,6 +13,7 @@
 #include "Engine/Events/Event.hpp"
 
 namespace bee {
+#if 0
 
 enum class ModifierKey : u8
 {
@@ -285,5 +286,7 @@ private:
     MouseButton _button = MouseButton::Unknown;
     u8 _clicks          = {};
 };
+
+#endif
 
 } // namespace bee

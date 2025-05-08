@@ -8,6 +8,7 @@
 #include "Engine/Events/WindowEvents.hpp"
 
 using namespace bee;
+#if 0
 
 WindowResizeEvent::WindowResizeEvent() : Event(EventType::WindowResize)
 {
@@ -36,3 +37,4 @@ String WindowResizeEvent::toString() const
 {
     return std::format("Event - Window Resize: {}x{}", width(), height());
 }
+#endif

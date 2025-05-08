@@ -8,6 +8,7 @@
 #include "Engine/Events/FileEvents.hpp"
 
 namespace bee {
+#if 0
 DropFileEvent::DropFileEvent() : Event(EventType::DragFile)
 {
 }
@@ -25,4 +26,5 @@ String DropFileEvent::toString() const
 {
     return std::format("Event - Drag File: {}", _fileName);
 }
+#endif
 } // namespace bee

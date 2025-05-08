@@ -11,6 +11,8 @@
 
 namespace bee {
 
+#if 0
+
 enum class DispatchEventType
 {
     Gui,
@@ -37,7 +39,7 @@ private:
     DispatchEventType _type = DispatchEventType::Unknown;
 };
 
-
+#endif
 
 
 } // namespace bee

@@ -11,6 +11,7 @@
 
 namespace bee {
 
+#if 0
 class BEE_API DropFileEvent final : public Event
 {
 public:
@@ -26,6 +27,7 @@ public:
 private:
     StringView _fileName;
 };
+#endif
 
 
 } // namespace bee

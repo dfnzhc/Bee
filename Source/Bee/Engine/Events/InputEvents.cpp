@@ -7,6 +7,7 @@
 
 #include "Engine/Events/InputEvents.hpp"
 
+#if 0
 using namespace bee;
 
 ModifierKeysState::ModifierKeysState(bool bInIsLeftShiftDown,
@@ -161,3 +162,4 @@ String MouseEvent::toString() const
 {
     return std::format("Event - Mouse: {}({}) [{}] {}", ToString(_button), ToString(_inputType), _modifierKeys.toString(), _bIsRepeat ? "+repeat" : "-");
 }
+#endif
