@@ -35,20 +35,4 @@ public:
     CMoveable(CMoveable&&)            = default;
     CMoveable& operator=(CMoveable&&) = default;
 };
-
-
-template<typename T>
-class BEE_API CSingleton : public CMoveable
-{
-public:
-    static T& Get()
-    {
-        static T instance;
-        return instance;
-    }
-
-protected:
-    CSingleton(CSingleton&&) = default;
-    ~CSingleton() override = default;
-};
 } // namespace bee

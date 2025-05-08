@@ -16,7 +16,7 @@
 
 namespace bee {
 
-class BEE_API MemoryManager : public CSingleton<MemoryManager>
+class BEE_API MemoryManager : public CMoveable
 {
 protected:
     ~MemoryManager() override;
