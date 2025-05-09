@@ -7,7 +7,6 @@
 
 #include "Engine/Events/InputEvents.hpp"
 
-#if 0
 using namespace bee;
 
 ModifierKeysState::ModifierKeysState(bool bInIsLeftShiftDown,
@@ -47,7 +46,7 @@ bool ModifierKeysState::isAltDown() const { return _bIsLeftAltDown || _bIsRightA
 bool ModifierKeysState::isLeftAltDown() const { return _bIsLeftAltDown; }
 bool ModifierKeysState::isRightAltDown() const { return _bIsRightAltDown; }
 
-bool ModifierKeysState::AreModifersDown(ModifierKey ModiferKeys) const
+bool ModifierKeysState::areModifersDown(ModifierKey ModiferKeys) const
 {
     BEE_USE_MAGIC_ENUM_BIT_OPERATOR;
 
@@ -78,17 +77,76 @@ String ModifierKeysState::toString() const
 
     String str{"Modifiers:"};
     // clang-format off
-    if (isLeftShiftDown())      str += " +LShift";
-    if (isRightShiftDown())     str += " +RShift";
-    if (isLeftControlDown())    str += " +LCtrl";
-    if (isRightControlDown())   str += " +RCtrl";
-    if (isLeftAltDown())        str += " +LAlt";
-    if (isRightAltDown())       str += " +RAlt";
+    if (isLeftAltDown())        str += " +LA";
+    if (isRightAltDown())       str += " +RA";
+    if (isLeftControlDown())    str += " +LC";
+    if (isRightControlDown())   str += " +RC";
+    if (isLeftShiftDown())      str += " +LS";
+    if (isRightShiftDown())     str += " +RS";
     // clang-format on
 
     return str;
 }
 
+String KeyPressedEvent::toString() const
+{
+    return std::format("KeyPressedEvent: [ Key: {}, Modifiers: {}, Repeat: {} ]", ToString(_key), _modifierKeys.toString(), _bIsRepeat ? "true" : "false");
+}
+
+String KeyReleasedEvent::toString() const
+{
+    return std::format("KeyReleasedEvent: [ Key: {}, Modifiers: {} ]", ToString(_key), _modifierKeys.toString());
+}
+
+String MouseButtonPressedEvent::toString() const
+{
+    return std::format("MouseButtonPressedEvent: [ Button: {}, "
+                       "Pos: ({}, {}), "
+                       "Clicks: {}, "
+                       "Modifiers: {},"
+                       "Repeat: {} ]",
+                       ToString(_button),
+                       _x,
+                       _y,
+                       _clicks,
+                       _modifierKeys.toString(),
+                       _bIsRepeat ? "true" : "false");
+}
+
+String MouseButtonReleasedEvent::toString() const
+{
+    return std::format("MouseButtonReleasedEvent: [ Button: {}, "
+                       "Pos: ({}, {}), "
+                       "Modifiers: {} ]",
+                       ToString(_button),
+                       _x,
+                       _y,
+                       _modifierKeys.toString());
+}
+
+String MouseMovedEvent::toString() const
+{
+    return std::format("MouseButtonReleasedEvent: [ Pos: ({}, {}), "
+                       "Delta: ({}, {}), "
+                       "Modifiers: {} ]",
+                       _x,
+                       _y,
+                       _deltaX,
+                       _deltaY,
+                       _modifierKeys.toString());
+}
+
+String MouseWheelEvent::toString() const
+{
+    
+    return std::format("MouseButtonReleasedEvent: [ Delta: ({}, {}), "
+                       "Modifiers: {} ]",
+                       _deltaX,
+                       _deltaY,
+                       _modifierKeys.toString());
+}
+
+#if 0
 String KeyboardEvent::toString() const
 {
     return std::format("Event - Key: {}({}) [{}] {}", ToString(_key), ToString(_inputType), _modifierKeys.toString(), _bIsRepeat ? "+repeat" : "-");

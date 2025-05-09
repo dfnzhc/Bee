@@ -13,8 +13,6 @@
 #include "Engine/Events/Event.hpp"
 
 namespace bee {
-#if 0
-
 enum class ModifierKey : u8
 {
     None    = 0,
@@ -22,6 +20,91 @@ enum class ModifierKey : u8
     Alt     = 1 << 1,
     Shift   = 1 << 2,
 };
+
+struct BEE_API ModifierKeysState
+{
+public:
+    ModifierKeysState();
+    ModifierKeysState(bool bInIsLeftShiftDown,
+                      bool bInIsRightShiftDown,
+                      bool bInIsLeftControlDown,
+                      bool bInIsRightControlDown,
+                      bool bInIsLeftAltDown,
+                      bool bInIsRightAltDown);
+
+    // clang-format off
+    bool isShiftDown()      const;
+    bool isLeftShiftDown()  const;
+    bool isRightShiftDown() const;
+
+    bool isControlDown()      const;
+    bool isLeftControlDown()  const;
+    bool isRightControlDown() const;
+
+    bool isAltDown()      const;
+    bool isLeftAltDown()  const;
+    bool isRightAltDown() const;
+    // clang-format on
+
+    bool areModifersDown(ModifierKey ModiferKeys) const;
+    bool anyModifiersDown() const;
+
+    String toString() const;
+
+private:
+    u16 _bIsLeftShiftDown  : 1;
+    u16 _bIsRightShiftDown : 1;
+
+    u16 _bIsLeftControlDown  : 1;
+    u16 _bIsRightControlDown : 1;
+
+    u16 _bIsLeftAltDown  : 1;
+    u16 _bIsRightAltDown : 1;
+};
+
+class BEE_API InputEventBase : public IEventBase
+{
+public:
+    /**
+     * @brief Constructor for InputEventBase.
+     * @param modifiers The state of modifier keys at the time of the event.
+     */
+    InputEventBase(const ModifierKeysState& modifiers)
+        : _modifierKeys(modifiers)
+    {
+    }
+
+    ~InputEventBase() override = default;
+
+    /**
+     * @brief Gets the state of the modifier keys (Shift, Ctrl, Alt).
+     * @return Const reference to ModifierKeysState.
+     */
+    const ModifierKeysState& modifierKeys() const { return _modifierKeys; }
+
+    // Helper methods to directly check modifier states
+
+    // clang-format off
+    bool isShiftDown()      const { return _modifierKeys.isShiftDown(); }
+    bool isLeftShiftDown()  const { return _modifierKeys.isLeftShiftDown(); }
+    bool isRightShiftDown() const { return _modifierKeys.isRightShiftDown(); }
+
+    bool isControlDown()      const { return _modifierKeys.isControlDown(); }
+    bool isLeftControlDown()  const { return _modifierKeys.isLeftControlDown(); }
+    bool isRightControlDown() const { return _modifierKeys.isRightControlDown(); }
+
+    bool isAltDown()      const { return _modifierKeys.isAltDown(); }
+    bool isLeftAltDown()  const { return _modifierKeys.isLeftAltDown(); }
+    bool isRightAltDown() const { return _modifierKeys.isRightAltDown(); }
+    // clang-format on
+
+protected:
+    ModifierKeysState _modifierKeys;
+};
+
+/// ==========================
+/// Key events
+/// ==========================
 
 enum class Keys : u32
 {
@@ -134,6 +217,87 @@ enum class Keys : u32
     Unknown        = 313 // Any unknown key code
 };
 
+/**
+ * @brief Base class for specific keyboard events (Pressed, Released).
+ *        Contains the key code involved in the event.
+ */
+class BEE_API KeyEvent : public InputEventBase
+{
+public:
+    /**
+     * @brief Constructor for KeyEvent.
+     * @param key The key code.
+     * @param modifiers The state of modifier keys.
+     */
+    KeyEvent(Keys key, const ModifierKeysState& modifiers)
+        : InputEventBase(modifiers), _key(key)
+    {
+    }
+
+    /**
+     * @brief Gets the key involved in this event.
+     * @return The Keys enum value.
+     */
+    Keys key() const { return _key; }
+
+protected:
+    Keys _key;
+};
+
+/**
+ * @brief Event triggered when a key is pressed down.
+ */
+class BEE_API KeyPressedEvent final : public KeyEvent
+{
+public:
+    /**
+     * @brief Constructor for KeyPressedEvent.
+     * @param key The key code that was pressed.
+     * @param modifiers The state of modifier keys.
+     * @param isRepeat True if this is a repeat event due to key being held down.
+     */
+    KeyPressedEvent(Keys key, const ModifierKeysState& modifiers = {}, bool isRepeat = false)
+        : KeyEvent(key, modifiers), _bIsRepeat(isRepeat)
+    {
+    }
+
+    /**
+     * @brief Checks if this is a repeat event (key held down).
+     * @return True if it's a repeat, false otherwise.
+     */
+    BEE_NODISCARD bool isRepeat() const { return _bIsRepeat; }
+
+    BEE_NODISCARD std::type_index typeId() const override { return EventTypeId<KeyPressedEvent>(); }
+    BEE_NODISCARD String toString() const override;
+
+private:
+    bool _bIsRepeat;
+};
+
+/**
+ * @brief Event triggered when a key is released.
+ */
+class BEE_API KeyReleasedEvent final : public KeyEvent
+{
+public:
+    /**
+     * @brief Constructor for KeyReleasedEvent.
+     * @param key The key code that was released.
+     * @param modifiers The state of modifier keys at the time of release.
+     */
+    KeyReleasedEvent(Keys key, const ModifierKeysState& modifiers = {})
+        : KeyEvent(key, modifiers)
+    {
+    }
+
+    BEE_NODISCARD std::type_index typeId() const override { return EventTypeId<KeyReleasedEvent>(); }
+    BEE_NODISCARD String toString() const override;
+};
+
+/// ==========================
+/// Mouse events
+/// ==========================
+
 enum class MouseButton : u8
 {
     Left,
@@ -144,149 +308,150 @@ enum class MouseButton : u8
     Unknown // Any unknown mouse button
 };
 
-enum class InputType : u16
-{
-    KeyDown,
-    KeyUp,
-
-    MouseButtonDown,
-    MouseButtonUp,
-    MouseMotion,
-    MouseWheel,
-
-    Unknown
-};
-
-struct BEE_API ModifierKeysState
+/**
+ * @brief Base class for mouse button related events (Pressed, Released).
+ */
+class BEE_API MouseButtonEvent : public InputEventBase
 {
 public:
-    ModifierKeysState();
-    ModifierKeysState(bool bInIsLeftShiftDown,
-                      bool bInIsRightShiftDown,
-                      bool bInIsLeftControlDown,
-                      bool bInIsRightControlDown,
-                      bool bInIsLeftAltDown,
-                      bool bInIsRightAltDown);
+    /**
+     * @brief Constructor for MouseButtonEvent.
+     * @param button The mouse button involved.
+     * @param x The x-coordinate of the mouse cursor.
+     * @param y The y-coordinate of the mouse cursor.
+     * @param modifiers The state of modifier keys.
+     */
+    MouseButtonEvent(MouseButton button, f32 x, f32 y, const ModifierKeysState& modifiers = {})
+        : InputEventBase(modifiers), _x(x), _y(y), _button(button)
+    {
+    }
 
-    // clang-format off
-    bool isShiftDown()      const;
-    bool isLeftShiftDown()  const;
-    bool isRightShiftDown() const;
+    BEE_NODISCARD MouseButton button() const { return _button; }
+    BEE_NODISCARD f32 posX() const { return _x; }
+    BEE_NODISCARD f32 posY() const { return _y; }
+    BEE_NODISCARD vec2f position() const { return vec2f{_x, _y}; }
 
-    bool isControlDown()      const;
-    bool isLeftControlDown()  const;
-    bool isRightControlDown() const;
-
-    bool isAltDown()      const;
-    bool isLeftAltDown()  const;
-    bool isRightAltDown() const;
-    // clang-format on
-
-    bool AreModifersDown(ModifierKey ModiferKeys) const;
-    bool anyModifiersDown() const;
-
-    String toString() const;
-
-private:
-    u16 _bIsLeftShiftDown  : 1;
-    u16 _bIsRightShiftDown : 1;
-
-    u16 _bIsLeftControlDown  : 1;
-    u16 _bIsRightControlDown : 1;
-
-    u16 _bIsLeftAltDown  : 1;
-    u16 _bIsRightAltDown : 1;
-};
-
-class BEE_API InputEvents
-{
-public:
-    // clang-format off
-    InputEvents() = default;
-    InputEvents(const ModifierKeysState& modifierKeys, bool bInIsRepeat, InputType inputType) : _modifierKeys(modifierKeys), _inputType(inputType), _bIsRepeat(bInIsRepeat) { }
-    
-    virtual ~InputEvents() = default;
-
-    bool isRepeat() const { return _bIsRepeat; }
-
-    bool isShiftDown()      const { return _modifierKeys.isShiftDown(); }
-    bool isLeftShiftDown()  const { return _modifierKeys.isLeftShiftDown(); }
-    bool isRightShiftDown() const { return _modifierKeys.isRightShiftDown(); }
-
-    bool isControlDown()      const { return _modifierKeys.isControlDown(); }
-    bool isLeftControlDown()  const { return _modifierKeys.isLeftControlDown(); }
-    bool isRightControlDown() const { return _modifierKeys.isRightControlDown(); }
-
-    bool isAltDown()      const { return _modifierKeys.isAltDown(); }
-    bool isLeftAltDown()  const { return _modifierKeys.isLeftAltDown(); }
-    bool isRightAltDown() const { return _modifierKeys.isRightAltDown(); }
-
-    const ModifierKeysState& modifierKeys() const { return _modifierKeys; }
-    InputType inputType() const { return _inputType; }
-    // clang-format on
-    
 protected:
-    ModifierKeysState _modifierKeys = {};
-
-    InputType _inputType = InputType::Unknown;
-    bool _bIsRepeat      = false;
+    f32 _x, _y;
+    MouseButton _button;
 };
 
-class BEE_API KeyboardEvent final : public Event, public InputEvents
+/**
+ * @brief Event triggered when a mouse button is pressed down.
+ */
+class BEE_API MouseButtonPressedEvent final : public MouseButtonEvent
 {
 public:
-    KeyboardEvent() : Event(EventType::keyboard), InputEvents()
+    /**
+     * @brief Constructor for MouseButtonPressedEvent.
+     * @param button The mouse button pressed.
+     * @param x The x-coordinate of the mouse cursor.
+     * @param y The y-coordinate of the mouse cursor.
+     * @param clicks The number of clicks (1 for single, 2 for double, etc.).
+     * @param modifiers The state of modifier keys.
+     * @param isRepeat True if this is a "repeat" due to button being held (less common for mice).
+     */
+    MouseButtonPressedEvent(MouseButton button, f32 x, f32 y, u8 clicks, const ModifierKeysState& modifiers, bool isRepeat = false)
+        : MouseButtonEvent(button, x, y, modifiers), _clicks(clicks), _bIsRepeat(isRepeat)
     {
     }
 
-    KeyboardEvent(Keys key, InputType keyType, const ModifierKeysState& modifierKeys, bool bIsRepeat) : Event(EventType::keyboard), InputEvents(modifierKeys, bIsRepeat, keyType), _key(key)
+    BEE_NODISCARD u8 clicks() const { return _clicks; }
+    BEE_NODISCARD bool isRepeat() const { return _bIsRepeat; }
+    BEE_NODISCARD std::type_index typeId() const override { return EventTypeId<MouseButtonPressedEvent>(); }
+    BEE_NODISCARD String toString() const override;
+
+private:
+    u8 _clicks;
+    bool _bIsRepeat;
+};
+
+/**
+ * @brief Event triggered when a mouse button is released.
+ */
+class BEE_API MouseButtonReleasedEvent final : public MouseButtonEvent
+{
+public:
+    /**
+     * @brief Constructor for MouseButtonReleasedEvent.
+     * @param button The mouse button released.
+     * @param x The x-coordinate of the mouse cursor.
+     * @param y The y-coordinate of the mouse cursor.
+     * @param modifiers The state of modifier keys.
+     */
+    MouseButtonReleasedEvent(MouseButton button, f32 x, f32 y, const ModifierKeysState& modifiers)
+        : MouseButtonEvent(button, x, y, modifiers)
     {
     }
 
-    ~KeyboardEvent() override = default;
-
-    Keys key() const { return _key; }
-    String toString() const override;
-
-private:
-    Keys _key = Keys::Unknown;
-    // Keycode?
+    BEE_NODISCARD std::type_index typeId() const override { return EventTypeId<MouseButtonReleasedEvent>(); }
+    BEE_NODISCARD String toString() const override;
 };
 
-class BEE_API MouseEvent final : public Event, public InputEvents
+/**
+ * @brief Event triggered when the mouse cursor moves.
+ */
+class BEE_API MouseMovedEvent final : public InputEventBase
 {
 public:
-    MouseEvent();
+    /**
+     * @brief Constructor for MouseMovedEvent.
+     * @param x The new x-coordinate of the mouse cursor.
+     * @param y The new y-coordinate of the mouse cursor.
+     * @param deltaX The change in x-coordinate since the last move event.
+     * @param deltaY The change in y-coordinate since the last move event.
+     * @param modifiers The state of modifier keys.
+     */
+    MouseMovedEvent(f32 x, f32 y, f32 deltaX, f32 deltaY, const ModifierKeysState& modifiers)
+        : InputEventBase(modifiers), _x(x), _y(y), _deltaX(deltaX), _deltaY(deltaY)
+    {
+    }
 
-    // Button
-    MouseEvent(f32 x, f32 y, MouseButton btn, InputType mouseType, u8 clicks, const ModifierKeysState& modifierKeys, bool bIsRepeat = false);
-    // Motion
-    MouseEvent(f32 x, f32 y, f32 relX, f32 relY, const ModifierKeysState& modifierKeys);
-    // Wheel
-    MouseEvent(f32 h, f32 v, const ModifierKeysState& modifierKeys);
+    BEE_NODISCARD f32 posX() const { return _x; }
+    BEE_NODISCARD f32 posY() const { return _y; }
+    BEE_NODISCARD vec2f position() const { return vec2f{_x, _y}; }
 
-    ~MouseEvent() override = default;
+    BEE_NODISCARD f32 deltaX() const { return _deltaX; }
+    BEE_NODISCARD f32 deltaY() const { return _deltaY; }
+    BEE_NODISCARD vec2f deltaMotion() const { return vec2f{_deltaX, _deltaY}; }
 
-    Opt<MouseButton> button() const;
-
-    Opt<vec2f> position() const;
-    Opt<vec2f> relativeMotion() const;
-    Opt<vec2f> wheelDelta() const;
-
-    Opt<u8> clicks() const;
-    
-    bool isButtonEvent() const; 
-
-    String toString() const override;
+    BEE_NODISCARD std::type_index typeId() const override { return EventTypeId<MouseMovedEvent>(); }
+    BEE_NODISCARD String toString() const override;
 
 private:
-    f32 _posX = {}, _posY = {}; ///< normalized position [0, 1]
-    f32 _relX = {}, _relY = {};
-
-    MouseButton _button = MouseButton::Unknown;
-    u8 _clicks          = {};
+    f32 _x, _y;
+    f32 _deltaX, _deltaY;
 };
 
-#endif
+/**
+ * @brief Event triggered when the mouse wheel is scrolled.
+ */
+class BEE_API MouseWheelEvent final : public InputEventBase
+{
+public:
+    /**
+     * @brief Constructor for MouseWheelEvent.
+     * @param deltaX The horizontal scroll offset.
+     * @param deltaY The vertical scroll offset.
+     * @param modifiers The state of modifier keys.
+     */
+    MouseWheelEvent(f32 deltaX, f32 deltaY, const ModifierKeysState& modifiers)
+        : InputEventBase(modifiers), _deltaX(deltaX), _deltaY(deltaY)
+    {
+    }
+
+    /** Horizontal scroll */
+    BEE_NODISCARD f32 deltaX() const { return _deltaX; }
+
+    /** Vertical scroll */
+    BEE_NODISCARD f32 deltaY() const { return _deltaY; }
+    BEE_NODISCARD vec2f wheelDelta() const { return vec2f{_deltaX, _deltaY}; }
+
+    BEE_NODISCARD std::type_index typeId() const override { return EventTypeId<MouseWheelEvent>(); }
+    BEE_NODISCARD String toString() const override;
+
+private:
+    f32 _deltaX, _deltaY;
+};
 
 } // namespace bee
