@@ -7,10 +7,13 @@
 
 #include "MainWindow.hpp"
 #include "ui_MainWindow.h"
+#include "Engine/Engine.hpp"
+
+#include <QKeyEvent>
 
 using namespace bee;
 
-MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::MainWindow)
+MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::MainWindow), _pEngine(std::make_unique<Engine>())
 {
     ui->setupUi(this);
 
@@ -18,10 +21,17 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::MainWi
     buildToolBar();
     buildStatusBar();
     buildLogWidget();
+
+    _pEngine->initialize();
 }
 
 MainWindow::~MainWindow()
 {
+    if (_pEngine) {
+        _pEngine.reset();
+        _pEngine = nullptr;
+    }
+
     delete ui;
 }
 
@@ -29,7 +39,7 @@ void MainWindow::buildMenus()
 {
     /// File actions
     ui->actionFileExit->setShortcut(QKeySequence::Quit);
-    connect(ui->actionFileExit, SIGNAL(triggered()), SLOT(close()));    // TODO：how to handle close event? 
+    connect(ui->actionFileExit, SIGNAL(triggered()), SLOT(close())); // TODO：how to handle close event? 
 }
 
 void MainWindow::buildToolBar()
@@ -42,4 +52,11 @@ void MainWindow::buildStatusBar()
 
 void MainWindow::buildLogWidget()
 {
+}
+
+void MainWindow::keyPressEvent(QKeyEvent* event)
+{
+    if (event->key() == Qt::Key_Escape) {
+        close();
+    }
 }

@@ -24,24 +24,26 @@ int main(int argc, char* argv[])
         LogInfo("mimalloc is redirected!");
     }
     {
-        
-    QSurfaceFormat surfaceFormat;
-    surfaceFormat.setVersion(4, 6);
-    surfaceFormat.setProfile(QSurfaceFormat::CoreProfile);
-    QSurfaceFormat::setDefaultFormat(surfaceFormat);
+        qputenv("QT_ENABLE_HIGHDPI_SCALING", "0");
 
-    QApplication app(argc, argv);
-    QApplication::setOrganizationName("Bee");
-    QApplication::setOrganizationDomain("Bee");
-    QApplication::setApplicationName("Bee");
-    QApplication::setApplicationVersion(QString("Ver %1.%2.%3").arg(BEE_VERSION_MAJOR).arg(BEE_VERSION_MINOR).arg(BEE_VERSION_PATCH));
-        
-    MainWindow window;
-    window.show();
+        QSurfaceFormat surfaceFormat;
+        surfaceFormat.setVersion(4, 6);
+        surfaceFormat.setProfile(QSurfaceFormat::CoreProfile);
+        QSurfaceFormat::setDefaultFormat(surfaceFormat);
 
-    // TODO: handle exceptions.
-    auto ret = app.exec();
+        QApplication app(argc, argv);
+        QApplication::setOrganizationName("Bee");
+        QApplication::setOrganizationDomain("Bee");
+        QApplication::setApplicationName("Bee");
+        QApplication::setApplicationVersion(QString("Ver %1.%2.%3").arg(BEE_VERSION_MAJOR).arg(BEE_VERSION_MINOR).arg(BEE_VERSION_PATCH));
+
+        MainWindow window;
+        window.move(10, 10);
+        window.show();
+
+        // TODO: handle exceptions.
+        auto ret = app.exec();
     }
-    
+
     return 0;
 }

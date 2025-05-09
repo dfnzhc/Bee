@@ -1,9 +1,6 @@
 # QT
 set(Qt_DIR $ENV{Qt6_DIR})
-list(APPEND CMAKE_PREFIX_PATH ${Qt_DIR})
-
-if (WIN32)
-endif (WIN32)
+list(APPEND CMAKE_PREFIX_PATH "${Qt_DIR}/lib/cmake")
 
 function(BeeDeployQT ProjectName)
     if (NOT TARGET ${ProjectName})

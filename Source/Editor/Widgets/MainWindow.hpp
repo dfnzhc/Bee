@@ -23,6 +23,8 @@ public:
     explicit MainWindow(QWidget* parent = nullptr);
     ~MainWindow() override;
 
+protected:
+    void keyPressEvent(QKeyEvent* event) override;
 
 private:
     void buildMenus();
@@ -33,6 +35,6 @@ private:
 private:
     Ui::MainWindow* ui;
 
-    
+    std::unique_ptr<class Engine> _pEngine;
 };
 } // namespace bee

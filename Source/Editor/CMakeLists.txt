@@ -29,16 +29,6 @@ set_target_properties(${BEE_TARGET}
         WIN32_EXECUTABLE ON
 )
 
-BeeDeployQT(${BEE_TARGET})
-
-qt_generate_deploy_app_script(
-        TARGET ${BEE_TARGET}
-        OUTPUT_SCRIPT DeployScript
-        NO_UNSUPPORTED_PLATFORM_ERROR
-)
-
-install(SCRIPT ${DeployScript})
-
 if (WIN32)
      add_custom_command(TARGET ${BEE_TARGET} 
              POST_BUILD COMMAND
