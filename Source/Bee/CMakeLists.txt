@@ -9,6 +9,7 @@ BeeDefaultSettings(${BEE_TARGET})
 target_link_libraries(${BEE_TARGET}
         PUBLIC 
         Mimalloc
+        GLM
         PRIVATE 
         Stringzilla
         Eventpp
@@ -24,6 +25,11 @@ target_compile_options(${BEE_TARGET}
         PUBLIC
         # MSVC
         $<$<CXX_COMPILER_ID:MSVC>:/DEBUG /Zc:preprocessor>
+)
+
+target_compile_features(${BEE_TARGET} 
+        PUBLIC 
+        cxx_std_23
 )
 
 target_compile_definitions(${BEE_TARGET}

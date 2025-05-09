@@ -519,7 +519,7 @@ TEST_F(EventManagerQueueDispatchTest, ConcurrentSubscribeAndEnqueueStability)
     auto finalListener = std::make_shared<QueueCountingListener>();
     auto finalHandle   = em->subscribeQueued<TestEventA>([&](const TestEventA& event) { (*finalListener)(event); });
     ASSERT_NE(finalHandle, EventManager::kInvalidHandle);
-    em->enqueue(std::make_shared<TestEventA>(1.0, ""), EventPriority::Normal);
+    em->enqueue(std::make_shared<TestEventA>(1, ""), EventPriority::Normal);
     waitForCondition([&]() { return finalListener->callCount.load() == 1; });
     EXPECT_EQ(finalListener->callCount.load(), 1);
     EXPECT_TRUE(em->unsubscribe(finalHandle));

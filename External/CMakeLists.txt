@@ -19,10 +19,24 @@ macro(ConfigurePathLibrary INCLUDE_VAR HEADER_PATH TARGET_NAME)
 endmacro()
 
 # mimalloc
-
 ConfigureInterfaceLibrary(mimalloc mimalloc-static Mimalloc)
 if(MSVC)
 	target_compile_options(Mimalloc INTERFACE /INCLUDE:mi_version)
+endif()
+
+# glm
+ConfigureInterfaceLibrary(glm glm::glm GLM)
+target_compile_definitions(GLM
+        INTERFACE
+        GLM_FORCE_CXX17
+		GLM_FORCE_SWIZZLE
+		GLM_FORCE_RADIANS
+		GLM_FORCE_RIGHT_HANDED
+		GLM_FORCE_DEPTH_ZERO_TO_ONE
+		GLM_ENABLE_EXPERIMENTAL
+)
+if (MSVC)
+    target_compile_options(GLM INTERFACE "/Zc:__cplusplus")
 endif()
 
 #find_package(mimalloc CONFIG REQUIRED)
