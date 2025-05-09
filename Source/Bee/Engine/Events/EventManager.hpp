@@ -156,39 +156,4 @@ EventManager::Handle EventManager::subscribeHelper(std::function<void(const Even
 
     return kInvalidHandle;
 }
-
-#if 0
-class BEE_API EventManager final : public CMoveable
-{
-public:
-    static EventManager& Instance()
-    {
-        static EventManager es;
-        return es;
-    }
-
-    using Handle       = u64;
-    using CallbackType = std::function<void(const EventPtr&)>;
-    
-    /// ==========================
-    Handle Register(EventType type, CallbackType&& callback) const;
-    
-    void Unregister(Handle handle) const;
-
-    // Asynchronously
-    void Push(const EventPtr& event) const;
-    void Process() const;
-
-    // Synchronously
-    void Dispatch(const EventPtr& event) const;
-
-private:
-    EventManager();
-    ~EventManager() override;
-
-private:
-    class Impl;
-    UniquePtr<Impl> _impl;
-};
-#endif
 } // namespace bee

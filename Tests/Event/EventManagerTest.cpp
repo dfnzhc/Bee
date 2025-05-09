@@ -9,7 +9,7 @@
 #include <random>
 #include <gtest/gtest.h>
 
-#include <Engine/EventManager.hpp>
+#include <Engine/Events/EventManager.hpp>
 
 using namespace bee;
 

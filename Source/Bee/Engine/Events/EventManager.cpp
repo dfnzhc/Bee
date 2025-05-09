@@ -5,8 +5,7 @@
  * @Brief This file is part of Bee.
  */
 
-#include "Engine/EventManager.hpp"
-#include "Engine/Events/DispatchEvents.hpp"
+#include "Engine/Events/EventManager.hpp"
 
 #include "Core/Error.hpp"
 
@@ -247,102 +246,3 @@ void EventManager::enqueue(std::shared_ptr<IEventBase> event, EventPriority prio
     const auto id = event->typeId();
     _pImpl->queue.enqueue(EventWrapQueued{.event = std::move(event), .id = id, .priority = static_cast<int>(priority)});
 }
-
-#if 0
-namespace {
-struct EventPolicy
-{
-    static EventType getEvent(const EventPtr& event) { return event->type(); }
-};
-} // namespace
-
-class bee::EventManager::Impl
-{
-public:
-    /// ==========================
-    using EventQueueType = eventpp::EventQueue<EventType, void(const EventPtr&), EventPolicy>;
-    using QueueHandle    = EventQueueType::Handle;
-
-    Handle Register(EventType type, CallbackType&& callback)
-    {
-        const auto h  = nextHandle();
-        const auto qh = queue.appendListener(type, callback);
-
-        handles.emplace(h, qh);
-        types.emplace(h, type);
-
-        return h;
-    }
-
-    void Unregister(Handle handle)
-    {
-        if (!(handles.contains(handle) && types.contains(handle))) {
-            LogWarn("No such event handle exist: '{}'.", handle);
-            return;
-        }
-
-        const auto qh = handles.extract(handle).mapped();
-        const auto type = types.extract(handle).mapped();
-        
-        if (!queue.removeListener(type, qh)) {
-            LogWarn("Unregister from event system failed: '{}'.", handle);
-        }
-    }
-
-    void Enqueue(const EventPtr& event) { queue.enqueue(event); }
-
-    void Process() { queue.process(); }
-
-    void Dispatch(const EventPtr& event) const { queue.dispatch(event); }
-
-    void DispatchSDL(VoidPtr event) const { dispatchCallbackList(event); }
-
-    Handle nextHandle() { return currentHandle++; }
-
-    EventQueueType queue;
-    std::unordered_map<Handle, QueueHandle> handles;
-    std::unordered_map<Handle, EventType> types;
-
-    eventpp::CallbackList<void(VoidPtr)> dispatchCallbackList;
-
-    Handle currentHandle = 0;
-};
-
-EventManager::Handle EventManager::Register(EventType type, CallbackType&& callback) const
-{
-    return _impl->Register(type, std::move(callback));
-}
-
-void EventManager::Unregister(Handle handle) const
-{
-    _impl->Unregister(handle);
-}
-
-void EventManager::Push(const EventPtr& event) const
-{
-    _impl->Enqueue(event);
-}
-
-void EventManager::Process() const
-{
-    _impl->Process();
-}
-
-void EventManager::Dispatch(const EventPtr& event) const
-{
-    _impl->Dispatch(event);
-}
-
-EventManager::EventManager() : _impl(std::make_unique<Impl>())
-{
-    BEE_ASSERT(_impl, "Failed to init event system.");
-}
-
-EventManager::~EventManager()
-{
-    if (_impl) {
-        _impl.reset();
-        _impl = nullptr;
-    }
-}
-#endif

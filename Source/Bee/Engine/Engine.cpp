@@ -12,7 +12,7 @@
 #include "Core/Logger.hpp"
 #include "Core/Error.hpp"
 
-#include "Engine/EventManager.hpp"
+#include "Engine/Events/EventManager.hpp"
 #include "Engine/Events/DispatchEvents.hpp"
 #include "Engine/Events/InputEvents.hpp"
 #include "Engine/Events/WindowEvents.hpp"
