@@ -19,7 +19,7 @@ public:
     PlainMemorySource()           = default;
     ~PlainMemorySource() override = default;
 
-    void* allocate(Size size, Size alignment) override;
+    void* allocate(Size size, Size alignment = 0) override;
     void deallocate(void* ptr, Size size) noexcept override;
 
     AllocStats stats() const noexcept override;

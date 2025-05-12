@@ -16,16 +16,23 @@ using namespace bee;
 
 void* PlainMemorySource::allocate(Size size, Size alignment)
 {
-    if (!IsPowerOfTwo(alignment)) {
-        // TODO: ToNextPowerOfTwo
-        alignment = alignof(std::max_align_t);
-    }
-
     if (size == 0) {
         return nullptr;
     }
+    
+    if (alignment != 0 && !IsPowerOfTwo(alignment)) {
+        alignment = NextPowerOfTwo(sizeof(std::max_align_t));
+    }
 
-    void* ptr = mi_malloc_aligned(size, alignment);
+    void* ptr = nullptr;
+
+    if (alignment == 0) {
+        ptr = mi_malloc(size);
+    }
+    else {
+        ptr = mi_malloc_aligned(size, alignment);
+    }
+    
     if (ptr != nullptr) {
         _stats.alloc(size);
     }

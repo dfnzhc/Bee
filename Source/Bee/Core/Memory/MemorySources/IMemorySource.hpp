@@ -31,7 +31,7 @@ public:
      * @return A pointer to the allocated memory block, or nullptr if allocation fails.
      *         The allocated block size will be at least 'size' bytes.
      */
-    virtual void* allocate(size_t size, size_t alignment = alignof(std::max_align_t)) = 0;
+    virtual void* allocate(size_t size, size_t alignment = 0) = 0;
 
     /**
      * @brief Deallocate a raw block of memory previously allocated by this source.
