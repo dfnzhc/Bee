@@ -6,7 +6,7 @@
  */
 
 #include "Core/Memory/MemorySources/PlainMemorySource.hpp"
-#include "Core/Math/Common.hpp"
+#include "Core/Math/Bits.hpp"
 
 #include <mimalloc.h>
 

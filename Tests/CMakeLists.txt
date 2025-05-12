@@ -11,6 +11,7 @@ set(${CMAKE_CURRENT_BINARY_DIR})
 
 AddTestProgram(Base/ErrorTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Bee")
 AddTestProgram(Math/MathTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Bee")
+AddTestProgram(Math/BitsTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Bee")
 
 AddTestProgram(Memory/PlainMemorySourceTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Bee")
 AddTestProgram(Memory/RingBufferTest.cpp "GTest::gtest;GTest::gtest_main;Bee::Bee")
