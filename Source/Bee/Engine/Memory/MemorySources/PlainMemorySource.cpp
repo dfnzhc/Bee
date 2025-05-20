@@ -5,12 +5,11 @@
  * @Brief This file is part of Bee.
  */
 
-#include "Core/Memory/MemorySources/PlainMemorySource.hpp"
-#include "Core/Math/Bits.hpp"
+#include "Memory/MemorySources/PlainMemorySource.hpp"
+#include "Error.hpp"
+#include "Math/Bits.hpp"
 
 #include <mimalloc.h>
-
-#include "Core/Error.hpp"
 
 using namespace bee;
 

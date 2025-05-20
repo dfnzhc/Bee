@@ -44,6 +44,8 @@ target_include_directories(${BEE_TARGET}
         ${CMAKE_BINARY_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}
         PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/Core
+        ${CMAKE_CURRENT_SOURCE_DIR}/Engine
 )
 
 if (${${PROJECT_NAME_UPPERCASE}_USE_DOUBLE_PRECISION})

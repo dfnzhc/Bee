@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include "Core/Memory/MemorySources/IMemorySource.hpp"
+#include "Core/Memory/IMemorySource.hpp"
 
 namespace bee {
 /**

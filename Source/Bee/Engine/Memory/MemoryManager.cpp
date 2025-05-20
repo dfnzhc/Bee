@@ -5,7 +5,7 @@
  * @Brief This file is part of Bee.
  */
 
-#include "Core/Memory/MemoryManager.hpp"
+#include "Memory/MemoryManager.hpp"
 
 using namespace bee;
 
