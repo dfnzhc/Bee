@@ -209,14 +209,21 @@ inline void SignalHandler(int signal)
 // ==================
 
 // TODO: How to handle the error? (Error handler, recovery...
-template<typename F, class... Args> inline int Guardian(F callback, Args&&... args)
+template<typename F, class... Args> inline bool Guardian(F callback, Args&&... args)
 {
+    static_assert(std::is_invocable_v<F, Args...>);
     std::set_terminate(details::CustomTerminateHandler);
     std::signal(SIGABRT, details::SignalHandler);
-
-    int result = EXIT_FAILURE;
+    
+    bool bResult = false;
     try {
-        result = std::invoke(callback, std::forward<Args>(args)...);
+        if constexpr (std::is_void_v<std::invoke_result<F, Args...>>) {
+            std::invoke(callback, std::forward<Args>(args)...);
+            bResult = true;
+        }
+        else {
+            bResult = std::invoke(callback, std::forward<Args>(args)...);
+        }
     } catch (const AssertionError& e) {
         std::cerr << "Assertion Failed: " << e.what();
         // LogFatal("Assertion Failed:\n{}", e.what()); // FIXME: logger not working
@@ -228,6 +235,6 @@ template<typename F, class... Args> inline int Guardian(F callback, Args&&... ar
         // LogFatal("Unknown Exception");
     }
 
-    return result;
+    return bResult;
 }
 } // namespace bee

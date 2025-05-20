@@ -13,7 +13,7 @@
 
 using namespace bee;
 
-MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::MainWindow), _pEngine(std::make_unique<Engine>())
+MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
 
@@ -21,17 +21,10 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::MainWi
     buildToolBar();
     buildStatusBar();
     buildLogWidget();
-
-    _pEngine->initialize();
 }
 
 MainWindow::~MainWindow()
 {
-    if (_pEngine) {
-        _pEngine.reset();
-        _pEngine = nullptr;
-    }
-
     delete ui;
 }
 

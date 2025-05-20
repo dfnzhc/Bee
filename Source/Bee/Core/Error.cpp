@@ -21,8 +21,8 @@ void bee::ThrowException(const std::source_location& loc, StringView msg)
 void bee::ReportAssertion(const std::source_location& loc, StringView cond, StringView msg)
 {
     // clang-format off
-    std::string fullMsg = std::format("'{}'\n{}{}\n{}:{} ({})",
-                                      cond, msg.empty() ? "" : "\n", msg.empty() ? "" : "\n",
+    std::string fullMsg = std::format("'{}'\n{}\n{}:{} ({})",
+                                      cond, msg,
                                       loc.file_name(), loc.line(), loc.function_name());
     // clang-format on
     fullMsg += std::format("\n\nStacktrace:\n{}", std::stacktrace::current(1));

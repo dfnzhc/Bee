@@ -34,7 +34,5 @@ private:
 
 private:
     Ui::MainWindow* ui;
-
-    std::unique_ptr<class Engine> _pEngine;
 };
 } // namespace bee

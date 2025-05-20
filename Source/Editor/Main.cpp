@@ -12,8 +12,10 @@
 #include <QApplication>
 #include <QSurfaceFormat>
 
+#include "Core/Error.hpp"
 #include "Core/Logger.hpp"
 #include "Core/Version.hpp"
+#include "Widgets/AppContext.hpp"
 #include "Widgets/MainWindow.hpp"
 
 using namespace bee;
@@ -23,27 +25,38 @@ int main(int argc, char* argv[])
     if (mi_is_redirected()) {
         LogInfo("mimalloc is redirected!");
     }
-    {
-        qputenv("QT_ENABLE_HIGHDPI_SCALING", "0");
+    qputenv("QT_ENABLE_HIGHDPI_SCALING", "0");
 
-        QSurfaceFormat surfaceFormat;
-        surfaceFormat.setVersion(4, 6);
-        surfaceFormat.setProfile(QSurfaceFormat::CoreProfile);
-        QSurfaceFormat::setDefaultFormat(surfaceFormat);
+#if 0
+    QSurfaceFormat surfaceFormat;
+    surfaceFormat.setVersion(4, 6);
+    surfaceFormat.setProfile(QSurfaceFormat::CoreProfile);
+    QSurfaceFormat::setDefaultFormat(surfaceFormat);
+#endif
 
-        QApplication app(argc, argv);
-        QApplication::setOrganizationName("Bee");
-        QApplication::setOrganizationDomain("Bee");
-        QApplication::setApplicationName("Bee");
-        QApplication::setApplicationVersion(QString("Ver %1.%2.%3").arg(BEE_VERSION_MAJOR).arg(BEE_VERSION_MINOR).arg(BEE_VERSION_PATCH));
+    AppContext context;
 
-        MainWindow window;
-        window.move(10, 10);
-        window.show();
+    bool bResult = Guardian([&] {
+        return context.initialize();
+    });
 
-        // TODO: handle exceptions.
-        auto ret = app.exec();
+    if (!bResult) {
+        LogFatal("Failed to init app context!");
+        return EXIT_FAILURE;
     }
 
-    return 0;
+    QApplication app(argc, argv);
+    QApplication::setOrganizationName("Bee");
+    QApplication::setOrganizationDomain("Bee");
+    QApplication::setApplicationName("Bee");
+    QApplication::setApplicationVersion(QString("Ver %1.%2.%3").arg(BEE_VERSION_MAJOR).arg(BEE_VERSION_MINOR).arg(BEE_VERSION_PATCH));
+
+    MainWindow window;
+    window.move(10, 10);
+    window.show();
+
+    auto ret = app.exec();
+    context.shutdown();
+
+    return ret;
 }
