@@ -38,7 +38,7 @@ BEE_FUNC BEE_CONSTEXPR auto DifferenceOfProducts(T a, T b, T c, T d)
 /**
  * @brief (a * b) + (c * d)
  */
-template<ArithmeticType Ta, ArithmeticType Tb, ArithmeticType Tc, ArithmeticType Td>
+template<cArithmeticType Ta, cArithmeticType Tb, cArithmeticType Tc, cArithmeticType Td>
 BEE_FUNC BEE_CONSTEXPR auto SumOfProducts(Ta a, Tb b, Tc c, Td d)
 {
     auto cd    = c * d;
@@ -47,7 +47,7 @@ BEE_FUNC BEE_CONSTEXPR auto SumOfProducts(Ta a, Tb b, Tc c, Td d)
     return sop + error;
 }
 
-template<FloatType T>
+template<cFloatType T>
 BEE_FUNC bool Quadratic(T a, T b, T c, T* t0, T* t1)
 {
     auto disc = DifferenceOfProducts(b, b, T(4) * a, c);

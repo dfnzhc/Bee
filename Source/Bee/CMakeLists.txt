@@ -46,6 +46,13 @@ target_include_directories(${BEE_TARGET}
         PRIVATE
 )
 
+if (${${PROJECT_NAME_UPPERCASE}_USE_DOUBLE_PRECISION})
+target_compile_definitions(${BEE_TARGET}
+		PUBLIC
+		BEE_DOUBLE_PRECISION
+)
+endif()
+
 if (WIN32)
      add_custom_command(TARGET ${BEE_TARGET} 
              POST_BUILD COMMAND

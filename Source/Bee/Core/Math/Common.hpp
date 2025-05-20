@@ -17,46 +17,46 @@ namespace bee {
         return glm::Func(x);                                                                                                                         \
     }
 
-BEE_DEFINE_COMMON_FUNC(FloatType, Floor, floor)
-BEE_DEFINE_COMMON_FUNC(FloatType, Ceil, ceil)
-BEE_DEFINE_COMMON_FUNC(FloatType, Trunc, trunc)
-BEE_DEFINE_COMMON_FUNC(FloatType, Round, round)
-BEE_DEFINE_COMMON_FUNC(FloatType, Sqrt, sqrt)
-BEE_DEFINE_COMMON_FUNC(FloatType, Exp, exp)
-BEE_DEFINE_COMMON_FUNC(FloatType, Exp2, exp2)
-BEE_DEFINE_COMMON_FUNC(FloatType, Log, log)
-BEE_DEFINE_COMMON_FUNC(FloatType, Log2, log2)
-BEE_DEFINE_COMMON_FUNC(FloatType, Sin, sin)
-BEE_DEFINE_COMMON_FUNC(FloatType, Cos, cos)
-BEE_DEFINE_COMMON_FUNC(FloatType, Tan, tan)
-BEE_DEFINE_COMMON_FUNC(FloatType, Sinh, sinh)
-BEE_DEFINE_COMMON_FUNC(FloatType, Cosh, cosh)
-BEE_DEFINE_COMMON_FUNC(FloatType, Tanh, tanh)
-BEE_DEFINE_COMMON_FUNC(FloatType, ASin, asin)
-BEE_DEFINE_COMMON_FUNC(FloatType, ACos, acos)
-BEE_DEFINE_COMMON_FUNC(FloatType, ATan, atan)
-BEE_DEFINE_COMMON_FUNC(FloatType, ASinh, asinh)
-BEE_DEFINE_COMMON_FUNC(FloatType, ACosh, acosh)
-BEE_DEFINE_COMMON_FUNC(FloatType, ATanh, atanh)
+BEE_DEFINE_COMMON_FUNC(cFloatType, Floor, floor)
+BEE_DEFINE_COMMON_FUNC(cFloatType, Ceil, ceil)
+BEE_DEFINE_COMMON_FUNC(cFloatType, Trunc, trunc)
+BEE_DEFINE_COMMON_FUNC(cFloatType, Round, round)
+BEE_DEFINE_COMMON_FUNC(cFloatType, Sqrt, sqrt)
+BEE_DEFINE_COMMON_FUNC(cFloatType, Exp, exp)
+BEE_DEFINE_COMMON_FUNC(cFloatType, Exp2, exp2)
+BEE_DEFINE_COMMON_FUNC(cFloatType, Log, log)
+BEE_DEFINE_COMMON_FUNC(cFloatType, Log2, log2)
+BEE_DEFINE_COMMON_FUNC(cFloatType, Sin, sin)
+BEE_DEFINE_COMMON_FUNC(cFloatType, Cos, cos)
+BEE_DEFINE_COMMON_FUNC(cFloatType, Tan, tan)
+BEE_DEFINE_COMMON_FUNC(cFloatType, Sinh, sinh)
+BEE_DEFINE_COMMON_FUNC(cFloatType, Cosh, cosh)
+BEE_DEFINE_COMMON_FUNC(cFloatType, Tanh, tanh)
+BEE_DEFINE_COMMON_FUNC(cFloatType, ASin, asin)
+BEE_DEFINE_COMMON_FUNC(cFloatType, ACos, acos)
+BEE_DEFINE_COMMON_FUNC(cFloatType, ATan, atan)
+BEE_DEFINE_COMMON_FUNC(cFloatType, ASinh, asinh)
+BEE_DEFINE_COMMON_FUNC(cFloatType, ACosh, acosh)
+BEE_DEFINE_COMMON_FUNC(cFloatType, ATanh, atanh)
 
 #undef BEE_DEFINE_COMMON_FUNC
 
-template<FloatType T> BEE_INLINE BEE_CONSTEXPR T Log10(T x) noexcept
+template<cFloatType T> BEE_INLINE BEE_CONSTEXPR T Log10(T x) noexcept
 {
     return std::log10(x);
 }
 
-template<FloatType T> BEE_INLINE BEE_CONSTEXPR T ATan2(T y, T x) noexcept
+template<cFloatType T> BEE_INLINE BEE_CONSTEXPR T ATan2(T y, T x) noexcept
 {
     return std::atan2(y, x);
 }
 
-template<SignedType T> BEE_FUNC BEE_CONSTEXPR T Abs(T x) noexcept
+template<cSignedType T> BEE_FUNC BEE_CONSTEXPR T Abs(T x) noexcept
 {
     return glm::abs(x);
 }
 
-template<SignedType T> BEE_FUNC BEE_CONSTEXPR T Sign(T x) noexcept
+template<cSignedType T> BEE_FUNC BEE_CONSTEXPR T Sign(T x) noexcept
 {
     return glm::sign(x);
 }
@@ -81,22 +81,22 @@ template<typename T, typename... Ts> BEE_FUNC BEE_CONSTEXPR auto Max(T a, T b, T
     return m;
 }
 
-template<ArithmeticType T> BEE_FUNC BEE_CONSTEXPR bool Equal(T x, T y) noexcept
+template<cArithmeticType T> BEE_FUNC BEE_CONSTEXPR bool Equal(T x, T y) noexcept
 {
     return x == y;
 }
 
-template<ArithmeticType T> BEE_FUNC BEE_CONSTEXPR bool NotEqual(T x, T y) noexcept
+template<cArithmeticType T> BEE_FUNC BEE_CONSTEXPR bool NotEqual(T x, T y) noexcept
 {
     return not Equal(x, y);
 }
 
-template<FloatType T> BEE_FUNC BEE_CONSTEXPR bool Approx(T x, T y, f32 eps = kShadowEpsilon) noexcept
+template<cFloatType T> BEE_FUNC BEE_CONSTEXPR bool Approx(T x, T y, f32 eps = kEpsilonF) noexcept
 {
     return Abs(x - y) < eps;
 }
 
-template<FloatType T> BEE_FUNC BEE_CONSTEXPR bool NotApprox(T x, T y, f32 eps = kShadowEpsilon) noexcept
+template<cFloatType T> BEE_FUNC BEE_CONSTEXPR bool NotApprox(T x, T y, f32 eps = kEpsilonF) noexcept
 {
     return not Approx(x, y, eps);
 }
@@ -131,7 +131,7 @@ BEE_FUNC BEE_CONSTEXPR bool IsFinite(auto)
     return true;
 }
 
-template<FloatType T> BEE_FUNC BEE_CONSTEXPR T FMA(T a, T b, T c)
+template<cFloatType T> BEE_FUNC BEE_CONSTEXPR T FMA(T a, T b, T c)
 {
     return glm::fma(a, b, c);
 }
@@ -173,7 +173,7 @@ BEE_FUNC BEE_CONSTEXPR f32 ApproxCbrt(f32 x0)
     return u.x;
 }
 
-template<FloatType T> BEE_FUNC BEE_CONSTEXPR T RecipSqrtFast(T x0)
+template<cFloatType T> BEE_FUNC BEE_CONSTEXPR T RecipSqrtFast(T x0)
 {
     BEE_DEBUG_ASSERT(x0 > 0);
 

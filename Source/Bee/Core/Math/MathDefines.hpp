@@ -11,6 +11,25 @@
 #include <cstddef>
 
 // -------------------------
+// Invalid Some Defines
+
+#ifdef max
+#  undef max
+#endif
+#ifdef min
+#  undef min
+#endif
+#ifdef isnan
+#  undef isnan
+#endif
+#ifdef isinf
+#  undef isinf
+#endif
+#ifdef log2
+#  undef log2
+#endif
+
+// -------------------------
 // Host and device macros
 
 #if defined(__CUDA_ARCH__) || defined(__CUDACC__)
@@ -24,7 +43,15 @@
 #endif
 
 #if BEE_HOST_CODE
+
+// -------------------------
+// Host defines and includes
+
 #include <limits>
+template<typename T>
+using numeric_limits = std::numeric_limits<T>;
+
+
 #include <type_traits>
 
 // C++20 <bit>
@@ -49,6 +76,15 @@
 #define BEE_HAS_MSVC_INTRINSICS 0
 #endif
 
+#else
+
+// -------------------------
+// Device defines and includes
+
+#include <cuda/std/limits>
+template<typename T>
+using numeric_limits = ::cuda::std::numeric_limits<T>;
+
 #endif
 
 namespace bee {
@@ -71,18 +107,13 @@ using f64 = double;
 
 using Size = std::size_t;
 
-static constexpr i8 kI8Min   = INT8_MIN;
-static constexpr i16 kI16Min = INT16_MIN;
-static constexpr i32 kI32Min = INT32_MIN;
-static constexpr i64 kI64Min = INT64_MIN;
+#ifdef BEE_DOUBLE_PRECISION
+using Float     = f64;
+using FloatBits = u64;
+#else
+using Float     = f32;
+using FloatBits = u32;
+#endif // BEE_DOUBLE_PRECISION
 
-static constexpr i8 kI8Max   = INT8_MAX;
-static constexpr i16 kI16Max = INT16_MAX;
-static constexpr i32 kI32Max = INT32_MAX;
-static constexpr i64 kI64Max = INT64_MAX;
 
-static constexpr u8 kU8Max   = UINT8_MAX;
-static constexpr u16 kU16Max = UINT16_MAX;
-static constexpr u32 kU32Max = UINT32_MAX;
-static constexpr u64 kU64Max = UINT64_MAX;
 } // namespace bee

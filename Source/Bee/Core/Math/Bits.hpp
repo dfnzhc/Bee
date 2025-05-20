@@ -29,7 +29,7 @@ BEE_FUNC BEE_CONSTEXPR int BitSize()
  * @param value The value to count leading zeros for.
  * @return The number of leading zeros. Returns BitSize<T>() if value is 0.
  */
-template<UnsignedType T>
+template<cUnsignedType T>
 BEE_FUNC BEE_CONSTEXPR int CountLeadingZeros(T value)
 {
     if (value == 0)
@@ -72,7 +72,7 @@ BEE_FUNC BEE_CONSTEXPR int CountLeadingZeros(T value)
  * @param value The value to count trailing zeros for.
  * @return The number of trailing zeros. Returns BitSize<T>() if value is 0.
  */
-template<UnsignedType T>
+template<cUnsignedType T>
 BEE_FUNC BEE_CONSTEXPR int CountTrailingZeros(T value)
 {
     if (value == 0)
@@ -113,7 +113,7 @@ BEE_FUNC BEE_CONSTEXPR int CountTrailingZeros(T value)
  * @param value The value to count set bits for.
  * @return The number of set bits.
  */
-template<UnsignedType T>
+template<cUnsignedType T>
 BEE_FUNC BEE_CONSTEXPR int Popcount(T value)
 {
 #if BEE_USE_STL_BIT
@@ -144,7 +144,7 @@ BEE_FUNC BEE_CONSTEXPR int Popcount(T value)
  * @param value The value.
  * @return The number of set bits.
  */
-template<UnsignedType T>
+template<cUnsignedType T>
 BEE_FUNC BEE_CONSTEXPR int CountSetBits(T value)
 {
     return Popcount(value);
@@ -156,7 +156,7 @@ BEE_FUNC BEE_CONSTEXPR int CountSetBits(T value)
  * @param value The value.
  * @return The number of cleared bits.
  */
-template<UnsignedType T>
+template<cUnsignedType T>
 BEE_FUNC BEE_CONSTEXPR int CountClearedBits(T value)
 {
     return detail::BitSize<T>() - Popcount(value);
@@ -168,7 +168,7 @@ BEE_FUNC BEE_CONSTEXPR int CountClearedBits(T value)
  * @param value The value.
  * @return 1 if the number of set bits is odd, 0 if even.
  */
-template<UnsignedType T>
+template<cUnsignedType T>
 BEE_FUNC BEE_CONSTEXPR int Parity(T value)
 {
 #if BEE_HAS_GCC_CLANG_INTRINSICS && !defined(__clang__) // __builtin_parity seems more common in GCC
@@ -187,7 +187,7 @@ BEE_FUNC BEE_CONSTEXPR int Parity(T value)
  * @param value The value.
  * @return True if value has a single bit set, false otherwise. False for 0.
  */
-template<UnsignedType T>
+template<cUnsignedType T>
 BEE_FUNC BEE_CONSTEXPR bool HasSingleBit(T value)
 {
 #if BEE_USE_STL_BIT
@@ -203,7 +203,7 @@ BEE_FUNC BEE_CONSTEXPR bool HasSingleBit(T value)
  * @param value The value.
  * @return True if value is a power of two, false otherwise. False for 0.
  */
-template<UnsignedType T>
+template<cUnsignedType T>
 BEE_FUNC BEE_CONSTEXPR bool IsPowerOfTwo(T value)
 {
     return HasSingleBit(value);
@@ -215,7 +215,7 @@ BEE_FUNC BEE_CONSTEXPR bool IsPowerOfTwo(T value)
  * @param value The value.
  * @return The largest power of two <= value. Returns 0 if value is 0.
  */
-template<UnsignedType T>
+template<cUnsignedType T>
 BEE_FUNC BEE_CONSTEXPR T BitFloor(T value)
 {
     if (value == 0)
@@ -236,7 +236,7 @@ BEE_FUNC BEE_CONSTEXPR T BitFloor(T value)
  * @param value The value.
  * @return The largest power of two <= value.
  */
-template<UnsignedType T>
+template<cUnsignedType T>
 BEE_FUNC BEE_CONSTEXPR T PreviousPowerOfTwo(T value)
 {
     return BitFloor(value);
@@ -248,7 +248,7 @@ BEE_FUNC BEE_CONSTEXPR T PreviousPowerOfTwo(T value)
  * @param value The value.
  * @return floor(log2(value)). Returns -1 if value is 0.
  */
-template<UnsignedType T>
+template<cUnsignedType T>
 BEE_FUNC BEE_CONSTEXPR int FloorLog2(T value)
 {
     if (value == 0)
@@ -262,7 +262,7 @@ BEE_FUNC BEE_CONSTEXPR int FloorLog2(T value)
 /// @param value The value.
 /// @return 0 if value is 0, otherwise FloorLog2(value) + 1.
  */
-template<UnsignedType T>
+template<cUnsignedType T>
 BEE_FUNC BEE_CONSTEXPR int BitWidth(T value)
 {
 #if BEE_USE_STL_BIT
@@ -280,7 +280,7 @@ BEE_FUNC BEE_CONSTEXPR int BitWidth(T value)
  * @return The smallest power of two >= value. Returns 1 if value is 0.
  *         Returns 0 if the next power of two would overflow type T (matches std::bit_ceil).
  */
-template<UnsignedType T>
+template<cUnsignedType T>
 BEE_FUNC BEE_CONSTEXPR T BitCeil(T value)
 {
     if (value <= 1)
@@ -298,7 +298,7 @@ BEE_FUNC BEE_CONSTEXPR T BitCeil(T value)
  * @param value The value.
  * @return The smallest power of two >= value.
  */
-template<UnsignedType T>
+template<cUnsignedType T>
 BEE_FUNC BEE_CONSTEXPR T NextPowerOfTwo(T value)
 {
     return BitCeil(value);
@@ -310,7 +310,7 @@ BEE_FUNC BEE_CONSTEXPR T NextPowerOfTwo(T value)
  * @param value The value.
  * @return The closest power of two.
  */
-template<UnsignedType T>
+template<cUnsignedType T>
 BEE_FUNC BEE_CONSTEXPR T ClosestPowerOfTwo(T value)
 {
     auto nx = NextPowerOfTwo(value);
@@ -324,7 +324,7 @@ BEE_FUNC BEE_CONSTEXPR T ClosestPowerOfTwo(T value)
  * @param value The value whose bits are to be reversed.
  * @return The value with bits reversed.
  */
-template<UnsignedType T>
+template<cUnsignedType T>
 BEE_FUNC BEE_CONSTEXPR T ReverseBits(T value)
 {
     T v = value;
@@ -396,7 +396,7 @@ BEE_FUNC BEE_CONSTEXPR T BitSwap(T value)
  * @param count The number of positions to rotate left. Negative count rotates right.
  * @return The value after left rotation.
  */
-template<UnsignedType T>
+template<cUnsignedType T>
 BEE_FUNC BEE_CONSTEXPR T RotateLeft(T value, int count)
 {
     constexpr int bits = detail::BitSize<T>();
@@ -424,7 +424,7 @@ BEE_FUNC BEE_CONSTEXPR T RotateLeft(T value, int count)
  * @param count The number of positions to rotate right. Negative count rotates left.
  * @return The value after right rotation.
  */
-template<UnsignedType T>
+template<cUnsignedType T>
 BEE_FUNC BEE_CONSTEXPR T RotateRight(T value, int count)
 {
     constexpr int bits = detail::BitSize<T>();
@@ -453,7 +453,7 @@ BEE_FUNC BEE_CONSTEXPR T RotateRight(T value, int count)
  * @return The value with the bit at pos set to 1.
  * @note Behavior is undefined if pos is out of range [0, BitSize<T>() - 1].
  */
-template<UnsignedType T>
+template<cUnsignedType T>
 BEE_FUNC BEE_CONSTEXPR T SetBit(T value, int pos)
 {
     // if (pos < 0 || pos >= detail::BitSize<T>()) throw std::out_of_range("Bit position out of range.");
@@ -468,7 +468,7 @@ BEE_FUNC BEE_CONSTEXPR T SetBit(T value, int pos)
  * @return The value with the bit at pos cleared to 0.
  * @note Behavior is undefined if pos is out of range [0, BitSize<T>() - 1].
  */
-template<UnsignedType T>
+template<cUnsignedType T>
 BEE_FUNC BEE_CONSTEXPR T ClearBit(T value, int pos)
 {
     // if (pos < 0 || pos >= detail::BitSize<T>()) throw std::out_of_range("Bit position out of range.");
@@ -483,7 +483,7 @@ BEE_FUNC BEE_CONSTEXPR T ClearBit(T value, int pos)
  * @return The value with the bit at pos toggled.
  * @note Behavior is undefined if pos is out of range [0, BitSize<T>() - 1].
  */
-template<UnsignedType T>
+template<cUnsignedType T>
 BEE_FUNC BEE_CONSTEXPR T ToggleBit(T value, int pos)
 {
     // if (pos < 0 || pos >= detail::BitSize<T>()) throw std::out_of_range("Bit position out of range.");
@@ -498,7 +498,7 @@ BEE_FUNC BEE_CONSTEXPR T ToggleBit(T value, int pos)
  * @return True if the bit at pos is 1, false if it is 0.
  * @note Behavior is undefined if pos is out of range [0, BitSize<T>() - 1].
  */
-template<UnsignedType T>
+template<cUnsignedType T>
 BEE_FUNC BEE_CONSTEXPR bool CheckBit(T value, int pos)
 {
     // if (pos < 0 || pos >= detail::BitSize<T>()) throw std::out_of_range("Bit position out of range.");
@@ -512,7 +512,7 @@ BEE_FUNC BEE_CONSTEXPR bool CheckBit(T value, int pos)
  * @param y The divisor to round up to; must be greater than 0.
  * @return The smallest multiple of y that is >= x.
  */
-template<UnsignedType T>
+template<cUnsignedType T>
 BEE_FUNC BEE_CONSTEXPR T RoundUp(T x, T y)
 {
     if (x == 0)
@@ -529,7 +529,7 @@ BEE_FUNC BEE_CONSTEXPR T RoundUp(T x, T y)
 /// @param value The value to align.
 /// @param alignment The alignment boundary; must be a power of two and > 0.
 /// @return The smallest multiple of alignment that is >= value.
-template<UnsignedType T>
+template<cUnsignedType T>
 BEE_FUNC BEE_CONSTEXPR T AlignUp(T value, T alignment)
 {
     return (value + alignment - 1) & ~(alignment - 1);

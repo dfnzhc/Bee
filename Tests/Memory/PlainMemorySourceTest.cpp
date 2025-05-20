@@ -49,8 +49,6 @@ TEST_F(PlainMemorySourceTest, AlignedAllocation)
     const size_t alloc_size = 256;
     const size_t alignment  = 64; // Choose an alignment larger than default potentially
 
-    ASSERT_TRUE(IsPowerOfTwo(alignment)) << "Alignment must be a power of two";
-
     void* ptr = source.allocate(alloc_size, alignment);
     ASSERT_NE(ptr, nullptr);
 
