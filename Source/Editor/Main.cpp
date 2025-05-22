@@ -15,7 +15,7 @@
 #include "Core/Error.hpp"
 #include "Core/Logger.hpp"
 #include "Core/Version.hpp"
-#include "Widgets/AppContext.hpp"
+#include "Core/AppContext.hpp"
 #include "Widgets/MainWindow.hpp"
 
 using namespace bee;
@@ -41,7 +41,7 @@ int main(int argc, char* argv[])
     });
 
     if (!bResult) {
-        LogFatal("Failed to init app context!");
+        qCritical("Failed to init app context!");
         return EXIT_FAILURE;
     }
 
@@ -51,7 +51,16 @@ int main(int argc, char* argv[])
     QApplication::setApplicationName("Bee");
     QApplication::setApplicationVersion(QString("Ver %1.%2.%3").arg(BEE_VERSION_MAJOR).arg(BEE_VERSION_MINOR).arg(BEE_VERSION_PATCH));
 
-    MainWindow window;
+    MainWindow window(context);
+    bResult = Guardian([&] {
+        window.setup();
+    });
+    
+    if (!bResult) {
+        qCritical("Failed to setup the main window!");
+        return EXIT_FAILURE;
+    }
+    
     window.move(10, 10);
     window.show();
 

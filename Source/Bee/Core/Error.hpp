@@ -217,12 +217,12 @@ template<typename F, class... Args> inline bool Guardian(F callback, Args&&... a
     
     bool bResult = false;
     try {
-        if constexpr (std::is_void_v<std::invoke_result<F, Args...>>) {
+        if constexpr (std::is_void_v<std::invoke_result_t<F, Args...>>) {
             std::invoke(callback, std::forward<Args>(args)...);
             bResult = true;
         }
         else {
-            bResult = std::invoke(callback, std::forward<Args>(args)...);
+            bResult = static_cast<bool>(std::invoke(callback, std::forward<Args>(args)...));
         }
     } catch (const AssertionError& e) {
         std::cerr << "Assertion Failed: " << e.what();

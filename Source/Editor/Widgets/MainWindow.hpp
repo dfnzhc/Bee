@@ -20,8 +20,10 @@ class MainWindow : public QMainWindow
     Q_OBJECT
 
 public:
-    explicit MainWindow(QWidget* parent = nullptr);
+    explicit MainWindow(const class AppContext& appContext, QWidget* parent = nullptr);
     ~MainWindow() override;
+
+    void setup();
 
 protected:
     void keyPressEvent(QKeyEvent* event) override;
@@ -30,9 +32,12 @@ private:
     void buildMenus();
     void buildToolBar();
     void buildStatusBar();
-    void buildLogWidget();
+    void buildWidgets();
 
 private:
     Ui::MainWindow* ui;
+
+    const class AppContext& _appContext;
+
 };
 } // namespace bee

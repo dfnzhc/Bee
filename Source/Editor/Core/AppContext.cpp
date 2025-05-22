@@ -5,7 +5,7 @@
  * @Brief This file is part of Bee.
  */
 
-#include "Widgets/AppContext.hpp"
+#include "Core/AppContext.hpp"
 
 #include "Core/Error.hpp"
 #include "Core/Logger.hpp"
@@ -25,8 +25,8 @@ AppContext::~AppContext()
 bool AppContext::initialize()
 {
     _pEngine = std::make_unique<Engine>();
-    if (!_pEngine->initialize()) {
-        LogError("Engine initialization failed!");   
+    if (!_pEngine->preInitialize()) {
+        LogError("Engine pre-initialization failed!");   
         return false;
     }
     
