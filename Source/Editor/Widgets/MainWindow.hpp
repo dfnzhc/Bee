@@ -39,5 +39,6 @@ private:
 
     const class AppContext& _appContext;
 
+    std::unique_ptr<class ViewportWidget> _pViewportWidget;
 };
 } // namespace bee

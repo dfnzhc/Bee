@@ -235,13 +235,13 @@ bool EventManager::unsubscribe(Handle handle)
     return _pImpl->removeHandle(handle);
 }
 
-void EventManager::dispatch(std::shared_ptr<IEventBase> event) const
+void EventManager::dispatch(EventPtr event) const
 {
     const auto id = event->typeId();
     _pImpl->dispatcher.dispatch(EventWrap{.event = std::move(event), .id = id});
 }
 
-void EventManager::enqueue(std::shared_ptr<IEventBase> event, EventPriority priority)
+void EventManager::enqueue(EventPtr event, EventPriority priority)
 {
     const auto id = event->typeId();
     _pImpl->queue.enqueue(EventWrapQueued{.event = std::move(event), .id = id, .priority = static_cast<int>(priority)});

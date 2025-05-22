@@ -12,6 +12,7 @@
 
 #include <QKeyEvent>
 
+#include "ViewportWidget.hpp"
 #include "Core/Error.hpp"
 
 using namespace bee;
@@ -59,6 +60,13 @@ void MainWindow::buildStatusBar()
 
 void MainWindow::buildWidgets()
 {
+    // viewport tab
+    _pViewportWidget = std::make_unique<ViewportWidget>(_appContext.engine());
+    if(!(_pViewportWidget && _pViewportWidget->setup())) {
+        BEE_THROW("Failed to setup viewport widget");
+    }
+    
+    ui->mainTab->addTab(_pViewportWidget.get(), "Viewport");
 }
 
 void MainWindow::keyPressEvent(QKeyEvent* event)

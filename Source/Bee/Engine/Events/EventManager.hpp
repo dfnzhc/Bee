@@ -87,7 +87,7 @@ public:
      *
      * @param event A std::shared_ptr to a IEventBase object. The event system takes shared ownership.
      */
-    void dispatch(std::shared_ptr<IEventBase> event) const;
+    void dispatch(EventPtr event) const;
 
     /**
      * @brief Enqueues an event for asynchronous dispatch by worker threads.
@@ -95,7 +95,7 @@ public:
      * @param event A std::shared_ptr to a const IEventBase object. The event system takes shared ownership.
      * @param priority The priority of this event. Events with higher priority are generally called first.
      */
-    void enqueue(std::shared_ptr<IEventBase> event, EventPriority priority = EventPriority::Normal);
+    void enqueue(EventPtr event, EventPriority priority = EventPriority::Normal);
 
 private:
     /**

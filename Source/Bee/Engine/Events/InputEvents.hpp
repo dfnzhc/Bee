@@ -74,6 +74,7 @@ public:
     {
     }
 
+    InputEventBase() = default;
     ~InputEventBase() override = default;
 
     /**
@@ -99,7 +100,7 @@ public:
     // clang-format on
 
 protected:
-    ModifierKeysState _modifierKeys;
+    ModifierKeysState _modifierKeys = {};
 };
 
 /// ==========================
@@ -309,9 +310,54 @@ enum class MouseButton : u8
 };
 
 /**
+ * @brief Base class for mouse related events.
+ */
+class BEE_API MouseEvent : public InputEventBase
+{
+public:
+    /**
+     * @brief Constructor for MouseButtonEvent.
+     * @param x The x-coordinate of the mouse cursor.
+     * @param y The y-coordinate of the mouse cursor.
+     * @param modifiers The state of modifier keys.
+     */
+    MouseEvent(f32 x, f32 y, const ModifierKeysState& modifiers = {})
+        : InputEventBase(modifiers), _x(x), _y(y)
+    {
+    }
+
+    BEE_NODISCARD f32 posX() const { return _x; }
+    BEE_NODISCARD f32 posY() const { return _y; }
+    BEE_NODISCARD vec2f position() const { return vec2f{_x, _y}; }
+
+protected:
+    f32 _x, _y;
+};
+
+/**
+ * @brief Event triggered when the mouse cursor moves.
+ */
+class BEE_API MouseMovedEvent final : public MouseEvent
+{
+public:
+    /**
+     * @brief Constructor for MouseMovedEvent.
+     * @param x The new x-coordinate of the mouse cursor.
+     * @param y The new y-coordinate of the mouse cursor.
+     */
+    MouseMovedEvent(f32 x, f32 y)
+        : MouseEvent(x, y)
+    {
+    }
+
+    BEE_NODISCARD std::type_index typeId() const override { return EventTypeId<MouseMovedEvent>(); }
+    BEE_NODISCARD String toString() const override;
+};
+
+/**
  * @brief Base class for mouse button related events (Pressed, Released).
  */
-class BEE_API MouseButtonEvent : public InputEventBase
+class BEE_API MouseButtonEvent : public MouseEvent
 {
 public:
     /**
@@ -322,17 +368,13 @@ public:
      * @param modifiers The state of modifier keys.
      */
     MouseButtonEvent(MouseButton button, f32 x, f32 y, const ModifierKeysState& modifiers = {})
-        : InputEventBase(modifiers), _x(x), _y(y), _button(button)
+        : MouseEvent(x, y, modifiers), _button(button)
     {
     }
 
     BEE_NODISCARD MouseButton button() const { return _button; }
-    BEE_NODISCARD f32 posX() const { return _x; }
-    BEE_NODISCARD f32 posY() const { return _y; }
-    BEE_NODISCARD vec2f position() const { return vec2f{_x, _y}; }
 
 protected:
-    f32 _x, _y;
     MouseButton _button;
 };
 
@@ -389,41 +431,6 @@ public:
 };
 
 /**
- * @brief Event triggered when the mouse cursor moves.
- */
-class BEE_API MouseMovedEvent final : public InputEventBase
-{
-public:
-    /**
-     * @brief Constructor for MouseMovedEvent.
-     * @param x The new x-coordinate of the mouse cursor.
-     * @param y The new y-coordinate of the mouse cursor.
-     * @param deltaX The change in x-coordinate since the last move event.
-     * @param deltaY The change in y-coordinate since the last move event.
-     * @param modifiers The state of modifier keys.
-     */
-    MouseMovedEvent(f32 x, f32 y, f32 deltaX, f32 deltaY, const ModifierKeysState& modifiers)
-        : InputEventBase(modifiers), _x(x), _y(y), _deltaX(deltaX), _deltaY(deltaY)
-    {
-    }
-
-    BEE_NODISCARD f32 posX() const { return _x; }
-    BEE_NODISCARD f32 posY() const { return _y; }
-    BEE_NODISCARD vec2f position() const { return vec2f{_x, _y}; }
-
-    BEE_NODISCARD f32 deltaX() const { return _deltaX; }
-    BEE_NODISCARD f32 deltaY() const { return _deltaY; }
-    BEE_NODISCARD vec2f deltaMotion() const { return vec2f{_deltaX, _deltaY}; }
-
-    BEE_NODISCARD std::type_index typeId() const override { return EventTypeId<MouseMovedEvent>(); }
-    BEE_NODISCARD String toString() const override;
-
-private:
-    f32 _x, _y;
-    f32 _deltaX, _deltaY;
-};
-
-/**
  * @brief Event triggered when the mouse wheel is scrolled.
  */
 class BEE_API MouseWheelEvent final : public InputEventBase
@@ -432,7 +439,7 @@ public:
     /**
      * @brief Constructor for MouseWheelEvent.
      * @param deltaX The horizontal scroll offset.
-     * @param deltaY The vertical scroll offset.
+     * @param deltaY The vertical(front/back) scroll offset.
      * @param modifiers The state of modifier keys.
      */
     MouseWheelEvent(f32 deltaX, f32 deltaY, const ModifierKeysState& modifiers)

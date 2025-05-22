@@ -102,8 +102,7 @@ String MouseButtonPressedEvent::toString() const
 {
     return std::format("MouseButtonPressedEvent: [ Button: {}, "
                        "Pos: ({}, {}), "
-                       "Clicks: {}, "
-                       "Modifiers: {},"
+                       "Clicks: {}, {}, "
                        "Repeat: {} ]",
                        ToString(_button),
                        _x,
@@ -116,8 +115,7 @@ String MouseButtonPressedEvent::toString() const
 String MouseButtonReleasedEvent::toString() const
 {
     return std::format("MouseButtonReleasedEvent: [ Button: {}, "
-                       "Pos: ({}, {}), "
-                       "Modifiers: {} ]",
+                       "Pos: ({}, {}), {} ]",
                        ToString(_button),
                        _x,
                        _y,
@@ -126,98 +124,17 @@ String MouseButtonReleasedEvent::toString() const
 
 String MouseMovedEvent::toString() const
 {
-    return std::format("MouseButtonReleasedEvent: [ Pos: ({}, {}), "
-                       "Delta: ({}, {}), "
-                       "Modifiers: {} ]",
+    return std::format("MouseButtonReleasedEvent: [ Pos: ({}, {}), {} ]",
                        _x,
                        _y,
-                       _deltaX,
-                       _deltaY,
                        _modifierKeys.toString());
 }
 
 String MouseWheelEvent::toString() const
 {
     
-    return std::format("MouseButtonReleasedEvent: [ Delta: ({}, {}), "
-                       "Modifiers: {} ]",
+    return std::format("MouseButtonReleasedEvent: [ Delta: ({}, {}), {} ]",
                        _deltaX,
                        _deltaY,
                        _modifierKeys.toString());
 }
-
-#if 0
-String KeyboardEvent::toString() const
-{
-    return std::format("Event - Key: {}({}) [{}] {}", ToString(_key), ToString(_inputType), _modifierKeys.toString(), _bIsRepeat ? "+repeat" : "-");
-}
-
-MouseEvent::MouseEvent() : Event(EventType::Mouse), InputEvents(ModifierKeysState(), false, InputType::Unknown)
-{
-}
-
-MouseEvent::MouseEvent(f32 x, f32 y, MouseButton btn, InputType mouseType, u8 clicks, const ModifierKeysState& modifierKeys, bool bIsRepeat)
-    : Event(EventType::Mouse), InputEvents(modifierKeys, bIsRepeat, mouseType), _posX(x), _posY(y), _button(btn), _clicks(clicks)
-{
-}
-
-MouseEvent::MouseEvent(f32 x, f32 y, f32 relX, f32 relY, const ModifierKeysState& modifierKeys)
-    : Event(EventType::Mouse), InputEvents(modifierKeys, false, InputType::MouseMotion), _posX(x), _posY(y), _relX(relX), _relY(relY)
-{
-}
-
-MouseEvent::MouseEvent(f32 h, f32 v, const ModifierKeysState& modifierKeys)
-    : Event(EventType::Mouse), InputEvents(modifierKeys, false, InputType::MouseWheel), _posX(h), _posY(v)
-{
-}
-
-Opt<MouseButton> MouseEvent::button() const
-{
-    if (isButtonEvent())
-        return _button;
-
-    return MouseButton::Unknown;
-}
-
-Opt<vec2f> MouseEvent::position() const
-{
-    if (_inputType == InputType::MouseMotion || isButtonEvent())
-        return vec2f{_posX, _posY};
-
-    return {};
-}
-
-Opt<vec2f> MouseEvent::relativeMotion() const
-{
-    if (_inputType == InputType::MouseMotion)
-        return vec2f{_relX, _relY};
-
-    return {};
-}
-
-Opt<vec2f> MouseEvent::wheelDelta() const
-{
-    if (_inputType == InputType::MouseWheel)
-        return vec2f{_posX, _posY};
-
-    return {};
-}
-
-Opt<u8> MouseEvent::clicks() const
-{
-    if (_inputType == InputType::MouseButtonDown)
-        return _clicks;
-
-    return {};
-}
-
-bool MouseEvent::isButtonEvent() const
-{
-    return _inputType == InputType::MouseButtonUp || _inputType == InputType::MouseButtonDown;
-}
-
-String MouseEvent::toString() const
-{
-    return std::format("Event - Mouse: {}({}) [{}] {}", ToString(_button), ToString(_inputType), _modifierKeys.toString(), _bIsRepeat ? "+repeat" : "-");
-}
-#endif
