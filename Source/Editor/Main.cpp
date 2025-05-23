@@ -23,7 +23,7 @@ using namespace bee;
 int main(int argc, char* argv[])
 {
     if (mi_is_redirected()) {
-        LogInfo("mimalloc is redirected!");
+        qInfo("mimalloc is redirected!");
     }
     qputenv("QT_ENABLE_HIGHDPI_SCALING", "0");
 

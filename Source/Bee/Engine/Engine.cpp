@@ -29,7 +29,6 @@ Engine::~Engine()
 
 bool Engine::preInitialize()
 {
-    Logger::Setup(true);
     LogInfo("Bee Engine pre-initializing... | Ver. {}.{}.{}", BEE_VERSION_MAJOR, BEE_VERSION_MINOR, BEE_VERSION_PATCH);
 
     return true;
@@ -51,5 +50,5 @@ void Engine::shutdown()
 
 void Engine::onInputEvent(Ptr<class InputEventBase> event) const
 {
-    LogInfo("Event: {}", event->toString().c_str());
+    // LogInfo("Event: {}", event->toString().c_str());
 }

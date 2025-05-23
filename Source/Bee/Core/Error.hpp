@@ -7,11 +7,13 @@
 
 #pragma once
 
+
 #include "Core/Defines.hpp"
 #include "Core/Logger.hpp"
 #include "Core/Portability.hpp"
 #include "Core/Thirdparty.hpp"
 
+#include <csignal>
 #include <expected>
 #include <iostream>
 

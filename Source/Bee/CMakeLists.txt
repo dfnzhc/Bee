@@ -13,12 +13,12 @@ target_link_libraries(${BEE_TARGET}
         PRIVATE 
         Stringzilla
         Eventpp
+        Quill
 )
 
 target_link_libraries(${BEE_TARGET}
         PUBLIC
         MagicEnum
-        Quill
 )
 
 target_compile_options(${BEE_TARGET}
