@@ -17,7 +17,7 @@ class ViewportWidget : public QWidget
 {
     Q_OBJECT
 public:
-    explicit ViewportWidget(const Engine* pEngine, QWidget* parent = nullptr);
+    explicit ViewportWidget(Engine* pEngine, QWidget* parent = nullptr);
     ~ViewportWidget() override;
 
     bool setup();
@@ -28,7 +28,7 @@ protected:
     void resizeEvent(QResizeEvent* event) override;
 
 private:
-    const Engine* _pEngine = nullptr;
+    Engine*const _pEngine = nullptr;
 };
 
 } // namespace bee

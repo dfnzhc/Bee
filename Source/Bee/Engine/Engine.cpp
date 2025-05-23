@@ -34,11 +34,14 @@ bool Engine::preInitialize()
     return true;
 }
 
-bool Engine::initialize(EngineConfig config)
+bool Engine::initialize(EngineInitParams params)
 {
     
-    _config = std::move(config);
-    
+    return true;
+}
+
+bool Engine::reset()
+{
     return true;
 }
 

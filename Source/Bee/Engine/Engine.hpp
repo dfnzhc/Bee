@@ -13,7 +13,7 @@
 
 namespace bee {
 
-struct EngineConfig
+struct EngineInitParams
 {
     void* windowHandle = nullptr;
 };
@@ -32,9 +32,16 @@ public:
     
     /**
      * @brief Initializes the engine.
+     * @param params Parameters to init the engine.
      * @return Returns true on success, false on failure.
      */
-    bool initialize(EngineConfig config);
+    bool initialize(EngineInitParams params);
+
+    /**
+     * @brief Reset the engine.
+     * @return Returns true on success, false on failure.
+     */
+    bool reset();
 
     /**
      * @brief Shuts down the engine, releasing all resources.
@@ -48,7 +55,6 @@ public:
     void onInputEvent(Ptr<class InputEventBase> event) const;
 
 private:
-    EngineConfig _config;
 
 };
 } // namespace bee

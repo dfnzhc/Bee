@@ -16,7 +16,7 @@
 
 using namespace bee;
 
-ViewportWidget::ViewportWidget(const Engine* pEngine, QWidget* parent) : QWidget(parent), _pEngine(pEngine)
+ViewportWidget::ViewportWidget(Engine* pEngine, QWidget* parent) : QWidget(parent), _pEngine(pEngine)
 {
     BEE_ASSERT(_pEngine, "pEngine must not be nullptr.");
     
@@ -36,12 +36,21 @@ ViewportWidget::~ViewportWidget()
 
 bool ViewportWidget::setup()
 {
+    EngineInitParams param;
+
+    if (!_pEngine->initialize(param)) {
+        // TODO: Log widget
+        return false;
+    }
+
+    
 
     return true;
 }
 
 void ViewportWidget::shutdown()
 {
+    _pEngine->shutdown();
 }
 
 bool ViewportWidget::event(QEvent* event)
