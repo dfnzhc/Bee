@@ -16,25 +16,18 @@
 
 using namespace bee;
 
-ViewportWidget::ViewportWidget(const Engine* pEngine, QWidget* parent) : QScrollArea(parent), _pEngine(pEngine)
+ViewportWidget::ViewportWidget(const Engine* pEngine, QWidget* parent) : QWidget(parent), _pEngine(pEngine)
 {
     BEE_ASSERT(_pEngine, "pEngine must not be nullptr.");
     
     setLayout(new QVBoxLayout);
     setMouseTracking(true);
-    setBackgroundRole(QPalette::Dark); // TODO: background color not working
 
     // For test
-    // QPalette pal = QPalette();
-    // pal.setColor(QPalette::Window, QColor{23, 23, 23});
-    // setAutoFillBackground(true); 
-    // setPalette(pal);
-
-    QLabel *imageLabel = new QLabel;
-    auto pm = QPixmap(1920, 1080);
-    pm.fill(QColor{23, 23, 23});
-    imageLabel->setPixmap(pm);
-    setWidget(imageLabel);
+    QPalette pal = QPalette();
+    pal.setColor(QPalette::Window, QColor{23, 23, 23});
+    setAutoFillBackground(true); 
+    setPalette(pal);
 }
 
 ViewportWidget::~ViewportWidget()

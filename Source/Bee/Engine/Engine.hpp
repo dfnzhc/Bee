@@ -12,6 +12,12 @@
 #include "Core/Utility/ClassTypes.hpp"
 
 namespace bee {
+
+struct EngineConfig
+{
+    void* windowHandle = nullptr;
+};
+
 class BEE_API Engine final : public CMoveable
 {
 public:
@@ -19,18 +25,30 @@ public:
     ~Engine() override;
 
     /**
+     * @brief Pre initializes the engine, basically build the common subsystems.
+     * @return Returns true on success, false on failure.
+     */
+    bool preInitialize();
+    
+    /**
      * @brief Initializes the engine.
      * @return Returns true on success, false on failure.
      */
-    bool initialize();
+    bool initialize(EngineConfig config);
 
     /**
      * @brief Shuts down the engine, releasing all resources.
      */
     void shutdown();
 
-private:
+    /**
+     * @brief Handle the input events.
+     * @param event Key or Mouse event.
+     */
+    void onInputEvent(Ptr<class InputEventBase> event) const;
 
+private:
+    EngineConfig _config;
 
 };
 } // namespace bee

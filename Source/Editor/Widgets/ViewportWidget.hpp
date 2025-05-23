@@ -7,13 +7,13 @@
  
 #pragma once
 
-#include <QScrollArea>
+#include <QWidget>
 
 namespace bee {
 
 class Engine;
 
-class ViewportWidget : public QScrollArea
+class ViewportWidget : public QWidget
 {
     Q_OBJECT
 public:

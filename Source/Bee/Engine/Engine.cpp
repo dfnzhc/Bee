@@ -27,10 +27,18 @@ Engine::~Engine()
     shutdown();
 }
 
-bool Engine::initialize()
+bool Engine::preInitialize()
 {
     Logger::Setup(true);
-    LogInfo("Bee Engine initializing... | Ver. {}.{}.{}", BEE_VERSION_MAJOR, BEE_VERSION_MINOR, BEE_VERSION_PATCH);
+    LogInfo("Bee Engine pre-initializing... | Ver. {}.{}.{}", BEE_VERSION_MAJOR, BEE_VERSION_MINOR, BEE_VERSION_PATCH);
+
+    return true;
+}
+
+bool Engine::initialize(EngineConfig config)
+{
+    
+    _config = std::move(config);
     
     return true;
 }
@@ -39,4 +47,9 @@ void Engine::shutdown()
 {
     
     LogInfo("Bee Engine shutdown.");
+}
+
+void Engine::onInputEvent(Ptr<class InputEventBase> event) const
+{
+    LogInfo("Event: {}", event->toString().c_str());
 }
