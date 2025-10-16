@@ -1,0 +1,16 @@
+﻿/**
+ * @File Core.hpp
+ * @Author dfnzhc (https://github.com/dfnzhc)
+ * @Date 2025/9/27
+ * @Brief This file is part of Bee.
+ */
+ 
+#pragma once
+
+
+namespace Bee
+{
+    
+int TestFunc();
+    
+} // namespace Bee

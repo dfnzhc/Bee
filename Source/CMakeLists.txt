@@ -1,0 +1,2 @@
+add_subdirectory(BeeLib)
+add_subdirectory(BeeEditor)
