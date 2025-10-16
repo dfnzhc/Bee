@@ -11,6 +11,8 @@ set(LayerDependencies
 )
 
 set(LayerComponents
+        Interface
+        Impl
 )
 
 set(LayerDefinitions
@@ -20,7 +22,6 @@ set(LayerOptions
 )
 
 set(LayerIncludeDirs
-        ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 BeeAddLayer(

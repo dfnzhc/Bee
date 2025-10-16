@@ -9,6 +9,7 @@
 
 #include <atomic>
 #include <string>
+#include <memory>
 #include "Core/Base/Defines.hpp"
 
 namespace Bee
@@ -44,6 +45,8 @@ namespace Bee
         void requestExit();
 
     private:
+        std::unique_ptr<class PlatformManager> _pPlatform;
+
         std::string m_name;
         std::atomic<bool> m_running{false};
         std::atomic<bool> m_initialized{false};

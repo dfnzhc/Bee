@@ -396,10 +396,11 @@ function(BeeAddComponent)
                 CXX_STANDARD_REQUIRED ON
                 CXX_EXTENSIONS OFF
         )
+        
+        # 设置编译器标志
+        SetCompilerFlags(${target_name})
     endif ()
 
-    # 设置编译器标志
-    SetCompilerFlags(${target_name})
 
     # 默认包含目录
     target_include_directories(${target_name} ${include_scope}

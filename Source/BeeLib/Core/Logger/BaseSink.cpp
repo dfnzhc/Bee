@@ -37,8 +37,6 @@ public:
         SetConsoleOutputCP(CP_UTF8);
         #endif
 
-        spdlog::init_thread_pool(8192, 1);
-
         auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
         // TODO: 日志路径
         auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>("Bee.log", true);
@@ -62,21 +60,34 @@ public:
         std::vector<spdlog::sink_ptr> sinks{console_sink, file_sink};
 
         // clang-format off
-        Logger = std::make_shared<spdlog::async_logger>("Bee", sinks.begin(), sinks.end(), spdlog::thread_pool(), spdlog::async_overflow_policy::block);
+        ThreadPool = std::make_shared<spdlog::details::thread_pool>(8192, 1);
+        Logger = std::make_shared<spdlog::async_logger>("Bee", sinks.begin(), sinks.end(), ThreadPool, spdlog::async_overflow_policy::block);
         // clang-format on
 
         Logger->set_level(spdlog::level::trace);
-        spdlog::register_logger(Logger);
+        spdlog::initialize_logger(Logger);
 
         Started = true;
     }
 
     void shutdown()
     {
-        Started = false;
+        if (Started)
+        {
+            try
+            {
+                ThreadPool.reset();
+                Logger.reset();
+                
+                spdlog::shutdown();
+            }
+            catch (std::exception& e)
+            {
+                BEE_ERROR("[spdlog]: {}", e.what());
+            }
 
-        spdlog::shutdown();
-        Logger.reset();
+            Started = false;
+        }
     }
 
     void write(const LogMessage& logMsg) const
@@ -95,7 +106,14 @@ public:
 
     void flush() const
     {
-        Logger->flush();
+        try
+        {
+            Logger->flush();
+        }
+        catch (std::exception& e)
+        {
+            BEE_ERROR("[spdlog]: {}", e.what());
+        }
     }
 
     bool isValid() const
@@ -103,8 +121,10 @@ public:
         return Logger && Started;
     }
 
-    std::shared_ptr<spdlog::logger> Logger = nullptr;
-    bool Started                           = false;
+    std::shared_ptr<spdlog::details::thread_pool> ThreadPool = nullptr;
+    std::shared_ptr<spdlog::logger> Logger                   = nullptr;
+
+    bool Started = false;
 };
 
 BaseSink::BaseSink() :

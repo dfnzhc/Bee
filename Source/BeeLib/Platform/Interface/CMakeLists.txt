@@ -1,5 +1,5 @@
-set(LAYER_NAME App)
-set(COMP_NAME Framework)
+﻿set(LAYER_NAME Platform)
+set(COMP_NAME Interface)
 
 file(GLOB_RECURSE CompSources
         "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp"
@@ -12,6 +12,7 @@ file(GLOB_RECURSE CompHeaders
 )
 
 set(CompDefinitions
+        $<$<CONFIG:Debug>:BEE_DEBUG=1>
 )
 
 set(CompOptions
@@ -21,7 +22,7 @@ set(CompIncludeDirs
 )
 
 set(CompLinkLibraries
-        Bee::Platform::Impl
+        Bee::Core::Base
 )
 
 BeeAddComponent(
@@ -40,13 +41,9 @@ set(COMP_LIB_NAME Bee${LAYER_NAME}_${COMP_NAME})
 target_compile_definitions(${COMP_LIB_NAME} PRIVATE
 )
 
-target_link_libraries(${COMP_LIB_NAME} PRIVATE
-        Bee::Core
-)
-
 get_target_property(TARGET_TYPE ${COMP_LIB_NAME} TYPE)
-if (NOT TARGET_TYPE STREQUAL "INTERFACE_LIBRARY")
+if(NOT TARGET_TYPE STREQUAL "INTERFACE_LIBRARY")
     BeeConfigurePrecompiledHeaders(
             TARGET_NAME ${COMP_LIB_NAME}
     )
-endif ()
+endif()

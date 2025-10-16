@@ -104,6 +104,14 @@ void Logger::shutdown()
     _initialized.store(false);
 }
 
+Logger::~Logger()
+{
+    if (_initialized.load())
+    {
+        shutdown();
+    }
+}
+
 bool Logger::shouldLog(LogMessage::Level level) const
 {
     return _globalMinLevel <= level;

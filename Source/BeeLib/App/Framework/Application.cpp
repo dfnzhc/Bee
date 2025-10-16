@@ -8,6 +8,8 @@
 
 #include "Application.hpp"
 
+#include "PlatformManager.hpp"
+
 using namespace Bee;
 
 Application::Application(std::string name) :
@@ -21,6 +23,7 @@ Application::~Application()
     {
         shutdown();
     }
+    Logger::Instance().shutdown();
 }
 
 bool Application::initialize()
@@ -36,7 +39,18 @@ bool Application::initialize()
         {
             std::cerr << "[Bee] 日志初始化失败.\n";
         }
+        
         BEE_INFO("{} 正在进行初始化.", m_name);
+
+        PlatformManager::InitConfig config;
+        config.enableWindow = true;
+        
+        _pPlatform = std::make_unique<PlatformManager>();
+        if (!_pPlatform->initialize(config))
+        {
+            BEE_ERROR("平台管理器初始化失败.");
+            return false;
+        }
 
         if (!onInitialize())
         {
@@ -82,7 +96,7 @@ int Application::run()
 {
     if (!m_initialized.load())
     {
-        BEE_ERROR("应用程序还未初始化.");
+        BEE_ERROR("应用程序未初始化.");
         return EXIT_FAILURE;
     }
 

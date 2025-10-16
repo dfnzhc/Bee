@@ -46,8 +46,9 @@ namespace Bee
         void shutdown();
 
     private:
-        Logger()                         = default;
-        ~Logger()                        = default;
+        Logger() = default;
+        ~Logger();
+
         Logger(const Logger&)            = delete;
         Logger& operator=(const Logger&) = delete;
 
