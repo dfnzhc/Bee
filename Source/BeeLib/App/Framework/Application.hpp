@@ -22,26 +22,26 @@ namespace Bee
 
         BEE_DISABLE_COPY_AND_MOVE(Application);
 
-        // ========== 生命周期管理 ==========
+        // === 生命周期管理 ===
 
         bool initialize();
         void shutdown();
 
         int run();
 
-        // ========== 状态查询 ==========
+        // === 状态查询 ===
 
         bool isRunning() const;
 
     protected:
-        // 用于子类重写
+        // === 用于子类重写 ===
         virtual bool onInitialize();
         virtual void onShutdown();
 
         virtual bool onPrepareRun();
         virtual void onFinishRun();
 
-        // 主循环控制
+        // === 主循环控制 ===
         void requestExit();
 
     private:

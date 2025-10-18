@@ -20,6 +20,7 @@ namespace Bee
     // 窗口状态
     enum class WindowState : u8
     {
+        Normal,
         Hidden,
         Shown,
         Minimized,
@@ -28,10 +29,33 @@ namespace Bee
         Restored
     };
 
+    // 窗口标志
+    enum class WindowFlags : u32
+    {
+        None          = 0x00000000,
+        Resizable     = 0x00000001,
+        Borderless    = 0x00000002,
+        Transparent   = 0x00000004,
+        MouseRelative = 0x00000008,
+        AlwaysOnTop   = 0x00000010,
+        SkipTaskbar   = 0x00000020,
+        HighDPI       = 0x00000040,
+
+        Vulkan = 0x00001000,
+        OpenGL = 0x00002000,
+        METAL  = 0x00004000,
+
+        // 一些预设
+        Default = Resizable
+    };
+
+    BEE_ENUM_CLASS_OPERATORS(WindowFlags)
+
+
     // TODO: 更换数学方法
     struct Vec2u
     {
-        u32 x = {}, y = {};
+        i32 x = {}, y = {};
     };
 
     // 创建信息
@@ -40,16 +64,20 @@ namespace Bee
         std::string title{};
         Vec2u pos{};
         Vec2u size{};
-        // Point2D position = {100, 100};
-        // Size2D size = {800, 600};
-        // WindowFlags flags = WindowFlags::Default;
+        WindowFlags flags = WindowFlags::Default;
     };
 
     // 原生平台窗口 Handle
     struct NativeWindowHandle
     {
-        void* handle   = nullptr; // Windows: HWND, Linux: Window, macOS: NSWindow*
-        void* instance = nullptr; // Windows: HINSTANCE, 其他平台可能为 nullptr
+        #ifdef BEE_ON_WINDOWS
+        HWND hwnd           = nullptr;
+        HDC hdc             = nullptr;
+        HINSTANCE hinstance = nullptr;
+        #elif defined(BEE_ON_LINUX)
+        u32 window    = 0;
+        void* display = nullptr;
+        #endif
     };
 
     class IWindowManager

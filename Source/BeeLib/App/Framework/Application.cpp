@@ -116,9 +116,18 @@ int Application::run()
 
         m_running.store(true);
 
-        // while (m_running.load())
-        // {
-        // }
+        auto* windowManager = _pPlatform->getWindowManager();
+
+        WindowCreateInfo createInfo;
+        createInfo.pos = {30, 50};
+        createInfo.size = {1280, 720};
+        createInfo.title = m_name;
+        
+        auto window = windowManager->createWindow(createInfo);
+        windowManager->showWindow(window);
+        while (m_running.load())
+        {
+        }
 
         onFinishRun();
 

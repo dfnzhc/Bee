@@ -25,14 +25,14 @@ namespace Bee
     // 显示器信息
     struct DisplayInfo
     {
-        std::string name  = {};
-        uint32_t index    = 0;
-        u32 sizeX         = 0;
-        u32 sizeY         = 0;
-        u32 dpiX          = 96;
-        u32 dpiY          = 96;
-        float refreshRate = 60.0f;
-        bool isPrimary    = false;
+        std::string name = {};
+        i32 index        = -1;
+        i32 posX         = 0;
+        i32 posY         = 0;
+        u32 width        = 0;
+        u32 height       = 0;
+        f32 dpi          = 1.0f;
+        f32 refreshRate  = 60.0f;
+        bool isPrimary   = false;
     };
-
 } // namespace Bee

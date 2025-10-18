@@ -7,14 +7,9 @@
 
 #include "PlatformManager.hpp"
 #include "Window/WindowManager.hpp"
+#include "SDLHeader.hpp"
 
 #include "Core/Error/Exception.hpp"
-
-BEE_PUSH_WARNING
-BEE_CLANG_DISABLE_WARNING("-Wreserved-macro-identifier")
-BEE_CLANG_DISABLE_WARNING("-Wdocumentation-unknown-command")
-#include <SDL3/SDL.h>
-BEE_POP_WARNING
 
 using namespace Bee;
 
@@ -132,8 +127,7 @@ public:
 
     bool initialized;
 
-    // 管理器实例
-    std::unique_ptr<IWindowManager> windowManager;
+    std::unique_ptr<IWindowManager> windowManager = nullptr;
 };
 
 PlatformManager::PlatformManager() :
@@ -164,4 +158,9 @@ bool PlatformManager::isInitialized() const
 void PlatformManager::update()
 {
     return _pImpl->update();
+}
+
+IWindowManager* PlatformManager::getWindowManager() const
+{
+    return _pImpl->windowManager.get();
 }

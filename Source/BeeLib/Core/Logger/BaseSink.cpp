@@ -65,7 +65,7 @@ public:
         // clang-format on
 
         Logger->set_level(spdlog::level::trace);
-        spdlog::initialize_logger(Logger);
+        spdlog::register_logger(Logger);
 
         Started = true;
     }

@@ -38,6 +38,7 @@ namespace Bee
         void update();
 
         // === 管理器访问接口 ===
+        IWindowManager* getWindowManager() const;
 
     private:
         class Impl;

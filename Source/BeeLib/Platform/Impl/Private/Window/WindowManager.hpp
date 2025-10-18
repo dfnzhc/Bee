@@ -17,13 +17,15 @@
 struct SDL_Window;
 union SDL_Event;
 
+// TODO: 返回结果中增加可能的错误信息
+
 namespace Bee
 {
     class WindowManager : public IWindowManager
     {
     public:
-        WindowManager();
-        ~WindowManager() override;
+        WindowManager()           = default;
+        ~WindowManager() override = default;
 
         BEE_DISABLE_COPY_AND_MOVE(WindowManager);
 
@@ -86,10 +88,37 @@ namespace Bee
         f32 getWindowOpacity(WindowHandle window) const override;
 
     private:
+        struct WindowData
+        {
+            SDL_Window* sdlWindow{nullptr};
+            WindowCreateInfo createInfo{};
+            WindowHandle handle{0};
+            bool isValid{false};
+        };
+
+        // === 内部辅助方法 ===
+        WindowData* getWindowData(WindowHandle window) const;
+        WindowData* getWindowDataBySDL(SDL_Window* sdlWindow) const;
+
+        u32 generateWindowId();
+        u32 convertWindowFlags(WindowFlags flags) const;
+
+        WindowState convertSDLWindowState(u64 sdlFlags) const;
+        DisplayInfo convertSDLDisplay(int displayIndex) const;
+
+        void cleanupWindow(WindowData* windowData);
+        void cleanupAllWindows();
+
+    private:
+        // --- 窗口管理 ---
+        std::unordered_map<u32, std::unique_ptr<WindowData>> _windows;
+        std::unordered_map<SDL_Window*, u32> _sdlWindowToId;
+
         // --- 内部状态 ---
-        bool m_initialized;
-        uint32_t m_nextWindowId;
-        WindowHandle m_mainWindow;
-        WindowHandle m_focusedWindow;
+        WindowHandle _focusedWindow{0};
+        WindowHandle _mainWindow{0};
+
+        u32 _nextWindowId{1};
+        bool _initialized{false};
     };
 } // namespace Bee
