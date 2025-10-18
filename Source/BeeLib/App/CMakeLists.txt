@@ -1,6 +1,7 @@
 message(STATUS "----- Configuring App Layer -----")
 
 set(LAYER_NAME App)
+set(LAYER_LOG_TAG 🎮)
 
 set(LayerSources
         App.hpp App.cpp

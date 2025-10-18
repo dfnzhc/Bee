@@ -40,6 +40,7 @@ set(COMP_LIB_NAME Bee${LAYER_NAME}_${COMP_NAME})
 SetDefaultCompileDefinitions(${COMP_LIB_NAME})
 
 target_compile_definitions(${COMP_LIB_NAME} PRIVATE
+        BEE_LOG_TAG="${LAYER_LOG_TAG}"
 )
 
 target_link_libraries(${COMP_LIB_NAME} PRIVATE

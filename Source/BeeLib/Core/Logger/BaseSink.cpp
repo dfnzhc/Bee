@@ -46,10 +46,10 @@ public:
         // TODO: 将线程 id 改为可读的线程名称
         // TODO: Tag-xxx
         // 控制台格式: [级别] [时间] [线程ID] [Logger名]: 消息
-        console_sink->set_pattern("[%^%l%$] [%H:%M:%S.%e] [%t] xxx: %v");
+        console_sink->set_pattern("[%^%l%$] [%H:%M:%S.%e] [%t] %v");
 
         // 文件格式: [日期 时间.毫秒] [级别] [Logger名] [线程ID] 消息
-        file_sink->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%8l] [xxx] [thread %t] %v");
+        file_sink->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%8l] [thread %t] %v");
         BEE_POP_WARNING
 
         // 默认开启所有级别的日志输出

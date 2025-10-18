@@ -1,6 +1,7 @@
 message(STATUS "----- Configuring Platform Layer -----")
 
 set(LAYER_NAME Platform)
+set(LAYER_LOG_TAG 🖥️)
 
 set(LayerSources
         Platform.hpp Platform.cpp

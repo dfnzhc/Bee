@@ -1,6 +1,7 @@
 message(STATUS "----- Configuring Core Layer -----")
 
 set(LAYER_NAME Core)
+set(LAYER_LOG_TAG ⚛️)
 
 set(LayerSources 
         Core.hpp Core.cpp

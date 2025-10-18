@@ -20,12 +20,13 @@ Logger& Logger::Instance()
     return instance;
 }
 
-void Logger::log(LogMessage::Level level, std::string_view message, std::source_location location) const
+void Logger::log(LogMessage::Level level, std::string_view tag, std::string_view message, std::source_location location) const
 {
     if (!shouldLog(level))
         return;
 
-    LogMessage msg{level, message, location};
+    LogMessage msg{level, "", location};
+    std::format_to(std::back_inserter(msg.message), "|{}|: {}", tag, message.data());
 
     std::unique_lock lock(_sinksMutex);
     for (const auto& sink : _sinks)

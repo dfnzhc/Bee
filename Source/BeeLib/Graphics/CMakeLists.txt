@@ -1,6 +1,7 @@
 message(STATUS "----- Configuring Graphics Layer -----")
 
 set(LAYER_NAME Graphics)
+set(LAYER_LOG_TAG 🎨)
 
 set(LayerSources
         Graphics.hpp Graphics.cpp

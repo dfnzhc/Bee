@@ -1,6 +1,7 @@
 message(STATUS "----- Configuring Engine Layer -----")
 
 set(LAYER_NAME Engine)
+set(LAYER_LOG_TAG 🛠️)
 
 set(LayerSources
         Engine.hpp Engine.cpp

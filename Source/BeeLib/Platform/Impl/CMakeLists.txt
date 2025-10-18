@@ -44,6 +44,7 @@ target_include_directories(${COMP_LIB_NAME} PRIVATE
 )
 
 target_compile_definitions(${COMP_LIB_NAME} PRIVATE
+        BEE_LOG_TAG="${LAYER_LOG_TAG}"
 )
 
 target_link_libraries(${COMP_LIB_NAME} PRIVATE
