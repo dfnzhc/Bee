@@ -20,6 +20,8 @@ namespace Bee
     protected:
         bool onInitialize() override;
         void onShutdown() override;
+        void drawFrame() override;
+
         bool onPrepareRun() override;
         void onFinishRun() override;
     };

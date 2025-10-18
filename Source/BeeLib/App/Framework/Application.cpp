@@ -115,18 +115,9 @@ int Application::run()
         }
 
         m_running.store(true);
-
-        auto* windowManager = _pPlatform->getWindowManager();
-
-        WindowCreateInfo createInfo;
-        createInfo.pos = {30, 50};
-        createInfo.size = {1280, 720};
-        createInfo.title = m_name;
-        
-        auto window = windowManager->createWindow(createInfo);
-        windowManager->showWindow(window);
         while (m_running.load())
         {
+            drawFrame();
         }
 
         onFinishRun();
@@ -161,6 +152,10 @@ bool Application::onPrepareRun()
 }
 
 void Application::onFinishRun()
+{
+}
+
+void Application::drawFrame()
 {
 }
 

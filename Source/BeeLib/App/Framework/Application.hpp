@@ -23,14 +23,12 @@ namespace Bee
         BEE_DISABLE_COPY_AND_MOVE(Application);
 
         // === 生命周期管理 ===
-
         bool initialize();
         void shutdown();
 
         int run();
 
         // === 状态查询 ===
-
         bool isRunning() const;
 
     protected:
@@ -41,12 +39,15 @@ namespace Bee
         virtual bool onPrepareRun();
         virtual void onFinishRun();
 
+        virtual void drawFrame();
+
         // === 主循环控制 ===
         void requestExit();
 
-    private:
+    protected:
         std::unique_ptr<class PlatformManager> _pPlatform;
 
+    private:
         std::string m_name;
         std::atomic<bool> m_running{false};
         std::atomic<bool> m_initialized{false};
