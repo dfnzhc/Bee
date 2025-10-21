@@ -7,6 +7,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <numeric>
 #include <gtest/gtest.h>
 #include <sstream>
 #include <string>
@@ -16,6 +17,7 @@
 
 #include <Core/Error/Exception.hpp>
 #include <Core/Error/Guardian.hpp>
+#include <Core/Error/Error.hpp>
 
 using namespace Bee;
 
@@ -1052,4 +1054,716 @@ TEST(ScopeGuardianTest, RAIIPatternWithRealResources)
     EXPECT_TRUE(resourceCreated);
     EXPECT_TRUE(resourceDestroyed);
     EXPECT_TRUE(cleanupExecuted);
+}
+
+// ==================== 错误类型 ====================
+
+TEST(ErrorIdTest, DefaultConstruction)
+{
+    ErrorId id;
+    EXPECT_EQ(id.domain, 0);
+    EXPECT_EQ(id.code, 0);
+    EXPECT_EQ(id.value(), 0);
+    EXPECT_TRUE(id.isSuccess());
+}
+
+TEST(ErrorIdTest, DomainCodeConstruction)
+{
+    ErrorId id(ErrorDomain::System, 0x1234);
+    EXPECT_EQ(id.domain, static_cast<u16>(ErrorDomain::System));
+    EXPECT_EQ(id.code, 0x1234);
+    EXPECT_EQ(id.getDomain(), ErrorDomain::System);
+    EXPECT_EQ(id.getCode(), 0x1234);
+    EXPECT_FALSE(id.isSuccess());
+}
+
+TEST(ErrorIdTest, CombinedValueConstruction)
+{
+    u32 combined = 0x10011234; // Domain: 0x1001, Code: 0x1234
+    ErrorId id(combined);
+    EXPECT_EQ(id.domain, 0x1001);
+    EXPECT_EQ(id.code, 0x1234);
+    EXPECT_EQ(id.getDomain(), ErrorDomain::Core);
+    EXPECT_EQ(id.getCode(), 0x1234);
+}
+
+TEST(ErrorIdTest, ValueConversion)
+{
+    ErrorId id(ErrorDomain::Graphics, 0x5678);
+    u32 expected = (0x1003 << 16) | 0x5678; // 0x10035678
+    EXPECT_EQ(id.value(), expected);
+}
+
+TEST(ErrorIdTest, HexFormatting)
+{
+    ErrorId id(ErrorDomain::Core, 0x1234);
+    std::string hex = id.hex();
+    EXPECT_EQ(hex, "10011234");
+}
+
+TEST(ErrorIdTest, StringFormatting)
+{
+    ErrorId id(ErrorDomain::System, 0x0042);
+    std::string formatted = id.format();
+    EXPECT_EQ(formatted, "System:0042");
+}
+
+TEST(ErrorIdTest, SuccessCheck)
+{
+    ErrorId success;
+    EXPECT_TRUE(success.isSuccess());
+
+    ErrorId error(ErrorDomain::System, 1);
+    EXPECT_FALSE(error.isSuccess());
+}
+
+TEST(ErrorIdTest, Comparison)
+{
+    ErrorId id1(ErrorDomain::System, 0x1234);
+    ErrorId id2(ErrorDomain::System, 0x1234);
+    ErrorId id3(ErrorDomain::Core, 0x1234);
+    ErrorId id4(ErrorDomain::System, 0x5678);
+
+    EXPECT_EQ(id1, id2);
+    EXPECT_NE(id1, id3);
+    EXPECT_NE(id1, id4);
+
+    EXPECT_TRUE(id1 < id3);
+    EXPECT_TRUE(id1 < id4);
+}
+
+TEST(ErrorTest, DefaultConstruction)
+{
+    Error error;
+    EXPECT_TRUE(error.isSuccess());
+    EXPECT_FALSE(error.isError());
+    EXPECT_FALSE(error);
+    EXPECT_EQ(error.domain(), ErrorDomain::NoError);
+    EXPECT_EQ(error.code(), 0);
+}
+
+TEST(ErrorTest, ErrorIdConstruction)
+{
+    ErrorId id(ErrorDomain::System, 0x1234);
+    Error error(id);
+
+    EXPECT_FALSE(error.isSuccess());
+    EXPECT_TRUE(error.isError());
+    EXPECT_TRUE(error);
+    EXPECT_EQ(error.id(), id);
+    EXPECT_EQ(error.domain(), ErrorDomain::System);
+    EXPECT_EQ(error.code(), 0x1234);
+}
+
+TEST(ErrorTest, DomainCodeConstruction)
+{
+    Error error(ErrorDomain::Core, 0x5678);
+
+    EXPECT_FALSE(error.isSuccess());
+    EXPECT_TRUE(error.isError());
+    EXPECT_EQ(error.domain(), ErrorDomain::Core);
+    EXPECT_EQ(error.code(), 0x5678);
+}
+
+TEST(ErrorTest, EmptyMessageConstruction)
+{
+    Error error(ErrorDomain::Graphics, 0x1111);
+
+    EXPECT_TRUE(error.isError());
+    EXPECT_EQ(error.domain(), ErrorDomain::Graphics);
+    EXPECT_EQ(error.code(), 0x1111);
+}
+
+TEST(ErrorTest, DomainCodeCheck)
+{
+    Error error(ErrorDomain::System, 0x1234);
+
+    EXPECT_TRUE(error.isDomain(ErrorDomain::System));
+    EXPECT_FALSE(error.isDomain(ErrorDomain::Core));
+
+    EXPECT_TRUE(error.isCode(0x1234));
+    EXPECT_FALSE(error.isCode(0x5678));
+}
+
+TEST(ErrorTest, Comparison)
+{
+    Error error1(ErrorDomain::System, 0x1234);
+    Error error2(ErrorDomain::System, 0x1234);
+    Error error3(ErrorDomain::Core, 0x1234);
+
+    EXPECT_EQ(error1, error2);
+    EXPECT_NE(error1, error3);
+    EXPECT_TRUE(error1 < error3);
+}
+
+TEST(ResultTest, OkValueCreation)
+{
+    auto result1 = Ok(42);
+    static_assert(std::is_same_v<decltype(result1), Result<int>>);
+    EXPECT_TRUE(result1.has_value());
+    EXPECT_EQ(result1.value(), 42);
+
+    auto result2 = Ok(std::string("hello"));
+    static_assert(std::is_same_v<decltype(result2), Result<std::string>>);
+    EXPECT_TRUE(result2.has_value());
+    EXPECT_EQ(result2.value(), "hello");
+
+    std::string str = "world";
+    auto result3    = Ok(std::move(str));
+    EXPECT_TRUE(result3.has_value());
+    EXPECT_EQ(result3.value(), "world");
+}
+
+TEST(ResultTest, OkVoidCreation)
+{
+    auto result = Ok();
+    static_assert(std::is_same_v<decltype(result), RVoid>);
+    EXPECT_TRUE(result.has_value());
+}
+
+TEST(ResultTest, ErrCreation)
+{
+    auto error1  = Err(ErrorDomain::System, 0x1234);
+    auto result1 = Result<int>(error1);
+    EXPECT_FALSE(result1.has_value());
+    EXPECT_EQ(result1.error().domain(), ErrorDomain::System);
+    EXPECT_EQ(result1.error().code(), 0x1234);
+
+    ErrorId id(ErrorDomain::Core, 0x5678);
+    auto error2  = Err(id);
+    auto result2 = Result<std::string>(error2);
+    EXPECT_FALSE(result2.has_value());
+    EXPECT_EQ(result2.error().id(), id);
+}
+
+TEST(ResultTest, ResultTypeDeduction)
+{
+    auto intResult = Ok(123);
+    static_assert(std::is_same_v<decltype(intResult), Result<int>>);
+
+    auto stringResult = Ok(std::string("test"));
+    static_assert(std::is_same_v<decltype(stringResult), Result<std::string>>);
+
+    auto voidResult = Ok();
+    static_assert(std::is_same_v<decltype(voidResult), RVoid>);
+}
+
+TEST(ResultTest, ResultChaining)
+{
+    // clang-format off
+    auto getValue = [](bool success) -> Result<int>
+    {
+        if (success)
+        { return Ok(42); }
+        else
+        { return Err(ErrorDomain::Core, 0x0001); }
+    };
+    // clang-format on
+
+    auto doubleValue = [](int value) -> Result<int>
+    {
+        return Ok(value * 2);
+    };
+
+    auto result1 = getValue(true);
+    EXPECT_TRUE(result1.has_value());
+    if (result1)
+    {
+        auto result2 = doubleValue(result1.value());
+        EXPECT_TRUE(result2.has_value());
+        EXPECT_EQ(result2.value(), 84);
+    }
+
+    auto result3 = getValue(false);
+    EXPECT_FALSE(result3.has_value());
+    EXPECT_EQ(result3.error().domain(), ErrorDomain::Core);
+}
+
+TEST(ResultTest, VoidResultOperations)
+{
+    // clang-format off
+    auto performOperation = [](bool success) -> RVoid
+    {
+        if (success)
+        { return Ok(); }
+        else
+        { return Err(ErrorDomain::System, 0x0002); }
+    };
+    // clang-format on
+
+    auto result1 = performOperation(true);
+    EXPECT_TRUE(result1.has_value());
+
+    auto result2 = performOperation(false);
+    EXPECT_FALSE(result2.has_value());
+}
+
+TEST(ResultTest, ComplexTypes)
+{
+    struct TestStruct
+    {
+        int value;
+        std::string name;
+
+        bool operator==(const TestStruct& other) const
+        {
+            return value == other.value && name == other.name;
+        }
+    };
+
+    TestStruct data{42, "test"};
+    auto result = Ok(data);
+
+    EXPECT_TRUE(result.has_value());
+    EXPECT_EQ(result.value().value, 42);
+    EXPECT_EQ(result.value().name, "test");
+}
+
+TEST(ResultTest, ErrorPropagation)
+{
+    auto step1 = []() -> Result<int>
+    {
+        return Err(ErrorDomain::System, 0x1001);
+    };
+
+    auto step2 = [&]() -> Result<std::string>
+    {
+        auto result = step1();
+        if (!result)
+        {
+            return std::unexpected{result.error()};
+        }
+        return Ok(std::to_string(result.value()));
+    };
+
+    auto finalResult = step2();
+    EXPECT_FALSE(finalResult.has_value());
+    EXPECT_EQ(finalResult.error().domain(), ErrorDomain::System);
+    EXPECT_EQ(finalResult.error().code(), 0x1001);
+}
+
+TEST(MacroTest, BEE_TRY_Success)
+{
+    auto getValue = [](int input) -> Result<int>
+    {
+        if (input > 0)
+        {
+            return Ok(input * 2);
+        }
+        return Err(ErrorDomain::Core, 0x0001);
+    };
+
+    auto processValue = [&](int input) -> Result<int>
+    {
+        int value = BEE_TRY(getValue(input));
+        return Ok(value + 10);
+    };
+
+    auto result = processValue(5);
+    EXPECT_TRUE(result.has_value());
+    EXPECT_EQ(result.value(), 20);
+}
+
+TEST(MacroTest, BEE_TRY_Failure)
+{
+    auto getValue = [](int input) -> Result<int>
+    {
+        if (input > 0)
+        {
+            return Ok(input * 2);
+        }
+        return Err(ErrorDomain::Core, 0x0001);
+    };
+
+    auto processValue = [&](int input) -> Result<int>
+    {
+        int value = BEE_TRY(getValue(input));
+        return Ok(value + 10);
+    };
+
+    auto result = processValue(-1);
+    EXPECT_FALSE(result.has_value());
+    EXPECT_EQ(result.error().domain(), ErrorDomain::Core);
+    EXPECT_EQ(result.error().code(), 0x0001);
+}
+
+TEST(MacroTest, BEE_TRY_VOID_Success)
+{
+    auto performOperation = [](bool success) -> RVoid
+    {
+        if (success)
+        {
+            return Ok();
+        }
+        return Err(ErrorDomain::System, 0x0002);
+    };
+
+    auto chainedOperation = [&](bool success) -> RVoid
+    {
+        BEE_TRY_VOID(performOperation(success));
+        return Ok();
+    };
+
+    auto result = chainedOperation(true);
+    EXPECT_TRUE(result.has_value());
+}
+
+TEST(MacroTest, BEE_TRY_VOID_Failure)
+{
+    auto performOperation = [](bool success) -> RVoid
+    {
+        if (success)
+        {
+            return Ok();
+        }
+        return Err(ErrorDomain::System, 0x0002);
+    };
+
+    auto chainedOperation = [&](bool success) -> RVoid
+    {
+        BEE_TRY_VOID(performOperation(success));
+        return Ok();
+    };
+
+    auto result = chainedOperation(false);
+    EXPECT_FALSE(result.has_value());
+    EXPECT_EQ(result.error().domain(), ErrorDomain::System);
+    EXPECT_EQ(result.error().code(), 0x0002);
+}
+
+TEST(MacroTest, BEE_TRY_OR_Success)
+{
+    auto getValue = [](int input) -> Result<int>
+    {
+        if (input > 0)
+        {
+            return Ok(input * 2);
+        }
+        return Err(ErrorDomain::Core, 0x0001);
+    };
+
+    auto processValue = [&](int input) -> Result<int>
+    {
+        int value = BEE_TRY_OR(getValue(input), 100);
+        return Ok(value + 10);
+    };
+
+    auto result = processValue(5);
+    EXPECT_TRUE(result.has_value());
+    EXPECT_EQ(result.value(), 20);
+}
+
+TEST(MacroTest, BEE_TRY_OR_Fallback)
+{
+    auto getValue = [](int input) -> Result<int>
+    {
+        if (input > 0)
+        {
+            return Ok(input * 2);
+        }
+        return Err(ErrorDomain::Core, 0x0001);
+    };
+
+    auto processValue = [&](int input) -> Result<int>
+    {
+        int value = BEE_TRY_OR(getValue(input), 100);
+        return Ok(value + 10);
+    };
+
+    auto result = processValue(-1);
+    EXPECT_TRUE(result.has_value());
+    EXPECT_EQ(result.value(), 110);
+}
+
+TEST(MacroTest, NestedBEE_TRY)
+{
+    auto step1 = [](int input) -> Result<int>
+    {
+        if (input > 0)
+        {
+            return Ok(input + 1);
+        }
+        return Err(ErrorDomain::Core, 0x0001);
+    };
+
+    auto step2 = [](int input) -> Result<int>
+    {
+        if (input > 5)
+        {
+            return Ok(input * 2);
+        }
+        return Err(ErrorDomain::Core, 0x0002);
+    };
+
+    auto step3 = [](int input) -> Result<int>
+    {
+        if (input > 12)
+        {
+            return Ok(input + 100);
+        }
+        return Err(ErrorDomain::Core, 0x0003);
+    };
+
+    auto processChain = [&](int input) -> Result<int>
+    {
+        int value1 = BEE_TRY(step1(input));
+        int value2 = BEE_TRY(step2(value1));
+        int value3 = BEE_TRY(step3(value2));
+        return Ok(value3);
+    };
+
+    auto result1 = processChain(10);
+    EXPECT_TRUE(result1.has_value());
+    EXPECT_EQ(result1.value(), 122);
+
+    auto result2 = processChain(-1);
+    EXPECT_FALSE(result2.has_value());
+    EXPECT_EQ(result2.error().code(), 0x0001);
+
+    auto result3 = processChain(3);
+    EXPECT_FALSE(result3.has_value());
+    EXPECT_EQ(result3.error().code(), 0x0002);
+
+    auto result4 = processChain(5);
+    EXPECT_FALSE(result4.has_value());
+    EXPECT_EQ(result4.error().code(), 0x0003);
+}
+
+TEST(MacroTest, MacroWithComplexExpressions)
+{
+    auto getVector = [](size_t size) -> Result<std::vector<int>>
+    {
+        if (size > 0 && size <= 10)
+        {
+            std::vector<int> vec(size);
+            std::iota(vec.begin(), vec.end(), 1);
+            return Ok(std::move(vec));
+        }
+        return Err(ErrorDomain::Core, 0x0004);
+    };
+
+    auto processVector = [&](size_t size) -> Result<int>
+    {
+        auto vec = BEE_TRY(getVector(size));
+        int sum  = std::accumulate(vec.begin(), vec.end(), 0);
+        return Ok(sum);
+    };
+
+    auto result = processVector(5);
+    EXPECT_TRUE(result.has_value());
+    EXPECT_EQ(result.value(), 15);
+}
+
+TEST(MacroTest, MacroReturnTypeCompatibility)
+{
+    auto intFunction = [](bool success) -> Result<int>
+    {
+        return success ? Ok(42) : Err(ErrorDomain::Core, 0x0001);
+    };
+
+    auto stringFunction = [&](bool success) -> Result<std::string>
+    {
+        int value = BEE_TRY(intFunction(success));
+        return Ok("Value: " + std::to_string(value));
+    };
+
+    auto voidFunction = [&](bool success) -> RVoid
+    {
+        BEE_TRY_VOID(stringFunction(success));
+        return Ok();
+    };
+
+    auto result1 = stringFunction(true);
+    EXPECT_TRUE(result1.has_value());
+    EXPECT_EQ(result1.value(), "Value: 42");
+
+    auto result2 = voidFunction(true);
+    EXPECT_TRUE(result2.has_value());
+
+    auto result3 = stringFunction(false);
+    EXPECT_FALSE(result3.has_value());
+
+    auto result4 = voidFunction(false);
+    EXPECT_FALSE(result4.has_value());
+}
+
+TEST(TypeTraitsTest, IsResultType)
+{
+    static_assert(IsResult<Result<int>>);
+    static_assert(IsResult<Result<std::string>>);
+    static_assert(IsResult<RVoid>);
+    static_assert(!IsResult<int>);
+    static_assert(!IsResult<std::string>);
+    static_assert(!IsResult<Error>);
+
+    static_assert(IsResult<Result<int>>);
+    static_assert(IsResult<Result<std::string>>);
+    static_assert(IsResult<RVoid>);
+    static_assert(!IsResult<int>);
+    static_assert(!IsResult<std::string>);
+    static_assert(!IsResult<Error>);
+}
+
+TEST(TypeTraitsTest, ResultValueType)
+{
+    static_assert(std::is_same_v<ResultValueType<Result<int>>, int>);
+    static_assert(std::is_same_v<ResultValueType<Result<std::string>>, std::string>);
+    static_assert(std::is_same_v<ResultValueType<RVoid>, void>);
+
+    static_assert(std::is_same_v<ResultValueType<Result<int>>, int>);
+    static_assert(std::is_same_v<ResultValueType<Result<std::string>>, std::string>);
+    static_assert(std::is_same_v<ResultValueType<RVoid>, void>);
+}
+
+TEST(TypeTraitsTest, TypeDeductionInTemplates)
+{
+    auto processAnyResult = []<typename T>(const Result<T>& result) -> std::string
+    {
+        if constexpr (std::is_same_v<T, void>)
+        {
+            return result.has_value() ? "void success" : "void error";
+        }
+        else
+        {
+            return result.has_value() ? "value success" : "value error";
+        }
+    };
+
+    auto intResult    = Ok(42);
+    auto stringResult = Ok(std::string("test"));
+    auto voidResult   = Ok();
+    auto errorResult  = Result<int>(Err(ErrorDomain::Core, 0x0001));
+
+    EXPECT_EQ(processAnyResult(intResult), "value success");
+    EXPECT_EQ(processAnyResult(stringResult), "value success");
+    EXPECT_EQ(processAnyResult(voidResult), "void success");
+    EXPECT_EQ(processAnyResult(errorResult), "value error");
+}
+
+TEST(TypeTraitsTest, ConceptsLikeConstraints)
+{
+    auto processOnlyResults = []<typename T>(const T& result)
+        -> std::enable_if_t<IsResult<T>, bool>
+    {
+        return result.has_value();
+    };
+
+    auto intResult   = Ok(42);
+    auto errorResult = Result<int>(Err(ErrorDomain::Core, 0x0001));
+
+    EXPECT_TRUE(processOnlyResults(intResult));
+    EXPECT_FALSE(processOnlyResults(errorResult));
+}
+
+TEST(ErrorEdgeCaseTest, MaxErrorCodeValues)
+{
+    constexpr uint16_t maxCode = std::numeric_limits<uint16_t>::max();
+    ErrorId id(ErrorDomain::System, maxCode);
+    Error error(id);
+
+    EXPECT_EQ(error.code(), maxCode);
+    EXPECT_EQ(error.domain(), ErrorDomain::System);
+}
+
+TEST(ErrorEdgeCaseTest, ZeroErrorCode)
+{
+    ErrorId id(ErrorDomain::Core, 0);
+    Error error(id);
+
+    EXPECT_EQ(error.code(), 0);
+    EXPECT_EQ(error.domain(), ErrorDomain::Core);
+    EXPECT_FALSE(error.isSuccess());
+}
+
+TEST(ErrorPerformanceTest, ErrorCreationOverhead)
+{
+    constexpr int iterations = 10000;
+
+    auto start = std::chrono::high_resolution_clock::now();
+
+    for (int i = 0; i < iterations; ++i)
+    {
+        Error error(ErrorDomain::System, static_cast<uint16_t>(i % 65536));
+        volatile auto domain = error.domain();
+        (void)domain;
+    }
+
+    auto end      = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+    EXPECT_LT(duration.count(), iterations);
+}
+
+TEST(ErrorPerformanceTest, ResultCreationOverhead)
+{
+    constexpr int iterations = 10000;
+
+    auto start = std::chrono::high_resolution_clock::now();
+
+    for (int i = 0; i < iterations; ++i)
+    {
+        if (i % 2 == 0)
+        {
+            auto result         = Ok(i);
+            volatile auto value = result.value();
+            (void)value;
+        }
+        else
+        {
+            auto result            = Result<int>(Err(ErrorDomain::Core, 0x0001));
+            volatile auto hasValue = result.has_value();
+            (void)hasValue;
+        }
+    }
+
+    auto end      = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+    EXPECT_LT(duration.count(), iterations * 2);
+}
+
+TEST(ErrorMemoryTest, ErrorSizeOptimization)
+{
+    static_assert(sizeof(Error) <= 64, "Error size should be optimized");
+    static_assert(sizeof(ErrorId) <= 8, "ErrorId should be small");
+
+    static_assert(sizeof(Result<int>) <= sizeof(std::expected<int, Error>), "Result should not have additional overhead");
+    static_assert(sizeof(RVoid) <= sizeof(std::expected<void, Error>), "RVoid should not have additional overhead");
+}
+
+TEST(ErrorCompatibilityTest, StdExpectedInteroperability)
+{
+    // 测试与 std::expected 的互操作性
+    auto createStdExpected = [](bool success) -> std::expected<int, Error>
+    {
+        if (success)
+        {
+            return 42;
+        }
+        else
+        {
+            return std::unexpected{Error(ErrorDomain::Core, 0x0001)};
+        }
+    };
+
+    auto convertToResult = [](const std::expected<int, Error>& expected) -> Result<int>
+    {
+        if (expected.has_value())
+        {
+            return Ok(expected.value());
+        }
+        else
+        {
+            return std::unexpected{expected.error()};
+        }
+    };
+
+    auto stdResult1 = createStdExpected(true);
+    auto ourResult1 = convertToResult(stdResult1);
+    EXPECT_TRUE(ourResult1.has_value());
+    EXPECT_EQ(ourResult1.value(), 42);
+
+    auto stdResult2 = createStdExpected(false);
+    auto ourResult2 = convertToResult(stdResult2);
+    EXPECT_FALSE(ourResult2.has_value());
 }

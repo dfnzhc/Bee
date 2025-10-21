@@ -63,3 +63,7 @@ inline constexpr void FlipEnumBit(enumType& val, enumType flag) { val = IsSet(va
     ClassName& operator=(const ClassName&) = delete;        \
     ClassName(ClassName&&) = delete;                        \
     ClassName& operator=(ClassName&&) = delete
+
+#define BEE_CONCAT_IMPL(x, y) x##y
+#define BEE_CONCAT(x, y) BEE_CONCAT_IMPL(x, y)
+#define BEE_UNIQUE_VAR(prefix) BEE_CONCAT(prefix, __LINE__)
