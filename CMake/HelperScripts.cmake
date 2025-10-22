@@ -208,6 +208,9 @@ function(BeeConfigurePrecompiledHeaders)
             "${CMAKE_SOURCE_DIR}/Source/BeeLib/Core/Base/Defines.hpp"
             "${CMAKE_SOURCE_DIR}/Source/BeeLib/Core/Base/Portable.hpp"
             "${CMAKE_SOURCE_DIR}/Source/BeeLib/Core/Logger/Logger.hpp"
+            "${CMAKE_SOURCE_DIR}/Source/BeeLib/Core/Error/Exception.hpp"
+            "${CMAKE_SOURCE_DIR}/Source/BeeLib/Core/Error/Error.hpp"
+            "${CMAKE_SOURCE_DIR}/Source/BeeLib/Core/Error/Guardian.hpp"
     )
 
     foreach (header ${PCH_POTENTIAL_HEADERS})

@@ -1217,7 +1217,7 @@ TEST(ResultTest, OkValueCreation)
 TEST(ResultTest, OkVoidCreation)
 {
     auto result = Ok();
-    static_assert(std::is_same_v<decltype(result), RVoid>);
+    static_assert(std::is_same_v<decltype(result), VResult>);
     EXPECT_TRUE(result.has_value());
 }
 
@@ -1245,7 +1245,7 @@ TEST(ResultTest, ResultTypeDeduction)
     static_assert(std::is_same_v<decltype(stringResult), Result<std::string>>);
 
     auto voidResult = Ok();
-    static_assert(std::is_same_v<decltype(voidResult), RVoid>);
+    static_assert(std::is_same_v<decltype(voidResult), VResult>);
 }
 
 TEST(ResultTest, ResultChaining)
@@ -1282,7 +1282,7 @@ TEST(ResultTest, ResultChaining)
 TEST(ResultTest, VoidResultOperations)
 {
     // clang-format off
-    auto performOperation = [](bool success) -> RVoid
+    auto performOperation = [](bool success) -> VResult
     {
         if (success)
         { return Ok(); }
@@ -1389,7 +1389,7 @@ TEST(MacroTest, BEE_TRY_Failure)
 
 TEST(MacroTest, BEE_TRY_VOID_Success)
 {
-    auto performOperation = [](bool success) -> RVoid
+    auto performOperation = [](bool success) -> VResult
     {
         if (success)
         {
@@ -1398,7 +1398,7 @@ TEST(MacroTest, BEE_TRY_VOID_Success)
         return Err(ErrorDomain::System, 0x0002);
     };
 
-    auto chainedOperation = [&](bool success) -> RVoid
+    auto chainedOperation = [&](bool success) -> VResult
     {
         BEE_TRY_VOID(performOperation(success));
         return Ok();
@@ -1410,7 +1410,7 @@ TEST(MacroTest, BEE_TRY_VOID_Success)
 
 TEST(MacroTest, BEE_TRY_VOID_Failure)
 {
-    auto performOperation = [](bool success) -> RVoid
+    auto performOperation = [](bool success) -> VResult
     {
         if (success)
         {
@@ -1419,7 +1419,7 @@ TEST(MacroTest, BEE_TRY_VOID_Failure)
         return Err(ErrorDomain::System, 0x0002);
     };
 
-    auto chainedOperation = [&](bool success) -> RVoid
+    auto chainedOperation = [&](bool success) -> VResult
     {
         BEE_TRY_VOID(performOperation(success));
         return Ok();
@@ -1567,7 +1567,7 @@ TEST(MacroTest, MacroReturnTypeCompatibility)
         return Ok("Value: " + std::to_string(value));
     };
 
-    auto voidFunction = [&](bool success) -> RVoid
+    auto voidFunction = [&](bool success) -> VResult
     {
         BEE_TRY_VOID(stringFunction(success));
         return Ok();
@@ -1591,14 +1591,14 @@ TEST(TypeTraitsTest, IsResultType)
 {
     static_assert(IsResult<Result<int>>);
     static_assert(IsResult<Result<std::string>>);
-    static_assert(IsResult<RVoid>);
+    static_assert(IsResult<VResult>);
     static_assert(!IsResult<int>);
     static_assert(!IsResult<std::string>);
     static_assert(!IsResult<Error>);
 
     static_assert(IsResult<Result<int>>);
     static_assert(IsResult<Result<std::string>>);
-    static_assert(IsResult<RVoid>);
+    static_assert(IsResult<VResult>);
     static_assert(!IsResult<int>);
     static_assert(!IsResult<std::string>);
     static_assert(!IsResult<Error>);
@@ -1608,11 +1608,11 @@ TEST(TypeTraitsTest, ResultValueType)
 {
     static_assert(std::is_same_v<ResultValueType<Result<int>>, int>);
     static_assert(std::is_same_v<ResultValueType<Result<std::string>>, std::string>);
-    static_assert(std::is_same_v<ResultValueType<RVoid>, void>);
+    static_assert(std::is_same_v<ResultValueType<VResult>, void>);
 
     static_assert(std::is_same_v<ResultValueType<Result<int>>, int>);
     static_assert(std::is_same_v<ResultValueType<Result<std::string>>, std::string>);
-    static_assert(std::is_same_v<ResultValueType<RVoid>, void>);
+    static_assert(std::is_same_v<ResultValueType<VResult>, void>);
 }
 
 TEST(TypeTraitsTest, TypeDeductionInTemplates)
@@ -1728,7 +1728,7 @@ TEST(ErrorMemoryTest, ErrorSizeOptimization)
     static_assert(sizeof(ErrorId) <= 8, "ErrorId should be small");
 
     static_assert(sizeof(Result<int>) <= sizeof(std::expected<int, Error>), "Result should not have additional overhead");
-    static_assert(sizeof(RVoid) <= sizeof(std::expected<void, Error>), "RVoid should not have additional overhead");
+    static_assert(sizeof(VResult) <= sizeof(std::expected<void, Error>), "RVoid should not have additional overhead");
 }
 
 TEST(ErrorCompatibilityTest, StdExpectedInteroperability)

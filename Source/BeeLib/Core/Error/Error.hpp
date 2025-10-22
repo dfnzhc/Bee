@@ -150,7 +150,7 @@ namespace Bee
     using Result = std::expected<T, Error>;
 
     // 无值的结果类型
-    using RVoid = std::expected<void, Error>;
+    using VResult = std::expected<void, Error>;
 
     // 创建成功结果
     template <typename T>
@@ -160,7 +160,7 @@ namespace Bee
     }
 
     // 创建成功的无值结果
-    constexpr RVoid Ok()
+    constexpr VResult Ok()
     {
         return std::expected<void, Error>{};
     }
@@ -188,7 +188,7 @@ namespace Bee
         };
 
         template <>
-        struct is_result<RVoid> : std::true_type
+        struct is_result<VResult> : std::true_type
         {
         };
 
@@ -205,7 +205,7 @@ namespace Bee
         };
 
         template <>
-        struct result_value_type<RVoid>
+        struct result_value_type<VResult>
         {
             using type = void;
         };
