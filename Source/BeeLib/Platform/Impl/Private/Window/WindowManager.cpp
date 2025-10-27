@@ -147,7 +147,7 @@ bool WindowManager::setWindowTitle(WindowHandle window, const std::string& title
     return true;
 }
 
-bool WindowManager::setWindowPosition(WindowHandle window, Vec2u pos)
+bool WindowManager::setWindowPosition(WindowHandle window, int2 pos)
 {
     WindowData* windowData = getWindowData(window);
     if (!windowData)
@@ -163,7 +163,7 @@ bool WindowManager::setWindowPosition(WindowHandle window, Vec2u pos)
     return true;
 }
 
-bool WindowManager::setWindowSize(WindowHandle window, Vec2u size)
+bool WindowManager::setWindowSize(WindowHandle window, int2 size)
 {
     WindowData* windowData = getWindowData(window);
     if (!windowData)
@@ -191,7 +191,7 @@ std::string WindowManager::GetWindowTitle(WindowHandle window) const
     return title ? title : "";
 }
 
-Vec2u WindowManager::GetWindowPosition(WindowHandle window) const
+int2 WindowManager::GetWindowPosition(WindowHandle window) const
 {
     WindowData* windowData = getWindowData(window);
     if (!windowData)
@@ -208,7 +208,7 @@ Vec2u WindowManager::GetWindowPosition(WindowHandle window) const
     return {x, y};
 }
 
-Vec2u WindowManager::GetWindowSize(WindowHandle window) const
+int2 WindowManager::GetWindowSize(WindowHandle window) const
 {
     WindowData* windowData = getWindowData(window);
     if (!windowData)

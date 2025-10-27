@@ -7,7 +7,9 @@
 
 #pragma once
 
+#include <string>
 #include "Core/Base/Defines.hpp"
+#include "Core/Math/Math.hpp"
 
 namespace Bee
 {

@@ -41,12 +41,12 @@ namespace Bee
 
         // === 窗口属性操作 ===
         bool setWindowTitle(WindowHandle window, const std::string& title) override;
-        bool setWindowPosition(WindowHandle window, Vec2u pos) override;
-        bool setWindowSize(WindowHandle window, Vec2u size) override;
+        bool setWindowPosition(WindowHandle window, int2 pos) override;
+        bool setWindowSize(WindowHandle window, int2 size) override;
 
         std::string GetWindowTitle(WindowHandle window) const override;
-        Vec2u GetWindowPosition(WindowHandle window) const override;
-        Vec2u GetWindowSize(WindowHandle window) const override;
+        int2 GetWindowPosition(WindowHandle window) const override;
+        int2 GetWindowSize(WindowHandle window) const override;
 
         // === 窗口状态控制 ===
         bool showWindow(WindowHandle window) override;

@@ -52,19 +52,12 @@ namespace Bee
 
     BEE_ENUM_CLASS_OPERATORS(WindowFlags)
 
-
-    // TODO: 更换数学方法
-    struct Vec2u
-    {
-        i32 x = {}, y = {};
-    };
-
     // 创建信息
     struct WindowCreateInfo
     {
         std::string title{};
-        Vec2u pos{};
-        Vec2u size{};
+        int2 pos{};
+        int2 size{};
         WindowFlags flags = WindowFlags::Default;
     };
 
@@ -98,12 +91,12 @@ namespace Bee
 
         // === 窗口属性操作 ===
         virtual bool setWindowTitle(WindowHandle window, const std::string& title) = 0;
-        virtual bool setWindowPosition(WindowHandle window, Vec2u pos) = 0;
-        virtual bool setWindowSize(WindowHandle window, Vec2u size) = 0;
+        virtual bool setWindowPosition(WindowHandle window, int2 pos) = 0;
+        virtual bool setWindowSize(WindowHandle window, int2 size) = 0;
 
         virtual std::string GetWindowTitle(WindowHandle window) const = 0;
-        virtual Vec2u GetWindowPosition(WindowHandle window) const = 0;
-        virtual Vec2u GetWindowSize(WindowHandle window) const = 0;
+        virtual int2 GetWindowPosition(WindowHandle window) const = 0;
+        virtual int2 GetWindowSize(WindowHandle window) const = 0;
 
         // === 窗口状态控制 ===
         virtual bool showWindow(WindowHandle window) = 0;

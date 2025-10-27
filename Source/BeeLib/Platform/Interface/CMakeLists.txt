@@ -23,6 +23,7 @@ set(CompIncludeDirs
 
 set(CompLinkLibraries
         Bee::Core::Base
+        Bee::Core::Math
 )
 
 BeeAddComponent(
