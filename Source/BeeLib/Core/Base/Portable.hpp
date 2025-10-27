@@ -204,6 +204,42 @@ static_assert(BEE_CPLUSPLUS >= 202'302L, "Bee using modern C++ features.");
 #endif
 
 // -------------------------
+// 关于 Cuda、Optix 的宏定义
+
+#if defined(__CUDA_ARCH__) || defined(__CUDACC__)
+#  ifndef BEE_NOINLINE
+#    define BEE_NOINLINE __attribute__((noinline))
+#  endif
+#  ifndef BEE_GPU_CODE
+#    define BEE_GPU_CODE
+#  endif
+#  define BEE_GPU                __device__
+#  define BEE_CPU                __host__
+#  define BEE_INLINE             __forceinline__
+#  define BEE_CONST              __device__ const
+#  define CONST_STATIC_INIT(...) void(0) /* ignore */
+#else
+#  ifndef BEE_HOST_CODE
+#    define BEE_HOST_CODE
+#  endif
+#  define BEE_GPU                /* ignore */
+#  define BEE_CPU                /* ignore */
+#  define BEE_CONST              const
+#  define BEE_INLINE             inline
+#  define CONST_STATIC_INIT(...) = __VA_ARGS__
+#endif
+
+#define BEE_CPU_GPU BEE_CPU BEE_GPU
+
+#define BEE_FUNC      BEE_CPU_GPU BEE_INLINE
+#define BEE_FUNC_DECL BEE_CPU_GPU
+
+
+// -------------------------
+// SIMD
+
+
+// -------------------------
 // attributes
 #define BEE_NO_UNIQUE_ADDRESS [[no_unique_address]]
 #define BEE_NODISCARD         [[nodiscard]]

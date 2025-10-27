@@ -33,3 +33,27 @@ endif ()
 add_library(SDL3 INTERFACE)
 target_link_libraries(SDL3 INTERFACE SDL3::SDL3-static)
 set_property(TARGET SDL3 PROPERTY FOLDER "External")
+
+# glm
+CPMAddPackage(
+        NAME glm
+        GITHUB_REPOSITORY "g-truc/glm"
+        GIT_TAG "1.0.2"
+        OPTIONS
+        "GLM_BUILD_TESTS OFF"
+        "BUILD_SHARED_LIBS OFF"
+)
+
+if (NOT glm_ADDED)
+    message(FATAL_ERROR "Failed to add glm library.")
+endif ()
+
+add_library(GLM INTERFACE)
+target_link_libraries(GLM INTERFACE glm::glm)
+target_compile_definitions(GLM INTERFACE
+        GLM_FORCE_SWIZZLE
+        GLM_FORCE_DEPTH_ZERO_TO_ONE
+        GLM_FORCE_RADIANS
+        GLM_ENABLE_EXPERIMENTAL
+)
+set_property(TARGET GLM PROPERTY FOLDER "External")

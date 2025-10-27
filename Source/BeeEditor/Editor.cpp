@@ -14,18 +14,26 @@ using namespace Bee;
 
 // ==========================================================================
 
-#define GLM_FORCE_RADIANS
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#define GLM_ENABLE_EXPERIMENTAL
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtx/hash.hpp>
+#include <Core/Math/Math.hpp>
 
+BEE_PUSH_WARNING
+BEE_CLANG_DISABLE_WARNING("-Wreserved-identifier")
+BEE_CLANG_DISABLE_WARNING("-Wunsafe-buffer-usage")
+BEE_CLANG_DISABLE_WARNING("-Wdisabled-macro-expansion")
+BEE_CLANG_DISABLE_WARNING("-Wzero-as-null-pointer-constant")
+BEE_CLANG_DISABLE_WARNING("-Wsign-conversion")
+BEE_CLANG_DISABLE_WARNING("-Wcast-qual")
+BEE_CLANG_DISABLE_WARNING("-Wcast-align")
+BEE_CLANG_DISABLE_WARNING("-Wimplicit-int-conversion")
+BEE_CLANG_DISABLE_WARNING("-Wextra-semi-stmt")
+BEE_CLANG_DISABLE_WARNING("-Wimplicit-fallthrough")
+BEE_CLANG_DISABLE_WARNING("-Wcast-function-type-strict")
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
+BEE_POP_WARNING
 
 #include <iostream>
 #include <fstream>
@@ -69,6 +77,9 @@ namespace
     const bool enableValidationLayers = true;
     #endif
 
+    BEE_PUSH_WARNING
+    BEE_CLANG_DISABLE_WARNING("-Wcast-function-type-strict")
+
     VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
                                           const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger)
     {
@@ -92,6 +103,8 @@ namespace
             func(instance, debugMessenger, pAllocator);
         }
     }
+
+    BEE_POP_WARNING
 
     struct QueueFamilyIndices
     {
@@ -182,7 +195,7 @@ namespace
     {
     public:
         IWindowManager* windowManager = nullptr;
-        WindowHandle window = WindowHandle{};
+        WindowHandle window           = WindowHandle{};
 
         VkInstance instance;
         VkDebugUtilsMessengerEXT debugMessenger;
@@ -308,7 +321,7 @@ namespace
         void cleanup()
         {
             vkDeviceWaitIdle(device);
-            
+
             cleanupSwapChain();
 
             vkDestroyPipeline(device, graphicsPipeline, nullptr);
@@ -451,13 +464,12 @@ namespace
 
         void createSurface()
         {
-
             NativeWindowHandle nativeHandle = windowManager->getNativeWindowHandle(window);
-            
+
             VkWin32SurfaceCreateInfoKHR createInfo = {};
-            createInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
-            createInfo.hwnd = nativeHandle.hwnd;
-            createInfo.hinstance = GetModuleHandle(nullptr);
+            createInfo.sType                       = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+            createInfo.hwnd                        = nativeHandle.hwnd;
+            createInfo.hinstance                   = GetModuleHandle(nullptr);
 
             if (vkCreateWin32SurfaceKHR(instance, &createInfo, nullptr, &surface) != VK_SUCCESS)
             {
@@ -478,11 +490,11 @@ namespace
             std::vector<VkPhysicalDevice> devices(deviceCount);
             vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
 
-            for (const auto& device : devices)
+            for (const auto& dev : devices)
             {
-                if (isDeviceSuitable(device))
+                if (isDeviceSuitable(dev))
                 {
-                    physicalDevice = device;
+                    physicalDevice = dev;
                     break;
                 }
             }
@@ -495,10 +507,11 @@ namespace
 
         void createLogicalDevice()
         {
-            QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+            QueueFamilyIndices queueIndices = findQueueFamilies(physicalDevice);
 
             std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-            std::set<uint32_t> uniqueQueueFamilies = {indices.graphicsFamily.value(), indices.presentFamily.value()};
+            std::set<uint32_t> uniqueQueueFamilies = {queueIndices.graphicsFamily.value(),
+                                                      queueIndices.presentFamily.value()};
 
             float queuePriority = 1.0f;
             for (uint32_t queueFamily : uniqueQueueFamilies)
@@ -540,8 +553,8 @@ namespace
                 throw std::runtime_error("failed to create logical device!");
             }
 
-            vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
-            vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
+            vkGetDeviceQueue(device, queueIndices.graphicsFamily.value(), 0, &graphicsQueue);
+            vkGetDeviceQueue(device, queueIndices.presentFamily.value(), 0, &presentQueue);
         }
 
         void createSwapChain()
@@ -569,10 +582,10 @@ namespace
             createInfo.imageArrayLayers = 1;
             createInfo.imageUsage       = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
-            QueueFamilyIndices indices    = findQueueFamilies(physicalDevice);
-            uint32_t queueFamilyIndices[] = {indices.graphicsFamily.value(), indices.presentFamily.value()};
+            QueueFamilyIndices queueIndices = findQueueFamilies(physicalDevice);
+            uint32_t queueFamilyIndices[]   = {queueIndices.graphicsFamily.value(), queueIndices.presentFamily.value()};
 
-            if (indices.graphicsFamily != indices.presentFamily)
+            if (queueIndices.graphicsFamily != queueIndices.presentFamily)
             {
                 createInfo.imageSharingMode      = VK_SHARING_MODE_CONCURRENT;
                 createInfo.queueFamilyIndexCount = 2;
@@ -773,6 +786,8 @@ namespace
                     VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
             colorBlendAttachment.blendEnable = VK_FALSE;
 
+            BEE_PUSH_WARNING
+            BEE_CLANG_DISABLE_WARNING("-Wunsafe-buffer-usage")
             VkPipelineColorBlendStateCreateInfo colorBlending{};
             colorBlending.sType             = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
             colorBlending.logicOpEnable     = VK_FALSE;
@@ -783,6 +798,7 @@ namespace
             colorBlending.blendConstants[1] = 0.0f;
             colorBlending.blendConstants[2] = 0.0f;
             colorBlending.blendConstants[3] = 0.0f;
+            BEE_POP_WARNING
 
             std::vector<VkDynamicState> dynamicStates = {
                     VK_DYNAMIC_STATE_VIEWPORT,
@@ -912,10 +928,13 @@ namespace
                     );
         }
 
-        bool hasStencilComponent(VkFormat format)
-        {
-            return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
-        }
+        // bool hasStencilComponent(VkFormat format)
+        // {
+        //     return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
+        // }
+
+        BEE_PUSH_WARNING
+        BEE_CLANG_DISABLE_WARNING("-Wsign-conversion")
 
         void createTextureImage()
         {
@@ -955,6 +974,8 @@ namespace
             vkDestroyBuffer(device, stagingBuffer, nullptr);
             vkFreeMemory(device, stagingBufferMemory, nullptr);
         }
+
+        BEE_POP_WARNING
 
         void createTextureImageView()
         {
@@ -1048,7 +1069,7 @@ namespace
             vkBindImageMemory(device, image, imageMemory, 0);
         }
 
-        void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout)
+        void transitionImageLayout(VkImage image, VkFormat /*format*/, VkImageLayout oldLayout, VkImageLayout newLayout)
         {
             VkCommandBuffer commandBuffer = beginSingleTimeCommands();
 
@@ -1141,6 +1162,8 @@ namespace
 
             std::unordered_map<Vertex, uint32_t> uniqueVertices{};
 
+            BEE_PUSH_WARNING
+            BEE_CLANG_DISABLE_WARNING("-Wsign-conversion")
             for (const auto& shape : shapes)
             {
                 for (const auto& index : shape.mesh.indices)
@@ -1169,6 +1192,7 @@ namespace
                     indices.push_back(uniqueVertices[vertex]);
                 }
             }
+            BEE_POP_WARNING
         }
 
         void createVertexBuffer()
@@ -1388,6 +1412,8 @@ namespace
             VkPhysicalDeviceMemoryProperties memProperties;
             vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
 
+            BEE_PUSH_WARNING
+            BEE_CLANG_DISABLE_WARNING("-Wunsafe-buffer-usage")
             for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
             {
                 if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
@@ -1395,6 +1421,7 @@ namespace
                     return i;
                 }
             }
+            BEE_POP_WARNING
 
             throw std::runtime_error("failed to find suitable memory type!");
         }
@@ -1510,7 +1537,9 @@ namespace
             UniformBufferObject ubo{};
             ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
             ubo.view  = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-            ubo.proj  = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f,
+            ubo.proj  = glm::perspective(glm::radians(45.0f),
+                                         static_cast<float>(swapChainExtent.width) /
+                                         static_cast<float>(swapChainExtent.height), 0.1f,
                                          10.0f);
             ubo.proj[1][1] *= -1;
 
@@ -1657,59 +1686,59 @@ namespace
             }
         }
 
-        SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device)
+        SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice phyDevice)
         {
             SwapChainSupportDetails details;
 
-            vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
+            vkGetPhysicalDeviceSurfaceCapabilitiesKHR(phyDevice, surface, &details.capabilities);
 
             uint32_t formatCount;
-            vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, nullptr);
+            vkGetPhysicalDeviceSurfaceFormatsKHR(phyDevice, surface, &formatCount, nullptr);
 
             if (formatCount != 0)
             {
                 details.formats.resize(formatCount);
-                vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, details.formats.data());
+                vkGetPhysicalDeviceSurfaceFormatsKHR(phyDevice, surface, &formatCount, details.formats.data());
             }
 
             uint32_t presentModeCount;
-            vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, nullptr);
+            vkGetPhysicalDeviceSurfacePresentModesKHR(phyDevice, surface, &presentModeCount, nullptr);
 
             if (presentModeCount != 0)
             {
                 details.presentModes.resize(presentModeCount);
-                vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, details.presentModes.data());
+                vkGetPhysicalDeviceSurfacePresentModesKHR(phyDevice, surface, &presentModeCount, details.presentModes.data());
             }
 
             return details;
         }
 
-        bool isDeviceSuitable(VkPhysicalDevice device)
+        bool isDeviceSuitable(VkPhysicalDevice phyDevice)
         {
-            QueueFamilyIndices indices = findQueueFamilies(device);
+            QueueFamilyIndices queueIndices = findQueueFamilies(phyDevice);
 
-            bool extensionsSupported = checkDeviceExtensionSupport(device);
+            bool extensionsSupported = checkDeviceExtensionSupport(phyDevice);
 
             bool swapChainAdequate = false;
             if (extensionsSupported)
             {
-                SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device);
+                SwapChainSupportDetails swapChainSupport = querySwapChainSupport(phyDevice);
                 swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
             }
 
             VkPhysicalDeviceFeatures supportedFeatures;
-            vkGetPhysicalDeviceFeatures(device, &supportedFeatures);
+            vkGetPhysicalDeviceFeatures(phyDevice, &supportedFeatures);
 
-            return indices.isComplete() && extensionsSupported && swapChainAdequate && supportedFeatures.samplerAnisotropy;
+            return queueIndices.isComplete() && extensionsSupported && swapChainAdequate && supportedFeatures.samplerAnisotropy;
         }
 
-        bool checkDeviceExtensionSupport(VkPhysicalDevice device)
+        bool checkDeviceExtensionSupport(VkPhysicalDevice physiDevice)
         {
             uint32_t extensionCount;
-            vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
+            vkEnumerateDeviceExtensionProperties(physiDevice, nullptr, &extensionCount, nullptr);
 
             std::vector<VkExtensionProperties> availableExtensions(extensionCount);
-            vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
+            vkEnumerateDeviceExtensionProperties(physiDevice, nullptr, &extensionCount, availableExtensions.data());
 
             std::set<std::string> requiredExtensions(deviceExtensions.begin(), deviceExtensions.end());
 
@@ -1721,33 +1750,33 @@ namespace
             return requiredExtensions.empty();
         }
 
-        QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device)
+        QueueFamilyIndices findQueueFamilies(VkPhysicalDevice physiDevice)
         {
-            QueueFamilyIndices indices;
+            QueueFamilyIndices queueIndices;
 
             uint32_t queueFamilyCount = 0;
-            vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+            vkGetPhysicalDeviceQueueFamilyProperties(physiDevice, &queueFamilyCount, nullptr);
 
             std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
-            vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+            vkGetPhysicalDeviceQueueFamilyProperties(physiDevice, &queueFamilyCount, queueFamilies.data());
 
             int i = 0;
             for (const auto& queueFamily : queueFamilies)
             {
                 if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
                 {
-                    indices.graphicsFamily = i;
+                    queueIndices.graphicsFamily = i;
                 }
 
                 VkBool32 presentSupport = false;
-                vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
+                vkGetPhysicalDeviceSurfaceSupportKHR(physiDevice, static_cast<uint32_t>(i), surface, &presentSupport);
 
                 if (presentSupport)
                 {
-                    indices.presentFamily = i;
+                    queueIndices.presentFamily = i;
                 }
 
-                if (indices.isComplete())
+                if (queueIndices.isComplete())
                 {
                     break;
                 }
@@ -1755,13 +1784,13 @@ namespace
                 i++;
             }
 
-            return indices;
+            return queueIndices;
         }
 
         std::vector<const char*> getRequiredExtensions()
         {
             std::vector<const char*> extensions;
-            
+
             extensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
             extensions.push_back(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
 
@@ -1816,17 +1845,17 @@ namespace
             std::vector<char> buffer(fileSize);
 
             file.seekg(0);
-            file.read(buffer.data(), fileSize);
+            file.read(buffer.data(), static_cast<int64_t>(fileSize));
 
             file.close();
 
             return buffer;
         }
 
-        static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-                                                            VkDebugUtilsMessageTypeFlagsEXT messageType,
+        static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT /*messageSeverity*/,
+                                                            VkDebugUtilsMessageTypeFlagsEXT /*messageType*/,
                                                             const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-                                                            void* pUserData)
+                                                            void* /*pUserData*/)
         {
             std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
 
@@ -1876,7 +1905,7 @@ void Editor::onShutdown()
     windowManager->destroyWindow(app->window);
 
     app->cleanup();
-    
+
     Application::onShutdown();
 }
 
