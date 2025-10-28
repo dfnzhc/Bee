@@ -7,6 +7,9 @@
 
 #pragma once
 
+#include <Core/Base/Defines.hpp>
+#include <Core/Logger/Logger.hpp>
+
 BEE_PUSH_WARNING
 BEE_CLANG_DISABLE_WARNING("-Wreserved-macro-identifier")
 BEE_CLANG_DISABLE_WARNING("-Wdocumentation-unknown-command")

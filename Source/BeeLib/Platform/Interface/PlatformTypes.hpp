@@ -9,6 +9,7 @@
 
 #include <string>
 #include "Core/Base/Defines.hpp"
+#include "Core/Error/Error.hpp"
 #include "Core/Math/Math.hpp"
 
 namespace Bee
@@ -23,6 +24,23 @@ namespace Bee
             bool operator<(const HandleName& other) const { return handle < other.handle; }     \
             explicit operator bool() const { return handle != UnderlyingType{}; }               \
         }
+
+    struct PlatformErrors
+    {
+        static constexpr ErrorDomain kDomain = ErrorDomain::Platform;
+
+        static constexpr u16 kInitializeFailed   = 0x0001;
+        static constexpr u16 kNotInitialize      = 0x0002;
+        static constexpr u16 kMissFlag           = 0x0003;
+        static constexpr u16 kCreateWindowFailed = 0x0004;
+        static constexpr u16 kWindowNotFound     = 0x0005;
+        static constexpr u16 kInternalFailure    = 0x0006;
+    };
+
+    constexpr auto MakePlatformErr(u16 errCode)
+    {
+        return std::unexpected{Error{PlatformErrors::kDomain, errCode}};
+    }
 
     // 显示器信息
     struct DisplayInfo

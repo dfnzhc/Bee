@@ -1670,11 +1670,11 @@ namespace
             }
             else
             {
-                auto size = windowManager->GetWindowSize(window);
+                auto size = windowManager->GetWindowSize(window).value();
 
                 VkExtent2D actualExtent = {
-                        static_cast<uint32_t>(size.x),
-                        static_cast<uint32_t>(size.y)
+                        static_cast<u32>(size.x),
+                        static_cast<u32>(size.y)
                 };
 
                 actualExtent.width = std::clamp(actualExtent.width, capabilities.minImageExtent.width,
@@ -1890,7 +1890,7 @@ bool Editor::onInitialize()
     createInfo.size  = {1280, 720};
     createInfo.title = "临时样例";
 
-    app->window = windowManager->createWindow(createInfo);
+    app->window = BEE_TRY_OR_RETURN_DEFAULT(windowManager->createWindow(createInfo));
     windowManager->showWindow(app->window);
 
     app->windowManager = windowManager;

@@ -30,12 +30,12 @@ namespace Bee
         BEE_DISABLE_COPY_AND_MOVE(WindowManager);
 
         // === 生命周期管理 ===
-        bool initialize() override;
+        VResult initialize() override;
         void shutdown() override;
         bool isInitialized() const override;
 
         // === 窗口创建与销毁 ===
-        WindowHandle createWindow(const WindowCreateInfo& createInfo) override;
+        Result<WindowHandle> createWindow(const WindowCreateInfo& createInfo) override;
         void destroyWindow(WindowHandle window) override;
         bool isWindowValid(WindowHandle window) const override;
 
@@ -45,8 +45,8 @@ namespace Bee
         bool setWindowSize(WindowHandle window, int2 size) override;
 
         std::string GetWindowTitle(WindowHandle window) const override;
-        int2 GetWindowPosition(WindowHandle window) const override;
-        int2 GetWindowSize(WindowHandle window) const override;
+        Result<int2> GetWindowPosition(WindowHandle window) const override;
+        Result<int2> GetWindowSize(WindowHandle window) const override;
 
         // === 窗口状态控制 ===
         bool showWindow(WindowHandle window) override;
@@ -82,9 +82,9 @@ namespace Bee
 
         // === 实用功能 ===
         void requestAttention(WindowHandle window) override;
-        void setWindowIcon(WindowHandle window, const u8* iconData, u32 width, u32 height) override;
+        bool setWindowIcon(WindowHandle window, const u8* iconData, u32 width, u32 height) override;
 
-        void setWindowOpacity(WindowHandle window, f32 opacity) override;
+        bool setWindowOpacity(WindowHandle window, f32 opacity) override;
         f32 getWindowOpacity(WindowHandle window) const override;
 
     private:
@@ -97,8 +97,8 @@ namespace Bee
         };
 
         // === 内部辅助方法 ===
-        WindowData* getWindowData(WindowHandle window) const;
-        WindowData* getWindowDataBySDL(SDL_Window* sdlWindow) const;
+        Result<WindowData*> getWindowData(WindowHandle window) const;
+        Result<WindowData*> getWindowDataBySDL(SDL_Window* sdlWindow) const;
 
         u32 generateWindowId();
         u32 convertWindowFlags(WindowFlags flags) const;

@@ -36,6 +36,7 @@ function(SetCompilerFlags ProjectName)
             -Wno-switch
             -Wno-missing-braces
             -Wno-invalid-offsetof
+            -Wno-gnu-statement-expression-from-macro-expansion
     )
 
     set(CLANG_FLAGS

@@ -46,9 +46,9 @@ bool Application::initialize()
         config.enableWindow = true;
         
         _pPlatform = std::make_unique<PlatformManager>();
-        if (!_pPlatform->initialize(config))
+        if (auto res = _pPlatform->initialize(config); !res)
         {
-            BEE_ERROR("平台管理器初始化失败.");
+            BEE_ERROR("平台管理器初始化失败, 错误码: '{:x}'.", res.error().code());
             return false;
         }
 

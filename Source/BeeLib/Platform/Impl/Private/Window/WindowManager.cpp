@@ -10,22 +10,22 @@
 
 using namespace Bee;
 
-bool WindowManager::initialize()
+VResult WindowManager::initialize()
 {
     if (_initialized)
     {
-        return true;
+        return Ok();
     }
 
     SDL_InitFlags initFlags = SDL_WasInit(SDL_INIT_VIDEO | SDL_INIT_EVENTS);
     if ((initFlags & SDL_INIT_VIDEO) == 0)
     {
         BEE_ERROR("SDL 初始化时没有设置 'SDL_INIT_VIDEO' 标志.");
-        return false;
+        return MakePlatformErr(PlatformErrors::kMissFlag);
     }
 
     _initialized = true;
-    return true;
+    return Ok();
 }
 
 void WindowManager::shutdown()
@@ -48,22 +48,20 @@ bool WindowManager::isInitialized() const
     return _initialized;
 }
 
-WindowHandle WindowManager::createWindow(const WindowCreateInfo& createInfo)
+Result<WindowHandle> WindowManager::createWindow(const WindowCreateInfo& createInfo)
 {
     if (!_initialized)
     {
-        return WindowHandle{};
+        BEE_ERROR("WindowManager 没有被正确初始化.");
+        return MakePlatformErr(PlatformErrors::kNotInitialize);
     }
 
-    u32 sdlFlags = convertWindowFlags(createInfo.flags);
-
-    // clang-format off
+    u32 sdlFlags          = convertWindowFlags(createInfo.flags);
     SDL_Window* sdlWindow = SDL_CreateWindow(createInfo.title.c_str(), createInfo.size.x, createInfo.size.y, sdlFlags);
-    // clang-format on
     if (!sdlWindow)
     {
-        BEE_ERROR("创建 SDL 窗口失败.");
-        return WindowHandle{};
+        BEE_ERROR("创建 SDL 窗口失败: {}", SDL_GetError());
+        return MakePlatformErr(PlatformErrors::kCreateWindowFailed);
     }
 
     if (createInfo.pos.x != 0 && createInfo.pos.y != 0)
@@ -99,13 +97,7 @@ void WindowManager::destroyWindow(WindowHandle window)
         return;
     }
 
-    WindowData* windowData = getWindowData(window);
-    if (!windowData)
-    {
-        BEE_WARN("销毁窗口失败, 没有找到该窗口: '{}'.", window.handle);
-        return;
-    }
-
+    WindowData* windowData = BEE_TRY_OR_RETURN_VOID(getWindowData(window));
     cleanupWindow(windowData);
 
     _sdlWindowToId.erase(windowData->sdlWindow);
@@ -126,20 +118,17 @@ void WindowManager::destroyWindow(WindowHandle window)
 
 bool WindowManager::isWindowValid(WindowHandle window) const
 {
-    WindowData* windowData = getWindowData(window);
+    WindowData* windowData = BEE_TRY_OR_RETURN_DEFAULT(getWindowData(window));
     return windowData && windowData->isValid;
 }
 
 bool WindowManager::setWindowTitle(WindowHandle window, const std::string& title)
 {
-    WindowData* windowData = getWindowData(window);
-    if (!windowData)
-    {
-        return false;
-    }
+    WindowData* windowData = BEE_TRY_OR_RETURN_DEFAULT(getWindowData(window));
 
     if (!SDL_SetWindowTitle(windowData->sdlWindow, title.c_str()))
     {
+        BEE_WARN("设置窗口('{}')标题失败: {}.", window.handle, SDL_GetError());
         return false;
     }
 
@@ -149,92 +138,69 @@ bool WindowManager::setWindowTitle(WindowHandle window, const std::string& title
 
 bool WindowManager::setWindowPosition(WindowHandle window, int2 pos)
 {
-    WindowData* windowData = getWindowData(window);
-    if (!windowData)
-    {
-        return false;
-    }
+    WindowData* windowData = BEE_TRY_OR_RETURN_DEFAULT(getWindowData(window));
 
     if (!SDL_SetWindowPosition(windowData->sdlWindow, pos.x, pos.y))
     {
+        BEE_WARN("设置窗口('{}')位置失败: {}.", window.handle, SDL_GetError());
         return false;
     }
-
     return true;
 }
 
 bool WindowManager::setWindowSize(WindowHandle window, int2 size)
 {
-    WindowData* windowData = getWindowData(window);
-    if (!windowData)
-    {
-        return false;
-    }
+    WindowData* windowData = BEE_TRY_OR_RETURN_DEFAULT(getWindowData(window));
 
     if (!SDL_SetWindowSize(windowData->sdlWindow, size.x, size.y))
     {
+        BEE_WARN("设置窗口('{}')尺寸失败: {}.", window.handle, SDL_GetError());
         return false;
     }
-
     return true;
 }
 
 std::string WindowManager::GetWindowTitle(WindowHandle window) const
 {
-    WindowData* windowData = getWindowData(window);
-    if (!windowData)
-    {
-        return "";
-    }
+    WindowData* windowData = BEE_TRY_OR_RETURN_DEFAULT(getWindowData(window));
 
     const char* title = SDL_GetWindowTitle(windowData->sdlWindow);
     return title ? title : "";
 }
 
-int2 WindowManager::GetWindowPosition(WindowHandle window) const
+Result<int2> WindowManager::GetWindowPosition(WindowHandle window) const
 {
-    WindowData* windowData = getWindowData(window);
-    if (!windowData)
-    {
-        return {};
-    }
+    WindowData* windowData = BEE_TRY(getWindowData(window));
 
     int x, y;
     if (!SDL_GetWindowPosition(windowData->sdlWindow, &x, &y))
     {
-        return {};
+        BEE_WARN("获取窗口('{}')位置失败: {}.", window.handle, SDL_GetError());
+        return MakePlatformErr(PlatformErrors::kInternalFailure);
     }
-
-    return {x, y};
+    return int2{x, y};
 }
 
-int2 WindowManager::GetWindowSize(WindowHandle window) const
+Result<int2> WindowManager::GetWindowSize(WindowHandle window) const
 {
-    WindowData* windowData = getWindowData(window);
-    if (!windowData)
-    {
-        return {};
-    }
+    WindowData* windowData = BEE_TRY(getWindowData(window));
 
     int width, height;
     if (!SDL_GetWindowSize(windowData->sdlWindow, &width, &height))
     {
-        return {};
+        BEE_WARN("获取窗口('{}')尺寸失败: {}.", window.handle, SDL_GetError());
+        return MakePlatformErr(PlatformErrors::kInternalFailure);
     }
-
-    return {width, height};
+    return int2{width, height};
 }
 
 bool WindowManager::showWindow(WindowHandle window)
 {
-    WindowData* windowData = getWindowData(window);
-    if (!windowData)
-    {
-        return false;
-    }
+    WindowData* windowData = BEE_TRY_OR_RETURN_DEFAULT(getWindowData(window));
 
     if (!SDL_ShowWindow(windowData->sdlWindow))
     {
+        BEE_WARN("显示窗口('{}')失败: {}.", window.handle, SDL_GetError());
         return false;
     }
     return true;
@@ -242,30 +208,23 @@ bool WindowManager::showWindow(WindowHandle window)
 
 bool WindowManager::hideWindow(WindowHandle window)
 {
-    WindowData* windowData = getWindowData(window);
-    if (!windowData)
-    {
-        return false;
-    }
+    WindowData* windowData = BEE_TRY_OR_RETURN_DEFAULT(getWindowData(window));
 
     if (!SDL_HideWindow(windowData->sdlWindow))
     {
+        BEE_WARN("隐藏窗口('{}')失败: {}.", window.handle, SDL_GetError());
         return false;
     }
-
     return true;
 }
 
 bool WindowManager::minimizeWindow(WindowHandle window)
 {
-    WindowData* windowData = getWindowData(window);
-    if (!windowData)
-    {
-        return {};
-    }
+    WindowData* windowData = BEE_TRY_OR_RETURN_DEFAULT(getWindowData(window));
 
     if (!SDL_MinimizeWindow(windowData->sdlWindow))
     {
+        BEE_WARN("最小化窗口('{}')失败: {}.", window.handle, SDL_GetError());
         return {};
     }
     return true;
@@ -273,14 +232,11 @@ bool WindowManager::minimizeWindow(WindowHandle window)
 
 bool WindowManager::maximizeWindow(WindowHandle window)
 {
-    WindowData* windowData = getWindowData(window);
-    if (!windowData)
-    {
-        return {};
-    }
+    WindowData* windowData = BEE_TRY_OR_RETURN_DEFAULT(getWindowData(window));
 
     if (!SDL_MaximizeWindow(windowData->sdlWindow))
     {
+        BEE_WARN("最大化窗口('{}')失败: {}.", window.handle, SDL_GetError());
         return {};
     }
     return true;
@@ -288,14 +244,11 @@ bool WindowManager::maximizeWindow(WindowHandle window)
 
 bool WindowManager::restoreWindow(WindowHandle window)
 {
-    WindowData* windowData = getWindowData(window);
-    if (!windowData)
-    {
-        return {};
-    }
+    WindowData* windowData = BEE_TRY_OR_RETURN_DEFAULT(getWindowData(window));
 
     if (!SDL_RestoreWindow(windowData->sdlWindow))
     {
+        BEE_WARN("恢复窗口('{}')失败: {}.", window.handle, SDL_GetError());
         return {};
     }
 
@@ -304,15 +257,12 @@ bool WindowManager::restoreWindow(WindowHandle window)
 
 bool WindowManager::setWindowFullscreen(WindowHandle window, bool fullscreen)
 {
-    WindowData* windowData = getWindowData(window);
-    if (!windowData)
-    {
-        return {};
-    }
+    WindowData* windowData = BEE_TRY_OR_RETURN_DEFAULT(getWindowData(window));
 
     u32 flags = fullscreen ? SDL_WINDOW_FULLSCREEN : 0;
     if (!SDL_SetWindowFullscreen(windowData->sdlWindow, flags))
     {
+        BEE_WARN("设置窗口('{}')全屏失败: {}.", window.handle, SDL_GetError());
         return {};
     }
     return true;
@@ -320,29 +270,20 @@ bool WindowManager::setWindowFullscreen(WindowHandle window, bool fullscreen)
 
 bool WindowManager::focusWindow(WindowHandle window)
 {
-    WindowData* windowData = getWindowData(window);
-    if (!windowData)
-    {
-        return {};
-    }
+    WindowData* windowData = BEE_TRY_OR_RETURN_DEFAULT(getWindowData(window));
 
     if (!SDL_RaiseWindow(windowData->sdlWindow))
     {
+        BEE_WARN("聚焦窗口('{}')失败: {}.", window.handle, SDL_GetError());
         return {};
     }
-
     _focusedWindow = window;
-
     return true;
 }
 
 bool WindowManager::isWindowFocused(WindowHandle window) const
 {
-    WindowData* windowData = getWindowData(window);
-    if (!windowData)
-    {
-        return false;
-    }
+    WindowData* windowData = BEE_TRY_OR_RETURN_DEFAULT(getWindowData(window));
 
     SDL_WindowFlags flags = SDL_GetWindowFlags(windowData->sdlWindow);
     return (flags & SDL_WINDOW_INPUT_FOCUS) != 0;
@@ -350,11 +291,7 @@ bool WindowManager::isWindowFocused(WindowHandle window) const
 
 WindowState WindowManager::getWindowState(WindowHandle window) const
 {
-    WindowData* windowData = getWindowData(window);
-    if (!windowData)
-    {
-        return {};
-    }
+    WindowData* windowData = BEE_TRY_OR_RETURN_DEFAULT(getWindowData(window));
 
     SDL_WindowFlags flags = SDL_GetWindowFlags(windowData->sdlWindow);
     return convertSDLWindowState(flags);
@@ -388,11 +325,7 @@ WindowHandle WindowManager::GetFocusedWindow() const
 
 NativeWindowHandle WindowManager::getNativeWindowHandle(WindowHandle window) const
 {
-    WindowData* windowData = getWindowData(window);
-    if (!windowData)
-    {
-        return {};
-    }
+    WindowData* windowData = BEE_TRY_OR_RETURN_DEFAULT(getWindowData(window));
 
     // 获取SDL窗口的原生句柄
     SDL_PropertiesID props = SDL_GetWindowProperties(windowData->sdlWindow);
@@ -451,15 +384,12 @@ DisplayInfo WindowManager::getPrimaryDisplay() const
 
 DisplayInfo WindowManager::getWindowDisplay(WindowHandle window) const
 {
-    WindowData* windowData = getWindowData(window);
-    if (!windowData)
-    {
-        return {};
-    }
+    WindowData* windowData = BEE_TRY_OR_RETURN_DEFAULT(getWindowData(window));
 
     SDL_DisplayID displayID = SDL_GetDisplayForWindow(windowData->sdlWindow);
     if (displayID == 0)
     {
+        BEE_WARN("获取窗口('{}')显示器失败: {}.", window.handle, SDL_GetError());
         return {};
     }
 
@@ -468,6 +398,7 @@ DisplayInfo WindowManager::getWindowDisplay(WindowHandle window) const
     SDL_DisplayID* displayIDs = SDL_GetDisplays(&displayCount);
     if (!displayIDs)
     {
+        BEE_WARN("获取显示器失败: {}.", SDL_GetError());
         return {};
     }
 
@@ -487,6 +418,7 @@ DisplayInfo WindowManager::getWindowDisplay(WindowHandle window) const
     SDL_free(displayIDs);
     if (displayIndex == -1)
     {
+        BEE_WARN("没有获取到有效的显示器.");
         return {};
     }
 
@@ -505,25 +437,16 @@ void WindowManager::removeWindowEventCallback()
 
 void WindowManager::requestAttention(WindowHandle window)
 {
-    WindowData* windowData = getWindowData(window);
-    if (!windowData)
-    {
-        return;
-    }
+    WindowData* windowData = BEE_TRY_OR_RETURN_VOID(getWindowData(window));
 
     SDL_FlashWindow(windowData->sdlWindow, SDL_FLASH_UNTIL_FOCUSED);
 }
 
-void WindowManager::setWindowIcon(WindowHandle window, const u8* iconData, u32 width, u32 height)
+bool WindowManager::setWindowIcon(WindowHandle window, const u8* iconData, u32 width, u32 height)
 {
-    WindowData* windowData = getWindowData(window);
-    if (!windowData)
-    {
-        return;
-    }
+    WindowData* windowData = BEE_TRY_OR_RETURN_DEFAULT(getWindowData(window));
 
     // 创建SDL表面
-
     SDL_Surface* iconSurface = SDL_CreateSurfaceFrom(
             static_cast<int>(width), static_cast<int>(height),
             SDL_PIXELFORMAT_RGBA32,
@@ -533,44 +456,62 @@ void WindowManager::setWindowIcon(WindowHandle window, const u8* iconData, u32 w
 
     if (!iconSurface)
     {
-        return;
+        BEE_WARN("创建 SDL Surface 失败: {}.", SDL_GetError());
+        return {};
     }
+    ScopeGuardian guardian;
+    guardian.onCleanup([&]
+    {
+        SDL_DestroySurface(iconSurface);
+    });
 
-    SDL_SetWindowIcon(windowData->sdlWindow, iconSurface);
-    SDL_DestroySurface(iconSurface);
+    if (!SDL_SetWindowIcon(windowData->sdlWindow, iconSurface))
+    {
+        BEE_WARN("设置窗口('{}')图标失败: {}.", window.handle, SDL_GetError());
+        return false;
+    }
+    return true;
 }
 
-void WindowManager::setWindowOpacity(WindowHandle window, f32 opacity)
+bool WindowManager::setWindowOpacity(WindowHandle window, f32 opacity)
 {
-    WindowData* windowData = getWindowData(window);
-    if (!windowData)
-    {
-        return;
-    }
+    WindowData* windowData = BEE_TRY_OR_RETURN_DEFAULT(getWindowData(window));
 
-    SDL_SetWindowOpacity(windowData->sdlWindow, opacity);
+    opacity = std::clamp(opacity, 0.0f, 1.0f);
+    if (!SDL_SetWindowOpacity(windowData->sdlWindow, opacity))
+    {
+        BEE_WARN("设置窗口('{}')透明度失败: {}.", window.handle, SDL_GetError());
+        return false;
+    }
+    return true;
 }
 
 f32 WindowManager::getWindowOpacity(WindowHandle window) const
 {
-    WindowData* windowData = getWindowData(window);
-    if (!windowData)
+    WindowData* windowData = BEE_TRY_OR_RETURN_DEFAULT(getWindowData(window));
+
+    const f32 opacity = SDL_GetWindowOpacity(windowData->sdlWindow);
+    if (opacity < 0.0f || opacity > 1.0f)
     {
-        return {};
+        BEE_WARN("获取窗口('{}')透明度失败: {}.", window.handle, SDL_GetError());
+        return -1.0f;
     }
 
-    return SDL_GetWindowOpacity(windowData->sdlWindow);
+    return opacity;
 }
 
-WindowManager::WindowData* WindowManager::getWindowData(WindowHandle window) const
+Result<WindowManager::WindowData*> WindowManager::getWindowData(WindowHandle window) const
 {
     if (!_windows.contains(window.handle))
-        return nullptr;
+    {
+        BEE_ERROR("没有找到该窗口: '{}'.", window.handle);
+        return MakePlatformErr(PlatformErrors::kWindowNotFound);
+    }
 
     return _windows.at(window.handle).get();
 }
 
-WindowManager::WindowData* WindowManager::getWindowDataBySDL(SDL_Window* sdlWindow) const
+Result<WindowManager::WindowData*> WindowManager::getWindowDataBySDL(SDL_Window* sdlWindow) const
 {
     auto it = _sdlWindowToId.find(sdlWindow);
     if (it == _sdlWindowToId.end())

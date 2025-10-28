@@ -29,11 +29,11 @@ public:
         }
     }
 
-    bool initialize(const InitConfig& config)
+    VResult initialize(const InitConfig& config)
     {
         if (initialized)
         {
-            return true;
+            return Ok();
         }
 
         initConfig = config;
@@ -48,8 +48,14 @@ public:
         if (!SDL_Init(sdlFlags))
         {
             BEE_ERROR("SDL3 初始化失败: {}.", SDL_GetError());
-            return false;
+            return MakePlatformErr(PlatformErrors::kInitializeFailed);
         }
+
+        ScopeGuardian sdlGuard;
+        sdlGuard.onCleanup([]
+        {
+            SDL_Quit();
+        });
 
         // 设置SDL3错误回调
         SDL_SetLogOutputFunction([](void* /* userdata */, int /* category */, SDL_LogPriority priority, const char* message)
@@ -69,14 +75,11 @@ public:
         }, this);
 
         // 初始化各个管理器
-        if (!initializeManagers())
-        {
-            SDL_Quit();
-            return false;
-        }
+        BEE_TRY_VOID(initializeManagers());
 
+        sdlGuard.dismiss();
         initialized = true;
-        return true;
+        return Ok();
     }
 
     void shutdown()
@@ -101,16 +104,12 @@ public:
     }
 
 private:
-    bool initializeManagers()
+    VResult initializeManagers()
     {
         windowManager = std::make_unique<WindowManager>();
-        if (!windowManager->initialize())
-        {
-            BEE_ERROR("窗口管理器初始化失败.");
-            return false;
-        }
+        BEE_TRY_VOID(windowManager->initialize());
 
-        return true;
+        return Ok();
     }
 
     void shutdownManagers()
@@ -140,7 +139,7 @@ PlatformManager::~PlatformManager()
     _pImpl->shutdown();
 }
 
-bool PlatformManager::initialize(const InitConfig& config)
+VResult PlatformManager::initialize(const InitConfig& config) const
 {
     return _pImpl->initialize(config);
 }

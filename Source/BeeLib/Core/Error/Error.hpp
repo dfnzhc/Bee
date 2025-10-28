@@ -240,13 +240,26 @@ namespace Bee
         } while(0)
 
     // 尝试获取结果值，失败时执行指定操作并返回默认值
-    #define BEE_TRY_OR(expr, default_value)                     \
+    #define BEE_TRY_OR(expr, defaultVal)                        \
         ({                                                      \
             auto&& BEE_UNIQUE_VAR(_result) = (expr);            \
             BEE_UNIQUE_VAR(_result).has_value() ?               \
                 std::move(BEE_UNIQUE_VAR(_result).value()) :    \
-                (default_value);                                \
+                (defaultVal);                                   \
         })
+
+    // 尝试获取结果值，失败时返回错误结果
+    #define BEE_TRY_OR_RETURN(expr, retVal)                                         \
+        ({                                                                          \
+            auto&& BEE_UNIQUE_VAR(_result) = (expr);                                \
+            if (!BEE_UNIQUE_VAR(_result).has_value()) {                             \
+                return retVal;                                                      \
+            }                                                                       \
+            std::move(BEE_UNIQUE_VAR(_result).value());                             \
+        })
+
+    #define BEE_TRY_OR_RETURN_VOID(expr) BEE_TRY_OR_RETURN(expr, )
+    #define BEE_TRY_OR_RETURN_DEFAULT(expr) BEE_TRY_OR_RETURN(expr, {})
 } // namespace Bee
 
 namespace std

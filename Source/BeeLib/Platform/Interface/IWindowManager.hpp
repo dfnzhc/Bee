@@ -80,12 +80,12 @@ namespace Bee
         virtual ~IWindowManager() = default;
 
         // === 生命周期管理 ===
-        virtual bool initialize() = 0;
+        virtual VResult initialize() = 0;
         virtual void shutdown() = 0;
         virtual bool isInitialized() const = 0;
 
         // === 窗口创建与销毁 ===
-        virtual WindowHandle createWindow(const WindowCreateInfo& createInfo) = 0;
+        virtual Result<WindowHandle> createWindow(const WindowCreateInfo& createInfo) = 0;
         virtual void destroyWindow(WindowHandle window) = 0;
         virtual bool isWindowValid(WindowHandle window) const = 0;
 
@@ -95,8 +95,8 @@ namespace Bee
         virtual bool setWindowSize(WindowHandle window, int2 size) = 0;
 
         virtual std::string GetWindowTitle(WindowHandle window) const = 0;
-        virtual int2 GetWindowPosition(WindowHandle window) const = 0;
-        virtual int2 GetWindowSize(WindowHandle window) const = 0;
+        virtual Result<int2> GetWindowPosition(WindowHandle window) const = 0;
+        virtual Result<int2> GetWindowSize(WindowHandle window) const = 0;
 
         // === 窗口状态控制 ===
         virtual bool showWindow(WindowHandle window) = 0;
@@ -132,9 +132,9 @@ namespace Bee
 
         // === 实用功能 ===
         virtual void requestAttention(WindowHandle window) = 0;
-        virtual void setWindowIcon(WindowHandle window, const u8* iconData, u32 width, u32 height) = 0;
+        virtual bool setWindowIcon(WindowHandle window, const u8* iconData, u32 width, u32 height) = 0;
 
-        virtual void setWindowOpacity(WindowHandle window, f32 opacity) = 0;
+        virtual bool setWindowOpacity(WindowHandle window, f32 opacity) = 0;
         virtual f32 getWindowOpacity(WindowHandle window) const = 0;
     };
 } // namespace Bee

@@ -8,6 +8,7 @@
 #pragma once
 
 #include <expected>
+#include <functional>
 #include "./Exception.hpp"
 
 namespace Bee

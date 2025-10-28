@@ -31,7 +31,7 @@ namespace Bee
         BEE_DISABLE_COPY_AND_MOVE(PlatformManager);
 
         // === 生命周期管理 ===
-        bool initialize(const InitConfig& config);
+        VResult initialize(const InitConfig& config) const;
         void shutdown();
         bool isInitialized() const;
 
