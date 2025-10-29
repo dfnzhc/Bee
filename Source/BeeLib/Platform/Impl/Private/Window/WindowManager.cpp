@@ -21,7 +21,7 @@ VResult WindowManager::initialize()
     if ((initFlags & SDL_INIT_VIDEO) == 0)
     {
         BEE_ERROR("SDL 初始化时没有设置 'SDL_INIT_VIDEO' 标志.");
-        return MakePlatformErr(PlatformErrors::kMissFlag);
+        return MakeWindowErr(WindowErrors::kMissFlag);
     }
 
     _initialized = true;
@@ -53,7 +53,7 @@ Result<WindowHandle> WindowManager::createWindow(const WindowCreateInfo& createI
     if (!_initialized)
     {
         BEE_ERROR("WindowManager 没有被正确初始化.");
-        return MakePlatformErr(PlatformErrors::kNotInitialize);
+        return MakeWindowErr(WindowErrors::kNotInitialize);
     }
 
     u32 sdlFlags          = convertWindowFlags(createInfo.flags);
@@ -61,7 +61,7 @@ Result<WindowHandle> WindowManager::createWindow(const WindowCreateInfo& createI
     if (!sdlWindow)
     {
         BEE_ERROR("创建 SDL 窗口失败: {}", SDL_GetError());
-        return MakePlatformErr(PlatformErrors::kCreateWindowFailed);
+        return MakeWindowErr(WindowErrors::kCreateWindowFailed);
     }
 
     if (createInfo.pos.x != 0 && createInfo.pos.y != 0)
@@ -176,7 +176,7 @@ Result<int2> WindowManager::GetWindowPosition(WindowHandle window) const
     if (!SDL_GetWindowPosition(windowData->sdlWindow, &x, &y))
     {
         BEE_WARN("获取窗口('{}')位置失败: {}.", window.handle, SDL_GetError());
-        return MakePlatformErr(PlatformErrors::kInternalFailure);
+        return MakeWindowErr(WindowErrors::kInternalFailure);
     }
     return int2{x, y};
 }
@@ -189,7 +189,7 @@ Result<int2> WindowManager::GetWindowSize(WindowHandle window) const
     if (!SDL_GetWindowSize(windowData->sdlWindow, &width, &height))
     {
         BEE_WARN("获取窗口('{}')尺寸失败: {}.", window.handle, SDL_GetError());
-        return MakePlatformErr(PlatformErrors::kInternalFailure);
+        return MakeWindowErr(WindowErrors::kInternalFailure);
     }
     return int2{width, height};
 }
@@ -505,7 +505,7 @@ Result<WindowManager::WindowData*> WindowManager::getWindowData(WindowHandle win
     if (!_windows.contains(window.handle))
     {
         BEE_ERROR("没有找到该窗口: '{}'.", window.handle);
-        return MakePlatformErr(PlatformErrors::kWindowNotFound);
+        return MakeWindowErr(WindowErrors::kWindowNotFound);
     }
 
     return _windows.at(window.handle).get();

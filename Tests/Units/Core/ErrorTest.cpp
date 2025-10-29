@@ -1079,18 +1079,18 @@ TEST(ErrorIdTest, DomainCodeConstruction)
 
 TEST(ErrorIdTest, CombinedValueConstruction)
 {
-    u32 combined = 0x10011234; // Domain: 0x1001, Code: 0x1234
+    u32 combined = 0x01011234; // Domain: 0x0101, Code: 0x1234
     ErrorId id(combined);
-    EXPECT_EQ(id.domain, 0x1001);
+    EXPECT_EQ(id.domain, 0x0101);
     EXPECT_EQ(id.code, 0x1234);
-    EXPECT_EQ(id.getDomain(), ErrorDomain::Core);
+    EXPECT_EQ(id.getDomain(), ErrorDomain::System);
     EXPECT_EQ(id.getCode(), 0x1234);
 }
 
 TEST(ErrorIdTest, ValueConversion)
 {
-    ErrorId id(ErrorDomain::Graphics, 0x5678);
-    u32 expected = (0x1003 << 16) | 0x5678; // 0x10035678
+    ErrorId id(ErrorDomain::FileSystem, 0x5678);
+    u32 expected = (0x0103 << 16) | 0x5678; // 0x01035678
     EXPECT_EQ(id.value(), expected);
 }
 
@@ -1098,7 +1098,7 @@ TEST(ErrorIdTest, HexFormatting)
 {
     ErrorId id(ErrorDomain::Core, 0x1234);
     std::string hex = id.hex();
-    EXPECT_EQ(hex, "10011234");
+    EXPECT_EQ(hex, "01001234");
 }
 
 TEST(ErrorIdTest, StringFormatting)
@@ -1128,7 +1128,7 @@ TEST(ErrorIdTest, Comparison)
     EXPECT_NE(id1, id3);
     EXPECT_NE(id1, id4);
 
-    EXPECT_TRUE(id1 < id3);
+    EXPECT_TRUE(id1 > id3);
     EXPECT_TRUE(id1 < id4);
 }
 
@@ -1193,7 +1193,7 @@ TEST(ErrorTest, Comparison)
 
     EXPECT_EQ(error1, error2);
     EXPECT_NE(error1, error3);
-    EXPECT_TRUE(error1 < error3);
+    EXPECT_TRUE(error1 > error3);
 }
 
 TEST(ResultTest, OkValueCreation)

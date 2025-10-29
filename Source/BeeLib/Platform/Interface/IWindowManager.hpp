@@ -16,6 +16,23 @@ namespace Bee
     // 类型、状态定义
     // -----------------------------
 
+    struct WindowErrors
+    {
+        static constexpr ErrorDomain kDomain  = ErrorDomain::Window;
+
+        static constexpr u16 kInitializeFailed   = 0x0001;
+        static constexpr u16 kNotInitialize      = 0x0002;
+        static constexpr u16 kMissFlag           = 0x0003;
+        static constexpr u16 kCreateWindowFailed = 0x0004;
+        static constexpr u16 kWindowNotFound     = 0x0005;
+        static constexpr u16 kInternalFailure    = 0x0006;
+    };
+
+    constexpr auto MakeWindowErr(u16 errCode)
+    {
+        return std::unexpected{Error{WindowErrors::kDomain, errCode}};
+    }
+
     XIHE_PLATFORM_HANDLE(WindowHandle, u32);
 
     // 窗口状态

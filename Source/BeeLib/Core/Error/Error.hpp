@@ -17,24 +17,35 @@ namespace Bee
     {
         NoError = 0x0000,
 
-        // === 系统错误 ===
-        System     = 0x0001,
-        Memory     = 0x0002,
-        FileSystem = 0x0003,
-        Threading  = 0x0004,
+        // === 核心错误 ===
+        Core       = 0x0100,
+        System     = 0x0101,
+        Memory     = 0x0102,
+        FileSystem = 0x0103,
+        Threading  = 0x0104,
 
-        // === 层级错误 ===
-        Core        = 0x1001,
-        Platform    = 0x1002,
-        Graphics    = 0x1003,
-        Engine      = 0x1004,
-        Application = 0x1005,
+        // === 层次错误 ===
+        Platform = 0x0200,
+        Window   = 0x0201,
+        Input    = 0x0202,
 
-        // === 其他分类 ===
-        Physics   = 0x2001,
-        Animation = 0x2002,
-        Resource  = 0x2003,
-        Editor    = 0x2004,
+        // === 图形错误 ===
+        Graphics = 0x0300,
+
+        // === 引擎错误 ===
+        Engine = 0x0400,
+
+        // === 应用错误 ===
+        Application = 0x0500,
+
+        // === 物理错误 ===
+        Physics   = 0x0600,
+        
+        // === 资源错误 ===
+        Resource  = 0x0700,
+        
+        // === 编辑器错误 ===
+        Editor    = 0x0800,
 
         // 未知错误
         Unknown = 0xFFFF

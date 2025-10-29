@@ -48,7 +48,7 @@ public:
         if (!SDL_Init(sdlFlags))
         {
             BEE_ERROR("SDL3 初始化失败: {}.", SDL_GetError());
-            return MakePlatformErr(PlatformErrors::kInitializeFailed);
+            return MakeWindowErr(WindowErrors::kInitializeFailed);
         }
 
         ScopeGuardian sdlGuard;

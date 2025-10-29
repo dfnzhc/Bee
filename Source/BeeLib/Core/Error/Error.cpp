@@ -16,17 +16,20 @@ namespace Bee
         switch (domain)
         {
             DOMAIN_CASE(NoError);
+            DOMAIN_CASE(Core);
             DOMAIN_CASE(System);
             DOMAIN_CASE(Memory);
             DOMAIN_CASE(FileSystem);
             DOMAIN_CASE(Threading);
-            DOMAIN_CASE(Core);
+            
             DOMAIN_CASE(Platform);
+            DOMAIN_CASE(Window);
+            DOMAIN_CASE(Input);
+            
             DOMAIN_CASE(Graphics);
             DOMAIN_CASE(Engine);
             DOMAIN_CASE(Application);
             DOMAIN_CASE(Physics);
-            DOMAIN_CASE(Animation);
             DOMAIN_CASE(Resource);
             DOMAIN_CASE(Editor);
             DOMAIN_CASE(Unknown);
