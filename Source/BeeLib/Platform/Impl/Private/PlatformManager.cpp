@@ -7,8 +7,9 @@
 
 #include "PlatformManager.hpp"
 #include "Window/WindowManager.hpp"
-#include "SDLHeader.hpp"
+#include "Window/InputManager.hpp"
 
+#include "SDLHeader.hpp"
 #include "Core/Error/Exception.hpp"
 
 using namespace Bee;
@@ -101,6 +102,8 @@ public:
         {
             return;
         }
+
+        inputManager->updateFrame();
     }
 
 private:
@@ -109,11 +112,19 @@ private:
         windowManager = std::make_unique<WindowManager>();
         BEE_TRY_VOID(windowManager->initialize());
 
+        inputManager = std::make_unique<InputManager>();
+        BEE_TRY_VOID(inputManager->initialize());
+
         return Ok();
     }
 
     void shutdownManagers()
     {
+        if (inputManager)
+        {
+            inputManager->shutdown();
+            inputManager.reset();
+        }
         if (windowManager)
         {
             windowManager->shutdown();
@@ -127,6 +138,7 @@ public:
     bool initialized;
 
     std::unique_ptr<IWindowManager> windowManager = nullptr;
+    std::unique_ptr<IInputManager> inputManager = nullptr;
 };
 
 PlatformManager::PlatformManager() :
@@ -162,4 +174,9 @@ void PlatformManager::update()
 IWindowManager* PlatformManager::getWindowManager() const
 {
     return _pImpl->windowManager.get();
+}
+
+IInputManager* PlatformManager::getInputManager() const
+{
+    return _pImpl->inputManager.get();
 }

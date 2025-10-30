@@ -17,8 +17,6 @@
 struct SDL_Window;
 union SDL_Event;
 
-// TODO: 返回结果中增加可能的错误信息
-
 namespace Bee
 {
     class WindowManager : public IWindowManager

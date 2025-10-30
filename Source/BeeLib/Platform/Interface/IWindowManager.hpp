@@ -8,7 +8,7 @@
 #pragma once
 
 #include <vector>
-#include "./PlatformTypes.hpp"
+#include "PlatformTypes.hpp"
 
 namespace Bee
 {
@@ -32,8 +32,6 @@ namespace Bee
     {
         return std::unexpected{Error{WindowErrors::kDomain, errCode}};
     }
-
-    XIHE_PLATFORM_HANDLE(WindowHandle, u32);
 
     // 窗口状态
     enum class WindowState : u8

@@ -9,6 +9,7 @@
 
 #include "Platform/Interface/PlatformTypes.hpp"
 #include "Platform/Interface/IWindowManager.hpp"
+#include "Platform/Interface/IInputManager.hpp"
 
 namespace Bee
 {
@@ -39,6 +40,7 @@ namespace Bee
 
         // === 管理器访问接口 ===
         IWindowManager* getWindowManager() const;
+        IInputManager* getInputManager() const;
 
     private:
         class Impl;
