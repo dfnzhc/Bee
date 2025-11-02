@@ -36,6 +36,10 @@ public:
         {
             return Ok();
         }
+        if (!Logger::Instance().isInitialized())
+        {
+            std::cerr << "[Bee] Logger 初始化失败\n";
+        }
 
         initConfig = config;
 
@@ -94,6 +98,7 @@ public:
         SDL_Quit();
 
         initialized = false;
+        Logger::Instance().shutdown();
     }
 
     void update()
@@ -138,7 +143,7 @@ public:
     bool initialized;
 
     std::unique_ptr<IWindowManager> windowManager = nullptr;
-    std::unique_ptr<IInputManager> inputManager = nullptr;
+    std::unique_ptr<IInputManager> inputManager   = nullptr;
 };
 
 PlatformManager::PlatformManager() :

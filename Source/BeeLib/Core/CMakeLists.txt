@@ -16,6 +16,7 @@ set(LayerComponents
         Logger
         Error
         Math
+        Utils
 )
 
 set(LayerDefinitions

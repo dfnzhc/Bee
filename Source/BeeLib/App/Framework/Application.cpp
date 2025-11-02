@@ -23,7 +23,6 @@ Application::~Application()
     {
         shutdown();
     }
-    Logger::Instance().shutdown();
 }
 
 bool Application::initialize()
@@ -35,11 +34,6 @@ bool Application::initialize()
 
     try
     {
-        if (!Logger::Instance().isInitialized())
-        {
-            std::cerr << "[Bee] 日志初始化失败.\n";
-        }
-        
         BEE_INFO("{} 正在进行初始化.", m_name);
 
         PlatformManager::InitConfig config;

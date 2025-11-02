@@ -619,7 +619,7 @@ DisplayInfo WindowManager::convertSDLDisplay(int displayIndex) const
     info.name        = name ? name : "";
 
     SDL_Rect bounds;
-    if (SDL_GetDisplayBounds(displayID, &bounds) == 0)
+    if (SDL_GetDisplayBounds(displayID, &bounds))
     {
         info.posX   = bounds.x;
         info.posY   = bounds.y;
