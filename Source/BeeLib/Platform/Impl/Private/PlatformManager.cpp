@@ -6,8 +6,10 @@
  */
 
 #include "PlatformManager.hpp"
-#include "Window/WindowManager.hpp"
-#include "Window/InputManager.hpp"
+
+#include "EventPump.hpp"
+#include "WindowManager.hpp"
+#include "InputManager.hpp"
 
 #include "SDLHeader.hpp"
 #include "Core/Error/Exception.hpp"
@@ -82,6 +84,12 @@ public:
         // 初始化各个管理器
         BEE_TRY_VOID(initializeManagers());
 
+        eventPump = std::make_unique<EventPump>();
+        eventPump->setEventCallback([this](PlatformEvent&& event)
+        {
+            dispatchEvent(std::forward<PlatformEvent>(event));
+        });
+
         sdlGuard.dismiss();
         initialized = true;
         return Ok();
@@ -101,14 +109,30 @@ public:
         Logger::Instance().shutdown();
     }
 
-    void update()
+    void update() const
     {
         if (!initialized)
         {
             return;
         }
 
+        eventPump->pumpEvents();
         inputManager->updateFrame();
+    }
+
+    void setCommonEventCallback(CommonEventCallback&& callback)
+    {
+        _commonCallback = std::move(callback);
+    }
+
+    void setWindowEventCallback(WindowEventCallback&& callback)
+    {
+        _windowCallback = std::move(callback);
+    }
+
+    void setDropEventCallback(DropEventCallback&& callback)
+    {
+        _dropCallback = std::move(callback);
     }
 
 private:
@@ -137,13 +161,67 @@ private:
         }
     }
 
+    void dispatchEvent(PlatformEvent&& event) const
+    {
+        if (std::holds_alternative<KeyboardEvent>(event))
+        {
+            inputManager->processInputEvent(std::get<KeyboardEvent>(event));
+        }
+        else if (std::holds_alternative<MouseButtonEvent>(event))
+        {
+            inputManager->processInputEvent(std::get<MouseButtonEvent>(event));
+        }
+        else if (std::holds_alternative<MouseMotionEvent>(event))
+        {
+            inputManager->processInputEvent(std::get<MouseMotionEvent>(event));
+        }
+        else if (std::holds_alternative<MouseWheelEvent>(event))
+        {
+            inputManager->processInputEvent(std::get<MouseWheelEvent>(event));
+        }
+
+        try
+        {
+            if (std::holds_alternative<CommonEvent>(event))
+            {
+                if (_commonCallback)
+                {
+                    _commonCallback(std::get<CommonEvent>(event));
+                }
+            }
+            else if (std::holds_alternative<WindowEvent>(event))
+            {
+                if (_windowCallback)
+                {
+                    _windowCallback(std::get<WindowEvent>(event));
+                }
+            }
+            else if (std::holds_alternative<DropEvent>(event))
+            {
+                if (_dropCallback)
+                {
+                    _dropCallback(std::get<DropEvent>(event));
+                }
+            }
+        }
+        catch (const std::exception& e)
+        {
+            BEE_ERROR("分发事件有错误: {}.", e.what());
+        }
+    }
+
 public:
     InitConfig initConfig;
 
-    bool initialized;
-
     std::unique_ptr<IWindowManager> windowManager = nullptr;
     std::unique_ptr<IInputManager> inputManager   = nullptr;
+    std::unique_ptr<EventPump> eventPump          = nullptr;
+
+    CommonEventCallback _commonCallback = {};
+    WindowEventCallback _windowCallback = {};
+    DropEventCallback _dropCallback     = {};
+
+    bool initialized = false;
 };
 
 PlatformManager::PlatformManager() :
@@ -161,7 +239,7 @@ VResult PlatformManager::initialize(const InitConfig& config) const
     return _pImpl->initialize(config);
 }
 
-void PlatformManager::shutdown()
+void PlatformManager::shutdown() const
 {
     return _pImpl->shutdown();
 }
@@ -171,7 +249,7 @@ bool PlatformManager::isInitialized() const
     return _pImpl->initialized;
 }
 
-void PlatformManager::update()
+void PlatformManager::update() const
 {
     return _pImpl->update();
 }
@@ -184,4 +262,39 @@ IWindowManager* PlatformManager::getWindowManager() const
 IInputManager* PlatformManager::getInputManager() const
 {
     return _pImpl->inputManager.get();
+}
+
+void PlatformManager::setCommonEventCallback(CommonEventCallback&& callback) const
+{
+    _pImpl->setCommonEventCallback(std::forward<CommonEventCallback>(callback));
+}
+
+void PlatformManager::setWindowEventCallback(WindowEventCallback&& callback) const
+{
+    _pImpl->setWindowEventCallback(std::forward<WindowEventCallback>(callback));
+}
+
+void PlatformManager::setDropEventCallback(DropEventCallback&& callback) const
+{
+    _pImpl->setDropEventCallback(std::forward<DropEventCallback>(callback));
+}
+
+void PlatformManager::setKeyEventCallback(IInputManager::KeyEventCallback&& callback) const
+{
+    _pImpl->inputManager->setKeyEventCallback(std::forward<IInputManager::KeyEventCallback>(callback));
+}
+
+void PlatformManager::setMouseButtonCallback(IInputManager::MouseButtonCallback&& callback) const
+{
+    _pImpl->inputManager->setMouseButtonCallback(std::forward<IInputManager::MouseButtonCallback>(callback));
+}
+
+void PlatformManager::setMouseMotionCallback(IInputManager::MouseMotionCallback&& callback) const
+{
+    _pImpl->inputManager->setMouseMotionCallback(std::forward<IInputManager::MouseMotionCallback>(callback));
+}
+
+void PlatformManager::setMouseWheelCallback(IInputManager::MouseWheelCallback&& callback) const
+{
+    _pImpl->inputManager->setMouseWheelCallback(std::forward<IInputManager::MouseWheelCallback>(callback));
 }

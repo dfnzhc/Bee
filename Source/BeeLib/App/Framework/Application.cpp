@@ -38,13 +38,24 @@ bool Application::initialize()
 
         PlatformManager::InitConfig config;
         config.enableWindow = true;
-        
+
         _pPlatform = std::make_unique<PlatformManager>();
         if (auto res = _pPlatform->initialize(config); !res)
         {
             BEE_ERROR("平台管理器初始化失败, 错误码: '{:x}'.", res.error().code());
             return false;
         }
+
+        // clang-format off
+        _pPlatform->setCommonEventCallback([this](const CommonEvent& event) { handleCommonEvent(event); });
+        _pPlatform->setWindowEventCallback([this](const WindowEvent& event) { handleWindowEvent(event); });
+        _pPlatform->setDropEventCallback([this](const DropEvent& event) { handleDropEvent(event); });
+        
+        _pPlatform->setKeyEventCallback([this](const KeyboardEvent& event) { handleKeyboardEvent(event); });
+        _pPlatform->setMouseButtonCallback([this](const MouseButtonEvent& event) { handleMouseButtonEvent(event); });
+        _pPlatform->setMouseMotionCallback([this](const MouseMotionEvent& event) { handleMouseMotionEvent(event); });
+        _pPlatform->setMouseWheelCallback([this](const MouseWheelEvent& event) { handleMouseWheelEvent(event); });
+        // clang-format on
 
         if (!onInitialize())
         {
@@ -111,6 +122,7 @@ int Application::run()
         m_running.store(true);
         while (m_running.load())
         {
+            update();
             drawFrame();
         }
 
@@ -153,7 +165,86 @@ void Application::drawFrame()
 {
 }
 
+void Application::onHandleKeyboardEvent(const KeyboardEvent&)
+{
+}
+
+void Application::onHandleMouseButtonEvent(const MouseButtonEvent&)
+{
+}
+
+void Application::onHandleMouseMotionEvent(const MouseMotionEvent&)
+{
+}
+
+void Application::onHandleMouseWheelEvent(const MouseWheelEvent&)
+{
+}
+
+void Application::onHandleCommonEvent(const CommonEvent&)
+{
+}
+
+void Application::onHandleWindowEvent(const WindowEvent&)
+{
+}
+
+void Application::onHandleDropEvent(const DropEvent&)
+{
+}
+
 void Application::requestExit()
 {
     m_running.store(false);
+}
+
+void Application::update() const
+{
+    _pPlatform->update();
+}
+
+void Application::handleKeyboardEvent(const KeyboardEvent& event)
+{
+    if (event.keyCode == KeyCode::Escape)
+    {
+        if (event.isPressed)
+            requestExit();
+    }
+
+    onHandleKeyboardEvent(event);
+}
+
+void Application::handleCommonEvent(const CommonEvent& event)
+{
+    if (event.type == PlatformEventType::Quit)
+    {
+        requestExit();
+    }
+
+    onHandleCommonEvent(event);
+}
+
+void Application::handleWindowEvent(const WindowEvent& event)
+{
+    onHandleWindowEvent(event);
+}
+
+void Application::handleDropEvent(const DropEvent& event)
+{
+    onHandleDropEvent(event);
+}
+
+void Application::handleMouseButtonEvent(const MouseButtonEvent& event)
+{
+    onHandleMouseButtonEvent(event);
+}
+
+void Application::handleMouseMotionEvent(const MouseMotionEvent& event)
+{
+    onHandleMouseMotionEvent(event);
+}
+
+void Application::handleMouseWheelEvent(const MouseWheelEvent& event)
+{
+    onHandleMouseWheelEvent(event);
 }

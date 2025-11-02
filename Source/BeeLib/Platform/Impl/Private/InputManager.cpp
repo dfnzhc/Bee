@@ -6,7 +6,7 @@
  */
 
 #include "InputManager.hpp"
-#include "../SDLHeader.hpp"
+#include "SDLHeader.hpp"
 
 using namespace Bee;
 
@@ -37,6 +37,7 @@ void InputManager::shutdown()
     {
         return;
     }
+    clearEventCallbacks();
 
     _initialized = false;
 }
@@ -46,35 +47,24 @@ bool InputManager::isInitialized() const
     return _initialized;
 }
 
-void InputManager::processInputEvent(const InputEvent& event)
+void InputManager::processInputEvent(const InputEvent& event) noexcept
 {
     try
     {
-        std::visit([this](const auto& evt)
+        if (std::holds_alternative<KeyboardEvent>(event))
         {
-            using T = std::decay_t<decltype(evt)>;
-
-            if constexpr (std::is_same_v<T, KeyboardEvent>)
-            {
-                updateKeyboardState(evt);
-            }
-            else if constexpr (std::is_same_v<T, MouseMotionEvent>)
-            {
-                updateMouseState(evt);
-            }
-            else if constexpr (std::is_same_v<T, MouseButtonEvent>)
-            {
-                updateMouseState(evt);
-            }
-            else if constexpr (std::is_same_v<T, MouseWheelEvent>)
-            {
-                updateMouseState(evt);
-            }
-        }, event);
+            processKeyboardEvent(std::get<KeyboardEvent>(event));
+        }
+        else if (std::holds_alternative<MouseMotionEvent>(event)
+            || std::holds_alternative<MouseButtonEvent>(event)
+            || std::holds_alternative<MouseWheelEvent>(event))
+        {
+            processMouseEvent(event);
+        }
     }
     catch (const std::exception& e)
     {
-        BEE_ERROR("事件执行错误: {}.", e.what());
+        BEE_ERROR("输入事件处理错误: {}.", e.what());
     }
 }
 
@@ -172,6 +162,34 @@ f32 InputManager::getMouseWheelDelta() const
     return _mouseState.wheelDelta;
 }
 
+void InputManager::setKeyEventCallback(KeyEventCallback&& callback)
+{
+    _keyEventCallback = std::move(callback);
+}
+
+void InputManager::setMouseButtonCallback(MouseButtonCallback&& callback)
+{
+    _mouseButtonCallback = std::move(callback);
+}
+
+void InputManager::setMouseMotionCallback(MouseMotionCallback&& callback)
+{
+    _mouseMotionCallback = std::move(callback);
+}
+
+void InputManager::setMouseWheelCallback(MouseWheelCallback&& callback)
+{
+    _mouseWheelCallback = std::move(callback);
+}
+
+void InputManager::clearEventCallbacks()
+{
+    _keyEventCallback    = {};
+    _mouseButtonCallback = {};
+    _mouseMotionCallback = {};
+    _mouseWheelCallback  = {};
+}
+
 void InputManager::updateKeyboardState(const KeyboardEvent& event)
 {
     if (!isValidKeyCode(event.keyCode))
@@ -242,7 +260,7 @@ std::vector<KeyCode> InputManager::getPressedKeys() const
 {
     std::vector<KeyCode> pressedKeys;
 
-    
+
     for (Size i = 0; i < _keyboardState.currentKeys.size(); ++i)
     {
         if (_keyboardState.currentKeys[i])
@@ -267,4 +285,47 @@ std::vector<MouseButton> InputManager::getPressedMouseButtons() const
     }
 
     return pressedButtons;
+}
+
+void InputManager::processKeyboardEvent(const KeyboardEvent& event)
+{
+    updateKeyboardState(event);
+    if (_keyEventCallback)
+    {
+        _keyEventCallback(event);
+    }
+}
+
+void InputManager::processMouseEvent(const InputEvent& event)
+{
+    if (std::holds_alternative<MouseButtonEvent>(event))
+    {
+        const auto& buttonEvent = std::get<MouseButtonEvent>(event);
+
+        updateMouseState(std::get<MouseButtonEvent>(event));
+        if (_mouseButtonCallback)
+        {
+            _mouseButtonCallback(buttonEvent);
+        }
+    }
+    else if (std::holds_alternative<MouseMotionEvent>(event))
+    {
+        const auto& motionEvent = std::get<MouseMotionEvent>(event);
+
+        updateMouseState(motionEvent);
+        if (_mouseMotionCallback)
+        {
+            _mouseMotionCallback(motionEvent);
+        }
+    }
+    else if (std::holds_alternative<MouseWheelEvent>(event))
+    {
+        const auto& wheelEvent = std::get<MouseWheelEvent>(event);
+
+        updateMouseState(std::get<MouseWheelEvent>(event));
+        if (_mouseWheelCallback)
+        {
+            _mouseWheelCallback(wheelEvent);
+        }
+    }
 }

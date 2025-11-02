@@ -33,7 +33,7 @@ namespace Bee
     struct KeyboardState
     {
         static constexpr Size kMaxKeys = static_cast<Size>(KeyCode::Count);
-        
+
         std::bitset<kMaxKeys> currentKeys;
         std::bitset<kMaxKeys> previousKeys;
         KeyModifier modifiers = KeyModifier::None;
@@ -66,7 +66,7 @@ namespace Bee
     struct MouseState
     {
         static constexpr Size kMaxMouseButtons = static_cast<Size>(MouseButton::Count);
-        
+
         float2 position{0, 0};
         float2 deltaPosition{0, 0};
         f32 wheelDelta = 0.0f;
@@ -104,7 +104,7 @@ namespace Bee
         virtual bool isInitialized() const = 0;
 
         // === 事件输入及更新 ===
-        virtual void processInputEvent(const InputEvent& event) = 0;
+        virtual void processInputEvent(const InputEvent& event) noexcept = 0;
         virtual void updateFrame() = 0;
 
         // === 键盘输入查询 ===
@@ -124,6 +124,18 @@ namespace Bee
         virtual int2 getMousePosition() const = 0;
         virtual int2 getMouseDelta() const = 0;
         virtual f32 getMouseWheelDelta() const = 0;
+
+        // === 事件回调管理 ===
+        using KeyEventCallback    = std::function<void(const KeyboardEvent&)>;
+        using MouseButtonCallback = std::function<void(const MouseButtonEvent&)>;
+        using MouseMotionCallback = std::function<void(const MouseMotionEvent&)>;
+        using MouseWheelCallback  = std::function<void(const MouseWheelEvent&)>;
+
+        virtual void setKeyEventCallback(KeyEventCallback&& callback) = 0;
+        virtual void setMouseButtonCallback(MouseButtonCallback&& callback) = 0;
+        virtual void setMouseMotionCallback(MouseMotionCallback&& callback) = 0;
+        virtual void setMouseWheelCallback(MouseWheelCallback&& callback) = 0;
+        virtual void clearEventCallbacks() = 0;
 
         // === 其他功能 ===
         virtual bool areKeysPressed(const std::vector<KeyCode>& keys) const = 0;

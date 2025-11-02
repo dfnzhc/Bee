@@ -33,14 +33,28 @@ namespace Bee
 
         // === 生命周期管理 ===
         VResult initialize(const InitConfig& config) const;
-        void shutdown();
+        void shutdown() const;
         bool isInitialized() const;
 
-        void update();
+        void update() const;
 
         // === 管理器访问接口 ===
         IWindowManager* getWindowManager() const;
         IInputManager* getInputManager() const;
+
+        // === 设置回调 ===
+        using CommonEventCallback = std::function<void(const CommonEvent&)>;
+        using WindowEventCallback = std::function<void(const WindowEvent&)>;
+        using DropEventCallback   = std::function<void(const DropEvent&)>;
+        
+        void setCommonEventCallback(CommonEventCallback&& callback) const;
+        void setWindowEventCallback(WindowEventCallback&& callback) const;
+        void setDropEventCallback(DropEventCallback&& callback) const;
+
+        void setKeyEventCallback(IInputManager::KeyEventCallback&& callback) const;
+        void setMouseButtonCallback(IInputManager::MouseButtonCallback&& callback) const;
+        void setMouseMotionCallback(IInputManager::MouseMotionCallback&& callback) const;
+        void setMouseWheelCallback(IInputManager::MouseWheelCallback&& callback) const;
 
     private:
         class Impl;

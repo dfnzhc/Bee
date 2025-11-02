@@ -8,7 +8,7 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 #include "../Impl/Private/SDLHeader.hpp"
-#include "../Impl/Private/Window/WindowManager.hpp"
+#include "../../../Source/BeeLib/Platform/Impl/Private/WindowManager.hpp"
 #include "Platform/Interface/PlatformTypes.hpp"
 
 using namespace Bee;

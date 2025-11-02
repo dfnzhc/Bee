@@ -5,8 +5,8 @@
  * @Brief This file is part of Bee.
  */
 
-#include "./WindowManager.hpp"
-#include "../SDLHeader.hpp"
+#include "WindowManager.hpp"
+#include "SDLHeader.hpp"
 
 using namespace Bee;
 

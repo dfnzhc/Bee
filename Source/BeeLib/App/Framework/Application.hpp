@@ -11,6 +11,7 @@
 #include <string>
 #include <memory>
 #include "Core/Base/Defines.hpp"
+#include "Platform/Interface/PlatformTypes.hpp"
 
 namespace Bee
 {
@@ -41,8 +42,29 @@ namespace Bee
 
         virtual void drawFrame();
 
+        virtual void onHandleCommonEvent(const CommonEvent& /*event*/);
+        virtual void onHandleWindowEvent(const WindowEvent& /*event*/);
+        virtual void onHandleDropEvent(const DropEvent& /*event*/);
+
+        virtual void onHandleKeyboardEvent(const KeyboardEvent& /*event*/);
+        virtual void onHandleMouseButtonEvent(const MouseButtonEvent& /*event*/);
+        virtual void onHandleMouseMotionEvent(const MouseMotionEvent& /*event*/);
+        virtual void onHandleMouseWheelEvent(const MouseWheelEvent& /*event*/);
+
         // === 主循环控制 ===
         void requestExit();
+
+    private:
+        void update() const;
+
+        void handleCommonEvent(const CommonEvent& event);
+        void handleWindowEvent(const WindowEvent& event);
+        void handleDropEvent(const DropEvent& event);
+
+        void handleKeyboardEvent(const KeyboardEvent& event);
+        void handleMouseButtonEvent(const MouseButtonEvent& event);
+        void handleMouseMotionEvent(const MouseMotionEvent& event);
+        void handleMouseWheelEvent(const MouseWheelEvent& event);
 
     protected:
         std::unique_ptr<class PlatformManager> _pPlatform;

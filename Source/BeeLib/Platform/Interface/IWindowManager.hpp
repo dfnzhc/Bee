@@ -18,7 +18,7 @@ namespace Bee
 
     struct WindowErrors
     {
-        static constexpr ErrorDomain kDomain  = ErrorDomain::Window;
+        static constexpr ErrorDomain kDomain = ErrorDomain::Window;
 
         static constexpr u16 kInitializeFailed   = 0x0001;
         static constexpr u16 kNotInitialize      = 0x0002;

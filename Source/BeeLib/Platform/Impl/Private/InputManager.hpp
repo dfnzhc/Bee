@@ -26,7 +26,7 @@ namespace Bee
         bool isInitialized() const override;
 
         // === 事件输入及更新 ===
-        void processInputEvent(const InputEvent& event) override;
+        void processInputEvent(const InputEvent& event) noexcept override;
         void updateFrame() override;
 
         // === 键盘输入查询 ===
@@ -47,6 +47,13 @@ namespace Bee
         int2 getMouseDelta() const override;
         f32 getMouseWheelDelta() const override;
 
+        // === 事件回调管理 ===
+        void setKeyEventCallback(KeyEventCallback&& callback) override;
+        void setMouseButtonCallback(MouseButtonCallback&& callback) override;
+        void setMouseMotionCallback(MouseMotionCallback&& callback) override;
+        void setMouseWheelCallback(MouseWheelCallback&& callback) override;
+        void clearEventCallbacks() override;
+
         // === 其他功能 ===
         bool areKeysPressed(const std::vector<KeyCode>& keys) const override;
         bool isAnyKeyPressed() const override;
@@ -56,6 +63,9 @@ namespace Bee
 
     private:
         // === 辅助方法 ===
+        void processKeyboardEvent(const KeyboardEvent& event);
+        void processMouseEvent(const InputEvent& event);
+
         void updateKeyboardState(const KeyboardEvent& event);
         void updateMouseState(const MouseMotionEvent& event);
         void updateMouseState(const MouseButtonEvent& event);
@@ -67,6 +77,11 @@ namespace Bee
     private:
         KeyboardState _keyboardState{};
         MouseState _mouseState{};
+
+        KeyEventCallback _keyEventCallback;
+        MouseButtonCallback _mouseButtonCallback;
+        MouseMotionCallback _mouseMotionCallback;
+        MouseWheelCallback _mouseWheelCallback;
 
         bool _initialized = false;
     };
