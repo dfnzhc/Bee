@@ -7,12 +7,13 @@
 
 #include "Application.hpp"
 #include <cstdio>
+#include <print>
 
 using namespace Bee;
 
 void Bee::Hello()
 {
-    std::printf("Hello form 🐝");
+    std::println("Hello form 🐝");
 }
 
 int Bee::Test(int a, int b)

@@ -7,10 +7,12 @@
 
 #include <iostream>
 #include "App/Application.hpp"
+#include <Otter/Otter.hpp>
 
 using namespace Bee;
 
 int main()
 {
     Hello();
+    ott::Hello();
 }

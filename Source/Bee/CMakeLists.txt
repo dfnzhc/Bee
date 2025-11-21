@@ -16,6 +16,7 @@ target_compile_features(Bee
 
 target_link_libraries(Bee
         PUBLIC
+        Otter::Otter
 
         PRIVATE
 )

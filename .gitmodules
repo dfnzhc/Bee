@@ -1,0 +1,3 @@
+[submodule "Depends/Otter"]
+	path = Depends/Otter
+	url = https://github.com/dfnzhc/Otter.git

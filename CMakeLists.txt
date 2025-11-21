@@ -32,8 +32,6 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${BEE_BINARY_DIR})
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${BEE_BINARY_DIR}/Lib")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${BEE_BINARY_DIR}/Lib")
 
-include(HelperScripts)
-
 # --------------------------------------------------------------
 # Sources
 # --------------------------------------------------------------
