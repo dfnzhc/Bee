@@ -1,21 +1,14 @@
-project(BeeUnitTest LANGUAGES CXX)
+enable_testing()
 
-CPMAddPackage(
-        NAME gtest
-        GITHUB_REPOSITORY google/googletest
-        GIT_TAG v1.17.0
-        VERSION 1.17.0
-        OPTIONS
-        "INSTALL_GTEST OFF"
-        "gtest_force_shared_crt ON"
-)
+set(INSTALL_GTEST OFF)
+set(gtest_force_shared_crt ON)
+find_package(GTest CONFIG)
 
-if (NOT gtest_ADDED)
-    message(WARNING "Failed to add gtest library, skipped unit tests build.")
+if (NOT GTest_FOUND)
+    message(WARNING "GTest not found, failed to build unit tests.")
     return()
 endif ()
 
-enable_testing()
 include(GoogleTest)
 
 file(GLOB_RECURSE TEST_FILES ./*.cpp)

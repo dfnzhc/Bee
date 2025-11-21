@@ -33,14 +33,13 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${BEE_BINARY_DIR}/Lib")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${BEE_BINARY_DIR}/Lib")
 
 include(HelperScripts)
-include(CPM)
 
 # --------------------------------------------------------------
 # Sources
 # --------------------------------------------------------------
 
-# Extern libraries
-add_subdirectory(External)
+# Depend libraries
+add_subdirectory(Depends)
 
 # Project
 add_subdirectory(Source)

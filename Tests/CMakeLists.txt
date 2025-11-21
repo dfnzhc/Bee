@@ -1,6 +1,6 @@
-if (NOT BEE_BUILD_TESTS)
-    return()
+
+if (BEE_BUILD_TESTS)
+    add_subdirectory(Units)
 endif ()
 
-add_subdirectory(Units)
 add_subdirectory(Benchmarks)
