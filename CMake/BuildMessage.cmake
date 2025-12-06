@@ -1,0 +1,96 @@
+string(ASCII 27 Esc)
+set(C_Reset "${Esc}[m")
+set(C_Bold "${Esc}[1m")
+set(C_Dim "${Esc}[2m")
+set(C_Red "${Esc}[31m")
+set(C_Green "${Esc}[32m")
+set(C_Yell "${Esc}[33m")
+set(C_Blue "${Esc}[34m")
+set(C_Cyan "${Esc}[36m")
+set(C_White "${Esc}[37m")
+
+set(LOG_TREE_MID " ├── ")
+
+function(BeeWarn MSG)
+    message(STATUS "${LOG_TREE_MID}${C_Yell}⚠️  Warn:${C_Reset} ${MSG}")
+endfunction()
+
+function(BeeError MSG)
+    message(STATUS "${LOG_TREE_MID}${C_Red}🚨  Error:${C_Red} ${MSG}")
+endfunction()
+
+function(PrintTreeEnd)
+    message(STATUS " └────")
+endfunction()
+
+function(BeeGetTargetStdVersion COMP_NAME OUT_VER)
+    set(RES_VER "??")
+
+    get_target_property(PROP_STD "Bee::${COMP_NAME}" CXX_STANDARD)
+    get_target_property(PROP_FEAT "Bee::${COMP_NAME}" INTERFACE_COMPILE_FEATURES)
+
+    if (PROP_STD)
+        set(RES_VER "${PROP_STD}")
+    elseif (PROP_FEAT)
+        foreach (FEAT ${PROP_FEAT})
+            if (FEAT MATCHES "cxx_std_([0-9]+)")
+                set(RES_VER "${CMAKE_MATCH_1}")
+                break()
+            endif ()
+        endforeach ()
+    elseif (DEFINED CMAKE_CXX_STANDARD)
+        set(RES_VER "${CMAKE_CXX_STANDARD}")
+    endif ()
+
+    set(${OUT_VER} "${RES_VER}" PARENT_SCOPE)
+endfunction()
+
+function(BeeLogComponent COMP_NAME IS_REQUIRED IS_CUDA_DEPEND DESCRIPTION)
+    get_target_property(T_TYPE "Bee::${COMP_NAME}" TYPE)
+    if ("${T_TYPE}" STREQUAL "INTERFACE_LIBRARY")
+        set(TYPE_TAG "${C_Cyan}[Header]${C_Reset}")
+        set(IS_INTERFACE TRUE)
+    elseif ("${T_TYPE}" STREQUAL "STATIC_LIBRARY")
+        set(TYPE_TAG "${C_Blue}[Static]${C_Reset}")
+        set(IS_INTERFACE FALSE)
+    elseif ("${T_TYPE}" STREQUAL "SHARED_LIBRARY")
+        set(TYPE_TAG "${C_Mag}[Shared]${C_Reset}")
+        set(IS_INTERFACE FALSE)
+    else ()
+        set(TYPE_TAG "[Other ]")
+    endif ()
+
+    if (IS_REQUIRED)
+        set(REQ_TAG "${C_Red}[Required]${C_Reset}")
+    else ()
+        set(REQ_TAG "${C_Green}[Optional]${C_Reset}")
+    endif ()
+
+    get_target_property(T_CUDA_STD "Bee::${COMP_NAME}" CUDA_STANDARD)
+    set(IS_CUDA_IMPL FALSE)
+    if (T_CUDA_STD)
+        set(IS_CUDA_IMPL TRUE)
+    endif ()
+
+    if (IS_CUDA_DEPEND)
+        # 能在 Host 和 Device 端使用
+        set(PLAT_TAG "${C_Green}[CUDA]${C_Reset}")
+        set(STD_COLOR "${C_Green}")
+    else ()
+        # 只能在 Host 端使用
+        set(PLAT_TAG "${C_Blue}[Host]${C_Reset}")
+        set(STD_COLOR "${C_Gray}")
+    endif ()
+
+    BeeGetTargetStdVersion(${COMP_NAME} STD_VER)
+    set(STD_TAG "${STD_COLOR}[C++${STD_VER}]${C_Reset}")
+
+    string(LENGTH "${COMP_NAME}" NAME_LEN)
+    math(EXPR PAD_LEN "23 - ${NAME_LEN}") # 调整宽度以适应较长的别名
+    if (PAD_LEN LESS 0)
+        set(PAD_LEN 1)
+    endif ()
+    string(REPEAT "." ${PAD_LEN} DOTS)
+
+    message(STATUS "${LOG_TREE_MID}${COMP_NAME}${C_Gray}${DOTS}${C_Reset} ${TYPE_TAG} ${STD_TAG} ${PLAT_TAG} ${REQ_TAG}: ${DESCRIPTION}")
+endfunction()
