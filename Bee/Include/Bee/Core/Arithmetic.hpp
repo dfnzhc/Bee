@@ -14,8 +14,9 @@ namespace bee
 {
 
 template <typename T>
-concept ArithmeticType = requires(T t)
+concept ArrayLike = requires(T t)
 {
+    requires ArithType<typename T::value_type>;
     T::Dimension;
     { t[0] };
 };
@@ -23,35 +24,36 @@ concept ArithmeticType = requires(T t)
 template <typename Op>
 struct ArithmeticUnaryOp
 {
-    template <ArithmeticType Lhs>
-    static constexpr Lhs& Apply(Lhs& lhs)
+    template <ArrayLike AL>
+    static constexpr AL& Apply(AL& al)
     {
-        for (int i = 0; i < Lhs::Dimension; ++i)
+        for (int i = 0; i < AL::Dimension; ++i)
         {
-            lhs[i] = Op::Apply(lhs[i]);
+            al[i] = Op::Apply(al[i]);
         }
-        return lhs;
+        return al;
     }
 };
 
 template <typename Op>
 struct ArithmeticBinaryOp
 {
-    template <ArithmeticType Lhs, typename Rhs>
+    template <ArrayLike Lhs, typename Rhs>
     static constexpr Lhs& Apply(Lhs& lhs, const Rhs& rhs)
     {
-        if constexpr (ArithmeticType<Rhs>)
+        using T = Lhs::value_type;
+        if constexpr (ArrayLike<Rhs>)
         {
             for (int i = 0; i < std::min(Lhs::Dimension, Rhs::Dimension); ++i)
             {
-                lhs[i] = Op::Apply(lhs[i], rhs[i]);
+                lhs[i] = Op::Apply(lhs[i], To<T>(rhs[i]));
             }
         }
         else
         {
             for (int i = 0; i < Lhs::Dimension; ++i)
             {
-                lhs[i] = Op::Apply(lhs[i], rhs);
+                lhs[i] = Op::Apply(lhs[i], To<T>(rhs));
             }
         }
         return lhs;
@@ -61,44 +63,50 @@ struct ArithmeticBinaryOp
 template <typename Op>
 struct ArithmeticComparisonOp
 {
-    template <ArithmeticType Lhs, typename Rhs>
+    template <ArrayLike Lhs, typename Rhs>
     static constexpr bool ApplyAll(const Lhs& lhs, const Rhs& rhs)
     {
-        if constexpr (ArithmeticType<Rhs>)
+        if constexpr (ArrayLike<Rhs>)
         {
+            using T = std::common_type_t<typename Lhs::value_type, typename Rhs::value_type>;
+            
             for (int i = 0; i < std::min(Lhs::Dimension, Rhs::Dimension); ++i)
             {
-                if (!Op::Apply(lhs[i], rhs[i]))
+                if (!Op::Apply(To<T>(lhs[i]), To<T>(rhs[i])))
                     return false;
             }
         }
         else
         {
+            using T = std::common_type_t<typename Lhs::value_type, Rhs>;
             for (int i = 0; i < Lhs::Dimension; ++i)
             {
-                if (!Op::Apply(lhs[i], rhs))
+                if (!Op::Apply(To<T>(lhs[i]), To<T>(rhs)))
                     return false;
             }
         }
         return true;
     }
 
-    template <ArithmeticType Lhs, typename Rhs>
+    template <ArrayLike Lhs, typename Rhs>
     static constexpr bool ApplyAny(const Lhs& lhs, const Rhs& rhs)
     {
-        if constexpr (ArithmeticType<Rhs>)
+        if constexpr (ArrayLike<Rhs>)
         {
+            using T = std::common_type_t<typename Lhs::value_type, typename Rhs::value_type>;
+            
             for (int i = 0; i < std::min(Lhs::Dimension, Rhs::Dimension); ++i)
             {
-                if (Op::Apply(lhs[i], rhs[i]))
+                if (Op::Apply(To<T>(lhs[i]), To<T>(rhs[i])))
                     return true;
             }
         }
         else
         {
+            using T = std::common_type_t<typename Lhs::value_type, Rhs>;
             for (int i = 0; i < Lhs::Dimension; ++i)
             {
-                if (Op::Apply(lhs[i], rhs))
+                if (Op::Apply(To<T>(lhs[i]), rhs))
                     return true;
             }
         }

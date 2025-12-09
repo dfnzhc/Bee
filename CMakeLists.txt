@@ -27,7 +27,7 @@ add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/utf-8>")
 set(BEE_BUILD_TESTS ON CACHE BOOL "Build test programs")
 set(BEE_BUILD_CUDA_TESTS ON CACHE BOOL "Build CUDA test program")
 
-set(BEE_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/Include)
+set(BEE_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/Bee/Include)
 set(BEE_BINARY_DIR "${CMAKE_SOURCE_DIR}/Bin/$<CONFIG>")
 set(BEE_DATA_DIR ${CMAKE_SOURCE_DIR}/Data)
 set(BEE_EXTERNAL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/External)
@@ -54,8 +54,7 @@ PrintTreeEnd()
 message(STATUS "")
 message(STATUS " ${C_Bold}📦 Modules${C_Reset}")
 
-add_subdirectory(Source)
-add_subdirectory(Editor)
+add_subdirectory(Bee)
 
 PrintTreeEnd()
 

@@ -8,6 +8,8 @@
 #pragma once
 
 #include <array>
+#include <numeric>
+
 #include "Bee/Core/Arithmetic.hpp"
 
 namespace bee
@@ -107,35 +109,69 @@ namespace detail
 {
     struct TupleFunc
     {
-        template <ArithmeticType Lhs, typename F>
-        static constexpr Lhs& CallUnary(Lhs& lhs, F&& func)
+        template <ArrayLike AL, typename F>
+        static constexpr AL& CallUnary(AL& al, F&& func)
         {
-            for (int i = 0; i < Lhs::Dimension; ++i)
+            for (int i = 0; i < AL::Dimension; ++i)
             {
-                lhs[i] = std::invoke(func, lhs[i]);
+                al[i] = std::invoke(func, al[i]);
             }
 
-            return lhs;
+            return al;
         }
 
-        template <ArithmeticType Lhs, typename Rhs, typename F>
+        template <ArrayLike Lhs, typename Rhs, typename F>
         static constexpr Lhs& CallBinary(Lhs& lhs, const Rhs& rhs, F&& func)
         {
-            if constexpr (ArithmeticType<Rhs>)
+            using T = Lhs::value_type;
+
+            if constexpr (ArrayLike<Rhs>)
             {
                 for (int i = 0; i < std::min(Lhs::Dimension, Rhs::Dimension); ++i)
                 {
-                    lhs[i] = std::invoke(func, lhs[i], rhs[i]);
+                    lhs[i] = std::invoke(func, lhs[i], To<T>(rhs[i]));
                 }
             }
             else
             {
                 for (int i = 0; i < Lhs::Dimension; ++i)
                 {
-                    lhs[i] = std::invoke(func, lhs[i], rhs);
+                    lhs[i] = std::invoke(func, lhs[i], To<T>(rhs));
                 }
             }
             return lhs;
+        }
+
+        template <ArrayLike A, ArrayLike B, typename C, typename F>
+        static constexpr A& CallTernary(A& a, const B& b, const C& c, F&& func)
+        {
+            using T = A::value_type;
+
+            if constexpr (ArrayLike<C>)
+            {
+                constexpr int N = std::min(A::Dimension, std::min(B::Dimension, C::Dimension));
+                for (int i = 0; i < N; ++i)
+                {
+                    a[i] = std::invoke(func, a[i], To<T>(b[i]), To<T>(c[i]));
+                }
+            }
+            else
+            {
+                constexpr int N = std::min(A::Dimension, B::Dimension);
+                for (int i = 0; i < N; ++i)
+                {
+                    a[i] = std::invoke(func, a[i], To<T>(b[i]), To<T>(c));
+                }
+            }
+            return a;
+        }
+
+        template <ArrayLike AL, typename I, typename F>
+        static constexpr auto Reduce(const AL& al, I init, F&& func)
+        {
+            using T = AL::value_type;
+
+            return std::reduce(al.begin(), al.end(), To<T>(init), std::forward<F>(func));
         }
     };
 
@@ -275,6 +311,120 @@ constexpr auto Ceil(const Tuple<Derived, T, N>& c)
     return detail::TupleFunc::CallUnary(ret, [](T v)
     {
         return std::ceil(v);
+    });
+}
+
+template <template <typename> class Derived, ArithType T, int N>
+constexpr auto Min(const Tuple<Derived, T, N>& c0, const Tuple<Derived, T, N>& c1)
+{
+    auto ret = Tuple<Derived, T, N>{c0.derived()};
+    return detail::TupleFunc::CallBinary(ret, c1, [](T v0, T v1)
+    {
+        return std::min(v0, v1);
+    });
+}
+
+template <template <typename> class Derived, ArithType T, int N>
+constexpr auto Max(const Tuple<Derived, T, N>& c0, const Tuple<Derived, T, N>& c1)
+{
+    auto ret = Tuple<Derived, T, N>{c0.derived()};
+    return detail::TupleFunc::CallBinary(ret, c1, [](T v0, T v1)
+    {
+        return std::max(v0, v1);
+    });
+}
+
+template <template <typename> class Derived, ArithType T, int N>
+constexpr auto MinValue(const Tuple<Derived, T, N>& c)
+{
+    return detail::TupleFunc::Reduce(c, c[0], [](T v0, T v1)
+    {
+        return std::min(v0, v1);
+    });
+}
+
+template <template <typename> class Derived, ArithType T, int N>
+constexpr auto MaxValue(const Tuple<Derived, T, N>& c)
+{
+    return detail::TupleFunc::Reduce(c, c[0], [](T v0, T v1)
+    {
+        return std::max(v0, v1);
+    });
+}
+
+template <template <typename> class Derived, ArithType T, int N>
+constexpr int MinIndex(const Tuple<Derived, T, N>& c)
+{
+    int index = 0;
+    for (int i = 1; i < N; ++i)
+    {
+        if (c[i] < c[index])
+        {
+            index = i;
+        }
+    }
+    return index;
+}
+
+template <template <typename> class Derived, ArithType T, int N>
+constexpr int MaxIndex(const Tuple<Derived, T, N>& c)
+{
+    int index = 0;
+    for (int i = 1; i < N; ++i)
+    {
+        if (c[i] > c[index])
+        {
+            index = i;
+        }
+    }
+    return index;
+}
+
+template <template <typename> class Derived, ArithType T, int N>
+constexpr auto Sum(const Tuple<Derived, T, N>& c)
+{
+    return detail::TupleFunc::Reduce(c, 0, std::plus<T>{});
+}
+
+template <template <typename> class Derived, ArithType T, int N>
+constexpr auto Product(const Tuple<Derived, T, N>& c)
+{
+    return detail::TupleFunc::Reduce(c, 1, std::multiplies<T>{});
+}
+
+template <template <typename> class Derived, ArithType T, ArithType U, int N, FloatType F>
+constexpr auto Lerp(const Tuple<Derived, T, N>& c0, const Tuple<Derived, U, N>& c1, F alpha)
+{
+    using R = CommonFloatType<T, U, F>;
+    
+    auto ret = Tuple<Derived, R, N>{c0.derived()};
+    return detail::TupleFunc::CallTernary(ret, c1, alpha, [](R v0, R v1, R a)
+    {
+        return std::lerp(v0, v1, a);
+    });
+}
+
+template <template <typename> class Derived, ArithType T, ArithType U, ArithType V, int N>
+constexpr auto FMA(const Tuple<Derived, T, N>& c0, const Tuple<Derived, U, N>& c1, const Tuple<Derived, V, N>& c2)
+{
+    using R = CommonFloatType<T, U, V>;
+    
+    auto ret = Tuple<Derived, R, N>{c0.derived()};
+    return detail::TupleFunc::CallTernary(ret, c1, c2, [](R x, R y, R z)
+    {
+        return std::fma(x, y, z);
+    });
+}
+
+template <template <typename> class Derived, ArithType T, ArithType U, ArithType V, int N>
+constexpr auto FMA(const Tuple<Derived, T, N>& c0, const Tuple<Derived, U, N>& c1, V c2)
+{
+    using R = CommonFloatType<T, U, V>;
+    
+    auto ret = Tuple<Derived, R, N>{c0.derived()};
+    return detail::TupleFunc::CallTernary(ret, c1, c2, [](R x, R y, R z)
+    {
+        return std::fma(x, y, z);
     });
 }
 

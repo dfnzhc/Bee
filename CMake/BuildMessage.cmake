@@ -6,8 +6,16 @@ set(C_Red "${Esc}[31m")
 set(C_Green "${Esc}[32m")
 set(C_Yell "${Esc}[33m")
 set(C_Blue "${Esc}[34m")
+set(C_Mag "${Esc}[35m")
 set(C_Cyan "${Esc}[36m")
 set(C_White "${Esc}[37m")
+set(C_brRed "${Esc}[91m")
+set(C_brGreen "${Esc}[92m")
+set(C_brYell "${Esc}[93m")
+set(C_brBlue "${Esc}[94m")
+set(C_brMag "${Esc}[95m")
+set(C_brCyan "${Esc}[96m")
+set(C_brWhite "${Esc}[97m")
 
 set(LOG_TREE_MID " ├── ")
 
@@ -83,7 +91,7 @@ function(BeeLogComponent COMP_NAME IS_REQUIRED IS_CUDA_DEPEND DESCRIPTION)
     endif ()
 
     BeeGetTargetStdVersion(${COMP_NAME} STD_VER)
-    set(STD_TAG "${STD_COLOR}[C++${STD_VER}]${C_Reset}")
+    set(STD_TAG "${C_brBlue}[CXX${STD_VER}]${C_Reset}")
 
     string(LENGTH "${COMP_NAME}" NAME_LEN)
     math(EXPR PAD_LEN "23 - ${NAME_LEN}") # 调整宽度以适应较长的别名
