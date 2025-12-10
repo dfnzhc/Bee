@@ -1,6 +1,7 @@
 ﻿
 add_subdirectory(Core)
 add_subdirectory(Container)
+add_subdirectory(Math)
 #add_subdirectory(Utils)
 
 add_library(Bee INTERFACE)
@@ -9,6 +10,7 @@ target_link_libraries(Bee
         INTERFACE
         Bee::Core
         Bee::Container
+        Bee::Math
 )
 
 target_include_directories(Bee

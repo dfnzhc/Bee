@@ -21,7 +21,7 @@
 #error "不支持的平台"
 #endif
 
-#if BEE_ON_LINUX || BEE_ON_MAC
+#if BEE_ON_MAC
 #warning "目前仅在 Windows 上开发测试"
 #endif
 

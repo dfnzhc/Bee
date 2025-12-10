@@ -18,6 +18,7 @@
 #include <iostream>
 #include <string_view>
 #include <vector>
+#include <memory>
 #endif
 
 namespace bee

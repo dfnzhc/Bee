@@ -11,6 +11,7 @@
 #include <numeric>
 
 #include "Bee/Core/Arithmetic.hpp"
+#include "Bee/Core/Check.hpp"
 
 namespace bee
 {
@@ -40,7 +41,7 @@ public:
 
     using SelfType = Derived<T>;
     template <typename U>
-    using OtherType = Tuple<Derived, U, N>;
+    using OtherType = Derived<U>;
 
     static constexpr int Dimension = N;
 
@@ -181,7 +182,7 @@ namespace detail
 
 template <template <typename> class Derived, ArithType T, int N>
 template <ArithType U>
-constexpr auto Tuple<Derived, T, N>::operator+(const OtherType<U>& c) const -> Derived<decltype(T{} + U{})>
+constexpr auto Tuple<Derived, T, N>::operator+(const Derived<U>& c) const -> Derived<decltype(T{} + U{})>
 {
     using R  = decltype(T{} + U{});
     auto ret = Derived<R>{derived()};
@@ -190,7 +191,7 @@ constexpr auto Tuple<Derived, T, N>::operator+(const OtherType<U>& c) const -> D
 
 template <template <typename> class Derived, ArithType T, int N>
 template <ArithType U>
-constexpr auto Tuple<Derived, T, N>::operator-(const OtherType<U>& c) const -> Derived<decltype(T{} - U{})>
+constexpr auto Tuple<Derived, T, N>::operator-(const Derived<U>& c) const -> Derived<decltype(T{} - U{})>
 {
     using R  = decltype(T{} + U{});
     auto ret = Derived<R>{derived()};
