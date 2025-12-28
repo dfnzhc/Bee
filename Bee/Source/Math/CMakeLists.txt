@@ -37,7 +37,7 @@ BeeAddComponent(
         SOURCES ${CompSources}
         HEADERS ${CompHeaders}
         CUDA_SOURCES ${CompCUDASources}
-        CUDA_DEPEND IS_CUDA_DEPEND
+        CUDA_DEPEND ${IS_CUDA_DEPEND}
         COMPILE_DEFINITIONS ${CompDefinitions}
         COMPILE_OPTIONS ${CompOptions}
         INCLUDE_DIRECTORIES ${CompIncludeDirs}

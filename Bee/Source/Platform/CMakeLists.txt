@@ -1,6 +1,6 @@
-﻿set(COMP_NAME Container)
+﻿set(COMP_NAME Platform)
 set(IS_REQUIRED TRUE)
-set(IS_CUDA_DEPEND TRUE)
+set(IS_CUDA_DEPEND FALSE)
 
 set(TARGET_NAME "Bee${COMP_NAME}")
 file(GLOB_RECURSE CompSources
@@ -29,6 +29,7 @@ set(CompIncludeDirs
 
 set(CompLinkLibraries
         Bee::Core
+        Bee::Math
 )
 
 BeeAddComponent(
@@ -43,10 +44,20 @@ BeeAddComponent(
         LINK_LIBRARIES ${CompLinkLibraries}
 )
 
-#target_include_directories(${TARGET_NAME} 
-#        PRIVATE
-#        ${CMAKE_CURRENT_SOURCE_DIR}
-#        "${BEE_INCLUDE_DIR}/Bee/${COMP_NAME}"
-#)
+target_include_directories(${TARGET_NAME}
+        PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        "${BEE_INCLUDE_DIR}/Bee/${COMP_NAME}"
+)
 
-BeeLogComponent(${COMP_NAME} IS_REQUIRED IS_CUDA_DEPEND "Containers.")
+# 外部库
+find_package(SDL3 CONFIG REQUIRED)
+find_package(spdlog CONFIG REQUIRED)
+
+target_link_libraries(${TARGET_NAME}
+        PRIVATE
+        SDL3::SDL3
+        spdlog::spdlog_header_only
+)
+
+BeeLogComponent(${COMP_NAME} IS_REQUIRED ${IS_CUDA_DEPEND} "Platform.")

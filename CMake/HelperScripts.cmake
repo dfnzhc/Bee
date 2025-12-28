@@ -19,8 +19,9 @@ macro(AddTestProgram TestFile Libraries Category)
     gtest_discover_tests(${FILE_NAME})
 
     set_target_properties(${FILE_NAME} PROPERTIES FOLDER "Tests/${Category}")
+    target_compile_features(${FILE_NAME} PRIVATE cxx_std_23)
 
-    target_link_libraries(${FILE_NAME} PUBLIC ${Libraries})
+    target_link_libraries(${FILE_NAME} PUBLIC ${Libraries} GTest::gtest GTest::gtest_main)
     add_test(NAME "${FILE_NAME}Test" COMMAND ${FILE_NAME})
 endmacro()
 
@@ -70,7 +71,6 @@ function(BeeAddComponent)
     set(is_cuda_target FALSE)
     if (COMP_CUDA_SOURCES)
         set(is_cuda_target TRUE)
-
         set_target_properties(${target_name} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
         set_target_properties(${target_name} PROPERTIES CUDA_STANDARD 20)
     endif ()

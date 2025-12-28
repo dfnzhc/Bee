@@ -12,9 +12,13 @@ endif ()
 
 include(GoogleTest)
 
-AddTestProgram(CoreTest.cpp "Bee::Core;GTest::gtest;GTest::gtest_main" "Core")
-AddTestProgram(TupleTest.cpp "Bee::Container;GTest::gtest;GTest::gtest_main" "Container")
+AddTestProgram(CoreTest.cpp "Bee::Core" "Core")
+AddTestProgram(TupleTest.cpp "Bee::Container" "Container")
 
-AddTestProgram(Math/BitsTest.cpp "Bee::Math;GTest::gtest;GTest::gtest_main" "Bits")
-AddTestProgram(Math/CommonTest.cpp "Bee::Math;GTest::gtest;GTest::gtest_main" "Common")
-AddTestProgram(Math/VectorTest.cpp "Bee::Math;GTest::gtest;GTest::gtest_main" "VectorMath")
+AddTestProgram(Math/BitsTest.cpp "Bee::Math" "Math")
+AddTestProgram(Math/CommonTest.cpp "Bee::Math" "Math")
+AddTestProgram(Math/VectorTest.cpp "Bee::Math" "Math")
+
+
+AddTestProgram(Platform/PlatformTest.cpp "Bee::Bee" "Platform")
+
