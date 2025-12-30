@@ -44,10 +44,10 @@ BeeAddComponent(
         LINK_LIBRARIES ${CompLinkLibraries}
 )
 
-#target_include_directories(${TARGET_NAME} 
-#        PRIVATE
-#        ${CMAKE_CURRENT_SOURCE_DIR}
-#        "${BEE_INCLUDE_DIR}/Bee/${COMP_NAME}"
-#)
+target_include_directories(${TARGET_NAME}
+        PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        "${BEE_INCLUDE_DIR}/Bee/${COMP_NAME}"
+)
 
 BeeLogComponent(${COMP_NAME} IS_REQUIRED ${IS_CUDA_DEPEND} "Utilities.")

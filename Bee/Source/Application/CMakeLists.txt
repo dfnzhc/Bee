@@ -1,4 +1,4 @@
-﻿set(COMP_NAME Platform)
+﻿set(COMP_NAME Application)
 set(IS_REQUIRED TRUE)
 set(IS_CUDA_DEPEND FALSE)
 
@@ -6,8 +6,6 @@ set(TARGET_NAME "Bee${COMP_NAME}")
 file(GLOB_RECURSE CompSources
         "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp"
 )
-
-list(FILTER CompSources EXCLUDE REGEX ".*/EntryPoint.cpp$")
 
 file(GLOB_RECURSE CompCUDASources
         "${CMAKE_CURRENT_SOURCE_DIR}/*.cu"
@@ -32,6 +30,7 @@ set(CompIncludeDirs
 set(CompLinkLibraries
         Bee::Core
         Bee::Math
+        Bee::Platform
 )
 
 BeeAddComponent(
@@ -46,28 +45,10 @@ BeeAddComponent(
         LINK_LIBRARIES ${CompLinkLibraries}
 )
 
-target_include_directories(${TARGET_NAME}
+target_include_directories(${TARGET_NAME} 
         PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
         "${BEE_INCLUDE_DIR}/Bee/${COMP_NAME}"
 )
 
-# 外部库
-find_package(SDL3 CONFIG REQUIRED)
-find_package(spdlog CONFIG REQUIRED)
-
-target_link_libraries(${TARGET_NAME}
-        PRIVATE
-        SDL3::SDL3
-        spdlog::spdlog_header_only
-)
-
-BeeLogComponent(${COMP_NAME} ${IS_REQUIRED} ${IS_CUDA_DEPEND} "Platform.")
-
-add_library(BeeEntryPoint STATIC EntryPoint.cpp)
-target_link_libraries(BeeEntryPoint
-        PRIVATE
-        SDL3::SDL3
-        Bee::Platform
-)
-add_library(Bee::EntryPoint ALIAS BeeEntryPoint)
+BeeLogComponent(${COMP_NAME} IS_REQUIRED ${IS_CUDA_DEPEND} "Application.")

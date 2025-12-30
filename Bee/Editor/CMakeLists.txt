@@ -8,6 +8,7 @@ add_executable(${TARGET_NAME} ${SOURCE_FILES})
 target_link_libraries(${TARGET_NAME}
         PRIVATE
         Bee::Bee
+        Bee::EntryPoint
 )
 
 target_include_directories(${TARGET_NAME}
@@ -20,7 +21,9 @@ set_target_properties(${TARGET_NAME}
         RUNTIME_OUTPUT_DIRECTORY ${BEE_BINARY_DIR}
 )
 
-target_compile_definitions(${TARGET_NAME} PRIVATE
+target_compile_definitions(${TARGET_NAME}
+        PRIVATE
+        BEE_LOG_TAG="🖥️"
 )
 
 string(LENGTH "${COMP_NAME}" NAME_LEN)
@@ -29,5 +32,4 @@ if (PAD_LEN LESS 0)
     set(PAD_LEN 1)
 endif ()
 string(REPEAT "." ${PAD_LEN} DOTS)
-
 message(STATUS "${LOG_TREE_MID}${COMP_NAME}${C_Gray}${DOTS}${C_Reset} ${C_White}[Executable]${C_Reset}: Editor of the Bee Engine.")
