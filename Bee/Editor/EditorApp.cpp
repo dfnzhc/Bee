@@ -21,7 +21,7 @@ EditorApp::~EditorApp()
 bool EditorApp::OnInit()
 {
     BEE_INFO("EditorApp onInit");
-    
+
     return true;
 }
 

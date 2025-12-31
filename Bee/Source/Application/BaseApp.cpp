@@ -23,6 +23,8 @@ bool BaseApp::initialize(int argc, char* argv[])
     Platform::Initialize();
     BEE_INFO("BaseApp init");
 
+    BEE_INFO("{}", (int)Platform::ShowMessageBox("初始化", "哈吉米哦南北路多🐝"));
+    
     OnInit();
 
     return true;
