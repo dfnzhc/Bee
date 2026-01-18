@@ -1,4 +1,4 @@
-﻿
+
 enable_testing()
 
 set(INSTALL_GTEST OFF)
@@ -15,10 +15,9 @@ include(GoogleTest)
 AddTestProgram(CoreTest.cpp "Bee::Core" "Core")
 AddTestProgram(TupleTest.cpp "Bee::Container" "Container")
 
-AddTestProgram(Math/BitsTest.cpp "Bee::Math" "Math")
-AddTestProgram(Math/CommonTest.cpp "Bee::Math" "Math")
-AddTestProgram(Math/VectorTest.cpp "Bee::Math" "Math")
+file(GLOB MathSources "Math/*.cpp")
+AddTestBundle(MathTests "${MathSources}" "Bee::Math")
 
-
-AddTestProgram(Platform/PlatformTest.cpp "Bee::Bee" "Platform")
+file(GLOB PlatformSources "Platform/*.cpp")
+AddTestBundle(PlatformTests "${PlatformSources}" "Bee::Bee")
 

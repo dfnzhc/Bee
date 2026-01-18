@@ -15,6 +15,10 @@ namespace bee
 constexpr f32 kEpsilonF = 1e-6f;
 constexpr f64 kEpsilonD = 1e-12;
 
+// 默认容差常量
+constexpr f32 kDefaultEpsilonF = (kEpsilonF + kEpsilonD) * 0.5f;
+constexpr f64 kDefaultEpsilonD = (kEpsilonF + kEpsilonD) * 0.5;
+
 constexpr f32 kInfinityF = std::numeric_limits<f32>::infinity();
 constexpr f64 kInfinityD = std::numeric_limits<f64>::infinity();
 

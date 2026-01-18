@@ -50,4 +50,4 @@ BeeAddComponent(
 #        "${BEE_INCLUDE_DIR}/Bee/${COMP_NAME}"
 #)
 
-BeeLogComponent(${COMP_NAME} IS_REQUIRED IS_CUDA_DEPEND "Mathmatical.")
+BeeLogComponent(${COMP_NAME} IS_REQUIRED IS_CUDA_DEPEND "Mathematical.")

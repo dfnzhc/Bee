@@ -12,11 +12,14 @@
 
 #include "Bee/Core/Arithmetic.hpp"
 #include "Bee/Core/Check.hpp"
+#include "Bee/Core/Concepts.hpp"
+#include "Bee/Math/Common.hpp"
 
 namespace bee
 {
 
 template <template<typename> class Derived, ArithType T, int N>
+    requires (N > 0 && N <= 4)
 class Tuple;
 
 // clang-format off
@@ -26,18 +29,17 @@ template <template<typename> class Derived, ArithType T> using Tuple4 = Tuple<De
 // clang-format on
 
 template <template<typename> class Derived, ArithType T, int N>
+    requires (N > 0 && N <= 4)
 class Tuple
 {
-    static_assert(N * sizeof(T) <= kCacheLineSize);
+    static_assert(N * sizeof(T) <= kCacheLineSize, "Tuple size exceeds cache line");
 
 public:
-    // 类型定义
+    // ========== 类型定义 ==========
     using value_type      = T;
     using size_type       = size_t;
     using reference       = T&;
     using const_reference = const T&;
-    using iterator        = typename std::array<T, N>::iterator;
-    using const_iterator  = typename std::array<T, N>::const_iterator;
 
     using SelfType = Derived<T>;
     template <typename U>
@@ -45,7 +47,10 @@ public:
 
     static constexpr int Dimension = N;
 
-    // 获取派生类引用
+    // ========== 编译期断言 ==========
+    static_assert(N > 0 && N <= 4, "Only 1-4 dimensional tuples supported");
+
+    // ========== 获取派生类引用 ==========
     // clang-format off
     constexpr       SelfType& derived()       noexcept { return static_cast<      SelfType&>(*this); }
     constexpr const SelfType& derived() const noexcept { return static_cast<const SelfType&>(*this); }
@@ -58,375 +63,309 @@ public:
 
     template <typename... Args>
         requires (sizeof...(Args) == N) && AllConvertibleTo<T, Args...>
-    constexpr explicit Tuple(Args... args) noexcept :
-        data{static_cast<T>(args)...}
+    constexpr explicit Tuple(Args... args) noexcept
     {
-        BEE_DCHECK(!hasNaN());
+        BEE_DCHECK(((!std::isnan(static_cast<T>(args))) && ...));
     }
 
-    // clang-format off
     template <ArithType U>
     constexpr explicit Tuple(const OtherType<U>& other) noexcept
     {
-        std::transform(other.begin(), other.end(), data.begin(), [](U val) { return static_cast<T>(val); });
+        for (int i = 0; i < N; ++i)
+            derived()[i] = static_cast<T>(other[i]);
         BEE_DCHECK(!hasNaN());
     }
 
-    constexpr       iterator  begin()       noexcept { return data.begin(); }
-    constexpr const_iterator  begin() const noexcept { return data.begin(); }
-    constexpr const_iterator cbegin() const noexcept { return data.cbegin(); }
-        
-    constexpr       iterator  end()       noexcept { return data.end(); }
-    constexpr const_iterator  end() const noexcept { return data.end(); }
-    constexpr const_iterator cend() const noexcept { return data.cend(); }
-    
-    constexpr T  operator[](int i) const { return data[i]; }
-    constexpr T& operator[](int i)       { return data[i]; }
+    // ========== 数据访问接口 ==========
 
-    template <ArithType U> constexpr auto operator+(const OtherType<U>& c) const -> Derived<decltype(T{} + U{})>;
-    template <ArithType U> constexpr auto operator-(const OtherType<U>& c) const -> Derived<decltype(T{} - U{})>;
-    template <ArithType U> constexpr auto operator*(U s) const -> Derived<decltype(T{} * U{})>;
-    template <ArithType U> constexpr auto operator/(U d) const -> Derived<decltype(T{} / U{})>;
+    constexpr T& at(int i) noexcept
+    {
+        BEE_DCHECK(i >= 0 && i < N);
+        return derived()[i];
+    }
 
-    template <ArithType U> constexpr SelfType& operator+=(const OtherType<U>& c);
-    template <ArithType U> constexpr SelfType& operator-=(const OtherType<U>& c);
-    template <ArithType U> constexpr SelfType& operator*=(U s);
-    template <ArithType U> constexpr SelfType& operator/=(U d);
-
-    constexpr SelfType operator-() const;
-
-    constexpr bool operator==(const SelfType& c) const;
-    constexpr bool operator!=(const SelfType& c) const;
+    constexpr T at(int i) const noexcept
+    {
+        BEE_DCHECK(i >= 0 && i < N);
+        return derived()[i];
+    }
 
     constexpr int size() const noexcept { return N; }
-    // clang-format on
 
-    constexpr bool hasNaN() const;
+    // ========== 算术运算符 ==========
 
-    std::array<T, N> data{};
-};
-
-namespace detail
-{
-    struct TupleFunc
+    template <ArithType U>
+    constexpr auto operator+(const OtherType<U>& other) const -> Derived<decltype(T{} + U{})>
     {
-        template <ArrayLike AL, typename F>
-        static constexpr AL& CallUnary(AL& al, F&& func)
-        {
-            for (int i = 0; i < AL::Dimension; ++i)
-            {
-                al[i] = std::invoke(func, al[i]);
-            }
+        using R = decltype(T{} + U{});
+        Derived<R> result;
+        for (int i = 0; i < N; ++i)
+            result[i] = at(i) + other[i];
+        return result;
+    }
 
-            return al;
-        }
+    template <ArithType U>
+    constexpr auto operator-(const OtherType<U>& other) const -> Derived<decltype(T{} - U{})>
+    {
+        using R = decltype(T{} - U{});
+        Derived<R> result;
+        for (int i = 0; i < N; ++i)
+            result[i] = at(i) - other[i];
+        return result;
+    }
 
-        template <ArrayLike Lhs, typename Rhs, typename F>
-        static constexpr Lhs& CallBinary(Lhs& lhs, const Rhs& rhs, F&& func)
-        {
-            using T = Lhs::value_type;
+    template <ArithType U>
+    constexpr auto operator*(U scalar) const -> Derived<decltype(T{} * U{})>
+    {
+        using R = decltype(T{} * U{});
+        Derived<R> result;
+        for (int i = 0; i < N; ++i)
+            result[i] = at(i) * scalar;
+        return result;
+    }
 
-            if constexpr (ArrayLike<Rhs>)
-            {
-                for (int i = 0; i < std::min(Lhs::Dimension, Rhs::Dimension); ++i)
-                {
-                    lhs[i] = std::invoke(func, lhs[i], To<T>(rhs[i]));
-                }
-            }
-            else
-            {
-                for (int i = 0; i < Lhs::Dimension; ++i)
-                {
-                    lhs[i] = std::invoke(func, lhs[i], To<T>(rhs));
-                }
-            }
-            return lhs;
-        }
+    template <ArithType U>
+    constexpr auto operator/(U divisor) const -> Derived<decltype(T{} / U{})>
+    {
+        BEE_DCHECK(divisor != 0);
+        using R = decltype(T{} / U{});
+        Derived<R> result;
+        for (int i = 0; i < N; ++i)
+            result[i] = at(i) / divisor;
+        return result;
+    }
 
-        template <ArrayLike A, ArrayLike B, typename C, typename F>
-        static constexpr A& CallTernary(A& a, const B& b, const C& c, F&& func)
-        {
-            using T = A::value_type;
+    // ========== 复合赋值运算符 ==========
 
-            if constexpr (ArrayLike<C>)
-            {
-                constexpr int N = std::min(A::Dimension, std::min(B::Dimension, C::Dimension));
-                for (int i = 0; i < N; ++i)
-                {
-                    a[i] = std::invoke(func, a[i], To<T>(b[i]), To<T>(c[i]));
-                }
-            }
-            else
-            {
-                constexpr int N = std::min(A::Dimension, B::Dimension);
-                for (int i = 0; i < N; ++i)
-                {
-                    a[i] = std::invoke(func, a[i], To<T>(b[i]), To<T>(c));
-                }
-            }
-            return a;
-        }
+    template <ArithType U>
+    constexpr SelfType& operator+=(const OtherType<U>& other)
+    {
+        for (int i = 0; i < N; ++i)
+            derived()[i] += static_cast<T>(other[i]);
+        return derived();
+    }
 
-        template <ArrayLike AL, typename I, typename F>
-        static constexpr auto Reduce(const AL& al, I init, F&& func)
-        {
-            using T = AL::value_type;
+    template <ArithType U>
+    constexpr SelfType& operator-=(const OtherType<U>& other)
+    {
+        for (int i = 0; i < N; ++i)
+            derived()[i] -= static_cast<T>(other[i]);
+        return derived();
+    }
 
-            return std::reduce(al.begin(), al.end(), To<T>(init), std::forward<F>(func));
-        }
-    };
+    template <ArithType U>
+    constexpr SelfType& operator*=(U scalar)
+    {
+        for (int i = 0; i < N; ++i)
+            derived()[i] *= static_cast<T>(scalar);
+        return derived();
+    }
 
-} // namespace detail
+    template <ArithType U>
+    constexpr SelfType& operator/=(U divisor)
+    {
+        BEE_DCHECK(divisor != 0);
+        for (int i = 0; i < N; ++i)
+            derived()[i] /= static_cast<T>(divisor);
+        return derived();
+    }
 
-// ==================== 成员 ====================
+    // ========== 一元运算符 ==========
 
-template <template <typename> class Derived, ArithType T, int N>
-template <ArithType U>
-constexpr auto Tuple<Derived, T, N>::operator+(const Derived<U>& c) const -> Derived<decltype(T{} + U{})>
-{
-    using R  = decltype(T{} + U{});
-    auto ret = Derived<R>{derived()};
-    return ArithmeticBinaryOp<AddOp>::Apply(ret, c);
-}
+    constexpr SelfType operator-() const
+    {
+        SelfType result(derived());
+        for (int i = 0; i < N; ++i)
+            result[i] = -at(i);
+        return result;
+    }
 
-template <template <typename> class Derived, ArithType T, int N>
-template <ArithType U>
-constexpr auto Tuple<Derived, T, N>::operator-(const Derived<U>& c) const -> Derived<decltype(T{} - U{})>
-{
-    using R  = decltype(T{} + U{});
-    auto ret = Derived<R>{derived()};
-    return ArithmeticBinaryOp<SubOp>::Apply(ret, c);
-}
+    // ========== 比较运算符 ==========
 
-template <template <typename> class Derived, ArithType T, int N>
-template <ArithType U>
-constexpr auto Tuple<Derived, T, N>::operator*(U s) const -> Derived<decltype(T{} * U{})>
-{
-    using R  = decltype(T{} + U{});
-    auto ret = Derived<R>{derived()};
-    return ArithmeticBinaryOp<MulOp>::Apply(ret, s);
-}
+    constexpr bool operator==(const SelfType& other) const
+    {
+        for (int i = 0; i < N; ++i)
+            if (at(i) != other[i])
+                return false;
+        return true;
+    }
 
-template <template <typename> class Derived, ArithType T, int N>
-template <ArithType U>
-constexpr auto Tuple<Derived, T, N>::operator/(U d) const -> Derived<decltype(T{} / U{})>
-{
-    BEE_DCHECK(d != 0);
-    using R  = decltype(T{} + U{});
-    auto ret = Derived<R>{derived()};
-    return ArithmeticBinaryOp<DivOp>::Apply(ret, d);
-}
+    constexpr bool operator!=(const SelfType& other) const
+    {
+        return !(*this == other);
+    }
 
-template <template <typename> class Derived, ArithType T, int N>
-template <ArithType U>
-constexpr Tuple<Derived, T, N>::SelfType& Tuple<Derived, T, N>::operator+=(const OtherType<U>& c)
-{
-    return ArithmeticBinaryOp<AddOp>::Apply(derived(), c);
-}
+    // ========== 实用方法 ==========
 
-template <template <typename> class Derived, ArithType T, int N>
-template <ArithType U>
-constexpr Tuple<Derived, T, N>::SelfType& Tuple<Derived, T, N>::operator-=(const OtherType<U>& c)
-{
-    return ArithmeticBinaryOp<SubOp>::Apply(derived(), c);
-}
-
-template <template <typename> class Derived, ArithType T, int N>
-template <ArithType U>
-constexpr Tuple<Derived, T, N>::SelfType& Tuple<Derived, T, N>::operator*=(U s)
-{
-    return ArithmeticBinaryOp<MulOp>::Apply(derived(), s);
-}
-
-template <template <typename> class Derived, ArithType T, int N>
-template <ArithType U>
-constexpr Tuple<Derived, T, N>::SelfType& Tuple<Derived, T, N>::operator/=(U d)
-{
-    BEE_DCHECK(d != 0);
-    return ArithmeticBinaryOp<DivOp>::Apply(derived(), d);
-}
-
-template <template <typename> class Derived, ArithType T, int N>
-constexpr Tuple<Derived, T, N>::SelfType Tuple<Derived, T, N>::operator-() const
-{
-    auto ret = SelfType{derived()};
-    return ArithmeticUnaryOp<UnaryMinusOp>::Apply(ret);
-}
-
-template <template <typename> class Derived, ArithType T, int N>
-constexpr bool Tuple<Derived, T, N>::operator==(const SelfType& c) const
-{
-    return ArithmeticComparisonOp<EqualOp>::ApplyAll(derived(), c);
-}
-
-template <template <typename> class Derived, ArithType T, int N>
-constexpr bool Tuple<Derived, T, N>::operator!=(const SelfType& c) const
-{
-    return ArithmeticComparisonOp<NotEqualOp>::ApplyAny(derived(), c);
-}
-
-template <template <typename> class Derived, ArithType T, int N>
-constexpr bool Tuple<Derived, T, N>::hasNaN() const
-{
-    for (int i = 0; i < N; i++)
-        if (std::isnan(data[i]))
-            return true;
-
-    return false;
-}
+    constexpr bool hasNaN() const
+    {
+        for (int i = 0; i < N; ++i)
+            if (std::isnan(at(i)))
+                return true;
+        return false;
+    }
+};
 
 // ==================== 外部函数 ====================
 
 template <ArithType U, template <typename> class Derived, ArithType T, int N>
-constexpr auto operator*(U s, const Tuple<Derived, T, N>& c) -> Derived<decltype(T{} + U{})>
+    requires (N > 0 && N <= 4)
+constexpr auto operator*(U scalar, const Tuple<Derived, T, N>& tuple) -> Derived<decltype(T{} * U{})>
 {
-    using R  = decltype(T{} + U{});
-    auto ret = Derived<R>{c.derived()};
-    return ArithmeticBinaryOp<MulOp>::Apply(ret, s);
+    return tuple * scalar;
 }
 
-template <template <typename> class Derived, ArithType T, int N>
-constexpr auto Abs(const Tuple<Derived, T, N>& c)
-{
-    auto ret = Tuple<Derived, T, N>{c.derived()};
-    return detail::TupleFunc::CallUnary(ret, [](T v)
-    {
-        return std::abs(v);
-    });
-}
+// ==================== Tuple 实用函数 ====================
 
-template <template <typename> class Derived, ArithType T, int N>
-constexpr auto Floor(const Tuple<Derived, T, N>& c)
+namespace detail
 {
-    auto ret = Tuple<Derived, T, N>{c.derived()};
-    return detail::TupleFunc::CallUnary(ret, [](T v)
+    template <typename Result, typename T, int N>
+    struct TupleConstructor
     {
-        return std::floor(v);
-    });
-}
-
-template <template <typename> class Derived, ArithType T, int N>
-constexpr auto Ceil(const Tuple<Derived, T, N>& c)
-{
-    auto ret = Tuple<Derived, T, N>{c.derived()};
-    return detail::TupleFunc::CallUnary(ret, [](T v)
-    {
-        return std::ceil(v);
-    });
-}
-
-template <template <typename> class Derived, ArithType T, int N>
-constexpr auto Min(const Tuple<Derived, T, N>& c0, const Tuple<Derived, T, N>& c1)
-{
-    auto ret = Tuple<Derived, T, N>{c0.derived()};
-    return detail::TupleFunc::CallBinary(ret, c1, [](T v0, T v1)
-    {
-        return std::min(v0, v1);
-    });
-}
-
-template <template <typename> class Derived, ArithType T, int N>
-constexpr auto Max(const Tuple<Derived, T, N>& c0, const Tuple<Derived, T, N>& c1)
-{
-    auto ret = Tuple<Derived, T, N>{c0.derived()};
-    return detail::TupleFunc::CallBinary(ret, c1, [](T v0, T v1)
-    {
-        return std::max(v0, v1);
-    });
-}
-
-template <template <typename> class Derived, ArithType T, int N>
-constexpr auto MinValue(const Tuple<Derived, T, N>& c)
-{
-    return detail::TupleFunc::Reduce(c, c[0], [](T v0, T v1)
-    {
-        return std::min(v0, v1);
-    });
-}
-
-template <template <typename> class Derived, ArithType T, int N>
-constexpr auto MaxValue(const Tuple<Derived, T, N>& c)
-{
-    return detail::TupleFunc::Reduce(c, c[0], [](T v0, T v1)
-    {
-        return std::max(v0, v1);
-    });
-}
-
-template <template <typename> class Derived, ArithType T, int N>
-constexpr int MinIndex(const Tuple<Derived, T, N>& c)
-{
-    int index = 0;
-    for (int i = 1; i < N; ++i)
-    {
-        if (c[i] < c[index])
+        template <typename... Ts>
+        static constexpr Result construct(Ts&&... vals)
         {
-            index = i;
+            Result result{};
+            int idx = 0;
+            ((result[idx++] = std::forward<Ts>(vals)), ...);
+            return result;
         }
-    }
-    return index;
+    };
+}
+
+template <template <typename> class Derived, ArithType T, ArithType U, int N>
+    requires (N > 0 && N <= 4)
+constexpr auto Min(const Tuple<Derived, T, N>& a, const Tuple<Derived, U, N>& b)
+{
+    using R = std::common_type_t<T, U>;
+    Derived<R> result{};
+    for (int i = 0; i < N; ++i)
+        result[i] = bee::Min(a.at(i), b.at(i));
+    return result;
+}
+
+template <template <typename> class Derived, ArithType T, ArithType U, int N>
+    requires (N > 0 && N <= 4)
+constexpr auto Max(const Tuple<Derived, T, N>& a, const Tuple<Derived, U, N>& b)
+{
+    using R = std::common_type_t<T, U>;
+    Derived<R> result{};
+    for (int i = 0; i < N; ++i)
+        result[i] = bee::Max(a.at(i), b.at(i));
+    return result;
 }
 
 template <template <typename> class Derived, ArithType T, int N>
-constexpr int MaxIndex(const Tuple<Derived, T, N>& c)
+    requires (N > 0 && N <= 4)
+constexpr auto Abs(const Tuple<Derived, T, N>& t)
 {
-    int index = 0;
-    for (int i = 1; i < N; ++i)
-    {
-        if (c[i] > c[index])
-        {
-            index = i;
-        }
-    }
-    return index;
+    using R = std::decay_t<decltype(bee::Abs(T{}))>;
+    Derived<R> result{};
+    for (int i = 0; i < N; ++i)
+        result[i] = bee::Abs(t.at(i));
+    return result;
 }
 
-template <template <typename> class Derived, ArithType T, int N>
-constexpr auto Sum(const Tuple<Derived, T, N>& c)
+template <template <typename> class Derived, FloatType T, int N>
+    requires (N > 0 && N <= 4)
+constexpr auto Floor(const Tuple<Derived, T, N>& t)
 {
-    return detail::TupleFunc::Reduce(c, 0, std::plus<T>{});
+    Derived<T> result{};
+    for (int i = 0; i < N; ++i)
+        result[i] = bee::Floor(t.at(i));
+    return result;
 }
 
-template <template <typename> class Derived, ArithType T, int N>
-constexpr auto Product(const Tuple<Derived, T, N>& c)
+template <template <typename> class Derived, FloatType T, int N>
+    requires (N > 0 && N <= 4)
+constexpr auto Ceil(const Tuple<Derived, T, N>& t)
 {
-    return detail::TupleFunc::Reduce(c, 1, std::multiplies<T>{});
-}
-
-template <template <typename> class Derived, ArithType T, ArithType U, int N, FloatType F>
-constexpr auto Lerp(const Tuple<Derived, T, N>& c0, const Tuple<Derived, U, N>& c1, F alpha)
-{
-    using R = CommonFloatType<T, U, F>;
-    
-    auto ret = Tuple<Derived, R, N>{c0.derived()};
-    return detail::TupleFunc::CallTernary(ret, c1, alpha, [](R v0, R v1, R a)
-    {
-        return std::lerp(v0, v1, a);
-    });
+    Derived<T> result{};
+    for (int i = 0; i < N; ++i)
+        result[i] = bee::Ceil(t.at(i));
+    return result;
 }
 
 template <template <typename> class Derived, ArithType T, ArithType U, ArithType V, int N>
-constexpr auto FMA(const Tuple<Derived, T, N>& c0, const Tuple<Derived, U, N>& c1, const Tuple<Derived, V, N>& c2)
+    requires (N > 0 && N <= 4)
+constexpr auto Lerp(const Tuple<Derived, T, N>& a, const Tuple<Derived, U, N>& b, V t)
 {
-    using R = CommonFloatType<T, U, V>;
-    
-    auto ret = Tuple<Derived, R, N>{c0.derived()};
-    return detail::TupleFunc::CallTernary(ret, c1, c2, [](R x, R y, R z)
-    {
-        return std::fma(x, y, z);
-    });
+    using R = std::common_type_t<T, U>;
+    Derived<R> result{};
+    for (int i = 0; i < N; ++i)
+        result[i] = bee::Lerp(a.at(i), b.at(i), t);
+    return result;
 }
 
 template <template <typename> class Derived, ArithType T, ArithType U, ArithType V, int N>
-constexpr auto FMA(const Tuple<Derived, T, N>& c0, const Tuple<Derived, U, N>& c1, V c2)
+    requires (N > 0 && N <= 4)
+constexpr auto FMA(const Tuple<Derived, T, N>& a, const Tuple<Derived, U, N>& b, V c)
 {
-    using R = CommonFloatType<T, U, V>;
-    
-    auto ret = Tuple<Derived, R, N>{c0.derived()};
-    return detail::TupleFunc::CallTernary(ret, c1, c2, [](R x, R y, R z)
-    {
-        return std::fma(x, y, z);
-    });
+    using R = std::common_type_t<T, U>;
+    Derived<R> result{};
+    for (int i = 0; i < N; ++i)
+        result[i] = bee::FMA(a.at(i), b.at(i), c);
+    return result;
+}
+
+template <template <typename> class Derived, ArithType T, int N>
+    requires (N > 0 && N <= 4)
+constexpr T MinValue(const Tuple<Derived, T, N>& t)
+{
+    T minVal = t.at(0);
+    for (int i = 1; i < N; ++i)
+        if (t.at(i) < minVal)
+            minVal = t.at(i);
+    return minVal;
+}
+
+template <template <typename> class Derived, ArithType T, int N>
+    requires (N > 0 && N <= 4)
+constexpr T MaxValue(const Tuple<Derived, T, N>& t)
+{
+    T maxVal = t.at(0);
+    for (int i = 1; i < N; ++i)
+        if (t.at(i) > maxVal)
+            maxVal = t.at(i);
+    return maxVal;
+}
+
+template <template <typename> class Derived, ArithType T, int N>
+    requires (N > 0 && N <= 4)
+constexpr int MinIndex(const Tuple<Derived, T, N>& t)
+{
+    int minIdx = 0;
+    T minVal = t.at(0);
+    for (int i = 1; i < N; ++i)
+        if (t.at(i) < minVal) {
+            minVal = t.at(i);
+            minIdx = i;
+        }
+    return minIdx;
+}
+
+template <template <typename> class Derived, ArithType T, int N>
+    requires (N > 0 && N <= 4)
+constexpr int MaxIndex(const Tuple<Derived, T, N>& t)
+{
+    int maxIdx = 0;
+    T maxVal = t.at(0);
+    for (int i = 1; i < N; ++i)
+        if (t.at(i) > maxVal) {
+            maxVal = t.at(i);
+            maxIdx = i;
+        }
+    return maxIdx;
+}
+
+template <template <typename> class Derived, ArithType T, int N>
+    requires (N > 0 && N <= 4)
+constexpr T Product(const Tuple<Derived, T, N>& t)
+{
+    T prod = T{1};
+    for (int i = 0; i < N; ++i)
+        prod = prod * t.at(i);
+    return prod;
 }
 
 } // namespace bee

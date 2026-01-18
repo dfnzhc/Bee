@@ -146,3 +146,92 @@ TEST(Common_Gaussian, GaussianAndIntegral)
     EXPECT_GT(gi, 0.0);
     EXPECT_LT(gi, 1.0);
 }
+
+TEST(Common_Trig, BasicWrappers)
+{
+    EXPECT_FLOAT_EQ(Sin(0.f), 0.f);
+    EXPECT_FLOAT_EQ(Cos(0.f), 1.f);
+    EXPECT_FLOAT_EQ(Tan(0.f), 0.f);
+    EXPECT_FLOAT_EQ(Asin(0.f), 0.f);
+    EXPECT_FLOAT_EQ(Acos(1.f), 0.f);
+    EXPECT_FLOAT_EQ(Atan2(0.f, 1.f), 0.f);
+}
+
+TEST(Common_Utils, Clamp)
+{
+    EXPECT_EQ(Clamp(5, 0, 10), 5);
+    EXPECT_EQ(Clamp(-5, 0, 10), 0);
+    EXPECT_EQ(Clamp(15, 0, 10), 10);
+    EXPECT_FLOAT_EQ(Clamp(0.5f, 0.f, 1.f), 0.5f);
+    EXPECT_FLOAT_EQ(Clamp(-0.5f, 0.f, 1.f), 0.f);
+    EXPECT_FLOAT_EQ(Clamp(1.5f, 0.f, 1.f), 1.f);
+}
+
+TEST(Common_Utils, Erf)
+{
+    EXPECT_FLOAT_EQ(Erf(0.f), 0.f);
+    // erf(1) approx 0.8427
+    EXPECT_NEAR(Erf(1.f), 0.8427f, 1e-4f);
+}
+
+TEST(Common_Math, InvSqrtHypot)
+{
+    EXPECT_FLOAT_EQ(InvSqrt(4.f), 0.5f);
+    EXPECT_FLOAT_EQ(InvHypot(3.f, 4.f), 0.2f); // 1/5
+}
+
+TEST(Common_Math, Rounding)
+{
+    EXPECT_FLOAT_EQ(Floor(1.5f), 1.f);
+    EXPECT_FLOAT_EQ(Floor(-1.5f), -2.f);
+    EXPECT_FLOAT_EQ(Ceil(1.5f), 2.f);
+    EXPECT_FLOAT_EQ(Ceil(-1.5f), -1.f);
+}
+
+TEST(Common_Math, FMA_CopySign)
+{
+    EXPECT_FLOAT_EQ(FMA(2.f, 3.f, 4.f), 10.f);
+    EXPECT_FLOAT_EQ(CopySign(1.f, -2.f), -1.f);
+    EXPECT_FLOAT_EQ(CopySign(-1.f, 2.f), 1.f);
+}
+
+TEST(Common_Checks, FiniteInfNaN)
+{
+    EXPECT_TRUE(IsFinite(1.f));
+    EXPECT_FALSE(IsFinite(kInfinityF));
+    EXPECT_FALSE(IsFinite(std::numeric_limits<f32>::quiet_NaN()));
+
+    EXPECT_FALSE(IsInf(1.f));
+    EXPECT_TRUE(IsInf(kInfinityF));
+    EXPECT_FALSE(IsInf(std::numeric_limits<f32>::quiet_NaN()));
+
+    EXPECT_FALSE(IsNaN(1.f));
+    EXPECT_FALSE(IsNaN(kInfinityF));
+    EXPECT_TRUE(IsNaN(std::numeric_limits<f32>::quiet_NaN()));
+}
+
+TEST(Common_Math, Sqrt)
+{
+    EXPECT_FLOAT_EQ(Sqrt(4.f), 2.f);
+    EXPECT_FLOAT_EQ(Sqrt(9.f), 3.f);
+}
+
+TEST(Common_Math, IsNearAbsolute)
+{
+    EXPECT_TRUE(IsNear(1.0f, 1.0001f, 0.001f));
+    EXPECT_TRUE(IsNear(1.0, 1.0001, 0.001));
+    EXPECT_FALSE(IsNear(1.0f, 1.01f, 0.001f));
+
+    // Test near zero
+    EXPECT_TRUE(IsNear(0.0f, 0.0001f, 0.001f));
+}
+
+TEST(Common_Math, IsNearRelative)
+{
+    EXPECT_TRUE(IsNearRel(1.0f, 1.001f, 0.001f));
+    EXPECT_TRUE(IsNearRel(1000.0f, 1001.0f, 0.001f));
+    EXPECT_FALSE(IsNearRel(1.0f, 1.01f, 0.001f));
+
+    // Test large values
+    EXPECT_TRUE(IsNearRel(1e6f, 1.001e6f, 0.001f));
+}

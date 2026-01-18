@@ -15,6 +15,17 @@ struct C2 : Tuple<C2, T, 2>
 {
     using Base = Tuple<C2, T, 2>;
     using Base::Base;
+
+    // 数据成员
+    T data[2] = {};
+
+    // 构造函数 - 需要实际存储数据
+    constexpr C2() = default;
+    constexpr C2(T x, T y) noexcept : data{x, y} {}
+
+    // operator[] 访问接口
+    T& operator[](int i) noexcept { return data[i]; }
+    T operator[](int i) const noexcept { return data[i]; }
 };
 
 template <typename T>
@@ -22,6 +33,17 @@ struct C3 : Tuple<C3, T, 3>
 {
     using Base = Tuple<C3, T, 3>;
     using Base::Base;
+
+    // 数据成员
+    T data[3] = {};
+
+    // 构造函数 - 需要实际存储数据
+    constexpr C3() = default;
+    constexpr C3(T x, T y, T z) noexcept : data{x, y, z} {}
+
+    // operator[] 访问接口
+    T& operator[](int i) noexcept { return data[i]; }
+    T operator[](int i) const noexcept { return data[i]; }
 };
 
 template <typename T>
@@ -29,6 +51,17 @@ struct C4 : Tuple<C4, T, 4>
 {
     using Base = Tuple<C4, T, 4>;
     using Base::Base;
+
+    // 数据成员
+    T data[4] = {};
+
+    // 构造函数 - 需要实际存储数据
+    constexpr C4() = default;
+    constexpr C4(T x, T y, T z, T w) noexcept : data{x, y, z, w} {}
+
+    // operator[] 访问接口
+    T& operator[](int i) noexcept { return data[i]; }
+    T operator[](int i) const noexcept { return data[i]; }
 };
 
 TEST(Tuple2, Basic)

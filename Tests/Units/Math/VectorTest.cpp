@@ -6,7 +6,7 @@
  */
 
 #include <gtest/gtest.h>
-#include <Bee/Math/Vector.hpp>
+#include <Bee/Math/VectorMath.hpp>
 
 using namespace bee;
 
@@ -15,99 +15,78 @@ TEST(VectorType1_Vector2_Basic, ConstructAndOps)
     Vec2f a{1.0f, -2.0f};
     Vec2f b{3.0f, 4.0f};
     auto c = a + b;
-    EXPECT_FLOAT_EQ(c.x(), 4.0f);
-    EXPECT_FLOAT_EQ(c.y(), 2.0f);
+    EXPECT_FLOAT_EQ(c.x, 4.0f);
+    EXPECT_FLOAT_EQ(c.y, 2.0f);
     auto d = b - a;
-    EXPECT_FLOAT_EQ(d.x(), 2.0f);
-    EXPECT_FLOAT_EQ(d.y(), 6.0f);
+    EXPECT_FLOAT_EQ(d.x, 2.0f);
+    EXPECT_FLOAT_EQ(d.y, 6.0f);
     auto m = a * 2.0f;
-    EXPECT_FLOAT_EQ(m.x(), 2.0f);
-    EXPECT_FLOAT_EQ(m.y(), -4.0f);
+    EXPECT_FLOAT_EQ(m.x, 2.0f);
+    EXPECT_FLOAT_EQ(m.y, -4.0f);
     auto ml = 2.0f * a;
-    EXPECT_FLOAT_EQ(ml.x(), 2.0f);
-    EXPECT_FLOAT_EQ(ml.y(), -4.0f);
+    EXPECT_FLOAT_EQ(ml.x, 2.0f);
+    EXPECT_FLOAT_EQ(ml.y, -4.0f);
     auto div = b / 2.0f;
-    EXPECT_FLOAT_EQ(div.x(), 1.5f);
-    EXPECT_FLOAT_EQ(div.y(), 2.0f);
+    EXPECT_FLOAT_EQ(div.x, 1.5f);
+    EXPECT_FLOAT_EQ(div.y, 2.0f);
     auto z = Vec2f::Zero();
-    EXPECT_FLOAT_EQ(z.x(), 0.0f);
-    EXPECT_FLOAT_EQ(z.y(), 0.0f);
+    EXPECT_FLOAT_EQ(z.x, 0.0f);
+    EXPECT_FLOAT_EQ(z.y, 0.0f);
     auto o = Vec2f::One();
-    EXPECT_FLOAT_EQ(o.x(), 1.0f);
-    EXPECT_FLOAT_EQ(o.y(), 1.0f);
+    EXPECT_FLOAT_EQ(o.x, 1.0f);
+    EXPECT_FLOAT_EQ(o.y, 1.0f);
     auto ux = Vec2f::UnitX();
-    EXPECT_FLOAT_EQ(ux.x(), 1.0f);
-    EXPECT_FLOAT_EQ(ux.y(), 0.0f);
+    EXPECT_FLOAT_EQ(ux.x, 1.0f);
+    EXPECT_FLOAT_EQ(ux.y, 0.0f);
     auto uy = Vec2f::UnitY();
-    EXPECT_FLOAT_EQ(uy.x(), 0.0f);
-    EXPECT_FLOAT_EQ(uy.y(), 1.0f);
+    EXPECT_FLOAT_EQ(uy.x, 0.0f);
+    EXPECT_FLOAT_EQ(uy.y, 1.0f);
 }
 
-TEST(VectorType1_Vector2_Swizzle, Swizzle2D3D4D)
+TEST(VectorType1_Vector2_Swizzle, Swizzle2D)
 {
     Vec2i a{2, -1};
-    auto xx = a.xx();
-    EXPECT_EQ(xx.x(), 2);
-    EXPECT_EQ(xx.y(), 2);
     auto xy = a.xy();
-    EXPECT_EQ(xy.x(), 2);
-    EXPECT_EQ(xy.y(), -1);
+    EXPECT_EQ(xy.x, 2);
+    EXPECT_EQ(xy.y, -1);
     auto yx = a.yx();
-    EXPECT_EQ(yx.x(), -1);
-    EXPECT_EQ(yx.y(), 2);
-    auto yy = a.yy();
-    EXPECT_EQ(yy.x(), -1);
-    EXPECT_EQ(yy.y(), -1);
-    auto xxx = a.xxx();
-    EXPECT_EQ(xxx.x(), 2);
-    EXPECT_EQ(xxx.y(), 2);
-    EXPECT_EQ(xxx.z(), 2);
-    auto xyy = a.xyy();
-    EXPECT_EQ(xyy.x(), 2);
-    EXPECT_EQ(xyy.y(), -1);
-    EXPECT_EQ(xyy.z(), -1);
-    auto xyxy = a.xyxy();
-    EXPECT_EQ(xyxy.x(), 2);
-    EXPECT_EQ(xyxy.y(), -1);
-    EXPECT_EQ(xyxy.z(), 2);
-    EXPECT_EQ(xyxy.w(), -1);
+    EXPECT_EQ(yx.x, -1);
+    EXPECT_EQ(yx.y, 2);
 }
 
 TEST(VectorType1_Vector3_Constructors, FromMixed)
 {
     Vec2f v2{1.0f, 2.0f};
     Vec3f v3a{v2, 3.0f};
-    EXPECT_FLOAT_EQ(v3a.x(), 1.0f);
-    EXPECT_FLOAT_EQ(v3a.y(), 2.0f);
-    EXPECT_FLOAT_EQ(v3a.z(), 3.0f);
+    EXPECT_FLOAT_EQ(v3a.x, 1.0f);
+    EXPECT_FLOAT_EQ(v3a.y, 2.0f);
+    EXPECT_FLOAT_EQ(v3a.z, 3.0f);
     Vec3f v3b{4.0f, Vec2f{5.0f, 6.0f}};
-    EXPECT_FLOAT_EQ(v3b.x(), 4.0f);
-    EXPECT_FLOAT_EQ(v3b.y(), 5.0f);
-    EXPECT_FLOAT_EQ(v3b.z(), 6.0f);
+    EXPECT_FLOAT_EQ(v3b.x, 4.0f);
+    EXPECT_FLOAT_EQ(v3b.y, 5.0f);
+    EXPECT_FLOAT_EQ(v3b.z, 6.0f);
     Vec3f v3c{Vec2f{7.0f, 8.0f}};
-    EXPECT_FLOAT_EQ(v3c.x(), 7.0f);
-    EXPECT_FLOAT_EQ(v3c.y(), 8.0f);
-    EXPECT_FLOAT_EQ(v3c.z(), 0.0f);
+    EXPECT_FLOAT_EQ(v3c.x, 7.0f);
+    EXPECT_FLOAT_EQ(v3c.y, 8.0f);
+    EXPECT_FLOAT_EQ(v3c.z, 0.0f);
     Vec3d v3d{Vec4f{1.0f, 2.0f, 3.0f, 4.0f}};
-    EXPECT_DOUBLE_EQ(v3d.x(), 1.0);
-    EXPECT_DOUBLE_EQ(v3d.y(), 2.0);
-    EXPECT_DOUBLE_EQ(v3d.z(), 3.0);
+    EXPECT_DOUBLE_EQ(v3d.x, 1.0);
+    EXPECT_DOUBLE_EQ(v3d.y, 2.0);
+    EXPECT_DOUBLE_EQ(v3d.z, 3.0);
 }
 
 TEST(VectorType1_Vector3_Swizzle, Swizzle)
 {
     Vec3i v{1, 2, 3};
-    auto zz = v.zz();
-    EXPECT_EQ(zz.x(), 3);
-    EXPECT_EQ(zz.y(), 3);
-    auto xyz = v.xyz();
-    EXPECT_EQ(xyz.x(), 1);
-    EXPECT_EQ(xyz.y(), 2);
-    EXPECT_EQ(xyz.z(), 3);
-    auto zxy = v.zxy();
-    EXPECT_EQ(zxy.x(), 3);
-    EXPECT_EQ(zxy.y(), 1);
-    EXPECT_EQ(zxy.z(), 2);
+    auto xy = v.xy();
+    EXPECT_EQ(xy.x, 1);
+    EXPECT_EQ(xy.y, 2);
+    auto xz = v.xz();
+    EXPECT_EQ(xz.x, 1);
+    EXPECT_EQ(xz.y, 3);
+    auto yz = v.yz();
+    EXPECT_EQ(yz.x, 2);
+    EXPECT_EQ(yz.y, 3);
 }
 
 TEST(VectorType1_Vector4_Constructors, FromMixed)
@@ -115,112 +94,107 @@ TEST(VectorType1_Vector4_Constructors, FromMixed)
     Vec2f v2{1.0f, 2.0f};
     Vec3f v3{3.0f, 4.0f, 5.0f};
     Vec4f v4a{v2, 6.0f, 7.0f};
-    EXPECT_FLOAT_EQ(v4a.x(), 1.0f);
-    EXPECT_FLOAT_EQ(v4a.y(), 2.0f);
-    EXPECT_FLOAT_EQ(v4a.z(), 6.0f);
-    EXPECT_FLOAT_EQ(v4a.w(), 7.0f);
+    EXPECT_FLOAT_EQ(v4a.x, 1.0f);
+    EXPECT_FLOAT_EQ(v4a.y, 2.0f);
+    EXPECT_FLOAT_EQ(v4a.z, 6.0f);
+    EXPECT_FLOAT_EQ(v4a.w, 7.0f);
     Vec4f v4b{8.0f, v2, 9.0f};
-    EXPECT_FLOAT_EQ(v4b.x(), 8.0f);
-    EXPECT_FLOAT_EQ(v4b.y(), 1.0f);
-    EXPECT_FLOAT_EQ(v4b.z(), 2.0f);
-    EXPECT_FLOAT_EQ(v4b.w(), 9.0f);
+    EXPECT_FLOAT_EQ(v4b.x, 8.0f);
+    EXPECT_FLOAT_EQ(v4b.y, 1.0f);
+    EXPECT_FLOAT_EQ(v4b.z, 2.0f);
+    EXPECT_FLOAT_EQ(v4b.w, 9.0f);
     Vec4f v4c{10.0f, 11.0f, v2};
-    EXPECT_FLOAT_EQ(v4c.x(), 10.0f);
-    EXPECT_FLOAT_EQ(v4c.y(), 11.0f);
-    EXPECT_FLOAT_EQ(v4c.z(), 1.0f);
-    EXPECT_FLOAT_EQ(v4c.w(), 2.0f);
+    EXPECT_FLOAT_EQ(v4c.x, 10.0f);
+    EXPECT_FLOAT_EQ(v4c.y, 11.0f);
+    EXPECT_FLOAT_EQ(v4c.z, 1.0f);
+    EXPECT_FLOAT_EQ(v4c.w, 2.0f);
     Vec4f v4d{v3, 12.0f};
-    EXPECT_FLOAT_EQ(v4d.x(), 3.0f);
-    EXPECT_FLOAT_EQ(v4d.y(), 4.0f);
-    EXPECT_FLOAT_EQ(v4d.z(), 5.0f);
-    EXPECT_FLOAT_EQ(v4d.w(), 12.0f);
+    EXPECT_FLOAT_EQ(v4d.x, 3.0f);
+    EXPECT_FLOAT_EQ(v4d.y, 4.0f);
+    EXPECT_FLOAT_EQ(v4d.z, 5.0f);
+    EXPECT_FLOAT_EQ(v4d.w, 12.0f);
     Vec4f v4e{13.0f, v3};
-    EXPECT_FLOAT_EQ(v4e.x(), 13.0f);
-    EXPECT_FLOAT_EQ(v4e.y(), 3.0f);
-    EXPECT_FLOAT_EQ(v4e.z(), 4.0f);
-    EXPECT_FLOAT_EQ(v4e.w(), 5.0f);
+    EXPECT_FLOAT_EQ(v4e.x, 13.0f);
+    EXPECT_FLOAT_EQ(v4e.y, 3.0f);
+    EXPECT_FLOAT_EQ(v4e.z, 4.0f);
+    EXPECT_FLOAT_EQ(v4e.w, 5.0f);
     Vec4f v4f{v2, v2};
-    EXPECT_FLOAT_EQ(v4f.x(), 1.0f);
-    EXPECT_FLOAT_EQ(v4f.y(), 2.0f);
-    EXPECT_FLOAT_EQ(v4f.z(), 1.0f);
-    EXPECT_FLOAT_EQ(v4f.w(), 2.0f);
+    EXPECT_FLOAT_EQ(v4f.x, 1.0f);
+    EXPECT_FLOAT_EQ(v4f.y, 2.0f);
+    EXPECT_FLOAT_EQ(v4f.z, 1.0f);
+    EXPECT_FLOAT_EQ(v4f.w, 2.0f);
     Vec4f v4g{Vec2f{1.0f, 2.0f}};
-    EXPECT_FLOAT_EQ(v4g.x(), 1.0f);
-    EXPECT_FLOAT_EQ(v4g.y(), 2.0f);
-    EXPECT_FLOAT_EQ(v4g.z(), 0.0f);
-    EXPECT_FLOAT_EQ(v4g.w(), 0.0f);
+    EXPECT_FLOAT_EQ(v4g.x, 1.0f);
+    EXPECT_FLOAT_EQ(v4g.y, 2.0f);
+    EXPECT_FLOAT_EQ(v4g.z, 0.0f);
+    EXPECT_FLOAT_EQ(v4g.w, 0.0f);
     Vec4f v4h{v3};
-    EXPECT_FLOAT_EQ(v4h.x(), 3.0f);
-    EXPECT_FLOAT_EQ(v4h.y(), 4.0f);
-    EXPECT_FLOAT_EQ(v4h.z(), 5.0f);
-    EXPECT_FLOAT_EQ(v4h.w(), 0.0f);
+    EXPECT_FLOAT_EQ(v4h.x, 3.0f);
+    EXPECT_FLOAT_EQ(v4h.y, 4.0f);
+    EXPECT_FLOAT_EQ(v4h.z, 5.0f);
+    EXPECT_FLOAT_EQ(v4h.w, 0.0f);
     Vec4f v4i{Vec4f{1.0f, 2.0f, 3.0f, 4.0f}};
-    EXPECT_FLOAT_EQ(v4i.x(), 1.0f);
-    EXPECT_FLOAT_EQ(v4i.y(), 2.0f);
-    EXPECT_FLOAT_EQ(v4i.z(), 3.0f);
-    EXPECT_FLOAT_EQ(v4i.w(), 4.0f);
+    EXPECT_FLOAT_EQ(v4i.x, 1.0f);
+    EXPECT_FLOAT_EQ(v4i.y, 2.0f);
+    EXPECT_FLOAT_EQ(v4i.z, 3.0f);
+    EXPECT_FLOAT_EQ(v4i.w, 4.0f);
 }
 
 TEST(VectorType1_Vector4_Swizzle, Swizzle)
 {
     Vec4i v{1, 2, 3, 4};
     auto xy = v.xy();
-    EXPECT_EQ(xy.x(), 1);
-    EXPECT_EQ(xy.y(), 2);
+    EXPECT_EQ(xy.x, 1);
+    EXPECT_EQ(xy.y, 2);
     auto wz = v.wz();
-    EXPECT_EQ(wz.x(), 4);
-    EXPECT_EQ(wz.y(), 3);
+    EXPECT_EQ(wz.x, 4);
+    EXPECT_EQ(wz.y, 3);
     auto yzw = v.yzw();
-    EXPECT_EQ(yzw.x(), 2);
-    EXPECT_EQ(yzw.y(), 3);
-    EXPECT_EQ(yzw.z(), 4);
-    auto yyyy = v.yyyy();
-    EXPECT_EQ(yyyy.x(), 2);
-    EXPECT_EQ(yyyy.y(), 2);
-    EXPECT_EQ(yyyy.z(), 2);
-    EXPECT_EQ(yyyy.w(), 2);
+    EXPECT_EQ(yzw.x, 2);
+    EXPECT_EQ(yzw.y, 3);
+    EXPECT_EQ(yzw.z, 4);
 }
 
 TEST(VectorType1_Point2_Ops, PointVectorOps)
 {
     Point2f p{1.0f, 2.0f};
     auto p0 = Point2f::Origin();
-    EXPECT_FLOAT_EQ(p0.x(), 0.0f);
-    EXPECT_FLOAT_EQ(p0.y(), 0.0f);
+    EXPECT_FLOAT_EQ(p0.x, 0.0f);
+    EXPECT_FLOAT_EQ(p0.y, 0.0f);
     Vec2f v{3.0f, -1.0f};
     auto p_add = p + v;
-    EXPECT_FLOAT_EQ(p_add.x(), 4.0f);
-    EXPECT_FLOAT_EQ(p_add.y(), 1.0f);
+    EXPECT_FLOAT_EQ(p_add.x, 4.0f);
+    EXPECT_FLOAT_EQ(p_add.y, 1.0f);
     auto p_sub = p - v;
-    EXPECT_FLOAT_EQ(p_sub.x(), -2.0f);
-    EXPECT_FLOAT_EQ(p_sub.y(), 3.0f);
+    EXPECT_FLOAT_EQ(p_sub.x, -2.0f);
+    EXPECT_FLOAT_EQ(p_sub.y, 3.0f);
     Point2f q{4.0f, -1.0f};
     auto d = p - q;
-    EXPECT_FLOAT_EQ(d.x(), -3.0f);
-    EXPECT_FLOAT_EQ(d.y(), 3.0f);
+    EXPECT_FLOAT_EQ(d.x, -3.0f);
+    EXPECT_FLOAT_EQ(d.y, 3.0f);
 }
 
 TEST(VectorType1_Point3_Ops, PointVectorOps)
 {
     Point3f p{1.0f, 2.0f, 3.0f};
     auto p0 = Point3f::Origin();
-    EXPECT_FLOAT_EQ(p0.x(), 0.0f);
-    EXPECT_FLOAT_EQ(p0.y(), 0.0f);
-    EXPECT_FLOAT_EQ(p0.z(), 0.0f);
+    EXPECT_FLOAT_EQ(p0.x, 0.0f);
+    EXPECT_FLOAT_EQ(p0.y, 0.0f);
+    EXPECT_FLOAT_EQ(p0.z, 0.0f);
     Vec3f v{3.0f, -1.0f, 2.0f};
     auto p_add = p + v;
-    EXPECT_FLOAT_EQ(p_add.x(), 4.0f);
-    EXPECT_FLOAT_EQ(p_add.y(), 1.0f);
-    EXPECT_FLOAT_EQ(p_add.z(), 5.0f);
+    EXPECT_FLOAT_EQ(p_add.x, 4.0f);
+    EXPECT_FLOAT_EQ(p_add.y, 1.0f);
+    EXPECT_FLOAT_EQ(p_add.z, 5.0f);
     auto p_sub = p - v;
-    EXPECT_FLOAT_EQ(p_sub.x(), -2.0f);
-    EXPECT_FLOAT_EQ(p_sub.y(), 3.0f);
-    EXPECT_FLOAT_EQ(p_sub.z(), 1.0f);
+    EXPECT_FLOAT_EQ(p_sub.x, -2.0f);
+    EXPECT_FLOAT_EQ(p_sub.y, 3.0f);
+    EXPECT_FLOAT_EQ(p_sub.z, 1.0f);
     Point3f q{4.0f, -1.0f, 0.0f};
     auto d = p - q;
-    EXPECT_FLOAT_EQ(d.x(), -3.0f);
-    EXPECT_FLOAT_EQ(d.y(), 3.0f);
-    EXPECT_FLOAT_EQ(d.z(), 3.0f);
+    EXPECT_FLOAT_EQ(d.x, -3.0f);
+    EXPECT_FLOAT_EQ(d.y, 3.0f);
+    EXPECT_FLOAT_EQ(d.z, 3.0f);
 }
 
 TEST(VectorType1_Normal2_Ops, NormalizeDotAbsDotFaceForward)
@@ -236,11 +210,11 @@ TEST(VectorType1_Normal2_Ops, NormalizeDotAbsDotFaceForward)
     EXPECT_FLOAT_EQ(AbsDot(v, n), 8.0f);
     Normal2f n2{0.0f, -2.0f};
     auto ff1 = FaceForward(n, v);
-    EXPECT_FLOAT_EQ(ff1.x(), (Dot(n, v) < 0.f) ? -n.x() : n.x());
-    EXPECT_FLOAT_EQ(ff1.y(), (Dot(n, v) < 0.f) ? -n.y() : n.y());
+    EXPECT_FLOAT_EQ(ff1.x, (Dot(n, v) < 0.f) ? -n.x : n.x);
+    EXPECT_FLOAT_EQ(ff1.y, (Dot(n, v) < 0.f) ? -n.y : n.y);
     auto ff2 = FaceForward(n, n2);
-    EXPECT_FLOAT_EQ(ff2.x(), (Dot(n, n2) < 0.f) ? -n.x() : n.x());
-    EXPECT_FLOAT_EQ(ff2.y(), (Dot(n, n2) < 0.f) ? -n.y() : n.y());
+    EXPECT_FLOAT_EQ(ff2.x, (Dot(n, n2) < 0.f) ? -n.x : n.x);
+    EXPECT_FLOAT_EQ(ff2.y, (Dot(n, n2) < 0.f) ? -n.y : n.y);
 }
 
 TEST(VectorType1_Normal3_Ops, NormalizeDotAbsDotCrossFaceForward)
@@ -254,15 +228,15 @@ TEST(VectorType1_Normal3_Ops, NormalizeDotAbsDotCrossFaceForward)
     EXPECT_FLOAT_EQ(Dot(v, n), 6.0f);
     EXPECT_FLOAT_EQ(AbsDot(n, v), 6.0f);
     Vec3f cvn = Cross(v, n);
-    EXPECT_FLOAT_EQ(cvn.x(), v.y() * n.z() - v.z() * n.y());
-    EXPECT_FLOAT_EQ(cvn.y(), v.z() * n.x() - v.x() * n.z());
-    EXPECT_FLOAT_EQ(cvn.z(), v.x() * n.y() - v.y() * n.x());
+    EXPECT_FLOAT_EQ(cvn.x, v.y * n.z - v.z * n.y);
+    EXPECT_FLOAT_EQ(cvn.y, v.z * n.x - v.x * n.z);
+    EXPECT_FLOAT_EQ(cvn.z, v.x * n.y - v.y * n.x);
     Vec3f cnv = Cross(n, v);
-    EXPECT_FLOAT_EQ(cnv.x(), n.y() * v.z() - n.z() * v.y());
-    EXPECT_FLOAT_EQ(cnv.y(), n.z() * v.x() - n.x() * v.z());
-    EXPECT_FLOAT_EQ(cnv.z(), n.x() * v.y() - n.y() * v.x());
+    EXPECT_FLOAT_EQ(cnv.x, n.y * v.z - n.z * v.y);
+    EXPECT_FLOAT_EQ(cnv.y, n.z * v.x - n.x * v.z);
+    EXPECT_FLOAT_EQ(cnv.z, n.x * v.y - n.y * v.x);
     auto ff1 = FaceForward(n, v);
-    EXPECT_FLOAT_EQ(ff1.z(), (Dot(n, v) < 0.f) ? -n.z() : n.z());
+    EXPECT_FLOAT_EQ(ff1.z, (Dot(n, v) < 0.f) ? -n.z : n.z);
 }
 
 TEST(VectorType1_Vector_Normalize, Normalize2D3D4D)
@@ -270,15 +244,15 @@ TEST(VectorType1_Vector_Normalize, Normalize2D3D4D)
     Vec2f v2{3.0f, 4.0f};
     auto n2 = Normalize(v2);
     EXPECT_NEAR(Length(n2), 1.0f, 1e-6f);
-    EXPECT_NEAR(n2.x(), 0.6f, 1e-6f);
-    EXPECT_NEAR(n2.y(), 0.8f, 1e-6f);
+    EXPECT_NEAR(n2.x, 0.6f, 1e-6f);
+    EXPECT_NEAR(n2.y, 0.8f, 1e-6f);
 
     Vec3f v3{1.0f, 2.0f, 2.0f};
     auto n3 = Normalize(v3);
     EXPECT_NEAR(Length(n3), 1.0f, 1e-6f);
-    EXPECT_NEAR(n3.x(), 1.0f / 3.0f, 1e-6f);
-    EXPECT_NEAR(n3.y(), 2.0f / 3.0f, 1e-6f);
-    EXPECT_NEAR(n3.z(), 2.0f / 3.0f, 1e-6f);
+    EXPECT_NEAR(n3.x, 1.0f / 3.0f, 1e-6f);
+    EXPECT_NEAR(n3.y, 2.0f / 3.0f, 1e-6f);
+    EXPECT_NEAR(n3.z, 2.0f / 3.0f, 1e-6f);
 
     Vec4f v4{1.0f, 2.0f, 2.0f, 1.0f};
     auto n4 = Normalize(v4);
@@ -316,9 +290,9 @@ TEST(VectorType1_Vector_GramSchmidt, Orthogonalize)
     Vec3f v{1.0f, 1.0f, 0.0f};
     Vec3f w{0.0f, 1.0f, 0.0f};
     auto g = GramSchmidt(v, w);
-    EXPECT_NEAR(g.x(), 1.0f, 1e-6f);
-    EXPECT_NEAR(g.y(), 0.0f, 1e-6f);
-    EXPECT_NEAR(g.z(), 0.0f, 1e-6f);
+    EXPECT_NEAR(g.x, 1.0f, 1e-6f);
+    EXPECT_NEAR(g.y, 0.0f, 1e-6f);
+    EXPECT_NEAR(g.z, 0.0f, 1e-6f);
 }
 
 TEST(VectorType1_Vector_CoordinateSystem, BuildBasis)
@@ -335,15 +309,15 @@ TEST(VectorType1_Vector_FaceForward, VectorWithVectorNormal)
     Vec3f v{1.0f, 0.0f, 0.0f};
     Vec3f v2{-1.0f, 0.0f, 0.0f};
     auto ffv = FaceForward(v, v2);
-    EXPECT_NEAR(ffv.x(), -1.0f, 1e-6f);
-    EXPECT_NEAR(ffv.y(), 0.0f, 1e-6f);
-    EXPECT_NEAR(ffv.z(), 0.0f, 1e-6f);
+    EXPECT_NEAR(ffv.x, -1.0f, 1e-6f);
+    EXPECT_NEAR(ffv.y, 0.0f, 1e-6f);
+    EXPECT_NEAR(ffv.z, 0.0f, 1e-6f);
 
     Normal3f n2{0.0f, -1.0f, 0.0f};
     auto ffvn = FaceForward(v, n2);
-    EXPECT_NEAR(ffvn.x(), 1.0f, 1e-6f);
-    EXPECT_NEAR(ffvn.y(), 0.0f, 1e-6f);
-    EXPECT_NEAR(ffvn.z(), 0.0f, 1e-6f);
+    EXPECT_NEAR(ffvn.x, 1.0f, 1e-6f);
+    EXPECT_NEAR(ffvn.y, 0.0f, 1e-6f);
+    EXPECT_NEAR(ffvn.z, 0.0f, 1e-6f);
 }
 
 TEST(VectorMath_SphericalAngles, ThetaPhiBasic)
@@ -391,8 +365,8 @@ TEST(VectorMath_SphericalPhiComponents, CosPhiSinPhi)
 
     Vector3<f32> v{0.5f, 0.5f, 0.70710678f};
     auto st = SinTheta(v);
-    EXPECT_NEAR(CosPhi(v), std::clamp(v.x() / st, -1.f, 1.f), 1e-6f);
-    EXPECT_NEAR(SinPhi(v), std::clamp(v.y() / st, -1.f, 1.f), 1e-6f);
+    EXPECT_NEAR(CosPhi(v), std::clamp(v.x / st, -1.f, 1.f), 1e-6f);
+    EXPECT_NEAR(SinPhi(v), std::clamp(v.y / st, -1.f, 1.f), 1e-6f);
 }
 
 TEST(VectorMath_CosDPhiAndHemisphere, CosDPhiAndSameHemisphere)
@@ -408,4 +382,174 @@ TEST(VectorMath_CosDPhiAndHemisphere, CosDPhiAndSameHemisphere)
     EXPECT_TRUE(SameHemisphere(Vector3<f32>{0.f, 0.f, 1.f}, Vector3<f32>{0.f, 0.f, 0.5f}));
     EXPECT_FALSE(SameHemisphere(Vector3<f32>{0.f, 0.f, 1.f}, Vector3<f32>{0.f, 0.f, -0.5f}));
     EXPECT_TRUE(SameHemisphere(Vector3<f32>{0.f, 0.f, 1.f}, Normal3<f32>{0.f, 0.f, 0.5f}));
+}
+
+TEST(VectorMath_Supp, Orthogonal)
+{
+    Vector3f v1(1, 0, 0);
+    auto o1 = Orthogonal(v1);
+    EXPECT_NEAR(Dot(v1, o1), 0.0f, 1e-5f);
+    EXPECT_NEAR(Length(o1), 1.0f, 1e-5f);
+
+    Vector3f v2(1, 1, 0);
+    auto o2 = Orthogonal(v2);
+    EXPECT_NEAR(Dot(v2, o2), 0.0f, 1e-5f);
+    EXPECT_NEAR(Length(o2), 1.0f, 1e-5f);
+
+    Vector3f v3(0, 1, 1);
+    auto o3 = Orthogonal(v3);
+    EXPECT_NEAR(Dot(v3, o3), 0.0f, 1e-5f);
+}
+
+TEST(VectorMath_Supp, LerpPoints)
+{
+    Point3f p0(0, 0, 0);
+    Point3f p1(10, 20, 30);
+
+    auto pMid = Lerp(p0, p1, 0.5f);
+    EXPECT_FLOAT_EQ(pMid.x, 5.0f);
+    EXPECT_FLOAT_EQ(pMid.y, 10.0f);
+    EXPECT_FLOAT_EQ(pMid.z, 15.0f);
+}
+
+// ========== 反射和折射测试 ==========
+
+TEST(VectorMath_Reflect, BasicReflection)
+{
+    // 测试镜面反射：入射角等于反射角
+    Vec3f incident(1, -1, 0);   // 45度入射
+    Normal3f normal(0, 1, 0);   // 水平表面法线
+
+    Vec3f reflected = Reflect(incident, normal);
+
+    // 反射向量应该是 (1, 1, 0) - 关于法线对称
+    EXPECT_NEAR(reflected.x, 1.0f, 1e-5f);
+    EXPECT_NEAR(reflected.y, 1.0f, 1e-5f);
+    EXPECT_NEAR(reflected.z, 0.0f, 1e-5f);
+
+    // 验证反射角等于入射角
+    f32 cosIncident = -Dot(incident, Vec3f(normal.x, normal.y, normal.z));
+    f32 cosReflected = Dot(reflected, Vec3f(normal.x, normal.y, normal.z));
+    EXPECT_NEAR(cosIncident, cosReflected, 1e-5f);
+}
+
+TEST(VectorMath_Reflect, PerpendicularReflection)
+{
+    // 垂直入射
+    Vec3f incident(0, -1, 0);
+    Normal3f normal(0, 1, 0);
+
+    Vec3f reflected = Reflect(incident, normal);
+
+    // 应该沿原路返回
+    EXPECT_NEAR(reflected.x, 0.0f, 1e-5f);
+    EXPECT_NEAR(reflected.y, 1.0f, 1e-5f);
+    EXPECT_NEAR(reflected.z, 0.0f, 1e-5f);
+}
+
+TEST(VectorMath_Refract, BasicRefraction)
+{
+    // 测试空气到水的折射 (n1=1.0, n2=1.33, eta = 1.0/1.33 ≈ 0.75)
+    Vec3f incident(1, -1, 0);  // 45度入射
+    Normal3f normal(0, 1, 0);
+    f32 eta = 1.0f / 1.33f;
+
+    auto refracted = Refract(incident, normal, eta);
+
+    // 应该成功折射（不发生全反射）
+    ASSERT_TRUE(refracted.has_value());
+
+    // 折射向量应该向下且向法线方向偏折
+    EXPECT_GT(refracted->x, 0.0f);
+    EXPECT_LT(refracted->y, 0.0f);
+    EXPECT_NEAR(refracted->z, 0.0f, 1e-5f);
+
+    // 验证折射向量是归一化的
+    EXPECT_NEAR(Length(*refracted), 1.0f, 1e-5f);
+}
+
+TEST(VectorMath_Refract, TotalInternalReflection)
+{
+    // 测试全反射：从光密介质到光疏介质
+    // 水到空气 (n1=1.33, n2=1.0, eta = 1.33/1.0 = 1.33)
+    // 临界角约为 48.75 度，我们需要入射角大于这个值
+    Vec3f incident(1, -0.3f, 0);   // 入射角约 73 度，大于临界角
+    Normal3f normal(0, 1, 0);
+    f32 eta = 1.33f;
+
+    auto refracted = Refract(incident, normal, eta);
+
+    // 应该发生全反射，返回空值
+    EXPECT_FALSE(refracted.has_value());
+}
+
+TEST(VectorMath_Refract, PerpendicularIncidence)
+{
+    // 垂直入射，不应该发生折射方向改变
+    Vec3f incident(0, -1, 0);
+    Normal3f normal(0, 1, 0);
+    f32 eta = 0.75f;  // 空气到水
+
+    auto refracted = Refract(incident, normal, eta);
+
+    ASSERT_TRUE(refracted.has_value());
+
+    // 折射向量应该与入射向量同方向
+    EXPECT_NEAR(refracted->x, 0.0f, 1e-5f);
+    EXPECT_NEAR(refracted->y, -1.0f, 1e-5f);
+    EXPECT_NEAR(refracted->z, 0.0f, 1e-5f);
+}
+
+TEST(VectorType_HasValidLength, ValidAndInvalidVectors)
+{
+    // Basic valid vectors
+    Vector3f v1{1.0f, 2.0f, 3.0f};
+    EXPECT_TRUE(v1.hasValidLength());
+
+    Vector3f v2{0.0f, 0.0f, 0.0f};
+    EXPECT_TRUE(v2.hasValidLength());
+
+    // Vector with Inf - construct using raw assignment to avoid constructor check
+    Vector3f infVec;
+    infVec.x = std::numeric_limits<f32>::infinity();
+    infVec.y = 0.0f;
+    infVec.z = 0.0f;
+    EXPECT_FALSE(infVec.hasValidLength());
+
+    // Vector with NaN - construct using raw assignment
+    Vector3f nanVec;
+    nanVec.x = std::numeric_limits<f32>::quiet_NaN();
+    nanVec.y = 0.0f;
+    nanVec.z = 0.0f;
+    EXPECT_FALSE(nanVec.hasValidLength());
+}
+
+TEST(VectorMath_SafeNormalize, ZeroVector)
+{
+    const Vector3f zero{0.0f, 0.0f, 0.0f};
+    const Vector3f result = SafeNormalize(zero);
+
+    // Should return a valid default direction (UnitY)
+    EXPECT_FLOAT_EQ(result.x, 0.0f);
+    EXPECT_FLOAT_EQ(result.y, 1.0f);
+    EXPECT_FLOAT_EQ(result.z, 0.0f);
+}
+
+TEST(VectorMath_SafeNormalize, TinyVector)
+{
+    const Vector3f tiny{1e-10f, 1e-10f, 1e-10f};
+    const Vector3f result = SafeNormalize(tiny);
+
+    // Should handle near-zero vectors gracefully
+    EXPECT_TRUE(result.hasValidLength());
+}
+
+TEST(VectorMath_SafeNormalize, NormalVector)
+{
+    const Vector3f v{3.0f, 4.0f, 0.0f};
+    const Vector3f result = SafeNormalize(v);
+
+    EXPECT_NEAR(Length(result), 1.0f, 1e-5f);
+    EXPECT_TRUE(IsNear(result.x, 0.6f, 1e-5f));
+    EXPECT_TRUE(IsNear(result.y, 0.8f, 1e-5f));
 }

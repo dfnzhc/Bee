@@ -221,19 +221,6 @@ TEST(BitsTest, IsPowerOfTwo)
     EXPECT_FALSE(IsPowerOfTwo(1025u));
 }
 
-TEST(BitsTest, IsPowerOf2)
-{
-    EXPECT_FALSE(IsPowerOf2(0u));
-    EXPECT_TRUE(IsPowerOf2(1u));
-    EXPECT_TRUE(IsPowerOf2(2u));
-    EXPECT_FALSE(IsPowerOf2(3u));
-    EXPECT_TRUE(IsPowerOf2(4u));
-    EXPECT_FALSE(IsPowerOf2(5u));
-    EXPECT_TRUE(IsPowerOf2(8u));
-    EXPECT_TRUE(IsPowerOf2(1024u));
-    EXPECT_FALSE(IsPowerOf2(1023u));
-}
-
 TEST(BitsTest, PreviousPowerOfTwo)
 {
     EXPECT_EQ(PreviousPowerOfTwo(0u), 0u);
@@ -296,23 +283,6 @@ TEST(BitsTest, ReverseBits)
     EXPECT_EQ(ReverseBits(static_cast<u32>(0x12345678)), 0x1E6A2C48u);
     EXPECT_EQ(ReverseBits(static_cast<u32>(0)), 0u);
     EXPECT_EQ(ReverseBits(static_cast<u32>(0xFFFFFFFF)), 0xFFFFFFFFu);
-}
-
-TEST(BitsTest, BitSwap)
-{
-    // 8-bit 测试（应该返回原值）
-    EXPECT_EQ(BitSwap(static_cast<uint8_t>(0x12)), static_cast<uint8_t>(0x12));
-
-    // 16-bit 测试
-    EXPECT_EQ(BitSwap(static_cast<uint16_t>(0x1234)), static_cast<uint16_t>(0x3412));
-    EXPECT_EQ(BitSwap(static_cast<uint16_t>(0xABCD)), static_cast<uint16_t>(0xCDAB));
-
-    // 32-bit 测试
-    EXPECT_EQ(BitSwap(static_cast<u32>(0x12345678)), 0x78563412u);
-    EXPECT_EQ(BitSwap(static_cast<u32>(0xABCDEF01)), 0x01EFCDAB);
-
-    // 64-bit 测试
-    EXPECT_EQ(BitSwap(static_cast<u64>(0x123456789ABCDEF0)), 0xF0DEBC9A78563412ull);
 }
 
 TEST(BitsTest, SetBit)
@@ -414,7 +384,7 @@ TEST(BitsTest, EdgeCases)
     EXPECT_EQ(BitFloor(0u), 0u);
     EXPECT_EQ(BitWidth(0u), 0u);
     EXPECT_FALSE(IsPowerOfTwo(0u));
-    EXPECT_FALSE(IsPowerOf2(0u));
+    EXPECT_FALSE(IsPowerOfTwo(0u));
 
     // 测试最大值
     constexpr u32 max32 = std::numeric_limits<u32>::max();
@@ -432,7 +402,7 @@ TEST(BitsTest, EdgeCases)
     {
         u32 val = 1u << i;
         EXPECT_TRUE(IsPowerOfTwo(val));
-        EXPECT_TRUE(IsPowerOf2(val));
+        EXPECT_TRUE(IsPowerOfTwo(val));
         EXPECT_EQ(OneBitCount(val), 1);
         EXPECT_EQ(CountTrailingZero(val), static_cast<u32>(i));
         EXPECT_EQ(CountLeadingZero(val), static_cast<u32>(31 - i));

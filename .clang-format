@@ -6,9 +6,9 @@ AlignConsecutiveAssignments: true
 AlignConsecutiveDeclarations: false
 AlignOperands: true
 AlignTrailingComments: true
-AllowShortBlocksOnASingleLine: false
+AllowShortBlocksOnASingleLine: Empty
 AllowShortFunctionsOnASingleLine: None
-AllowShortIfStatementsOnASingleLine: false
+AllowShortIfStatementsOnASingleLine: WithoutElse
 AlwaysBreakTemplateDeclarations: Yes
 BraceWrapping: 
   AfterCaseLabel: true
@@ -29,7 +29,7 @@ BraceWrapping:
   SplitEmptyRecord: true
   SplitEmptyNamespace: true
 BreakBeforeBraces: Custom
-BreakConstructorInitializers: AfterColon
+BreakConstructorInitializers: BeforeColon
 BreakConstructorInitializersBeforeComma: false
 ColumnLimit: 150
 ConstructorInitializerAllOnOneLineOrOnePerLine: false

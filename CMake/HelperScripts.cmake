@@ -25,6 +25,17 @@ macro(AddTestProgram TestFile Libraries Category)
     add_test(NAME "${FILE_NAME}Test" COMMAND ${FILE_NAME})
 endmacro()
 
+# 添加测试程序包
+macro(AddTestBundle TargetName Sources Libraries)
+    add_executable(${TargetName} ${Sources})
+    gtest_discover_tests(${TargetName})
+
+    set_target_properties(${TargetName} PROPERTIES FOLDER "Tests")
+    target_compile_features(${TargetName} PRIVATE cxx_std_23)
+
+    target_link_libraries(${TargetName} PUBLIC ${Libraries} GTest::gtest GTest::gtest_main)
+endmacro()
+
 # 添加组件
 function(BeeAddComponent)
     set(options SHARED)
