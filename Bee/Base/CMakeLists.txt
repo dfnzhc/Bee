@@ -20,7 +20,3 @@ bee_add_component(
     PRIVATE_INCLUDE_DIRS
         "${base_private_include_dir}"
 )
-
-if(BEE_BUILD_TESTS)
-    add_subdirectory(Tests)
-endif()

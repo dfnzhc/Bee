@@ -3,4 +3,10 @@ cmake_minimum_required(VERSION 3.24)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake")
 project(Bee VERSION 0.1.0 LANGUAGES CXX)
 
+option(BEE_BUILD_TESTS "Build tests for Bee components" ON)
+
 add_subdirectory(Bee)
+
+if(BEE_BUILD_TESTS)
+    add_subdirectory(Tests)
+endif()
