@@ -2,8 +2,8 @@
 
 #include <string_view>
 
-namespace bee::base {
+namespace bee {
 
 std::string_view name() noexcept;
 
-}  // namespace bee::base
+}  // namespace bee
