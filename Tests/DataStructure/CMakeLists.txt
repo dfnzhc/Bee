@@ -3,4 +3,6 @@ bee_add_component_test(
     TARGET DataStructure.Tests
     SOURCES
         DataStructureTests.cpp
+        CountMinSketchTests.cpp
+        HyperLogLogTests.cpp
 )
