@@ -3,4 +3,5 @@ bee_add_component_test(
     TARGET Concurrency.Tests
     SOURCES
         ConcurrencyTests.cpp
+        ThreadingTests.cpp
 )
