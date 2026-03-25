@@ -45,7 +45,7 @@ public:
     using count_type = CountT;
 
     // =========================================================================
-    // 构造
+    // 构造与生命周期管理
     // =========================================================================
 
     /**
@@ -72,7 +72,7 @@ public:
      * @param epsilon 相对误差上界，必须在 (0, 1) 之间
      * @param delta   失败概率上界，必须在 (0, 1) 之间
      */
-    static CountMinSketch from_error_params(double epsilon, double delta)
+    static CountMinSketch make_from_error_params(double epsilon, double delta)
     {
         if (epsilon <= 0.0 || epsilon >= 1.0)
             throw std::invalid_argument("epsilon 必须在 (0, 1) 之间");
@@ -87,7 +87,7 @@ public:
     }
 
     // =========================================================================
-    // 更新接口
+    // 更新
     // =========================================================================
 
     /**
@@ -108,7 +108,7 @@ public:
     {
         auto h = std::hash<T>{}(item);
         for (std::size_t i = 0; i < _depth; ++i) {
-            std::size_t idx = _hashToIndex(h, i);
+            std::size_t idx = _hash_to_index(h, i);
             auto& cell      = _table[i * _width + idx];
             cell            = SaturatingAdd(cell, count);
         }
@@ -135,7 +135,7 @@ public:
     }
 
     // =========================================================================
-    // 查询接口
+    // 状态访问与查询
     // =========================================================================
 
     /**
@@ -148,7 +148,7 @@ public:
         auto h            = std::hash<T>{}(item);
         count_type result = std::numeric_limits<count_type>::max();
         for (std::size_t i = 0; i < _depth; ++i) {
-            std::size_t idx = _hashToIndex(h, i);
+            std::size_t idx = _hash_to_index(h, i);
             result          = std::min(result, _table[i * _width + idx]);
         }
         return result;
@@ -167,7 +167,7 @@ public:
     }
 
     /** @brief 返回所有插入元素的总计数 */
-    [[nodiscard]] count_type totalCount() const noexcept
+    [[nodiscard]] count_type total_count() const noexcept
     {
         return _totalCount;
     }
@@ -195,7 +195,7 @@ public:
      * @brief 使用指定的种子
      * @param seeds 种子数组，长度必须等于 depth
      */
-    void setSeeds(const std::vector<std::uint64_t>& seeds)
+    void set_seeds(const std::vector<std::uint64_t>& seeds)
     {
         if (seeds.size() != _depth)
             throw std::invalid_argument("seeds 长度必须等于 depth");
@@ -207,7 +207,7 @@ private:
     /**
      * @brief 将元素哈希值与行种子混合后映射到 [0, width) 的列索引。
      */
-    [[nodiscard]] std::size_t _hashToIndex(std::size_t hash, std::size_t row) const noexcept
+    [[nodiscard]] std::size_t _hash_to_index(std::size_t hash, std::size_t row) const noexcept
     {
         return Splitmix64(hash ^ _seeds[row]) % _width;
     }

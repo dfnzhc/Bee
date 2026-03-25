@@ -28,7 +28,7 @@ TEST(CountMinSketchTests, ConstructWithWidthAndDepth)
     EXPECT_EQ(cms.width(), 100u);
     EXPECT_EQ(cms.depth(), 5u);
     EXPECT_TRUE(cms.empty());
-    EXPECT_EQ(cms.totalCount(), 0u);
+    EXPECT_EQ(cms.total_count(), 0u);
 }
 
 TEST(CountMinSketchTests, ConstructWithZeroWidthThrows)
@@ -43,7 +43,7 @@ TEST(CountMinSketchTests, ConstructWithZeroDepthThrows)
 
 TEST(CountMinSketchTests, ConstructFromErrorParams)
 {
-    auto cms = CountMinSketch<int>::from_error_params(0.01, 0.001);
+    auto cms = CountMinSketch<int>::make_from_error_params(0.01, 0.001);
     // width = ceil(e / 0.01) = ceil(271.8) = 272
     EXPECT_GE(cms.width(), 272u);
     // depth = ceil(ln(1/0.001)) = ceil(6.9) = 7
@@ -52,15 +52,15 @@ TEST(CountMinSketchTests, ConstructFromErrorParams)
 
 TEST(CountMinSketchTests, InvalidEpsilonThrows)
 {
-    EXPECT_THROW(CountMinSketch<int>::from_error_params(0.0, 0.01), std::invalid_argument);
-    EXPECT_THROW(CountMinSketch<int>::from_error_params(1.0, 0.01), std::invalid_argument);
-    EXPECT_THROW(CountMinSketch<int>::from_error_params(-0.5, 0.01), std::invalid_argument);
+    EXPECT_THROW(CountMinSketch<int>::make_from_error_params(0.0, 0.01), std::invalid_argument);
+    EXPECT_THROW(CountMinSketch<int>::make_from_error_params(1.0, 0.01), std::invalid_argument);
+    EXPECT_THROW(CountMinSketch<int>::make_from_error_params(-0.5, 0.01), std::invalid_argument);
 }
 
 TEST(CountMinSketchTests, InvalidDeltaThrows)
 {
-    EXPECT_THROW(CountMinSketch<int>::from_error_params(0.01, 0.0), std::invalid_argument);
-    EXPECT_THROW(CountMinSketch<int>::from_error_params(0.01, 1.0), std::invalid_argument);
+    EXPECT_THROW(CountMinSketch<int>::make_from_error_params(0.01, 0.0), std::invalid_argument);
+    EXPECT_THROW(CountMinSketch<int>::make_from_error_params(0.01, 1.0), std::invalid_argument);
 }
 
 // =============================================================================
@@ -72,7 +72,7 @@ TEST(CountMinSketchTests, InsertAndEstimateSingleElement)
     CountMinSketch<int> cms(1000, 5);
     cms.insert(42);
     EXPECT_GE(cms.estimate(42), 1u);
-    EXPECT_EQ(cms.totalCount(), 1u);
+    EXPECT_EQ(cms.total_count(), 1u);
     EXPECT_FALSE(cms.empty());
 }
 
@@ -90,7 +90,7 @@ TEST(CountMinSketchTests, UpdateWithCount)
     CountMinSketch<int> cms(1000, 5);
     cms.update(10, 50);
     EXPECT_GE(cms.estimate(10), 50u);
-    EXPECT_EQ(cms.totalCount(), 50u);
+    EXPECT_EQ(cms.total_count(), 50u);
 }
 
 TEST(CountMinSketchTests, EstimateNeverUnderestimates)
@@ -149,7 +149,7 @@ TEST(CountMinSketchTests, ClearResetsAllCounters)
 
     cms.clear();
     EXPECT_TRUE(cms.empty());
-    EXPECT_EQ(cms.totalCount(), 0u);
+    EXPECT_EQ(cms.total_count(), 0u);
     EXPECT_EQ(cms.estimate(0), 0u);
 }
 
@@ -163,7 +163,7 @@ TEST(CountMinSketchTests, MergeTwoSketches)
     CountMinSketch<int> cms2(200, 5);
 
     // 确保种子一致
-    cms2.setSeeds(cms1.seeds());
+    cms2.set_seeds(cms1.seeds());
 
     for (int i = 0; i < 100; ++i) {
         cms1.insert(1);
@@ -174,7 +174,7 @@ TEST(CountMinSketchTests, MergeTwoSketches)
 
     cms1.merge(cms2);
     EXPECT_GE(cms1.estimate(1), 150u);
-    EXPECT_EQ(cms1.totalCount(), 150u);
+    EXPECT_EQ(cms1.total_count(), 150u);
 }
 
 TEST(CountMinSketchTests, MergeDimensionMismatchThrows)
@@ -190,7 +190,7 @@ TEST(CountMinSketchTests, MergeSeedMismatchThrows)
     CountMinSketch<int> cms2(100, 3);
     // 默认种子相同（基于行号），但手动设置不同种子
     std::vector<std::uint64_t> seeds = {1, 2, 3};
-    cms2.setSeeds(seeds);
+    cms2.set_seeds(seeds);
     EXPECT_THROW(cms1.merge(cms2), std::invalid_argument);
 }
 
@@ -204,7 +204,7 @@ TEST(CountMinSketchTests, SetSeedsClearsData)
     cms.insert(1);
     EXPECT_FALSE(cms.empty());
 
-    cms.setSeeds(cms.seeds());
+    cms.set_seeds(cms.seeds());
     EXPECT_TRUE(cms.empty());
 }
 
@@ -212,7 +212,7 @@ TEST(CountMinSketchTests, SetSeedsWrongSizeThrows)
 {
     CountMinSketch<int> cms(100, 3);
     std::vector<std::uint64_t> seeds = {1, 2}; // 长度为 2，但 depth 为 3
-    EXPECT_THROW(cms.setSeeds(seeds), std::invalid_argument);
+    EXPECT_THROW(cms.set_seeds(seeds), std::invalid_argument);
 }
 
 // =============================================================================
@@ -224,7 +224,7 @@ TEST(CountMinSketchTests, ErrorBoundIsRespected)
     // 使用较大的 sketch 来验证误差界
     double epsilon = 0.001;
     double delta   = 0.01;
-    auto cms       = CountMinSketch<int>::from_error_params(epsilon, delta);
+    auto cms       = CountMinSketch<int>::make_from_error_params(epsilon, delta);
 
     std::unordered_map<int, std::uint64_t> actual;
     int N = 100000;
@@ -260,14 +260,14 @@ TEST(CountMinSketchTests, UpdateSaturatesCounterAndTotalCount)
     cms.update(42, static_cast<std::uint8_t>(20));
 
     EXPECT_EQ(cms.estimate(42), std::numeric_limits<std::uint8_t>::max());
-    EXPECT_EQ(cms.totalCount(), std::numeric_limits<std::uint8_t>::max());
+    EXPECT_EQ(cms.total_count(), std::numeric_limits<std::uint8_t>::max());
 }
 
 TEST(CountMinSketchTests, MergeSaturatesCounterAndTotalCount)
 {
     CountMinSketch<int, std::uint8_t> cms1(512, 5);
     CountMinSketch<int, std::uint8_t> cms2(512, 5);
-    cms2.setSeeds(cms1.seeds());
+    cms2.set_seeds(cms1.seeds());
 
     cms1.update(1, static_cast<std::uint8_t>(240));
     cms2.update(1, static_cast<std::uint8_t>(50));
@@ -275,5 +275,5 @@ TEST(CountMinSketchTests, MergeSaturatesCounterAndTotalCount)
     cms1.merge(cms2);
 
     EXPECT_EQ(cms1.estimate(1), std::numeric_limits<std::uint8_t>::max());
-    EXPECT_EQ(cms1.totalCount(), std::numeric_limits<std::uint8_t>::max());
+    EXPECT_EQ(cms1.total_count(), std::numeric_limits<std::uint8_t>::max());
 }

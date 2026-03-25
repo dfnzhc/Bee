@@ -4,4 +4,5 @@ bee_add_component_test(
     SOURCES
         ConcurrencyTests.cpp
         ThreadingTests.cpp
+        SPSCQueueTests.cpp
 )

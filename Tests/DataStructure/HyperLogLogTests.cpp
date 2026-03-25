@@ -26,7 +26,7 @@ TEST(HyperLogLogTests, DefaultPrecision)
 {
     HyperLogLog<int> hll;
     EXPECT_EQ(hll.precision(), 14);
-    EXPECT_EQ(hll.registerCount(), 1u << 14);
+    EXPECT_EQ(hll.register_count(), 1u << 14);
     EXPECT_TRUE(hll.empty());
 }
 
@@ -34,7 +34,7 @@ TEST(HyperLogLogTests, CustomPrecision)
 {
     HyperLogLog<int> hll(10);
     EXPECT_EQ(hll.precision(), 10);
-    EXPECT_EQ(hll.registerCount(), 1024u);
+    EXPECT_EQ(hll.register_count(), 1024u);
 }
 
 TEST(HyperLogLogTests, PrecisionTooLowThrows)
@@ -155,15 +155,15 @@ TEST(HyperLogLogTests, StandardErrorDecreasesWithPrecision)
     HyperLogLog<int> hll8(8);
     HyperLogLog<int> hll14(14);
 
-    EXPECT_GT(hll4.standardError(), hll8.standardError());
-    EXPECT_GT(hll8.standardError(), hll14.standardError());
+    EXPECT_GT(hll4.standard_error(), hll8.standard_error());
+    EXPECT_GT(hll8.standard_error(), hll14.standard_error());
 }
 
 TEST(HyperLogLogTests, StandardErrorFormula)
 {
     HyperLogLog<int> hll(10);
     double expected = 1.04 / std::sqrt(1024.0);
-    EXPECT_NEAR(hll.standardError(), expected, 1e-10);
+    EXPECT_NEAR(hll.standard_error(), expected, 1e-10);
 }
 
 // =============================================================================

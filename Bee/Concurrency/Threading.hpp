@@ -26,12 +26,12 @@
 namespace bee
 {
 
-inline void ThreadYield() noexcept
+inline void thread_yield() noexcept
 {
     std::this_thread::yield();
 }
 
-inline void ThreadPauseRelaxed() noexcept
+inline void thread_pause_relaxed() noexcept
 {
     #if defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_X64))
     _mm_pause();
@@ -62,11 +62,11 @@ namespace internal
         static void wait(std::uint32_t spin_count) noexcept
         {
             for (std::uint32_t i = 0; i < PauseRepeats; ++i) {
-                ThreadPauseRelaxed();
+                thread_pause_relaxed();
             }
 
             if ((spin_count & YieldMask) == YieldMask) {
-                ThreadYield();
+                thread_yield();
             }
         }
     };
@@ -77,38 +77,40 @@ namespace internal
         static void wait(std::uint32_t) noexcept
         {
             for (std::uint32_t i = 0; i < PauseRepeats; ++i) {
-                ThreadPauseRelaxed();
+                thread_pause_relaxed();
             }
         }
     };
 
 } // namespace internal
 
-using DefaultSpinPolicy           = internal::AdaptiveSpinPolicy<internal::kSpinPauseRepeats, internal::kSpinYieldMask>;
-using ThroughputDefaultSpinPolicy = internal::ThroughputSpinPolicy<(internal::kSpinPauseRepeats * 2U)>;
+// 默认自旋策略：一定次数等待后换出
+using DefaultSpinPolicy = internal::AdaptiveSpinPolicy<internal::kSpinPauseRepeats, internal::kSpinYieldMask>;
+// 吞吐量导向自旋策略：不进行换出
+using ThroughputSpinPolicy = internal::ThroughputSpinPolicy<(internal::kSpinPauseRepeats * 2U)>;
 
-inline auto HardwareThreadCount() noexcept -> std::uint32_t
+inline auto hardware_thread_count() noexcept -> std::uint32_t
 {
     const auto count = std::thread::hardware_concurrency();
     return count == 0 ? 1u : count;
 }
 
-inline auto ThreadIdHash() noexcept -> std::size_t
+inline auto thread_id_hash() noexcept -> std::size_t
 {
     return std::hash<std::thread::id>{}(std::this_thread::get_id());
 }
 
-inline void SleepForNanos(std::uint64_t nanoseconds) noexcept
+inline void sleep_for_nanos(std::uint64_t nanoseconds) noexcept
 {
     std::this_thread::sleep_for(std::chrono::nanoseconds(nanoseconds));
 }
 
-inline void SleepForMicros(std::uint64_t microseconds) noexcept
+inline void sleep_for_micros(std::uint64_t microseconds) noexcept
 {
     std::this_thread::sleep_for(std::chrono::microseconds(microseconds));
 }
 
-inline auto SetCurrentThreadName(std::string_view name) noexcept -> bool
+inline auto set_current_thread_name(std::string_view name) noexcept -> bool
 {
     if (name.empty()) {
         return false;
