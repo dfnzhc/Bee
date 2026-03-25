@@ -30,6 +30,8 @@ namespace bee
  *   - precision 决定寄存器个数 m = 2^p，取值范围 [4, 18]。
  *   - 每个寄存器存储观察到的最大前导零位数 + 1。
  *   - 估计时使用调和平均数，并对小基数和大基数分别做线性计数和大范围修正。
+ *   
+ *   https://en.wikipedia.org/wiki/HyperLogLog
  *
  * @tparam T 元素类型，需要可哈希（std::hash<T> 可用）
  */
@@ -57,7 +59,7 @@ public:
         _registers.assign(_registerCount, 0);
 
         // 预计算偏差修正常数 alpha_m
-        _alpha = _compute_alpha(_registerCount);
+        _alpha = _computeAlpha(_registerCount);
     }
 
     // =========================================================================
@@ -162,13 +164,13 @@ public:
     }
 
     /** @brief 返回寄存器数量 */
-    [[nodiscard]] std::size_t register_count() const noexcept
+    [[nodiscard]] std::size_t registerCount() const noexcept
     {
         return _registerCount;
     }
 
     /** @brief 返回标准误差（约 1.04 / sqrt(m)） */
-    [[nodiscard]] double standard_error() const noexcept
+    [[nodiscard]] double standardError() const noexcept
     {
         return 1.04 / std::sqrt(static_cast<double>(_registerCount));
     }
@@ -182,7 +184,9 @@ public:
     /** @brief 检查是否为空（未插入过任何元素） */
     [[nodiscard]] bool empty() const noexcept
     {
-        return std::all_of(_registers.begin(), _registers.end(), [](std::uint8_t v) { return v == 0; });
+        return std::all_of(_registers.begin(), _registers.end(), [](std::uint8_t v) {
+            return v == 0;
+        });
     }
 
 private:
@@ -191,18 +195,16 @@ private:
      *
      * 对于 m=16,32,64 使用预先计算好的精确值，其他情况使用通用公式。
      */
-    static constexpr double _compute_alpha(std::size_t m) noexcept
+    static constexpr double _computeAlpha(std::size_t m) noexcept
     {
+        // clang-format off
         switch (m) {
-        case 16:
-            return 0.673;
-        case 32:
-            return 0.697;
-        case 64:
-            return 0.709;
-        default:
-            return 0.7213 / (1.0 + 1.079 / static_cast<double>(m));
+        case 16: return 0.673;
+        case 32: return 0.697;
+        case 64: return 0.709;
+        default: return 0.7213 / (1.0 + 1.079 / static_cast<double>(m));
         }
+        // clang-format on
     }
 
 private:

@@ -53,7 +53,8 @@ public:
      * @param width  每行计数器的个数（w）
      * @param depth  哈希函数的个数（d，即行数）
      */
-    CountMinSketch(std::size_t width, std::size_t depth) : _width(width), _depth(depth), _table(width * depth, count_type{0}), _totalCount(0)
+    CountMinSketch(std::size_t width, std::size_t depth)
+        : _width(width), _depth(depth), _table(width * depth, count_type{0}), _totalCount(0)
     {
         if (width == 0 || depth == 0)
             throw std::invalid_argument("CountMinSketch: width 和 depth 必须大于 0");
@@ -107,7 +108,7 @@ public:
     {
         auto h = std::hash<T>{}(item);
         for (std::size_t i = 0; i < _depth; ++i) {
-            std::size_t idx = _hash_to_index(h, i);
+            std::size_t idx = _hashToIndex(h, i);
             auto& cell      = _table[i * _width + idx];
             cell            = SaturatingAdd(cell, count);
         }
@@ -147,7 +148,7 @@ public:
         auto h            = std::hash<T>{}(item);
         count_type result = std::numeric_limits<count_type>::max();
         for (std::size_t i = 0; i < _depth; ++i) {
-            std::size_t idx = _hash_to_index(h, i);
+            std::size_t idx = _hashToIndex(h, i);
             result          = std::min(result, _table[i * _width + idx]);
         }
         return result;
@@ -166,7 +167,7 @@ public:
     }
 
     /** @brief 返回所有插入元素的总计数 */
-    [[nodiscard]] count_type total_count() const noexcept
+    [[nodiscard]] count_type totalCount() const noexcept
     {
         return _totalCount;
     }
@@ -194,7 +195,7 @@ public:
      * @brief 使用指定的种子
      * @param seeds 种子数组，长度必须等于 depth
      */
-    void set_seeds(const std::vector<std::uint64_t>& seeds)
+    void setSeeds(const std::vector<std::uint64_t>& seeds)
     {
         if (seeds.size() != _depth)
             throw std::invalid_argument("seeds 长度必须等于 depth");
@@ -206,7 +207,7 @@ private:
     /**
      * @brief 将元素哈希值与行种子混合后映射到 [0, width) 的列索引。
      */
-    [[nodiscard]] std::size_t _hash_to_index(std::size_t hash, std::size_t row) const noexcept
+    [[nodiscard]] std::size_t _hashToIndex(std::size_t hash, std::size_t row) const noexcept
     {
         return Splitmix64(hash ^ _seeds[row]) % _width;
     }
