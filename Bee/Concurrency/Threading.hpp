@@ -89,6 +89,36 @@ using DefaultSpinPolicy = internal::AdaptiveSpinPolicy<internal::kSpinPauseRepea
 // 吞吐量导向自旋策略：不进行换出
 using ThroughputSpinPolicy = internal::ThroughputSpinPolicy<(internal::kSpinPauseRepeats * 2U)>;
 
+template <typename SpinPolicy = DefaultSpinPolicy>
+static void try_contention(std::uint32_t& spin_count) noexcept
+{
+    // try 路径保持轻量退避，降低 CAS 热点冲突。
+    // 设计取向：优先减少失败 CAS 洪泛，而非追求“永不让步”。
+    SpinPolicy::wait(spin_count);
+    ++spin_count;
+}
+
+template <typename SpinPolicy = DefaultSpinPolicy>
+void adaptive_backoff(std::uint32_t& spin_count, std::uint32_t spin_limit, std::uint32_t yield_limit) noexcept
+{
+    // 分段退避：
+    // 1) 前段以 pause 为主（低开销，低延迟）
+    // 2) 中段插入少量 yield（降低争用）
+    // 3) 后段以 yield 为主（避免长期空转）
+    if (spin_count < spin_limit) {
+        SpinPolicy::wait(spin_count);
+    } else if (spin_count < yield_limit) {
+        if ((spin_count & 0x07u) == 0x07u) {
+            thread_yield();
+        } else {
+            SpinPolicy::wait(spin_count);
+        }
+    } else {
+        thread_yield();
+    }
+    ++spin_count;
+}
+
 inline auto hardware_thread_count() noexcept -> std::uint32_t
 {
     const auto count = std::thread::hardware_concurrency();

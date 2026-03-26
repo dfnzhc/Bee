@@ -26,10 +26,10 @@ TEST(BaseThreadingTests, ThreadPauseVariantsAndContentionHelpersAreCallable)
 {
     bee::thread_yield();
     bee::thread_pause_relaxed();
-    
+
     bee::DefaultSpinPolicy::wait(1);
     SUCCEED();
-    
+
     bee::ThroughputSpinPolicy::wait(1);
     SUCCEED();
 }

@@ -19,7 +19,7 @@ namespace bee
 {
 
 /**
- * @brief 无锁、有界的单生产者单消费者队列
+ * @brief 无锁、有界的单生产者单消费者队列 - SPSCQueue
  * 
  * 1) 单生产者 / 单消费者前提：
  *    - 写端只改 _writeIdx
@@ -58,6 +58,7 @@ public:
     // =========================================================================
     // 构造与生命周期管理
     // =========================================================================
+
     explicit BasicSPSCQueue(size_type capacity, const Allocator& allocator = Allocator())
         : _capacity(normalize_internal_capacity(capacity))
         , _indexMask(initial_index_mask(_capacity))
@@ -172,6 +173,7 @@ public:
     // =========================================================================
     // 消费者
     // =========================================================================
+
     [[nodiscard]] bool try_pop(reference out_value) noexcept
     {
         static_assert(std::is_nothrow_move_assignable_v<T>, "T must be nothrow move assignable");

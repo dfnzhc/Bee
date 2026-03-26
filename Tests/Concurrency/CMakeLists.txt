@@ -5,4 +5,6 @@ bee_add_component_test(
         ConcurrencyTests.cpp
         ThreadingTests.cpp
         SPSCQueueTests.cpp
+        MPMCQueueTests.cpp
+        ChaseLevDequeTests.cpp
 )
