@@ -5,4 +5,6 @@ bee_add_component_test(
         DataStructureTests.cpp
         CountMinSketchTests.cpp
         HyperLogLogTests.cpp
+        SkipListTests.cpp
+        CacheTests.cpp
 )
