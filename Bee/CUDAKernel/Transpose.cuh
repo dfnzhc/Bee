@@ -115,7 +115,7 @@ __global__ void transpose_tiled_diagonal_kernel(const T* in, T* out, int rows, i
 }
 
 template <typename T>
-cudaError_t Launch_transpose(const T* in, T* out, int rows, int cols, cudaStream_t stream = nullptr)
+cudaError_t launch_transpose(const T* in, T* out, int rows, int cols, cudaStream_t stream = nullptr)
 {
     static_assert(std::is_same_v<T, float> || std::is_same_v<T, double> || std::is_same_v<T, int>, "Launch currently supports float/double/int.");
 

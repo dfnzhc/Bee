@@ -297,7 +297,7 @@ TEST(CUDAKernelOpsTests, TransposeProducesExpectedLayout)
     expect_cuda_success(cudaMalloc(&d_out, h_in.size() * sizeof(int)));
     expect_cuda_success(cudaMemcpy(d_in, h_in.data(), h_in.size() * sizeof(int), cudaMemcpyHostToDevice));
 
-    expect_cuda_success(bee::cuda::Launch_transpose(d_in, d_out, rows, cols));
+    expect_cuda_success(bee::cuda::launch_transpose(d_in, d_out, rows, cols));
     expect_cuda_success(cudaDeviceSynchronize());
 
     std::vector<int> h_out(h_in.size());

@@ -12,6 +12,7 @@
 #include <mma.h>
 #include <cstdint>
 
+#include "Warp.cuh"
 
 namespace bee::cuda
 {
@@ -21,14 +22,6 @@ namespace bee::cuda
 // =========================================================
 
 // ----------------------- 特殊寄存器读取 -----------------------
-
-// 当前线程在 warp 内的 lane id（范围 [0,31]）。
-__device__ __forceinline__ int lane_id()
-{
-    int v;
-    asm volatile("mov.u32 %0, %%laneid;" : "=r"(v));
-    return v;
-}
 
 // 当前线程在 CTA 内所属 warp id。
 __device__ __forceinline__ int warp_id()
@@ -51,38 +44,6 @@ __device__ __forceinline__ int num_sms()
 {
     int v;
     asm volatile("mov.u32 %0, %%nsmid;" : "=r"(v));
-    return v;
-}
-
-// lane 左侧掩码（不含自身）。
-__device__ __forceinline__ unsigned lane_mask_lt()
-{
-    unsigned v;
-    asm volatile("mov.u32 %0, %%lanemask_lt;" : "=r"(v));
-    return v;
-}
-
-// lane 左侧掩码（含自身）。
-__device__ __forceinline__ unsigned lane_mask_le()
-{
-    unsigned v;
-    asm volatile("mov.u32 %0, %%lanemask_le;" : "=r"(v));
-    return v;
-}
-
-// lane 右侧掩码（不含自身）。
-__device__ __forceinline__ unsigned lane_mask_gt()
-{
-    unsigned v;
-    asm volatile("mov.u32 %0, %%lanemask_gt;" : "=r"(v));
-    return v;
-}
-
-// lane 右侧掩码（含自身）。
-__device__ __forceinline__ unsigned lane_mask_ge()
-{
-    unsigned v;
-    asm volatile("mov.u32 %0, %%lanemask_ge;" : "=r"(v));
     return v;
 }
 

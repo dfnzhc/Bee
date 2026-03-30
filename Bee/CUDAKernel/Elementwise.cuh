@@ -181,16 +181,17 @@ cudaError_t launch_elementwise_unary(Out* out, const In* in, int n, Op op, cudaS
     }
 
     constexpr int kBlock = 256;
-    const auto cfg       = make_1d(n, kBlock);
 
     if constexpr (std::is_same_v<Out, In>) {
         using PackT = Pack<Out, VecWidth>;
         if (can_vectorize<PackT>(out, static_cast<std::size_t>(n)) && can_vectorize<PackT>(in, static_cast<std::size_t>(n))) {
-            unary_kernel_vectorized<Out, VecWidth, Op><<<cfg.grid, cfg.block, 0, stream>>>(out, in, n, op);
+            const auto vec_cfg = make_1d(n / VecWidth, kBlock);
+            unary_kernel_vectorized<Out, VecWidth, Op><<<vec_cfg.grid, vec_cfg.block, 0, stream>>>(out, in, n, op);
             return cudaGetLastError();
         }
     }
 
+    const auto cfg = make_1d(n, kBlock);
     unary_kernel_scalar<Out, In, Op><<<cfg.grid, cfg.block, 0, stream>>>(out, in, n, op);
     return cudaGetLastError();
 }
@@ -204,17 +205,18 @@ cudaError_t launch_elementwise_binary(Out* out, const In0* in0, const In1* in1, 
     }
 
     constexpr int kBlock = 256;
-    const auto cfg       = make_1d(n, kBlock);
 
     if constexpr (std::is_same_v<Out, In0> && std::is_same_v<Out, In1>) {
         using PackT = Pack<Out, VecWidth>;
         if (can_vectorize<PackT>(out, static_cast<std::size_t>(n)) && can_vectorize<PackT>(in0, static_cast<std::size_t>(n)) &&
             can_vectorize<PackT>(in1, static_cast<std::size_t>(n))) {
-            binary_kernel_vectorized<Out, VecWidth, Op><<<cfg.grid, cfg.block, 0, stream>>>(out, in0, in1, n, op);
+            const auto vec_cfg = make_1d(n / VecWidth, kBlock);
+            binary_kernel_vectorized<Out, VecWidth, Op><<<vec_cfg.grid, vec_cfg.block, 0, stream>>>(out, in0, in1, n, op);
             return cudaGetLastError();
         }
     }
 
+    const auto cfg = make_1d(n, kBlock);
     binary_kernel_scalar<Out, In0, In1, Op><<<cfg.grid, cfg.block, 0, stream>>>(out, in0, in1, n, op);
     return cudaGetLastError();
 }
@@ -228,17 +230,18 @@ cudaError_t launch_elementwise_ternary(Out* out, const In0* in0, const In1* in1,
     }
 
     constexpr int kBlock = 256;
-    const auto cfg       = make_1d(n, kBlock);
 
     if constexpr (std::is_same_v<Out, In0> && std::is_same_v<Out, In1> && std::is_same_v<Out, In2>) {
         using PackT = Pack<Out, VecWidth>;
         if (can_vectorize<PackT>(out, static_cast<std::size_t>(n)) && can_vectorize<PackT>(in0, static_cast<std::size_t>(n)) &&
             can_vectorize<PackT>(in1, static_cast<std::size_t>(n)) && can_vectorize<PackT>(in2, static_cast<std::size_t>(n))) {
-            ternary_kernel_vectorized<Out, VecWidth, Op><<<cfg.grid, cfg.block, 0, stream>>>(out, in0, in1, in2, n, op);
+            const auto vec_cfg = make_1d(n / VecWidth, kBlock);
+            ternary_kernel_vectorized<Out, VecWidth, Op><<<vec_cfg.grid, vec_cfg.block, 0, stream>>>(out, in0, in1, in2, n, op);
             return cudaGetLastError();
         }
     }
 
+    const auto cfg = make_1d(n, kBlock);
     ternary_kernel_scalar<Out, In0, In1, In2, Op><<<cfg.grid, cfg.block, 0, stream>>>(out, in0, in1, in2, n, op);
     return cudaGetLastError();
 }

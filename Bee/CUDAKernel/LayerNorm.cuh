@@ -187,8 +187,10 @@ cudaError_t launch_layer_norm(const T* x, const T* gamma, const T* beta, T* y, i
     }
 
     if (use_vec) {
-        layer_norm_rowwise_f32_vec4_kernel<kBlock><<<grid, block, 0, stream>>>(x, gamma, beta, y, rows, cols, eps);
-        return cudaGetLastError();
+        if constexpr (std::is_same_v<T, float>) {
+            layer_norm_rowwise_f32_vec4_kernel<kBlock><<<grid, block, 0, stream>>>(x, gamma, beta, y, rows, cols, eps);
+            return cudaGetLastError();
+        }
     }
 
     layer_norm_rowwise_scalar_kernel<T, kBlock><<<grid, block, 0, stream>>>(x, gamma, beta, y, rows, cols, eps);

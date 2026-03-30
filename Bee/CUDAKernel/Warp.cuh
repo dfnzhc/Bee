@@ -52,8 +52,9 @@ __device__ __forceinline__ int lane_id()
  */
 __device__ __forceinline__ unsigned lane_mask_lt()
 {
-    const int lane = lane_id();
-    return (lane == 0) ? 0u : ((1u << lane) - 1u);
+    unsigned v;
+    asm volatile("mov.u32 %0, %%lanemask_lt;" : "=r"(v));
+    return v;
 }
 
 /**
@@ -61,8 +62,9 @@ __device__ __forceinline__ unsigned lane_mask_lt()
  */
 __device__ __forceinline__ unsigned lane_mask_le()
 {
-    const int lane = lane_id();
-    return (lane >= 31) ? kFullMask : ((1u << (lane + 1)) - 1u);
+    unsigned v;
+    asm volatile("mov.u32 %0, %%lanemask_le;" : "=r"(v));
+    return v;
 }
 
 /**
@@ -70,8 +72,9 @@ __device__ __forceinline__ unsigned lane_mask_le()
  */
 __device__ __forceinline__ unsigned lane_mask_gt()
 {
-    const int lane = lane_id();
-    return (lane >= 31) ? 0u : ~((1u << (lane + 1)) - 1u);
+    unsigned v;
+    asm volatile("mov.u32 %0, %%lanemask_gt;" : "=r"(v));
+    return v;
 }
 
 /**
@@ -79,8 +82,9 @@ __device__ __forceinline__ unsigned lane_mask_gt()
  */
 __device__ __forceinline__ unsigned lane_mask_ge()
 {
-    const int lane = lane_id();
-    return ~((1u << lane) - 1u);
+    unsigned v;
+    asm volatile("mov.u32 %0, %%lanemask_ge;" : "=r"(v));
+    return v;
 }
 
 /**
