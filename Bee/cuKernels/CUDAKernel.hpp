@@ -2,7 +2,7 @@
 
 #include <string_view>
 
-namespace bee::cuda
+namespace bee
 {
 
 std::string_view cuda_kernel_name() noexcept;
@@ -13,4 +13,4 @@ bool cuda_kernel_has_cutlass() noexcept;
 
 int cuda_kernel_compiled_with_nvcc() noexcept;
 
-} // namespace bee::cuda
+} // namespace bee

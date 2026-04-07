@@ -13,7 +13,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace bee::cuda
+namespace bee
 {
 
 inline void check_cuda(cudaError_t err, const char* expr, const char* file, int line)
@@ -33,10 +33,10 @@ inline void check_last_kernel(const char* file, int line)
     check_cuda(cudaGetLastError(), "cudaGetLastError()", file, line);
 }
 
-} // namespace bee::cuda
+} // namespace bee
 
-#define GPU_CUDA_CHECK(expr)  ::bee::cuda::check_cuda((expr), #expr, __FILE__, __LINE__)
-#define GPU_CUDA_CHECK_LAST() ::bee::cuda::check_last_kernel(__FILE__, __LINE__)
+#define GPU_CUDA_CHECK(expr)  ::bee::check_cuda((expr), #expr, __FILE__, __LINE__)
+#define GPU_CUDA_CHECK_LAST() ::bee::check_last_kernel(__FILE__, __LINE__)
 
 // 可选 NVTX 标注（只有显式开启 GPU_ENABLE_NVTX 且可用头文件时生效）。
 #if defined(BEE_ENABLE_NVTX)

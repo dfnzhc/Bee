@@ -1,11 +1,11 @@
-#include "CUDAKernel/CUDAKernel.hpp"
+#include "cuKernels/CUDAKernel.hpp"
 
-namespace bee::cuda
+namespace bee
 {
 
 std::string_view cuda_kernel_name() noexcept
 {
-    return "CUDAKernel";
+    return "cuKernels";
 }
 
 std::string_view cuda_toolkit_version() noexcept
@@ -18,4 +18,4 @@ bool cuda_kernel_has_cutlass() noexcept
     return BEE_HAS_CUTLASS != 0;
 }
 
-} // namespace bee::cuda
+} // namespace bee

@@ -1,10 +1,10 @@
 include(CheckLanguage)
 
-set(CMAKE_CUDA_ARCHITECTURES "120") # 89;90;
+set(CMAKE_CUDA_ARCHITECTURES "89;120" PARENT_SCOPE) # 89;90;
 
 check_language(CUDA)
 if (NOT CMAKE_CUDA_COMPILER)
-    message(WARNING "CUDA compiler not found. Skipping CUDAKernel component.")
+    message(WARNING "CUDA compiler not found. Skipping cuKernels component.")
     return()
 endif ()
 
@@ -12,7 +12,7 @@ enable_language(CUDA)
 
 find_package(CUDAToolkit QUIET)
 if (NOT CUDAToolkit_FOUND)
-    message(WARNING "CUDA Toolkit not found. Skipping CUDAKernel component.")
+    message(WARNING "CUDA Toolkit not found. Skipping cuKernels component.")
     return()
 endif ()
 
@@ -97,12 +97,12 @@ file(GLOB_RECURSE cuda_kernel_sources CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/*.cu"
 )
 
-add_library(CUDAKernel STATIC
+add_library(cuKernels STATIC
         ${cuda_kernel_sources}
         ${cuda_kernel_public_headers}
 )
 
-target_include_directories(CUDAKernel
+target_include_directories(cuKernels
         PUBLIC
         $<BUILD_INTERFACE:${BEE_PUBLIC_INCLUDE_DIR}>
         $<INSTALL_INTERFACE:include>
@@ -111,27 +111,27 @@ target_include_directories(CUDAKernel
 )
 
 if (BEE_HAS_CUTLASS)
-    target_include_directories(CUDAKernel PRIVATE ${BEE_CUTLASS_INCLUDE_DIR})
+    target_include_directories(cuKernels PRIVATE ${BEE_CUTLASS_INCLUDE_DIR})
 endif ()
 
-target_link_libraries(CUDAKernel
+target_link_libraries(cuKernels
         PUBLIC
         Bee::Base
         CUDA::cudart
 )
 
 if (TARGET cutlass::cutlass)
-    target_link_libraries(CUDAKernel PRIVATE cutlass::cutlass)
+    target_link_libraries(cuKernels PRIVATE cutlass::cutlass)
 endif ()
 
-target_compile_features(CUDAKernel
+target_compile_features(cuKernels
         PUBLIC
         cxx_std_20
         PRIVATE
         cuda_std_20
 )
 
-set_target_properties(CUDAKernel PROPERTIES
+set_target_properties(cuKernels PROPERTIES
         CXX_STANDARD 20
         CXX_STANDARD_REQUIRED ON
         CUDA_STANDARD 20
@@ -142,23 +142,23 @@ if (NOT CUDAToolkit_VERSION)
     set(CUDAToolkit_VERSION "unknown")
 endif ()
 
-target_compile_definitions(CUDAKernel
+target_compile_definitions(cuKernels
         PUBLIC
         BEE_CUDA_VERSION_STRING="${CUDAToolkit_VERSION}"
         BEE_HAS_CUTLASS=$<BOOL:${BEE_HAS_CUTLASS}>
         BEE_HAS_WGMMA=$<BOOL:${BEE_HAS_WGMMA}>
 )
 
-set_target_properties(CUDAKernel PROPERTIES
+set_target_properties(cuKernels PROPERTIES
         CUDA_ARCHITECTURES "${CMAKE_CUDA_ARCHITECTURES}"
         CUDA_SEPARABLE_COMPILATION OFF
 )
 
 set(cuda_kernel_all_sources ${cuda_kernel_sources} ${cuda_kernel_public_headers})
 bee_group_sources(
-        TARGET CUDAKernel
+        TARGET cuKernels
         BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}"
         SOURCES ${cuda_kernel_all_sources}
 )
 
-add_library(Bee::CUDAKernel ALIAS CUDAKernel)
+add_library(Bee::cuKernels ALIAS cuKernels)
