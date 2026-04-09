@@ -7,14 +7,15 @@
 
 #pragma once
 
+#include <concepts>
 #include <limits>
 #include <numeric>
 
 namespace bee
 {
 
-template <typename T>
-constexpr T SaturatingAdd(T a, T b) noexcept
+template <std::unsigned_integral T>
+[[nodiscard]] constexpr T SaturatingAdd(T a, T b) noexcept
 {
     const auto maxValue = std::numeric_limits<T>::max();
     if (maxValue - a < b) {

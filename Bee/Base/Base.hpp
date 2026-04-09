@@ -4,6 +4,6 @@
 
 namespace bee {
 
-std::string_view name() noexcept;
+std::string_view base_name() noexcept;
 
 }  // namespace bee

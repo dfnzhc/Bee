@@ -8,6 +8,7 @@
 #pragma once
 
 #include <cassert>
+#include <concepts>
 #include <cstddef>
 #include <functional>
 #include <list>
@@ -33,7 +34,7 @@ namespace bee
  * @tparam Value  值类型
  * @tparam Hash   哈希函数，默认 std::hash<Key>
  */
-template <typename Key, typename Value, typename Hash = std::hash<Key>>
+template <std::equality_comparable Key, typename Value, typename Hash = std::hash<Key>>
 class LRUCache
 {
 public:
@@ -168,7 +169,7 @@ private:
  * @tparam Value  值类型
  * @tparam Hash   哈希函数
  */
-template <typename Key, typename Value, typename Hash = std::hash<Key>>
+template <std::equality_comparable Key, typename Value, typename Hash = std::hash<Key>>
 class MRUCache
 {
 public:
@@ -297,7 +298,7 @@ private:
  * @tparam Value  值类型
  * @tparam Hash   哈希函数
  */
-template <typename Key, typename Value, typename Hash = std::hash<Key>>
+template <std::equality_comparable Key, typename Value, typename Hash = std::hash<Key>>
 class LFUCache
 {
     struct Entry
@@ -459,7 +460,9 @@ private:
 
         if (bucket.empty()) {
             _freqBuckets.erase(bucketIt);
-            _recomputeMinFreq();
+            // No need to recompute _minFreq here:
+            // _evict() is only called from put(), which always sets _minFreq = 1
+            // immediately after inserting the new entry.
         }
     }
 
@@ -496,7 +499,7 @@ private:
  * @tparam Value  值类型
  * @tparam Hash   哈希函数
  */
-template <typename Key, typename Value, typename Hash = std::hash<Key>>
+template <std::equality_comparable Key, typename Value, typename Hash = std::hash<Key>>
 class MFUCache
 {
     struct Entry
@@ -666,11 +669,28 @@ private:
 
     /**
      * @brief 重新计算当前最大频率。
+     *
+     * 先尝试 _maxFreq - 1（连续频率的常见情况，O(1)），
+     * 不命中时回退到全桶扫描（O(m)，m 为不同频率数）。
      */
     void _recomputeMaxFreq()
     {
+        if (_freqBuckets.empty()) {
+            _maxFreq = 0;
+            return;
+        }
+
+        // Fast path: check _maxFreq - 1 (common when frequencies are consecutive)
+        if (_maxFreq > 1) {
+            if (auto it = _freqBuckets.find(_maxFreq - 1); it != _freqBuckets.end() && !it->second.empty()) {
+                _maxFreq = _maxFreq - 1;
+                return;
+            }
+        }
+
+        // Slow path: full scan
         _maxFreq = 0;
-        for (auto& [f, bucket] : _freqBuckets) {
+        for (const auto& [f, bucket] : _freqBuckets) {
             if (!bucket.empty() && f > _maxFreq) {
                 _maxFreq = f;
             }
@@ -699,13 +719,14 @@ private:
  *   - 命中 B2（最近淘汰的多次访问条目）→ 减小 p → 给 T2 更多空间
  *
  * 时间复杂度：所有操作 O(1)
- * 空间复杂度：O(2c)，其中 c 为缓存容量（包括幽灵条目）
+ * 空间复杂度：O(2c)，其中 c 为缓存容量
+ *   （T1 + T2 ≤ c，B1 ≤ c，B2 ≤ c，总目录 T1+T2+B1+B2 ≤ 2c）
  *
  * @tparam Key    键类型
  * @tparam Value  值类型
  * @tparam Hash   哈希函数
  */
-template <typename Key, typename Value, typename Hash = std::hash<Key>>
+template <std::equality_comparable Key, typename Value, typename Hash = std::hash<Key>>
 class ARCache
 {
     // 条目类型标记
@@ -974,6 +995,18 @@ public:
         return _t2.size();
     }
 
+    /** @brief 返回 B1 幽灵列表的当前大小 */
+    [[nodiscard]] size_type b1Size() const noexcept
+    {
+        return _b1.size();
+    }
+
+    /** @brief 返回 B2 幽灵列表的当前大小 */
+    [[nodiscard]] size_type b2Size() const noexcept
+    {
+        return _b2.size();
+    }
+
     /** @brief 清空所有数据和幽灵记录 */
     void clear()
     {
@@ -1033,6 +1066,11 @@ private:
         if (evictFromT1 && !_t1.empty()) {
             // 从 T1 尾部淘汰，加入 B1
             auto& back = _t1.back();
+            // 防御性检查：确保 |B1| + |T1| ≤ c（正常由 put() 维护，此处为安全网）
+            if (_b1.size() + _t1.size() >= _capacity && !_b1.empty()) {
+                _b1Map.erase(_b1.back().key);
+                _b1.pop_back();
+            }
             _b1.emplace_front(GhostEntry{back.key, ListType::B1});
             _b1Map[back.key] = _b1.begin();
             _t1Map.erase(back.key);
@@ -1040,6 +1078,11 @@ private:
         } else if (!_t2.empty()) {
             // 从 T2 尾部淘汰，加入 B2
             auto& back = _t2.back();
+            // 防御性检查：确保 |B2| + |T2| ≤ c
+            if (_b2.size() + _t2.size() >= _capacity && !_b2.empty()) {
+                _b2Map.erase(_b2.back().key);
+                _b2.pop_back();
+            }
             _b2.emplace_front(GhostEntry{back.key, ListType::B2});
             _b2Map[back.key] = _b2.begin();
             _t2Map.erase(back.key);

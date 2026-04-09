@@ -10,6 +10,7 @@
 #include "Base/Hash.hpp"
 
 #include <cstdint>
+#include <random>
 #include <stdexcept>
 #include <type_traits>
 #include <vector>
@@ -59,11 +60,13 @@ public:
         if (width == 0 || depth == 0)
             throw std::invalid_argument("CountMinSketch: width 和 depth 必须大于 0");
 
-        // 生成各行的哈希种子，使用简单的线性序列
+        // 使用硬件随机源生成各行种子，保证哈希函数独立性
         _seeds.resize(_depth);
-        // 使用不同的质数作为各行种子，使哈希函数近似独立
+        std::random_device rd;
         for (std::size_t i = 0; i < _depth; ++i) {
-            _seeds[i] = 0x9E3779B97F4A7C15ULL * (i + 1);
+            auto hi = static_cast<std::uint64_t>(rd()) << 32;
+            auto lo = static_cast<std::uint64_t>(rd());
+            _seeds[i] = hi | lo;
         }
     }
 

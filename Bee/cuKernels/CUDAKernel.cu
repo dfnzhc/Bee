@@ -3,12 +3,12 @@
 namespace bee
 {
 
-int cuda_kernel_compiled_with_nvcc() noexcept
+bool cuda_kernel_compiled_with_nvcc() noexcept
 {
     #if defined(__CUDACC__)
-    return 1;
+    return true;
     #else
-    return 0;
+    return false;
     #endif
 }
 

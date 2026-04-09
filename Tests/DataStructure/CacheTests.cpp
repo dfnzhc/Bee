@@ -369,6 +369,63 @@ TEST(LFUCacheTests, CapacityOne)
     EXPECT_TRUE(cache.contains(2));
 }
 
+TEST(LFUCacheTests, EvictionIsCorrectAfterFrequencyBuildUp)
+{
+    // Verify that after heavy frequency build-up, eviction still picks
+    // the truly least-frequent item, and _minFreq is correctly maintained.
+    IntLFU cache(3);
+
+    cache.put(1, 10); // freq 1
+    cache.put(2, 20); // freq 1
+    cache.put(3, 30); // freq 1
+
+    // Build up frequencies: key 1 gets freq 4, key 2 gets freq 3, key 3 stays freq 1
+    cache.get(1); cache.get(1); cache.get(1); // key 1: freq 4
+    cache.get(2); cache.get(2);               // key 2: freq 3
+
+    // Insert key 4 — should evict key 3 (freq 1, the minimum)
+    cache.put(4, 40);
+    EXPECT_FALSE(cache.get(3).has_value()) << "key 3 (lowest freq) should have been evicted";
+    EXPECT_TRUE(cache.get(1).has_value());
+    EXPECT_TRUE(cache.get(2).has_value());
+    EXPECT_TRUE(cache.get(4).has_value());
+
+    // Insert key 5 — should evict key 4 (freq 1, just inserted)
+    cache.put(5, 50);
+    EXPECT_FALSE(cache.get(4).has_value()) << "key 4 (freq 1) should have been evicted";
+
+    // Keys 1, 2, 5 should remain
+    EXPECT_TRUE(cache.get(1).has_value());
+    EXPECT_TRUE(cache.get(2).has_value());
+    EXPECT_TRUE(cache.get(5).has_value());
+}
+
+TEST(LFUCacheTests, EraseMinFreqItemRecomputesCorrectly)
+{
+    IntLFU cache(4);
+    cache.put(1, 10); // freq 1
+    cache.put(2, 20); // freq 1
+    cache.put(3, 30); // freq 1
+    cache.put(4, 40); // freq 1
+
+    // Boost keys 2,3,4 so key 1 remains sole freq=1
+    cache.get(2); // freq 2
+    cache.get(3); // freq 2
+    cache.get(4); // freq 2
+
+    // Erase key 1 (the only freq=1 entry). _minFreq should recompute to 2.
+    EXPECT_TRUE(cache.erase(1));
+    EXPECT_EQ(cache.size(), 3u);
+
+    // Now insert a new key — it gets freq=1, becomes the new min
+    cache.put(5, 50);
+    // Cache now has 2(f2), 3(f2), 4(f2), 5(f1) — at capacity
+    // Inserting 6 should evict 5
+    cache.put(6, 60);
+    EXPECT_FALSE(cache.get(5).has_value()) << "key 5 (freq 1) should be evicted";
+    EXPECT_TRUE(cache.get(6).has_value());
+}
+
 // =============================================================================
 // MFUCache 测试
 // =============================================================================
@@ -493,6 +550,48 @@ TEST(MFUCacheTests, CapacityOne)
     // 1 的频率更高，应被淘汰
     EXPECT_FALSE(cache.contains(1));
     EXPECT_TRUE(cache.contains(2));
+}
+
+TEST(MFUCacheTests, EvictsHighestFrequencyItem)
+{
+    IntMFU cache(3);
+    cache.put(1, 10);
+    cache.put(2, 20);
+    cache.put(3, 30);
+
+    // key 1: freq 4, key 2: freq 2, key 3: freq 1
+    cache.get(1); cache.get(1); cache.get(1);
+    cache.get(2);
+
+    // Insert 4 — should evict key 1 (highest freq = 4)
+    cache.put(4, 40);
+    EXPECT_FALSE(cache.get(1).has_value()) << "key 1 (highest freq) should be evicted";
+    EXPECT_TRUE(cache.get(2).has_value());
+    EXPECT_TRUE(cache.get(3).has_value());
+    EXPECT_TRUE(cache.get(4).has_value());
+}
+
+TEST(MFUCacheTests, EraseMaxFreqRecomputesCorrectly)
+{
+    IntMFU cache(4);
+    cache.put(1, 10);
+    cache.put(2, 20);
+    cache.put(3, 30);
+    cache.put(4, 40);
+
+    // key 1: freq 5 (max), key 2: freq 3, key 3: freq 2, key 4: freq 1
+    cache.get(1); cache.get(1); cache.get(1); cache.get(1);
+    cache.get(2); cache.get(2);
+    cache.get(3);
+
+    // Erase key 1 (sole freq=5 entry). _maxFreq should recompute to 3.
+    EXPECT_TRUE(cache.erase(1));
+
+    // Insert 5 — cache has 2(f3), 3(f2), 4(f1), 5(f1)
+    // Should evict key 2 (highest freq = 3)
+    cache.put(5, 50);
+    cache.put(6, 60);
+    EXPECT_FALSE(cache.get(2).has_value()) << "key 2 (now highest freq=3) should be evicted";
 }
 
 // =============================================================================

@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "Base/Bit.hpp"
 #include "Math/Math.hpp"
 
 TEST(MathComponentTests, ClampKeepsValueInRange)
@@ -17,8 +18,13 @@ TEST(MathComponentTests, LerpInterpolates)
 
 TEST(MathComponentTests, DetectsPowerOfTwo)
 {
-    EXPECT_TRUE(bee::IsPowerOfTwo(1));
-    EXPECT_TRUE(bee::IsPowerOfTwo(64));
-    EXPECT_FALSE(bee::IsPowerOfTwo(0));
-    EXPECT_FALSE(bee::IsPowerOfTwo(70));
+    // Now uses the generic Base/Bit.hpp version
+    EXPECT_TRUE(bee::IsPowerOfTwo(1u));
+    EXPECT_TRUE(bee::IsPowerOfTwo(64u));
+    EXPECT_FALSE(bee::IsPowerOfTwo(0u));
+    EXPECT_FALSE(bee::IsPowerOfTwo(70u));
+
+    // Verify it works with different unsigned types
+    EXPECT_TRUE(bee::IsPowerOfTwo(static_cast<std::uint8_t>(128)));
+    EXPECT_TRUE(bee::IsPowerOfTwo(static_cast<std::uint32_t>(1024)));
 }

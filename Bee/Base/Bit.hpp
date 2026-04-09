@@ -10,13 +10,13 @@ namespace bee
 {
 
 template <std::unsigned_integral UInt>
-constexpr auto IsPowerOfTwo(UInt value) noexcept -> bool
+[[nodiscard]] constexpr auto IsPowerOfTwo(UInt value) noexcept -> bool
 {
     return std::has_single_bit(value);
 }
 
 template <std::unsigned_integral UInt>
-constexpr auto RoundUpPowerOfTwo(UInt value) noexcept -> UInt
+[[nodiscard]] constexpr auto RoundUpPowerOfTwo(UInt value) noexcept -> UInt
 {
     if (value <= UInt{1}) {
         return UInt{1};
@@ -31,13 +31,13 @@ constexpr auto RoundUpPowerOfTwo(UInt value) noexcept -> UInt
 }
 
 template <std::unsigned_integral UInt>
-constexpr auto HighestPowerOfTwoLEQ(UInt value) noexcept -> UInt
+[[nodiscard]] constexpr auto HighestPowerOfTwoLEQ(UInt value) noexcept -> UInt
 {
     return std::bit_floor(value);
 }
 
 template <std::integral Int>
-constexpr auto ByteSwap(Int value) noexcept -> Int
+[[nodiscard]] constexpr auto ByteSwap(Int value) noexcept -> Int
 {
     using UInt = std::make_unsigned_t<Int>;
 
@@ -54,18 +54,18 @@ constexpr auto ByteSwap(Int value) noexcept -> Int
     #endif
 }
 
-constexpr bool IsBigEndian() noexcept
+[[nodiscard]] constexpr bool IsBigEndian() noexcept
 {
     return std::endian::native == std::endian::big;
 }
 
-constexpr bool IsLittleEndian() noexcept
+[[nodiscard]] constexpr bool IsLittleEndian() noexcept
 {
     return std::endian::native == std::endian::little;
 }
 
 template <std::integral Int>
-constexpr auto ToBigEndian(Int value) noexcept -> Int
+[[nodiscard]] constexpr auto ToBigEndian(Int value) noexcept -> Int
 {
     if constexpr (std::endian::native == std::endian::big) {
         return value;
@@ -75,7 +75,7 @@ constexpr auto ToBigEndian(Int value) noexcept -> Int
 }
 
 template <std::integral Int>
-constexpr auto ToLittleEndian(Int value) noexcept -> Int
+[[nodiscard]] constexpr auto ToLittleEndian(Int value) noexcept -> Int
 {
     if constexpr (std::endian::native == std::endian::little) {
         return value;
@@ -85,13 +85,13 @@ constexpr auto ToLittleEndian(Int value) noexcept -> Int
 }
 
 template <std::integral Int>
-constexpr auto FromBigEndian(Int value) noexcept -> Int
+[[nodiscard]] constexpr auto FromBigEndian(Int value) noexcept -> Int
 {
     return ToBigEndian(value);
 }
 
 template <std::integral Int>
-constexpr auto FromLittleEndian(Int value) noexcept -> Int
+[[nodiscard]] constexpr auto FromLittleEndian(Int value) noexcept -> Int
 {
     return ToLittleEndian(value);
 }

@@ -12,7 +12,7 @@ std::string_view data_structure_name() noexcept
 
 std::string_view data_structure_base_name() noexcept
 {
-    return name();
+    return base_name();
 }
 
 } // namespace bee

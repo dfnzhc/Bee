@@ -25,27 +25,27 @@ template <typename E>
 concept EnumBitmask = std::is_enum_v<E> && EnableEnumBitmaskOperatorsV<E>;
 
 template <typename E>
-constexpr auto ToUnderlying(E value) noexcept -> std::underlying_type_t<E>
+[[nodiscard]] constexpr auto ToUnderlying(E value) noexcept -> std::underlying_type_t<E>
 {
     static_assert(std::is_enum_v<E>);
     return static_cast<std::underlying_type_t<E>>(value);
 }
 
 template <EnumBitmask E>
-constexpr auto EnumIsZero(E value) noexcept -> bool
+[[nodiscard]] constexpr auto EnumIsZero(E value) noexcept -> bool
 {
     return ToUnderlying(value) == 0;
 }
 
 template <EnumBitmask E>
-constexpr auto EnumHasAny(E value, E flags) noexcept -> bool
+[[nodiscard]] constexpr auto EnumHasAny(E value, E flags) noexcept -> bool
 {
     using U = std::underlying_type_t<E>;
     return (static_cast<U>(value) & static_cast<U>(flags)) != 0;
 }
 
 template <EnumBitmask E>
-constexpr auto EnumHasAll(E value, E flags) noexcept -> bool
+[[nodiscard]] constexpr auto EnumHasAll(E value, E flags) noexcept -> bool
 {
     using U               = std::underlying_type_t<E>;
     const auto value_bits = static_cast<U>(value);
@@ -54,41 +54,41 @@ constexpr auto EnumHasAll(E value, E flags) noexcept -> bool
 }
 
 template <EnumBitmask E>
-constexpr auto EnumHasNone(E value, E flags) noexcept -> bool
+[[nodiscard]] constexpr auto EnumHasNone(E value, E flags) noexcept -> bool
 {
     return !EnumHasAny(value, flags);
 }
 
 template <EnumBitmask E>
-constexpr auto EnumSet(E value, E flags) noexcept -> E
+[[nodiscard]] constexpr auto EnumSet(E value, E flags) noexcept -> E
 {
     using U = std::underlying_type_t<E>;
     return static_cast<E>(static_cast<U>(value) | static_cast<U>(flags));
 }
 
 template <EnumBitmask E>
-constexpr auto EnumClear(E value, E flags) noexcept -> E
+[[nodiscard]] constexpr auto EnumClear(E value, E flags) noexcept -> E
 {
     using U = std::underlying_type_t<E>;
     return static_cast<E>(static_cast<U>(value) & ~static_cast<U>(flags));
 }
 
 template <EnumBitmask E>
-constexpr auto EnumToggle(E value, E flags) noexcept -> E
+[[nodiscard]] constexpr auto EnumToggle(E value, E flags) noexcept -> E
 {
     using U = std::underlying_type_t<E>;
     return static_cast<E>(static_cast<U>(value) ^ static_cast<U>(flags));
 }
 
 template <EnumBitmask E>
-constexpr auto EnumBitCount(E value) noexcept -> int
+[[nodiscard]] constexpr auto EnumBitCount(E value) noexcept -> int
 {
     using U = std::make_unsigned_t<std::underlying_type_t<E>>;
     return std::popcount(static_cast<U>(ToUnderlying(value)));
 }
 
 template <EnumBitmask E>
-constexpr auto EnumIsSingleBit(E value) noexcept -> bool
+[[nodiscard]] constexpr auto EnumIsSingleBit(E value) noexcept -> bool
 {
     using U         = std::make_unsigned_t<std::underlying_type_t<E>>;
     const auto bits = static_cast<U>(ToUnderlying(value));

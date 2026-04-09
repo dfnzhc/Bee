@@ -12,7 +12,7 @@
 namespace bee
 {
 
-constexpr u64 Splitmix64(u64 state) noexcept
+[[nodiscard]] constexpr u64 Splitmix64(u64 state) noexcept
 {
     auto z = state;
     z      = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;

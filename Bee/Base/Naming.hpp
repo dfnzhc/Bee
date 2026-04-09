@@ -15,7 +15,7 @@
 namespace bee
 {
 
-inline auto ToSnakeCase(std::string_view text) -> std::string
+[[nodiscard]] inline auto ToSnakeCase(std::string_view text) -> std::string
 {
     std::string result;
     result.reserve(text.size() * 2);

@@ -90,7 +90,7 @@ using DefaultSpinPolicy = internal::AdaptiveSpinPolicy<internal::kSpinPauseRepea
 using ThroughputSpinPolicy = internal::ThroughputSpinPolicy<(internal::kSpinPauseRepeats * 2U)>;
 
 template <typename SpinPolicy = DefaultSpinPolicy>
-static void try_contention(std::uint32_t& spin_count) noexcept
+inline void try_contention(std::uint32_t& spin_count) noexcept
 {
     // try 路径保持轻量退避，降低 CAS 热点冲突。
     // 设计取向：优先减少失败 CAS 洪泛，而非追求“永不让步”。
@@ -119,13 +119,13 @@ void adaptive_backoff(std::uint32_t& spin_count, std::uint32_t spin_limit, std::
     ++spin_count;
 }
 
-inline auto hardware_thread_count() noexcept -> std::uint32_t
+[[nodiscard]] inline auto hardware_thread_count() noexcept -> std::uint32_t
 {
     const auto count = std::thread::hardware_concurrency();
     return count == 0 ? 1u : count;
 }
 
-inline auto thread_id_hash() noexcept -> std::size_t
+[[nodiscard]] inline auto thread_id_hash() noexcept -> std::size_t
 {
     return std::hash<std::thread::id>{}(std::this_thread::get_id());
 }

@@ -8,7 +8,9 @@
 #pragma once
 
 #include <cassert>
+#include <concepts>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <initializer_list>
 #include <iterator>
@@ -37,7 +39,7 @@ namespace bee
  * @tparam Value    值类型
  * @tparam Compare  比较函数类型，默认 std::less<Key>
  */
-template <typename Key, typename Value, typename Compare = std::less<Key>>
+template <std::totally_ordered Key, typename Value, typename Compare = std::less<Key>>
 class SkipList
 {
     static constexpr int kMaxLevel       = 32;
@@ -91,10 +93,10 @@ public:
     {
     public:
         using iterator_category = std::forward_iterator_tag;
-        using value_type        = std::pair<const Key&, Value&>;
+        using value_type        = std::pair<const Key, Value>;
         using difference_type   = std::ptrdiff_t;
         using pointer           = void;
-        using reference         = value_type;
+        using reference         = std::pair<const Key&, Value&>;
 
         iterator() noexcept
             : _node(nullptr)
@@ -147,10 +149,10 @@ public:
     {
     public:
         using iterator_category = std::forward_iterator_tag;
-        using value_type        = std::pair<const Key&, const Value&>;
+        using value_type        = std::pair<const Key, Value>;
         using difference_type   = std::ptrdiff_t;
         using pointer           = void;
-        using reference         = value_type;
+        using reference         = std::pair<const Key&, const Value&>;
 
         const_iterator() noexcept
             : _node(nullptr)
@@ -564,11 +566,15 @@ private:
      */
     int _randomLevel()
     {
-        int lvl = 1;
-        // 使用均匀分布模拟伯努利试验
-        std::uniform_real_distribution<double> dist(0.0, 1.0);
-        while (dist(_rng) < kProbability && lvl < kMaxLevel) {
+        // 使用位运算模拟几何分布，比 uniform_real_distribution 快数倍。
+        // 每 2 位提供一次伯努利试验（kProbability = 0.25 = 1/4）。
+        int lvl          = 1;
+        std::uint32_t rn = _rng();
+        while ((rn & 0x3u) == 0 && lvl < kMaxLevel) {
             ++lvl;
+            rn >>= 2;
+            if (lvl % 16 == 0) // 用完 32 位后重新生成
+                rn = _rng();
         }
         return lvl;
     }
@@ -619,8 +625,9 @@ private:
         // 生成新节点层数
         int newLevel = _randomLevel();
 
-        // 创建新节点
-        auto* newNode = new Node(key, std::forward<V>(value), newLevel);
+        // 创建新节点（RAII guard 保证异常安全）
+        auto nodeGuard = std::unique_ptr<Node>(new Node(key, std::forward<V>(value), newLevel));
+        auto* newNode  = nodeGuard.get();
 
         if (newLevel > _level) {
             // 新增的高层的 update 全部指向头节点
@@ -642,6 +649,7 @@ private:
         }
 
         ++_size;
+        nodeGuard.release(); // Ownership transferred to the skip list
         return {iterator(newNode), true};
     }
 
