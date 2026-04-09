@@ -4,6 +4,8 @@ bee_add_component_test(
     SOURCES
         BaseTests.cpp
         BaseUtilsTests.cpp
+        CheckTests.cpp
+        ErrorTests.cpp
         EnumTests.cpp
         LogTests.cpp
         NameofTests.cpp

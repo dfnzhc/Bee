@@ -8,6 +8,7 @@
 #pragma once
 
 #include "Config.hpp"
+#include "Nameof.hpp"
 
 #include <atomic>
 #include <format>
@@ -40,21 +41,7 @@ void EnableDefaultLogging(LogLevel level = LogLevel::Info) noexcept;
 
 [[nodiscard]] constexpr auto LogLevelToString(LogLevel level) noexcept -> std::string_view
 {
-    switch (level) {
-    case LogLevel::Trace:
-        return "Trace";
-    case LogLevel::Debug:
-        return "Debug";
-    case LogLevel::Info:
-        return "Info";
-    case LogLevel::Warn:
-        return "Warn";
-    case LogLevel::Error:
-        return "Error";
-    case LogLevel::Fatal:
-        return "Fatal";
-    }
-    return "Unknown";
+    return enum_to_name(level);
 }
 
 // --- Built-in sink ---

@@ -1,5 +1,8 @@
 #pragma once
 
+#include "Check.hpp"
+#include "Error.hpp"
+
 #include <string_view>
 
 namespace bee {
