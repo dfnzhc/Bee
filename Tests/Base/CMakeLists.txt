@@ -5,5 +5,6 @@ bee_add_component_test(
         BaseTests.cpp
         BaseUtilsTests.cpp
         EnumTests.cpp
+        LogTests.cpp
         NameofTests.cpp
 )
