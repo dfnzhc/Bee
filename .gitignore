@@ -382,3 +382,4 @@ Source/BeeEditor/Dirty
 **/[Bb]uild/*
 **/.idea
 docs
+.github
