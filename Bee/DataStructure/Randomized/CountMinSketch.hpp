@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include "Base/Hash.hpp"
+#include "Base/Numeric/Hash.hpp"
 
 #include <cstdint>
 #include <random>
@@ -15,7 +15,7 @@
 #include <type_traits>
 #include <vector>
 
-#include "Base/Numeric.hpp"
+#include "Base/Numeric/Numeric.hpp"
 
 namespace bee
 {

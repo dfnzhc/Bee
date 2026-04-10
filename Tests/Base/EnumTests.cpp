@@ -10,7 +10,7 @@
 #include <cstdint>
 #include <type_traits>
 
-#include "Base/Enum.hpp"
+#include "Base/Reflection/Enum.hpp"
 
 namespace bee::enum_test_samples
 {

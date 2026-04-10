@@ -7,9 +7,9 @@
 
 #pragma once
 
-#include "Check.hpp"
-#include "Config.hpp"
-#include "Nameof.hpp"
+#include "Base/Diagnostics/Check.hpp"
+#include "Base/Core/Config.hpp"
+#include "Base/Reflection/Nameof.hpp"
 
 #include <chrono>
 #include <expected>

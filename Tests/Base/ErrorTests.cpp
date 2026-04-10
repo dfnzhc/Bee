@@ -7,7 +7,7 @@
 
 #include <gtest/gtest.h>
 
-#include "Base/Error.hpp"
+#include "Base/Diagnostics/Error.hpp"
 
 #include <stdexcept>
 #include <string>

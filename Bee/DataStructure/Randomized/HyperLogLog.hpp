@@ -10,8 +10,8 @@
 #include <bit>
 #include <stdexcept>
 
-#include "Base/Hash.hpp"
-#include "Base/Numeric.hpp"
+#include "Base/Numeric/Hash.hpp"
+#include "Base/Numeric/Numeric.hpp"
 
 #include <algorithm>
 #include <cmath>

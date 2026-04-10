@@ -7,8 +7,8 @@
 
 #pragma once
 
-#include "Defines.hpp"
-#include "Log.hpp"
+#include "Base/Core/Defines.hpp"
+#include "Base/Diagnostics/Log.hpp"
 
 #include <atomic>
 #include <format>

@@ -12,7 +12,7 @@
 #include <string_view>
 #include <type_traits>
 
-#include "Base/Nameof.hpp"
+#include "Base/Reflection/Nameof.hpp"
 
 namespace bee::nameof_test_samples
 {

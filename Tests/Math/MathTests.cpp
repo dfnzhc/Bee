@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "Base/Bit.hpp"
+#include "Base/Numeric/Bit.hpp"
 #include "Math/Math.hpp"
 
 TEST(MathComponentTests, ClampKeepsValueInRange)

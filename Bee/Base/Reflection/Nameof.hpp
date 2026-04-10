@@ -17,9 +17,9 @@
 #include <type_traits>
 #include <utility>
 
-#include "Ascii.hpp"
-#include "Naming.hpp"
-#include "Text.hpp"
+#include "Base/String/Ascii.hpp"
+#include "Base/String/Naming.hpp"
+#include "Base/String/Text.hpp"
 
 namespace bee
 {

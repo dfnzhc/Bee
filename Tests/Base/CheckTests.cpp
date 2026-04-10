@@ -7,7 +7,7 @@
 
 #include <gtest/gtest.h>
 
-#include "Base/Check.hpp"
+#include "Base/Diagnostics/Check.hpp"
 
 #include <cstdio>
 

@@ -10,8 +10,8 @@
 #include <limits>
 #include <semaphore>
 
-#include "Base/Bit.hpp"
-#include "Base/Defines.hpp"
+#include "Base/Numeric/Bit.hpp"
+#include "Base/Core/Defines.hpp"
 #include "Concurrency/Threading.hpp"
 
 namespace bee

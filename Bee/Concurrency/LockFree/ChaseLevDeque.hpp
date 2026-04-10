@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include "Base/Defines.hpp"
+#include "Base/Core/Defines.hpp"
 #include "Concurrency/Threading.hpp"
 
 namespace bee

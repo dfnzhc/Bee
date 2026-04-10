@@ -5,10 +5,10 @@
 #include <type_traits>
 
 #include "Base/Base.hpp"
-#include "Base/Config.hpp"
-#include "Base/Hash.hpp"
-#include "Base/Macros.hpp"
-#include "Base/Numeric.hpp"
+#include "Base/Core/Config.hpp"
+#include "Base/Numeric/Hash.hpp"
+#include "Base/Core/Macros.hpp"
+#include "Base/Numeric/Numeric.hpp"
 
 TEST(BaseComponentTests, ReturnsComponentName)
 {

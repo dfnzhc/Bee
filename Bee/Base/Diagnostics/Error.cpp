@@ -5,7 +5,7 @@
  * @Brief This file is part of Bee.
  */
 
-#include "Base/Error.hpp"
+#include "Base/Diagnostics/Error.hpp"
 
 #include <cstdio>
 #include <ctime>

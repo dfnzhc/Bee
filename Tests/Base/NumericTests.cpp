@@ -10,7 +10,7 @@
 #include <cstdint>
 #include <limits>
 
-#include "Base/Numeric.hpp"
+#include "Base/Numeric/Numeric.hpp"
 
 // ============================================================================
 // Compile-time verification

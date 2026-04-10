@@ -11,8 +11,8 @@
 #include <atomic>
 #include <cassert>
 
-#include "Base/Defines.hpp"
-#include "Base/Bit.hpp"
+#include "Base/Core/Defines.hpp"
+#include "Base/Numeric/Bit.hpp"
 #include "Concurrency/Threading.hpp"
 
 namespace bee

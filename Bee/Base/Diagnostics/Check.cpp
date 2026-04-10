@@ -5,7 +5,7 @@
  * @Brief This file is part of Bee.
  */
 
-#include "Base/Check.hpp"
+#include "Base/Diagnostics/Check.hpp"
 
 #include <cstdio>
 #include <cstdlib>

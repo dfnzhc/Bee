@@ -7,7 +7,7 @@
 
 #include <gtest/gtest.h>
 
-#include "Base/Log.hpp"
+#include "Base/Diagnostics/Log.hpp"
 
 #include <mutex>
 #include <string>

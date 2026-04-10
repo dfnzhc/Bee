@@ -7,8 +7,8 @@
 
 #pragma once
 
-#include "Config.hpp"
-#include "Nameof.hpp"
+#include "Base/Core/Config.hpp"
+#include "Base/Reflection/Nameof.hpp"
 
 #include <atomic>
 #include <format>

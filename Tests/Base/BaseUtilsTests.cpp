@@ -11,10 +11,10 @@
 #include <cstdint>
 #include <string_view>
 
-#include "Base/Ascii.hpp"
-#include "Base/Bit.hpp"
-#include "Base/Naming.hpp"
-#include "Base/Text.hpp"
+#include "Base/String/Ascii.hpp"
+#include "Base/Numeric/Bit.hpp"
+#include "Base/String/Naming.hpp"
+#include "Base/String/Text.hpp"
 
 // ============================================================================
 // BaseTextTests

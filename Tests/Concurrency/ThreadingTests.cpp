@@ -14,7 +14,7 @@
 #include <thread>
 #include <vector>
 
-#include "Base/Bit.hpp"
+#include "Base/Numeric/Bit.hpp"
 #include "Concurrency/Threading.hpp"
 
 TEST(BaseThreadingTests, ThreadPauseIsCallable)

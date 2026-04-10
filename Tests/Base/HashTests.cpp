@@ -10,7 +10,7 @@
 #include <cstdint>
 #include <set>
 
-#include "Base/Hash.hpp"
+#include "Base/Numeric/Hash.hpp"
 
 // ============================================================================
 // Compile-time verification
