@@ -832,3 +832,324 @@ TEST(ARCacheTests, PutOnT2Hit)
     EXPECT_EQ(v->get(), 100);
     EXPECT_EQ(cache.size(), 1u);
 }
+
+// =============================================================================
+// LFU Eviction Correctness
+// =============================================================================
+
+TEST(LFUCacheTests, EvictsCorrectItemWithMixedFrequencies)
+{
+    IntLFU cache(5);
+    for (int i = 1; i <= 5; ++i)
+        cache.put(i, i * 10);
+
+    // Build distinct frequencies: 1→f5, 2→f3, 3→f1 (no extra gets), 4→f2, 5→f4
+    for (int j = 0; j < 4; ++j)
+        cache.get(1); // freq 1→5
+    for (int j = 0; j < 2; ++j)
+        cache.get(2); // freq 2→3
+    // key 3 stays at freq 1
+    for (int j = 0; j < 1; ++j)
+        cache.get(4); // freq 4→2
+    for (int j = 0; j < 3; ++j)
+        cache.get(5); // freq 5→4
+
+    cache.put(6, 60); // evicts key 3 (lowest freq=1)
+    EXPECT_FALSE(cache.contains(3));
+    EXPECT_TRUE(cache.contains(1));
+    EXPECT_TRUE(cache.contains(2));
+    EXPECT_TRUE(cache.contains(4));
+    EXPECT_TRUE(cache.contains(5));
+    EXPECT_TRUE(cache.contains(6));
+    EXPECT_EQ(cache.size(), 5u);
+}
+
+TEST(LFUCacheTests, FrequencyGapRecomputesMinCorrectly)
+{
+    IntLFU cache(3);
+    cache.put(1, 10);
+    cache.put(2, 20);
+    cache.put(3, 30);
+
+    // Build frequencies: 1→f10, 2→f5, 3→f1
+    for (int j = 0; j < 9; ++j)
+        cache.get(1);
+    for (int j = 0; j < 4; ++j)
+        cache.get(2);
+
+    // Erase key 3 (the only item at freq 1); minFreq should jump to 5
+    cache.erase(3);
+    EXPECT_EQ(cache.size(), 2u);
+
+    // Insert D: freq=1, minFreq reset to 1
+    cache.put(4, 40);
+    EXPECT_EQ(cache.size(), 3u);
+
+    // Insert E: should evict key 4 (freq=1, the lowest)
+    cache.put(5, 50);
+    EXPECT_FALSE(cache.contains(4));
+    EXPECT_TRUE(cache.contains(1));
+    EXPECT_TRUE(cache.contains(2));
+    EXPECT_TRUE(cache.contains(5));
+}
+
+TEST(LFUCacheTests, LargeScaleEvictionOrder)
+{
+    IntLFU cache(100);
+
+    // Insert first 100 keys
+    for (int i = 0; i < 100; ++i)
+        cache.put(i, i);
+
+    // Give them high frequency (freq → 11 each)
+    for (int i = 0; i < 100; ++i)
+        for (int j = 0; j < 10; ++j)
+            cache.get(i);
+
+    // Insert 100 more keys; low-freq newcomers keep evicting each other
+    for (int i = 100; i < 200; ++i)
+        cache.put(i, i);
+
+    EXPECT_EQ(cache.size(), 100u);
+
+    int highFreqSurvivors = 0;
+    for (int i = 0; i < 100; ++i)
+        if (cache.contains(i))
+            ++highFreqSurvivors;
+
+    // All but the first evicted high-freq key should survive
+    EXPECT_GE(highFreqSurvivors, 90);
+}
+
+// =============================================================================
+// MFU Eviction Correctness
+// =============================================================================
+
+TEST(MFUCacheTests, EvictsCorrectItemWithDistinctFrequencies)
+{
+    IntMFU cache(5);
+    for (int i = 1; i <= 5; ++i)
+        cache.put(i, i * 10);
+
+    // Build frequencies: 1→f1, 2→f3, 3→f5, 4→f2, 5→f4
+    // (no extra gets for key 1)
+    for (int j = 0; j < 2; ++j)
+        cache.get(2); // freq 2→3
+    for (int j = 0; j < 4; ++j)
+        cache.get(3); // freq 3→5
+    for (int j = 0; j < 1; ++j)
+        cache.get(4); // freq 4→2
+    for (int j = 0; j < 3; ++j)
+        cache.get(5); // freq 5→4
+
+    cache.put(6, 60); // MFU evicts key 3 (highest freq=5)
+    EXPECT_FALSE(cache.contains(3));
+    EXPECT_TRUE(cache.contains(1));
+    EXPECT_TRUE(cache.contains(2));
+    EXPECT_TRUE(cache.contains(4));
+    EXPECT_TRUE(cache.contains(5));
+    EXPECT_TRUE(cache.contains(6));
+    EXPECT_EQ(cache.size(), 5u);
+}
+
+TEST(MFUCacheTests, FrequencyGapRecomputesMaxCorrectly)
+{
+    IntMFU cache(3);
+    cache.put(1, 10);
+    cache.put(2, 20);
+    cache.put(3, 30);
+
+    // Build frequencies: 1→f1, 2→f5, 3→f10
+    for (int j = 0; j < 4; ++j)
+        cache.get(2);
+    for (int j = 0; j < 9; ++j)
+        cache.get(3);
+
+    // Erase key 3 (freq 10); maxFreq should drop to 5
+    cache.erase(3);
+    EXPECT_EQ(cache.size(), 2u);
+
+    // Insert D (freq=1)
+    cache.put(4, 40);
+    EXPECT_EQ(cache.size(), 3u);
+
+    // Insert E: should evict key 2 (maxFreq=5)
+    cache.put(5, 50);
+    EXPECT_FALSE(cache.contains(2));
+    EXPECT_TRUE(cache.contains(1));
+    EXPECT_TRUE(cache.contains(4));
+    EXPECT_TRUE(cache.contains(5));
+}
+
+// =============================================================================
+// ARC Adaptation Tests
+// =============================================================================
+
+TEST(ARCacheTests, B1GhostHitIncreasesP)
+{
+    IntARC cache(5);
+    // Fill T1
+    for (int i = 1; i <= 5; ++i)
+        cache.put(i, i);
+
+    // Promote keys 1,2 to T2 via get → T1=[5,4,3], T2=[2,1]
+    cache.get(1);
+    cache.get(2);
+
+    // Insert 6,7 to push T1 items (3, then 4) into B1 via _replace
+    cache.put(6, 6);
+    cache.put(7, 7);
+
+    // Key 4 should be in B1; ghost hit it to increase p
+    auto pBefore = cache.targetT1Size();
+    cache.put(4, 40);
+    EXPECT_GT(cache.targetT1Size(), pBefore);
+}
+
+TEST(ARCacheTests, B2GhostHitDecreasesP)
+{
+    IntARC cache(4);
+    // Fill T1 and promote 1,2 to T2
+    cache.put(1, 1);
+    cache.put(2, 2);
+    cache.put(3, 3);
+    cache.put(4, 4);
+    cache.get(1);
+    cache.get(2); // T1=[4,3], T2=[2,1]
+
+    // Insert new items to push T1 entries to B1
+    cache.put(5, 5); // evicts T1 back(3)→B1
+    cache.put(6, 6); // evicts T1 back(4)→B1
+
+    // B1 ghost hit to raise p above 0
+    cache.put(4, 40);
+    ASSERT_GT(cache.targetT1Size(), 0u);
+
+    // Insert to push a T2 entry to B2
+    cache.put(7, 7);
+
+    // B2 ghost hit decreases p
+    auto pBefore = cache.targetT1Size();
+    cache.put(1, 10);
+    EXPECT_LT(cache.targetT1Size(), pBefore);
+}
+
+TEST(ARCacheTests, PNeverExceedsCapacity)
+{
+    constexpr std::size_t kCap = 5;
+    IntARC cache(kCap);
+
+    for (int round = 0; round < 50; ++round) {
+        int base = round * 20;
+        for (int i = 0; i < 5; ++i)
+            cache.put(base + i, i);
+
+        // Promote two items to T2
+        cache.get(base);
+        cache.get(base + 1);
+
+        // Insert new keys to force evictions into B1
+        for (int i = 5; i < 10; ++i)
+            cache.put(base + i, i);
+
+        // Trigger ghost hits on evicted keys
+        for (int i = 0; i < 5; ++i) {
+            cache.put(base + i, i * 10);
+            EXPECT_LE(cache.targetT1Size(), kCap);
+        }
+    }
+}
+
+TEST(ARCacheTests, PNeverGoesBelowZero)
+{
+    constexpr std::size_t kCap = 5;
+    IntARC cache(kCap);
+
+    for (int round = 0; round < 50; ++round) {
+        int base = round * 20;
+
+        // Fill with items and promote all to T2
+        for (int i = 0; i < 5; ++i)
+            cache.put(base + i, i);
+        for (int i = 0; i < 5; ++i)
+            cache.get(base + i);
+
+        // Insert new keys; with T1 small, _replace evicts from T2 → B2
+        for (int i = 5; i < 10; ++i) {
+            cache.put(base + i, i);
+            // p is size_type (unsigned); if underflow occurred it would be huge
+            EXPECT_LE(cache.targetT1Size(), kCap);
+        }
+
+        // Re-insert evicted T2 keys as B2 ghost hits to push p down
+        for (int i = 0; i < 5; ++i) {
+            cache.put(base + i, i * 10);
+            EXPECT_LE(cache.targetT1Size(), kCap);
+        }
+    }
+}
+
+TEST(ARCacheTests, GhostListsBounded)
+{
+    constexpr std::size_t kCap = 10;
+    IntARC cache(kCap);
+
+    for (int i = 0; i < 1000; ++i) {
+        cache.put(i, i);
+        // Some gets to exercise T2 promotion and B2 ghost generation
+        if (i > 0 && (i % 3 == 0))
+            cache.get(i - 1);
+
+        EXPECT_LE(cache.t1Size() + cache.t2Size(), kCap);
+        EXPECT_LE(cache.b1Size() + cache.t1Size(), kCap);
+        EXPECT_LE(cache.b1Size() + cache.b2Size() + cache.t1Size() + cache.t2Size(), 2 * kCap);
+    }
+}
+
+// =============================================================================
+// Cache Stress Tests
+// =============================================================================
+
+TEST(LRUCacheTests, StressEvictionOrderWithLargeSequence)
+{
+    IntLRU cache(50);
+
+    for (int i = 0; i < 1000; ++i) {
+        cache.put(i, i);
+        EXPECT_LE(cache.size(), 50u);
+    }
+
+    // Only last 50 keys (950–999) should remain
+    EXPECT_EQ(cache.size(), 50u);
+    for (int i = 950; i < 1000; ++i)
+        EXPECT_TRUE(cache.contains(i));
+    for (int i = 0; i < 950; ++i)
+        EXPECT_FALSE(cache.contains(i));
+}
+
+TEST(MRUCacheTests, StressMRUEvictionPattern)
+{
+    IntMRU cache(50);
+
+    // Insert 100 keys (0–99); MRU evicts most recently used
+    for (int i = 0; i < 100; ++i)
+        cache.put(i, i);
+
+    // Repeatedly: access key 0 (making it MRU), then insert a new key.
+    // The new key becomes the most recently inserted but key 0 was
+    // just accessed so it is the MRU item among existing entries.
+    // MRU should evict the most-recently-used item.
+    int evictions = 0;
+    for (int i = 100; i < 200; ++i) {
+        cache.get(0);     // make key 0 most recently used
+        cache.put(i, i);  // insert triggers eviction of MRU → key 0
+        if (!cache.contains(0))
+            ++evictions;
+        // re-insert key 0 if evicted, to repeat the pattern
+        if (!cache.contains(0))
+            cache.put(0, 0);
+    }
+
+    EXPECT_GT(evictions, 0);
+    EXPECT_LE(cache.size(), 50u);
+}

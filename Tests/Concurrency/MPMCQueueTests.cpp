@@ -305,3 +305,92 @@ TEST(MPMCQueueTests, ConcurrentMPMCCorrectness)
         EXPECT_EQ(flag.load(std::memory_order_relaxed), 1);
     }
 }
+
+// =============================================================================
+// Additional MPMC Queue Tests
+// =============================================================================
+
+TEST(MPMCQueueTests, CapacityOneMultipleProducersConsumers)
+{
+    MPMCQueue<int> queue(4);
+    constexpr int kItemsPerProducer = 1000;
+    constexpr int kProducers        = 4;
+    constexpr int kConsumers        = 4;
+    constexpr int kTotalItems       = kProducers * kItemsPerProducer;
+
+    std::vector<std::atomic<int>> seen(kTotalItems);
+    for (auto& a : seen)
+        a.store(0, std::memory_order_relaxed);
+
+    std::atomic<int> producersDone{0};
+
+    std::vector<std::thread> producers;
+    for (int p = 0; p < kProducers; ++p) {
+        producers.emplace_back([&queue, &producersDone, p]() {
+            for (int i = 0; i < kItemsPerProducer; ++i) {
+                int val = p * kItemsPerProducer + i;
+                while (!queue.try_push(val))
+                    std::this_thread::yield();
+            }
+            producersDone.fetch_add(1, std::memory_order_release);
+        });
+    }
+
+    std::atomic<int> totalConsumed{0};
+    std::vector<std::thread> consumers;
+    for (int c = 0; c < kConsumers; ++c) {
+        consumers.emplace_back([&queue, &seen, &totalConsumed, &producersDone]() {
+            int value = 0;
+            while (true) {
+                if (queue.try_pop(value)) {
+                    seen[value].fetch_add(1, std::memory_order_relaxed);
+                    totalConsumed.fetch_add(1, std::memory_order_relaxed);
+                } else if (producersDone.load(std::memory_order_acquire) == kProducers
+                           && queue.is_empty()) {
+                    break;
+                } else {
+                    std::this_thread::yield();
+                }
+            }
+        });
+    }
+
+    for (auto& t : producers)
+        t.join();
+    for (auto& t : consumers)
+        t.join();
+
+    EXPECT_EQ(totalConsumed.load(std::memory_order_relaxed), kTotalItems);
+    for (int i = 0; i < kTotalItems; ++i)
+        EXPECT_EQ(seen[i].load(std::memory_order_relaxed), 1);
+}
+
+TEST(MPMCQueueTests, TryPushOnFullReturnsFalse)
+{
+    MPMCQueue<int> queue(2);
+
+    ASSERT_TRUE(queue.try_push(1));
+    ASSERT_TRUE(queue.try_push(2));
+    EXPECT_TRUE(queue.is_full());
+    EXPECT_FALSE(queue.try_push(3));
+
+    int value = 0;
+    ASSERT_TRUE(queue.try_pop(value));
+    EXPECT_EQ(value, 1);
+
+    EXPECT_TRUE(queue.try_push(3));
+    EXPECT_TRUE(queue.is_full());
+}
+
+TEST(MPMCQueueTests, AlternatingPushPop)
+{
+    MPMCQueue<int> queue(4);
+    constexpr int kCount = 10000;
+
+    for (int i = 0; i < kCount; ++i) {
+        ASSERT_TRUE(queue.try_push(i));
+        int value = 0;
+        ASSERT_TRUE(queue.try_pop(value));
+        EXPECT_EQ(value, i);
+    }
+}

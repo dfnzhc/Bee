@@ -214,3 +214,72 @@ TEST(SPSCQueueDynamicTests, ConcurrentProducerConsumerPreservesOrder)
         EXPECT_EQ(consumed[i], i);
     }
 }
+
+// =============================================================================
+// Additional SPSC Queue Tests
+// =============================================================================
+
+TEST(SPSCQueueDynamicTests, CapacityOneStress)
+{
+    SPSCQueue<int> queue(1);
+    ASSERT_EQ(queue.capacity(), 1u);
+
+    constexpr int kCount = 10000;
+    std::vector<int> consumed;
+    consumed.reserve(kCount);
+
+    std::atomic<bool> producer_done{false};
+
+    std::thread producer([&queue, &producer_done]() {
+        for (int i = 0; i < kCount; ++i) {
+            while (!queue.try_push(i))
+                std::this_thread::yield();
+        }
+        producer_done.store(true, std::memory_order_release);
+    });
+
+    std::thread consumer([&queue, &producer_done, &consumed]() {
+        int value = 0;
+        while (!producer_done.load(std::memory_order_acquire) || !queue.is_empty()) {
+            if (queue.try_pop(value))
+                consumed.push_back(value);
+            else
+                std::this_thread::yield();
+        }
+    });
+
+    producer.join();
+    consumer.join();
+
+    ASSERT_EQ(consumed.size(), static_cast<std::size_t>(kCount));
+    for (int i = 0; i < kCount; ++i)
+        EXPECT_EQ(consumed[i], i);
+}
+
+TEST(SPSCQueueDynamicTests, EmptyPopReturnsFalse)
+{
+    SPSCQueue<int> queue(4);
+    int value = 0;
+
+    // Pop on empty returns false
+    EXPECT_FALSE(queue.try_pop(value));
+
+    // Push one, pop one, pop again should be false
+    ASSERT_TRUE(queue.try_push(42));
+    ASSERT_TRUE(queue.try_pop(value));
+    EXPECT_EQ(value, 42);
+    EXPECT_FALSE(queue.try_pop(value));
+}
+
+TEST(SPSCQueueDynamicTests, WrapAroundManyTimes)
+{
+    SPSCQueueExact<int> queue(4);
+    constexpr int kCount = 10000;
+
+    for (int i = 0; i < kCount; ++i) {
+        ASSERT_TRUE(queue.try_push(i));
+        int value = 0;
+        ASSERT_TRUE(queue.try_pop(value));
+        EXPECT_EQ(value, i);
+    }
+}

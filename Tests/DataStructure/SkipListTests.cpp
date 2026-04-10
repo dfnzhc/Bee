@@ -600,3 +600,90 @@ TEST(SkipListTests, ConstLookupApisWork)
     EXPECT_EQ(uk, 20);
     EXPECT_EQ(uv, 200);
 }
+
+// =============================================================================
+// SkipList Edge Cases
+// =============================================================================
+
+TEST(SkipListTests, ExtremeIntValues)
+{
+    SkipList<int, int> sl;
+    sl.insert(std::numeric_limits<int>::min(), -1);
+    sl.insert(0, 0);
+    sl.insert(std::numeric_limits<int>::max(), 1);
+
+    EXPECT_EQ(sl.size(), 3u);
+
+    // Verify sorted order via iteration
+    auto it = sl.begin();
+    ASSERT_NE(it, sl.end());
+    EXPECT_EQ((*it).first, std::numeric_limits<int>::min());
+    ++it;
+    ASSERT_NE(it, sl.end());
+    EXPECT_EQ((*it).first, 0);
+    ++it;
+    ASSERT_NE(it, sl.end());
+    EXPECT_EQ((*it).first, std::numeric_limits<int>::max());
+
+    // Verify find works for all extreme values
+    EXPECT_NE(sl.find(std::numeric_limits<int>::min()), sl.end());
+    EXPECT_NE(sl.find(0), sl.end());
+    EXPECT_NE(sl.find(std::numeric_limits<int>::max()), sl.end());
+}
+
+TEST(SkipListTests, EraseByIteratorSequential)
+{
+    SkipList<int, int> sl;
+    for (int i = 0; i < 10; ++i)
+        sl.insert(i, i * 100);
+
+    EXPECT_EQ(sl.size(), 10u);
+
+    for (int i = 10; i > 0; --i) {
+        EXPECT_EQ(sl.size(), static_cast<std::size_t>(i));
+        auto it = sl.begin();
+        ASSERT_NE(it, sl.end());
+        sl.erase(it);
+    }
+
+    EXPECT_TRUE(sl.empty());
+    EXPECT_EQ(sl.size(), 0u);
+}
+
+TEST(SkipListTests, OperatorBracketOnEmpty)
+{
+    SkipList<int, int> sl;
+    EXPECT_TRUE(sl.empty());
+
+    (void)sl[42]; // creates entry with default value
+    EXPECT_EQ(sl.size(), 1u);
+    EXPECT_EQ(sl[42], 0); // default int is 0
+}
+
+TEST(SkipListTests, LargeScaleInsertEraseReinsert)
+{
+    SkipList<int, int> sl;
+    constexpr int kCount = 5000;
+
+    // Phase 1: insert
+    for (int i = 0; i < kCount; ++i)
+        sl.insert(i, i * 2);
+    EXPECT_EQ(sl.size(), static_cast<std::size_t>(kCount));
+
+    // Phase 2: erase all
+    for (int i = 0; i < kCount; ++i)
+        EXPECT_TRUE(sl.erase(i));
+    EXPECT_TRUE(sl.empty());
+
+    // Phase 3: reinsert with different values
+    for (int i = 0; i < kCount; ++i)
+        sl.insert(i, i * 3);
+    EXPECT_EQ(sl.size(), static_cast<std::size_t>(kCount));
+
+    // Verify all present with correct values
+    for (int i = 0; i < kCount; ++i) {
+        auto it = sl.find(i);
+        ASSERT_NE(it, sl.end());
+        EXPECT_EQ((*it).second, i * 3);
+    }
+}

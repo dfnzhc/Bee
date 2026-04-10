@@ -296,3 +296,61 @@ TEST(ChaseLevDequeTests, DestructorReleasesRemainingNonTrivialElements)
 }
 
 } // namespace
+
+// =============================================================================
+// Additional ChaseLev Deque Tests
+// =============================================================================
+
+TEST(ChaseLevDequeTests, CapacityOneWithMultipleStealers)
+{
+    ChaseLevDeque<int> deque(1);
+    constexpr int kRounds = 5000;
+    std::atomic<int> stolen{0};
+    std::atomic<bool> done{false};
+
+    std::vector<std::thread> stealers;
+    for (int t = 0; t < 4; ++t) {
+        stealers.emplace_back([&]() {
+            int val = 0;
+            while (!done.load(std::memory_order_acquire)) {
+                if (deque.try_steal(val))
+                    stolen.fetch_add(1, std::memory_order_relaxed);
+                else
+                    std::this_thread::yield();
+            }
+            // Drain anything remaining
+            while (deque.try_steal(val))
+                stolen.fetch_add(1, std::memory_order_relaxed);
+        });
+    }
+
+    int ownerPopped = 0;
+    for (int i = 0; i < kRounds; ++i) {
+        while (!deque.try_push(i))
+            std::this_thread::yield();
+        int val = 0;
+        if (deque.try_pop(val))
+            ++ownerPopped;
+    }
+
+    done.store(true, std::memory_order_release);
+    for (auto& t : stealers)
+        t.join();
+
+    EXPECT_EQ(ownerPopped + stolen.load(std::memory_order_relaxed), kRounds);
+}
+
+TEST(ChaseLevDequeTests, EmptyStealReturnsFalse)
+{
+    ChaseLevDeque<int> deque(4);
+    int val = 0;
+
+    // Steal on empty returns false
+    EXPECT_FALSE(deque.try_steal(val));
+
+    // Push one, steal one, steal again should be false
+    ASSERT_TRUE(deque.try_push(42));
+    ASSERT_TRUE(deque.try_steal(val));
+    EXPECT_EQ(val, 42);
+    EXPECT_FALSE(deque.try_steal(val));
+}

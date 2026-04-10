@@ -8,8 +8,11 @@
 #include <gtest/gtest.h>
 
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <string_view>
+#include <thread>
+#include <vector>
 
 #include "Base/Bit.hpp"
 #include "Concurrency/Threading.hpp"
@@ -54,4 +57,25 @@ TEST(BaseThreadingTests, SetCurrentThreadNameAcceptsNonEmptyName)
 {
     EXPECT_FALSE(bee::set_current_thread_name(std::string_view{}));
     SUCCEED() << bee::set_current_thread_name("BaseThreadingTests");
+}
+
+TEST(BaseThreadingTests, ThreadIdHashDiffersAcrossThreads)
+{
+    constexpr int kThreads = 4;
+    std::vector<std::size_t> hashes(kThreads, 0);
+    std::vector<std::thread> threads;
+
+    for (int i = 0; i < kThreads; ++i) {
+        threads.emplace_back([&hashes, i]() {
+            hashes[i] = bee::thread_id_hash();
+        });
+    }
+
+    for (auto& t : threads)
+        t.join();
+
+    // All hashes should be distinct
+    for (int i = 0; i < kThreads; ++i)
+        for (int j = i + 1; j < kThreads; ++j)
+            EXPECT_NE(hashes[i], hashes[j]) << "Thread " << i << " and " << j << " produced the same hash";
 }
