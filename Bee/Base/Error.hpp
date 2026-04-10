@@ -40,6 +40,8 @@ enum class Severity : u8
     Bug,         // logic defect
 };
 
+BEE_ENUM_SCAN_RANGE(Severity, 0, 3, false)
+
 [[nodiscard]] constexpr auto to_string(Severity s) noexcept -> std::string_view
 {
     return enum_to_name(s);

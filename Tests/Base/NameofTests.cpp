@@ -43,10 +43,10 @@ struct FancyName
 namespace nested
 {
 
-struct Inner
-{
-    int value;
-};
+    struct Inner
+    {
+        int value;
+    };
 
 } // namespace nested
 
@@ -126,28 +126,20 @@ template <>
 struct EnumEntries<bee::nameof_test_samples::Action>
 {
     static constexpr std::array<EnumEntry<bee::nameof_test_samples::Action>, 3> entries = {
-        EnumEntry<bee::nameof_test_samples::Action>{bee::nameof_test_samples::Action::Idle, "idle", "Idle"},
-        EnumEntry<bee::nameof_test_samples::Action>{bee::nameof_test_samples::Action::Move, "move", "Move Action"},
-        EnumEntry<bee::nameof_test_samples::Action>{bee::nameof_test_samples::Action::Attack, "attack", ""}
+            EnumEntry<bee::nameof_test_samples::Action>{bee::nameof_test_samples::Action::Idle, "idle", "Idle"},
+            EnumEntry<bee::nameof_test_samples::Action>{bee::nameof_test_samples::Action::Move, "move", "Move Action"},
+            EnumEntry<bee::nameof_test_samples::Action>{bee::nameof_test_samples::Action::Attack, "attack", ""}
     };
-};
-
-template <>
-struct EnumScanRange<bee::nameof_test_samples::AutoCheckedAction>
-{
-    static constexpr int kMin = 0;
-    static constexpr int kMax = 1;
-    static constexpr bool kEnableAliasCheck = true;
 };
 
 template <>
 struct EnumEntries<bee::nameof_test_samples::Permission>
 {
     static constexpr std::array<EnumEntry<bee::nameof_test_samples::Permission>, 4> entries = {
-        EnumEntry<bee::nameof_test_samples::Permission>{bee::nameof_test_samples::Permission::Read, "read", ""},
-        EnumEntry<bee::nameof_test_samples::Permission>{bee::nameof_test_samples::Permission::Write, "write", ""},
-        EnumEntry<bee::nameof_test_samples::Permission>{bee::nameof_test_samples::Permission::Execute, "execute", ""},
-        EnumEntry<bee::nameof_test_samples::Permission>{bee::nameof_test_samples::Permission::None, "none", ""}
+            EnumEntry<bee::nameof_test_samples::Permission>{bee::nameof_test_samples::Permission::Read, "read", ""},
+            EnumEntry<bee::nameof_test_samples::Permission>{bee::nameof_test_samples::Permission::Write, "write", ""},
+            EnumEntry<bee::nameof_test_samples::Permission>{bee::nameof_test_samples::Permission::Execute, "execute", ""},
+            EnumEntry<bee::nameof_test_samples::Permission>{bee::nameof_test_samples::Permission::None, "none", ""}
     };
 };
 
@@ -158,20 +150,104 @@ struct EnumFlags<bee::nameof_test_samples::Permission>
 };
 
 template <>
-struct EnumScanRange<bee::nameof_test_samples::AutoPermission>
-{
-    static constexpr int kMin = 0;
-    static constexpr int kMax = 4;
-    static constexpr bool kEnableAliasCheck = false;
-};
-
-template <>
 struct EnumFlags<bee::nameof_test_samples::AutoPermission>
 {
     static constexpr bool kEnabled = true;
 };
 
 } // namespace bee::Customize
+
+namespace bee
+{
+
+BEE_ENUM_SCAN_RANGE(bee::nameof_test_samples::AutoCheckedAction, 0, 1, true)
+
+BEE_ENUM_SCAN_RANGE(bee::nameof_test_samples::AutoPermission, 0, 4, false)
+
+} // namespace bee
+
+// ============================================================================
+// Compile-time static assertions
+// ============================================================================
+
+namespace bee::nameof_static_assert_samples
+{
+
+struct SampleType
+{
+};
+
+struct MoveSpeed
+{
+};
+
+enum class SampleAction
+{
+    Idle = 0,
+    Move = 1
+};
+
+enum class SampleAutoAction
+{
+    Waiting = 0,
+    Running = 1
+};
+
+enum class SampleAliasCheckAction
+{
+    A = 0,
+    B = 1
+};
+
+} // namespace bee::nameof_static_assert_samples
+
+namespace bee::Customize
+{
+
+template <>
+struct TypeName<bee::nameof_static_assert_samples::SampleType>
+{
+    static constexpr std::string_view value = "Gameplay::SampleType";
+};
+
+template <>
+struct DisplayName<bee::nameof_static_assert_samples::MoveSpeed>
+{
+    static constexpr std::string_view value = "Move Speed";
+};
+
+template <>
+struct EnumEntries<bee::nameof_static_assert_samples::SampleAction>
+{
+    static constexpr std::array<EnumEntry<bee::nameof_static_assert_samples::SampleAction>, 2> entries = {
+            EnumEntry<bee::nameof_static_assert_samples::SampleAction>{bee::nameof_static_assert_samples::SampleAction::Idle, "idle", "Idle"},
+            EnumEntry<bee::nameof_static_assert_samples::SampleAction>{bee::nameof_static_assert_samples::SampleAction::Move, "move", "Move"}};
+};
+
+template <>
+struct EnumScanRange<bee::nameof_static_assert_samples::SampleAliasCheckAction>
+{
+    static constexpr int kMin               = 0;
+    static constexpr int kMax               = 1;
+    static constexpr bool kEnableAliasCheck = true;
+};
+
+} // namespace bee::Customize
+
+static_assert(bee::type_name_short<bee::nameof_static_assert_samples::SampleType>() == "Gameplay::SampleType");
+static_assert(bee::type_name_display<bee::nameof_static_assert_samples::SampleType>() == "Gameplay::SampleType");
+static_assert(bee::type_name_display<bee::nameof_static_assert_samples::MoveSpeed>() == "Move Speed");
+static_assert(bee::value_name_short<bee::nameof_static_assert_samples::SampleAction::Idle>() == "idle");
+static_assert(bee::value_name_display<bee::nameof_static_assert_samples::SampleAction::Move>() == "Move");
+static_assert(std::is_same_v<decltype(bee::value_name_key<bee::nameof_static_assert_samples::SampleAction::Move>()), std::string_view>);
+static_assert(bee::enum_to_name(bee::nameof_static_assert_samples::SampleAction::Idle) == "idle");
+static_assert(bee::enum_from_name<bee::nameof_static_assert_samples::SampleAction>("move").has_value());
+static_assert(bee::enum_from_name<bee::nameof_static_assert_samples::SampleAction>("missing") == std::nullopt);
+static_assert(bee::value_name_short<bee::nameof_static_assert_samples::SampleAutoAction::Waiting>() == "Waiting");
+static_assert(std::is_same_v<decltype(bee::value_name_key<bee::nameof_static_assert_samples::SampleAutoAction::Running>()), std::string_view>);
+static_assert(bee::enum_to_name(bee::nameof_static_assert_samples::SampleAutoAction::Running) == "Running");
+static_assert(bee::enum_from_name<bee::nameof_static_assert_samples::SampleAutoAction>("Waiting").has_value());
+static_assert(bee::enum_to_name(bee::nameof_static_assert_samples::SampleAliasCheckAction::A) == "A");
 
 namespace
 {

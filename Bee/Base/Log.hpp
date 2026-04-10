@@ -29,6 +29,8 @@ enum class LogLevel : u8
     Fatal
 };
 
+BEE_ENUM_SCAN_RANGE(LogLevel, 0, 5, false)
+
 using LogSink = void (*)(LogLevel level, std::string_view category, std::string_view message, std::source_location location);
 
 // --- Control API ---

@@ -17,9 +17,9 @@
 #include <type_traits>
 #include <utility>
 
-#include "Base/Ascii.hpp"
-#include "Base/Naming.hpp"
-#include "Base/Text.hpp"
+#include "Ascii.hpp"
+#include "Naming.hpp"
+#include "Text.hpp"
 
 namespace bee
 {
@@ -53,6 +53,7 @@ namespace Customize
     {
     };
 
+    // 偏特化必须对提供下列所有三个值的定义，不然会引起奇怪的模板错误 (e.g., MSVC C2131)
     template <typename E>
     struct EnumScanRange
     {
@@ -77,6 +78,14 @@ namespace internal
     inline constexpr std::string_view kUnsupportedCompilerFormat = "[Unsupported Compiler Format]";
     inline constexpr std::string_view kUnknownEnumValueName      = "[Unknown Enum Value]";
     inline constexpr int kMaxAliasCheckScanCount                 = 64;
+
+    template <typename T>
+    concept ValidEnumScanRange = requires
+    {
+        { T::kMin } -> std::convertible_to<int>;
+        { T::kMax } -> std::convertible_to<int>;
+        { T::kEnableAliasCheck } -> std::convertible_to<bool>;
+    };
 
     constexpr auto SliceTemplateArg(std::string_view text, std::string_view marker) -> std::string_view
     {
@@ -122,15 +131,15 @@ namespace internal
     {
         constexpr auto wrapped = WrappedTypeName<T>();
 
-#if defined(__clang__)
+        #if defined(__clang__)
         return Slice(wrapped, "[T = ", "]", kUnsupportedCompilerFormat);
-#elif defined(__GNUC__)
+        #elif defined(__GNUC__)
         return Slice(wrapped, "with T = ", "]", kUnsupportedCompilerFormat);
-#elif defined(_MSC_VER)
+        #elif defined(_MSC_VER)
         return SliceTemplateArg(wrapped, "WrappedTypeName<");
-#else
+        #else
         return kUnsupportedCompilerFormat;
-#endif
+        #endif
     }
 
     template <auto V>
@@ -144,15 +153,15 @@ namespace internal
     {
         constexpr auto wrapped = WrappedValueName<V>();
 
-#if defined(__clang__)
+        #if defined(__clang__)
         return Slice(wrapped, "[V = ", "]", kUnsupportedCompilerFormat);
-#elif defined(__GNUC__)
+        #elif defined(__GNUC__)
         return Slice(wrapped, "with auto V = ", "]", kUnsupportedCompilerFormat);
-#elif defined(_MSC_VER)
+        #elif defined(_MSC_VER)
         return SliceTemplateArg(wrapped, "WrappedValueName<");
-#else
+        #else
         return kUnsupportedCompilerFormat;
-#endif
+        #endif
     }
 
     constexpr auto StripLeadingKeywords(std::string_view text) -> std::string_view
@@ -179,6 +188,10 @@ namespace internal
 
     constexpr auto FindTemplateEnd(std::string_view text, std::size_t start) -> std::size_t
     {
+        if (start >= text.size() || text[start] != '<') {
+            return std::string_view::npos;
+        }
+
         int depth = 0;
         for (std::size_t i = start; i < text.size(); ++i) {
             if (text[i] == '<') {
@@ -287,12 +300,16 @@ namespace internal
     consteval auto BuildAutoEnumEntries(std::integer_sequence<int, Offsets...>)
     {
         return std::array<Customize::EnumEntry<E>, sizeof...(Offsets)>{Customize::EnumEntry<E>{
-                static_cast<E>(Min + Offsets), ValueNameShortFromRaw(ValueNameRawImpl<static_cast<E>(Min + Offsets)>()), ""}...};
+                static_cast<E>(Min + Offsets),
+                ValueNameShortFromRaw(ValueNameRawImpl<static_cast<E>(Min + Offsets)>()),
+                ""}...};
     }
 
     template <typename E>
     consteval auto AutoEnumEntries()
     {
+        static_assert(ValidEnumScanRange<Customize::EnumScanRange<E>>,
+                      "EnumScanRange specialization must provide kMin (int), kMax (int), and kEnableAliasCheck (bool).");
         constexpr int kMin  = Customize::EnumScanRange<E>::kMin;
         constexpr int kMax  = Customize::EnumScanRange<E>::kMax;
         constexpr int kSize = kMax - kMin + 1;
@@ -334,6 +351,42 @@ namespace internal
         }
     }
 
+    // Compact enum entry table: holds up to Capacity entries with only 'size' valid.
+    // Entries are sorted by underlying value for binary search support.
+    template <typename E, std::size_t Capacity>
+    struct EnumTable
+    {
+        std::array<Customize::EnumEntry<E>, Capacity> entries{};
+        std::size_t size = 0;
+
+        constexpr auto begin() const
+        {
+            return entries.begin();
+        }
+
+        constexpr auto end() const
+        {
+            return entries.begin() + static_cast<std::ptrdiff_t>(size);
+        }
+    };
+
+    template <typename E, std::size_t N>
+    consteval auto SortTableByValue(EnumTable<E, N> table) -> EnumTable<E, N>
+    {
+        using U = std::underlying_type_t<E>;
+        for (std::size_t i = 1; i < table.size; ++i) {
+            auto key      = table.entries[i];
+            auto key_val  = static_cast<U>(key.value);
+            std::size_t j = i;
+            while (j > 0 && static_cast<U>(table.entries[j - 1].value) > key_val) {
+                table.entries[j] = table.entries[j - 1];
+                --j;
+            }
+            table.entries[j] = key;
+        }
+        return table;
+    }
+
     template <typename E>
     constexpr auto EnumToUnsigned(E value) -> std::make_unsigned_t<std::underlying_type_t<E>>
     {
@@ -341,15 +394,23 @@ namespace internal
         return static_cast<U>(static_cast<std::underlying_type_t<E>>(value));
     }
 
-    template <typename E, typename Entries>
-    constexpr auto FindEnumNameByValue(E value, const Entries& entries) -> std::string_view
+    // Binary search by value in a sorted EnumTable. O(log n).
+    template <typename E, std::size_t N>
+    constexpr auto FindEnumNameByValue(E value, const EnumTable<E, N>& table) -> std::string_view
     {
-        for (const auto& entry : entries) {
-            if (entry.name == kUnknownEnumValueName) {
-                continue;
-            }
-            if (entry.value == value) {
-                return entry.name;
+        using U           = std::underlying_type_t<E>;
+        const auto target = static_cast<U>(value);
+        std::size_t lo    = 0;
+        std::size_t hi    = table.size;
+        while (lo < hi) {
+            const std::size_t mid = lo + (hi - lo) / 2;
+            const auto mid_val    = static_cast<U>(table.entries[mid].value);
+            if (mid_val < target) {
+                lo = mid + 1;
+            } else if (mid_val > target) {
+                hi = mid;
+            } else {
+                return table.entries[mid].name;
             }
         }
         return kUnknownEnumValueName;
@@ -359,9 +420,6 @@ namespace internal
     constexpr auto FindEnumValueByName(std::string_view name, const Entries& entries) -> std::optional<E>
     {
         for (const auto& entry : entries) {
-            if (entry.name == kUnknownEnumValueName) {
-                continue;
-            }
             if (entry.name == name) {
                 return entry.value;
             }
@@ -380,7 +438,7 @@ namespace internal
             return std::string(kUnknownEnumValueName);
         }
 
-        using U = std::make_unsigned_t<std::underlying_type_t<E>>;
+        using U     = std::make_unsigned_t<std::underlying_type_t<E>>;
         U remaining = EnumToUnsigned(value);
         if (remaining == 0) {
             return std::string(kUnknownEnumValueName);
@@ -396,9 +454,6 @@ namespace internal
 
             std::string_view bit_name = kUnknownEnumValueName;
             for (const auto& entry : entries) {
-                if (entry.name == kUnknownEnumValueName) {
-                    continue;
-                }
                 const U entry_value = EnumToUnsigned(entry.value);
                 if (!std::has_single_bit(entry_value)) {
                     continue;
@@ -442,12 +497,12 @@ namespace internal
             return std::nullopt;
         }
 
-        using U = std::make_unsigned_t<std::underlying_type_t<E>>;
+        using U  = std::make_unsigned_t<std::underlying_type_t<E>>;
         U result = 0;
 
         std::size_t start = 0;
         while (start < trimmed.size()) {
-            const auto end = trimmed.find('|', start);
+            const auto end   = trimmed.find('|', start);
             const auto token = (end == std::string_view::npos)
                                    ? trimmed.substr(start)
                                    : trimmed.substr(start, end - start);
@@ -469,6 +524,35 @@ namespace internal
         }
 
         return static_cast<E>(result);
+    }
+
+    // Resolves the effective enum entry table for E:
+    // uses Customize::EnumEntries if specialized, otherwise auto-scans with optional alias check.
+    // Returns an EnumTable with only valid entries, sorted by underlying value for binary search.
+    template <typename E>
+    consteval auto ResolvedEnumEntries()
+    {
+        if constexpr (requires { Customize::EnumEntries<E>::entries; }) {
+            constexpr auto& src = Customize::EnumEntries<E>::entries;
+            EnumTable<E, src.size()> table;
+            for (const auto& entry : src) {
+                table.entries[table.size++] = entry;
+            }
+            return SortTableByValue(table);
+        } else {
+            constexpr auto all = AutoEnumEntries<E>();
+            if constexpr (ShouldRunAliasCheck<E>()) {
+                static_assert(AutoEnumNoDuplicateNames(all),
+                              "Auto enum scan found duplicate names for different values. Please provide Customize::EnumEntries.");
+            }
+            EnumTable<E, all.size()> table;
+            for (const auto& entry : all) {
+                if (entry.name != kUnknownEnumValueName) {
+                    table.entries[table.size++] = entry;
+                }
+            }
+            return SortTableByValue(table);
+        }
     }
 
 } // namespace internal
@@ -567,30 +651,8 @@ constexpr auto enum_to_name(E value) noexcept -> std::string_view
 {
     static_assert(std::is_enum_v<E>);
 
-    if constexpr (requires { Customize::EnumEntries<E>::entries; }) {
-        for (const auto& entry : Customize::EnumEntries<E>::entries) {
-            if (entry.value == value) {
-                return entry.name;
-            }
-        }
-    } else {
-        constexpr auto entries = internal::AutoEnumEntries<E>();
-        if constexpr (internal::ShouldRunAliasCheck<E>()) {
-            static_assert(internal::AutoEnumNoDuplicateNames(entries),
-                          "Auto enum scan found duplicate names for different values. Please provide Customize::EnumEntries.");
-        }
-        for (const auto& entry : entries) {
-            if (entry.name == internal::kUnknownEnumValueName) {
-                continue;
-            }
-            if (entry.value == value) {
-                return entry.name;
-            }
-        }
-        return internal::kUnknownEnumValueName;
-    }
-
-    return internal::kUnknownEnumValueName;
+    constexpr auto entries = internal::ResolvedEnumEntries<E>();
+    return internal::FindEnumNameByValue(value, entries);
 }
 
 template <typename E>
@@ -598,30 +660,8 @@ constexpr auto enum_from_name(std::string_view name) noexcept -> std::optional<E
 {
     static_assert(std::is_enum_v<E>);
 
-    if constexpr (requires { Customize::EnumEntries<E>::entries; }) {
-        for (const auto& entry : Customize::EnumEntries<E>::entries) {
-            if (entry.name == name) {
-                return entry.value;
-            }
-        }
-    } else {
-        constexpr auto entries = internal::AutoEnumEntries<E>();
-        if constexpr (internal::ShouldRunAliasCheck<E>()) {
-            static_assert(internal::AutoEnumNoDuplicateNames(entries),
-                          "Auto enum scan found duplicate names for different values. Please provide Customize::EnumEntries.");
-        }
-        for (const auto& entry : entries) {
-            if (entry.name == internal::kUnknownEnumValueName) {
-                continue;
-            }
-            if (entry.name == name) {
-                return entry.value;
-            }
-        }
-        return std::nullopt;
-    }
-
-    return std::nullopt;
+    constexpr auto entries = internal::ResolvedEnumEntries<E>();
+    return internal::FindEnumValueByName<E>(name, entries);
 }
 
 template <typename E>
@@ -630,16 +670,8 @@ auto enum_flags_to_name(E value) -> std::string
     static_assert(std::is_enum_v<E>);
 
     constexpr bool allow_composite = Customize::EnumFlags<E>::kEnabled;
-    if constexpr (requires { Customize::EnumEntries<E>::entries; }) {
-        return internal::EnumFlagsToNameFromEntries(value, Customize::EnumEntries<E>::entries, allow_composite);
-    } else {
-        constexpr auto entries = internal::AutoEnumEntries<E>();
-        if constexpr (internal::ShouldRunAliasCheck<E>()) {
-            static_assert(internal::AutoEnumNoDuplicateNames(entries),
-                          "Auto enum scan found duplicate names for different values. Please provide Customize::EnumEntries.");
-        }
-        return internal::EnumFlagsToNameFromEntries(value, entries, allow_composite);
-    }
+    constexpr auto entries         = internal::ResolvedEnumEntries<E>();
+    return internal::EnumFlagsToNameFromEntries(value, entries, allow_composite);
 }
 
 template <typename E>
@@ -648,100 +680,26 @@ auto enum_flags_from_name(std::string_view name) -> std::optional<E>
     static_assert(std::is_enum_v<E>);
 
     constexpr bool allow_composite = Customize::EnumFlags<E>::kEnabled;
-    if constexpr (requires { Customize::EnumEntries<E>::entries; }) {
-        return internal::EnumFlagsFromNameFromEntries<E>(name, Customize::EnumEntries<E>::entries, allow_composite);
-    } else {
-        constexpr auto entries = internal::AutoEnumEntries<E>();
-        if constexpr (internal::ShouldRunAliasCheck<E>()) {
-            static_assert(internal::AutoEnumNoDuplicateNames(entries),
-                          "Auto enum scan found duplicate names for different values. Please provide Customize::EnumEntries.");
-        }
-        return internal::EnumFlagsFromNameFromEntries<E>(name, entries, allow_composite);
-    }
+    constexpr auto entries         = internal::ResolvedEnumEntries<E>();
+    return internal::EnumFlagsFromNameFromEntries<E>(name, entries, allow_composite);
 }
-
-namespace nameof_static_assert_samples
-{
-
-    struct SampleType
-    {
-    };
-
-    struct MoveSpeed
-    {
-    };
-
-    enum class SampleAction
-    {
-        Idle = 0,
-        Move = 1
-    };
-
-    enum class SampleAutoAction
-    {
-        Waiting = 0,
-        Running = 1
-    };
-
-    enum class SampleAliasCheckAction
-    {
-        A = 0,
-        B = 1
-    };
-
-} // namespace nameof_static_assert_samples
-
-namespace Customize
-{
-
-    template <>
-    struct TypeName<nameof_static_assert_samples::SampleType>
-    {
-        static constexpr std::string_view value = "Gameplay::SampleType";
-    };
-
-    template <>
-    struct DisplayName<nameof_static_assert_samples::MoveSpeed>
-    {
-        static constexpr std::string_view value = "Move Speed";
-    };
-
-    template <>
-    struct EnumEntries<nameof_static_assert_samples::SampleAction>
-    {
-        static constexpr std::array<EnumEntry<nameof_static_assert_samples::SampleAction>, 2> entries = {
-                EnumEntry<nameof_static_assert_samples::SampleAction>{nameof_static_assert_samples::SampleAction::Idle, "idle", "Idle"},
-                EnumEntry<nameof_static_assert_samples::SampleAction>{nameof_static_assert_samples::SampleAction::Move, "move", "Move"}};
-    };
-
-    template <>
-    struct EnumScanRange<nameof_static_assert_samples::SampleAliasCheckAction>
-    {
-        static constexpr int kMin               = 0;
-        static constexpr int kMax               = 1;
-        static constexpr bool kEnableAliasCheck = true;
-    };
-
-} // namespace Customize
 
 static_assert(!type_name_raw<int>().empty());
 static_assert(type_name_raw<int>() == type_name_raw<int>());
 static_assert(type_name_short<const int&>().find("int") != std::string_view::npos);
-static_assert(type_name_short<nameof_static_assert_samples::SampleType>() == "Gameplay::SampleType");
-static_assert(type_name_display<nameof_static_assert_samples::SampleType>() == "Gameplay::SampleType");
-static_assert(type_name_display<nameof_static_assert_samples::MoveSpeed>() == "Move Speed");
 static_assert(std::is_same_v<decltype(type_name_key<int>()), std::string_view>);
 static_assert(noexcept(type_name_key<int>()));
-static_assert(value_name_short<nameof_static_assert_samples::SampleAction::Idle>() == "idle");
-static_assert(value_name_display<nameof_static_assert_samples::SampleAction::Move>() == "Move");
-static_assert(std::is_same_v<decltype(value_name_key<nameof_static_assert_samples::SampleAction::Move>()), std::string_view>);
-static_assert(enum_to_name(nameof_static_assert_samples::SampleAction::Idle) == "idle");
-static_assert(enum_from_name<nameof_static_assert_samples::SampleAction>("move").has_value());
-static_assert(enum_from_name<nameof_static_assert_samples::SampleAction>("missing") == std::nullopt);
-static_assert(value_name_short<nameof_static_assert_samples::SampleAutoAction::Waiting>() == "Waiting");
-static_assert(std::is_same_v<decltype(value_name_key<nameof_static_assert_samples::SampleAutoAction::Running>()), std::string_view>);
-static_assert(enum_to_name(nameof_static_assert_samples::SampleAutoAction::Running) == "Running");
-static_assert(enum_from_name<nameof_static_assert_samples::SampleAutoAction>("Waiting").has_value());
-static_assert(enum_to_name(nameof_static_assert_samples::SampleAliasCheckAction::A) == "A");
+
+#define BEE_ENUM_SCAN_RANGE(EnumName, RangeMin, RangeMax, EnableAliasCheck)  \
+    namespace Customize                                                      \
+    {                                                                        \
+        template <>                                                          \
+        struct EnumScanRange<EnumName>                                       \
+        {                                                                    \
+            static constexpr int kMin               = RangeMin;              \
+            static constexpr int kMax               = RangeMax;              \
+            static constexpr bool kEnableAliasCheck = EnableAliasCheck;      \
+        };                                                                   \
+    }
 
 } // namespace bee
