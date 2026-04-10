@@ -376,10 +376,10 @@ public:
     {
         if (it == end())
             return end();
-        auto [k, v] = *it;
-        ++it;
-        erase(k);
-        return it;
+        Node* target = it.node();
+        iterator next(target->forward[0]);
+        erase(target->key);
+        return next;
     }
 
     // =========================================================================
@@ -444,8 +444,7 @@ public:
     Value& operator[](const Key& key)
     {
         auto [it, _] = insert(key, Value{});
-        auto [k, v]  = *it;
-        return v;
+        return it.node()->value;
     }
 
     // =========================================================================

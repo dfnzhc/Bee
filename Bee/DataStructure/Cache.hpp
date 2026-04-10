@@ -466,16 +466,18 @@ private:
         }
     }
 
-    /** @brief 在删除/淘汰后重新计算最小频率。 */
+    /** @brief 在删除后重新计算最小频率。从 _minFreq+1 向上搜索，O(gap) 而非 O(m)。 */
     void _recomputeMinFreq()
     {
-        _minFreq = 0;
-        for (const auto& [freq, bucket] : _freqBuckets) {
-            if (bucket.empty()) {
-                continue;
-            }
-            if (_minFreq == 0 || freq < _minFreq) {
-                _minFreq = freq;
+        if (_freqBuckets.empty()) {
+            _minFreq = 0;
+            return;
+        }
+        // The old min bucket was just removed; everything else has freq > old _minFreq.
+        for (++_minFreq;; ++_minFreq) {
+            auto it = _freqBuckets.find(_minFreq);
+            if (it != _freqBuckets.end() && !it->second.empty()) {
+                return;
             }
         }
     }
@@ -668,10 +670,7 @@ private:
     }
 
     /**
-     * @brief 重新计算当前最大频率。
-     *
-     * 先尝试 _maxFreq - 1（连续频率的常见情况，O(1)），
-     * 不命中时回退到全桶扫描（O(m)，m 为不同频率数）。
+     * @brief 重新计算当前最大频率。从 _maxFreq-1 向下搜索，O(gap) 而非 O(m)。
      */
     void _recomputeMaxFreq()
     {
@@ -679,20 +678,11 @@ private:
             _maxFreq = 0;
             return;
         }
-
-        // Fast path: check _maxFreq - 1 (common when frequencies are consecutive)
-        if (_maxFreq > 1) {
-            if (auto it = _freqBuckets.find(_maxFreq - 1); it != _freqBuckets.end() && !it->second.empty()) {
-                _maxFreq = _maxFreq - 1;
+        // The old max bucket was just removed; search downward for next non-empty bucket.
+        for (--_maxFreq; _maxFreq > 0; --_maxFreq) {
+            auto it = _freqBuckets.find(_maxFreq);
+            if (it != _freqBuckets.end() && !it->second.empty()) {
                 return;
-            }
-        }
-
-        // Slow path: full scan
-        _maxFreq = 0;
-        for (const auto& [f, bucket] : _freqBuckets) {
-            if (!bucket.empty() && f > _maxFreq) {
-                _maxFreq = f;
             }
         }
     }
@@ -843,8 +833,8 @@ public:
         // Case 2: 在 B1 中（幽灵命中）
         auto ib1 = _b1Map.find(key);
         if (ib1 != _b1Map.end()) {
-            // 增大 p：给 T1 更多空间
-            size_type delta = _b2.size() >= _b1.size() ? 1 : (_b2.size() > 0 ? _b1.size() / _b2.size() : _capacity);
+            // 增大 p：给 T1 更多空间。delta = max(|B2|/|B1|, 1) per ARC paper.
+            size_type delta = std::max<size_type>(1, _b2.size() / _b1.size());
             _p              = std::min(_p + delta, _capacity);
 
             _replace(false);
@@ -862,8 +852,8 @@ public:
         // Case 3: 在 B2 中（幽灵命中）
         auto ib2 = _b2Map.find(key);
         if (ib2 != _b2Map.end()) {
-            // 减小 p：给 T2 更多空间
-            size_type delta = _b1.size() >= _b2.size() ? 1 : (_b1.size() > 0 ? _b2.size() / _b1.size() : _capacity);
+            // 减小 p：给 T2 更多空间。delta = max(|B1|/|B2|, 1) per ARC paper.
+            size_type delta = std::max<size_type>(1, _b1.size() / _b2.size());
             _p              = (_p > delta) ? _p - delta : 0;
 
             _replace(true);
