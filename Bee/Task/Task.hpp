@@ -11,3 +11,5 @@
 #include "Task/Core/SharedState.hpp"
 #include "Task/Core/Task.hpp"
 #include "Task/Core/Submit.hpp"
+#include "Task/Graph/NodeHandle.hpp"
+#include "Task/Graph/TaskGraph.hpp"
