@@ -119,6 +119,103 @@ public:
         return state_ != nullptr;
     }
 
+    // -----------------------------------------------------------------
+    // Continuation
+    // -----------------------------------------------------------------
+
+    /// 挂载内联 Continuation — fn 在完成当前任务的线程上直接执行。
+    /// 失败/取消时 fn 不执行，错误自动传播到返回的 Task。
+    /// 每个 Task 最多调用一次 then()（BEE_CHECK 强制保证）。
+    template <typename Fn>
+    auto then(Fn&& fn) -> Task<detail::ContinuationResult_t<T, Fn>>
+    {
+        using R = detail::ContinuationResult_t<T, Fn>;
+        BEE_CHECK(state_ != nullptr);
+
+        auto next_state = std::make_shared<detail::SharedState<R>>();
+        auto prev_state = state_;
+
+        auto meta = [next = next_state, fn = std::forward<Fn>(fn), prev = prev_state]() mutable {
+            auto s = prev->state.load(std::memory_order_acquire);
+            if (s == TaskState::Completed) {
+                try {
+                    detail::invoke_continuation<T, R>(fn, prev.get(), next.get());
+                } catch (...) {
+                    next->fail(std::current_exception());
+                }
+            } else if (s == TaskState::Failed) {
+                next->fail(prev->exception);
+            } else {
+                next->cancel();
+            }
+        };
+
+        bool run_now = false;
+        {
+            std::lock_guard lock(state_->mutex);
+            BEE_CHECK(!state_->has_continuation);
+            if (state_->is_terminal()) {
+                run_now = true;
+            } else {
+                state_->continuation     = MoveOnlyFunction<void()>(std::move(meta));
+                state_->has_continuation = true;
+            }
+        }
+
+        if (run_now) {
+            meta();
+        }
+
+        return Task<R>(next_state);
+    }
+
+    /// 挂载池派发 Continuation — 当前任务完成时将 fn 投递到线程池执行。
+    /// Pool 参数为模板类型，避免 Task.hpp 对 ThreadPool.hpp 的硬依赖。
+    template <typename Pool, typename Fn>
+    auto then(Pool& pool, Fn&& fn) -> Task<detail::ContinuationResult_t<T, Fn>>
+    {
+        using R = detail::ContinuationResult_t<T, Fn>;
+        BEE_CHECK(state_ != nullptr);
+
+        auto next_state = std::make_shared<detail::SharedState<R>>();
+        auto prev_state = state_;
+
+        auto meta = [next = next_state, fn = std::forward<Fn>(fn), prev = prev_state, &pool]() mutable {
+            auto s = prev->state.load(std::memory_order_acquire);
+            if (s == TaskState::Completed) {
+                pool.post([next, fn = std::move(fn), prev]() mutable {
+                    try {
+                        detail::invoke_continuation<T, R>(fn, prev.get(), next.get());
+                    } catch (...) {
+                        next->fail(std::current_exception());
+                    }
+                });
+            } else if (s == TaskState::Failed) {
+                next->fail(prev->exception);
+            } else {
+                next->cancel();
+            }
+        };
+
+        bool run_now = false;
+        {
+            std::lock_guard lock(state_->mutex);
+            BEE_CHECK(!state_->has_continuation);
+            if (state_->is_terminal()) {
+                run_now = true;
+            } else {
+                state_->continuation     = MoveOnlyFunction<void()>(std::move(meta));
+                state_->has_continuation = true;
+            }
+        }
+
+        if (run_now) {
+            meta();
+        }
+
+        return Task<R>(next_state);
+    }
+
 private:
     std::shared_ptr<detail::SharedState<T>> state_;
 

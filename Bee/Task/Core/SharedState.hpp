@@ -27,7 +27,7 @@ namespace bee::detail
 // SharedState<T> — Task<T> 的内部结果/continuation存储
 // =========================================================================
 
-template<typename T>
+template <typename T>
 struct SharedState
 {
     // 结果存储：非 void 类型使用 std::optional<T>，void 类型使用空标签。
@@ -58,7 +58,7 @@ struct SharedState
         state.store(TaskState::Running, std::memory_order_release);
     }
 
-    template<typename U = T>
+    template <typename U = T>
         requires(!std::is_void_v<U>)
     auto complete(U&& value) -> void
     {
@@ -68,10 +68,11 @@ struct SharedState
         });
     }
 
-    auto complete() -> void
-        requires std::is_void_v<T>
+    auto complete() -> void requires std::is_void_v<T>
     {
-        terminate([&] { state.store(TaskState::Completed, std::memory_order_release); });
+        terminate([&] {
+            state.store(TaskState::Completed, std::memory_order_release);
+        });
     }
 
     auto fail(std::exception_ptr ep) -> void
@@ -84,7 +85,9 @@ struct SharedState
 
     auto cancel() -> void
     {
-        terminate([&] { state.store(TaskState::Cancelled, std::memory_order_release); });
+        terminate([&] {
+            state.store(TaskState::Cancelled, std::memory_order_release);
+        });
     }
 
     // -----------------------------------------------------------------
@@ -104,20 +107,24 @@ struct SharedState
     auto wait() const -> void
     {
         std::unique_lock lock(mutex);
-        cv.wait(lock, [this] { return is_terminal(); });
+        cv.wait(lock, [this] {
+            return is_terminal();
+        });
     }
 
-    template<typename Rep, typename Period>
+    template <typename Rep, typename Period>
     auto wait_for(std::chrono::duration<Rep, Period> timeout) const -> TaskState
     {
         std::unique_lock lock(mutex);
-        cv.wait_for(lock, timeout, [this] { return is_terminal(); });
+        cv.wait_for(lock, timeout, [this] {
+            return is_terminal();
+        });
         return state.load(std::memory_order_acquire);
     }
 
 private:
     // 终态转换公共辅助：加锁设置状态、提取 continuation、通知 CV、在锁外执行 continuation。
-    template<typename SetupFn>
+    template <typename SetupFn>
     auto terminate(SetupFn&& setup) -> void
     {
         MoveOnlyFunction<void()> cont;
@@ -135,5 +142,45 @@ private:
         }
     }
 };
+
+// =========================================================================
+// Continuation 类型辅助工具
+// =========================================================================
+
+template <typename T, typename Fn, bool IsVoid = std::is_void_v<T>>
+struct ContinuationResultImpl;
+
+template <typename T, typename Fn>
+struct ContinuationResultImpl<T, Fn, false>
+{
+    using type = std::invoke_result_t<Fn, T>;
+};
+
+template <typename T, typename Fn>
+struct ContinuationResultImpl<T, Fn, true>
+{
+    using type = std::invoke_result_t<Fn>;
+};
+
+template <typename T, typename Fn>
+using ContinuationResult_t = typename ContinuationResultImpl<T, Fn>::type;
+
+/// 调用 Continuation 函数并完成后继共享状态。
+/// 处理 T 和 R 的 void/non-void 四种组合。
+template <typename T, typename R, typename Fn>
+auto invoke_continuation(Fn& fn, SharedState<T>* prev, SharedState<R>* next) -> void
+{
+    if constexpr (std::is_void_v<T> && std::is_void_v<R>) {
+        fn();
+        next->complete();
+    } else if constexpr (std::is_void_v<T>) {
+        next->complete(fn());
+    } else if constexpr (std::is_void_v<R>) {
+        fn(std::move(*prev->result));
+        next->complete();
+    } else {
+        next->complete(fn(std::move(*prev->result)));
+    }
+}
 
 } // namespace bee::detail

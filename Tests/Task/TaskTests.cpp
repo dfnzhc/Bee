@@ -189,4 +189,187 @@ TEST(TaskBasicTests, ExceptionPropagation)
     EXPECT_EQ(task.state(), TaskState::Failed);
 }
 
+// =========================================================================
+// Continuation Tests
+// =========================================================================
+
+TEST(TaskContinuationTests, ThenInline)
+{
+    bee::ThreadPool pool(2);
+    auto task = bee::submit(pool, [] {
+                return 10;
+            })
+           .then([](int v) {
+                return v * 2;
+            });
+    EXPECT_EQ(task.get(), 20);
+}
+
+TEST(TaskContinuationTests, ThenPoolDispatched)
+{
+    bee::ThreadPool pool(2);
+    std::atomic<std::thread::id> cont_thread{};
+
+    auto task = bee::submit(pool, [] {
+                return 5;
+            })
+           .then(pool, [&](int v) {
+                cont_thread.store(std::this_thread::get_id());
+                return v + 1;
+            });
+
+    EXPECT_EQ(task.get(), 6);
+    EXPECT_NE(cont_thread.load(), std::this_thread::get_id());
+}
+
+TEST(TaskContinuationTests, ThenChained)
+{
+    bee::ThreadPool pool(2);
+    auto task = bee::submit(pool, [] {
+                    return 1;
+                })
+               .then([](int v) {
+                    return v + 1;
+                })
+               .then([](int v) {
+                    return v * 10;
+                })
+               .then([](int v) {
+                    return v + 3;
+                });
+    EXPECT_EQ(task.get(), 23);
+}
+
+TEST(TaskContinuationTests, ThenOnCompletedTask)
+{
+    bee::ThreadPool pool(2);
+    auto task = bee::submit(pool, [] {
+        return 42;
+    });
+    task.wait();
+    EXPECT_TRUE(task.is_ready());
+
+    auto next = task.then([](int v) {
+        return v + 8;
+    });
+    EXPECT_EQ(next.get(), 50);
+}
+
+TEST(TaskContinuationTests, ThenOnFailedTask)
+{
+    bee::ThreadPool pool(2);
+    auto task = bee::submit(pool, []() -> int {
+        throw std::runtime_error("fail");
+    });
+    task.wait();
+
+    auto next = task.then([](int v) {
+        return v + 1;
+    });
+    EXPECT_THROW(next.get(), std::runtime_error);
+    EXPECT_EQ(next.state(), TaskState::Failed);
+}
+
+TEST(TaskContinuationTests, ThenVoidToInt)
+{
+    bee::ThreadPool pool(2);
+    auto task = bee::submit(pool, [] {
+            })
+           .then([] {
+                return 99;
+            });
+    EXPECT_EQ(task.get(), 99);
+}
+
+TEST(TaskContinuationTests, ThenIntToVoid)
+{
+    bee::ThreadPool pool(2);
+    std::atomic<int> captured{0};
+    auto task = bee::submit(pool, [] {
+                return 7;
+            })
+           .then([&](int v) {
+                captured.store(v);
+            });
+    task.get();
+    EXPECT_EQ(captured.load(), 7);
+}
+
+TEST(TaskContinuationTests, ThenTypeChanging)
+{
+    bee::ThreadPool pool(2);
+    auto task = bee::submit(pool, [] {
+                })
+               .then([] {
+                    return 42;
+                })
+               .then([](int v) {
+                    return std::to_string(v);
+                });
+    EXPECT_EQ(task.get(), "42");
+}
+
+TEST(TaskContinuationTests, ThenMoveOnlyCapture)
+{
+    bee::ThreadPool pool(2);
+    auto ptr  = std::make_unique<int>(100);
+    auto task = bee::submit(pool, [] {
+                return 1;
+            })
+           .then([p = std::move(ptr)](int v) {
+                return v + *p;
+            });
+    EXPECT_EQ(task.get(), 101);
+}
+
+TEST(TaskContinuationTests, ErrorPropagationThroughChain)
+{
+    bee::ThreadPool pool(2);
+    std::atomic<bool> f1_ran{false};
+    std::atomic<bool> f2_ran{false};
+
+    auto task = bee::submit(pool, []() -> int {
+                    throw std::runtime_error("err");
+                })
+               .then([&](int v) {
+                    f1_ran.store(true);
+                    return v;
+                })
+               .then([&](int v) {
+                    f2_ran.store(true);
+                    return v;
+                });
+
+    EXPECT_THROW(task.get(), std::runtime_error);
+    EXPECT_FALSE(f1_ran.load());
+    EXPECT_FALSE(f2_ran.load());
+}
+
+// =========================================================================
+// 错误测试
+// =========================================================================
+
+TEST(TaskErrorTests, FailedStateAfterException)
+{
+    bee::ThreadPool pool(2);
+    auto task = bee::submit(pool, []() -> int {
+        throw std::logic_error("logic");
+    });
+    EXPECT_THROW(task.get(), std::logic_error);
+    EXPECT_EQ(task.state(), TaskState::Failed);
+}
+
+TEST(TaskErrorTests, ContinuationExceptionPropagates)
+{
+    bee::ThreadPool pool(2);
+    auto task = bee::submit(pool, [] {
+                return 1;
+            })
+           .then([](int) -> int {
+                throw std::runtime_error("in-cont");
+            });
+    EXPECT_THROW(task.get(), std::runtime_error);
+    EXPECT_EQ(task.state(), TaskState::Failed);
+}
+
 } // namespace
