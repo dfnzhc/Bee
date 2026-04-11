@@ -10,7 +10,9 @@
 #include <chrono>
 #include <memory>
 #include <stop_token>
+#include <tuple>
 #include <variant>
+#include <vector>
 #include <stdexcept>
 #include <type_traits>
 
@@ -35,6 +37,12 @@ auto submit(ThreadPool& pool, Fn&& fn, std::stop_token token) -> Task<std::invok
 template <typename Fn>
     requires std::is_invocable_v<Fn, std::stop_token>
 auto submit_cancellable(ThreadPool& pool, Fn&& fn, std::stop_source& source) -> Task<std::invoke_result_t<Fn, std::stop_token>>;
+
+template <typename... Ts>
+auto when_all(Task<Ts>&&... tasks) -> Task<std::tuple<typename Task<Ts>::value_type...>>;
+
+template <typename T>
+auto when_all(std::vector<Task<T>> tasks) -> Task<std::vector<T>>;
 
 // =========================================================================
 // Task<T> — 异步结果的轻量句柄
@@ -237,6 +245,12 @@ private:
     template <typename Fn>
         requires std::is_invocable_v<Fn, std::stop_token>
     friend auto submit_cancellable(ThreadPool& pool, Fn&& fn, std::stop_source& source) -> Task<std::invoke_result_t<Fn, std::stop_token>>;
+
+    template <typename... Us>
+    friend auto when_all(Task<Us>&&... tasks) -> Task<std::tuple<typename Task<Us>::value_type...>>;
+
+    template <typename U>
+    friend auto when_all(std::vector<Task<U>> tasks) -> Task<std::vector<U>>;
 
     template <typename U>
     friend class Task;
