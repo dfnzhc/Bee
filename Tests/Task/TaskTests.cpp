@@ -12,6 +12,7 @@
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include "Task/Task.hpp"
 
@@ -490,6 +491,76 @@ TEST(TaskCancellationTests, CancelPropagatesThroughThen)
 
     EXPECT_FALSE(then_ran.load());
     EXPECT_EQ(task.state(), TaskState::Cancelled);
+}
+
+// =========================================================================
+// 并发测试
+// =========================================================================
+
+TEST(TaskConcurrencyTests, ManyConcurrentSubmits)
+{
+    bee::ThreadPool pool(4);
+    constexpr int N = 1000;
+
+    std::vector<Task<int>> tasks;
+    tasks.reserve(N);
+    for (int i = 0; i < N; ++i) {
+        tasks.push_back(bee::submit(pool, [i] {
+            return i;
+        }));
+    }
+
+    for (int i = 0; i < N; ++i) {
+        EXPECT_EQ(tasks[i].get(), i);
+    }
+}
+
+TEST(TaskConcurrencyTests, ConcurrentGetFromMultipleThreads)
+{
+    bee::ThreadPool pool(4);
+    std::atomic<bool> proceed{false};
+
+    auto task = bee::submit(pool, [&] {
+        while (!proceed.load(std::memory_order_acquire)) {
+            std::this_thread::yield();
+        }
+    });
+
+    // Launch threads that will all wait on the same task.
+    constexpr int W = 4;
+    std::vector<std::thread> waiters;
+    std::atomic<int> woke{0};
+
+    for (int i = 0; i < W; ++i) {
+        waiters.emplace_back([&] {
+            task.wait();
+            woke.fetch_add(1);
+        });
+    }
+
+    proceed.store(true, std::memory_order_release);
+
+    for (auto& t : waiters) {
+        t.join();
+    }
+
+    EXPECT_EQ(woke.load(), W);
+    EXPECT_EQ(task.state(), TaskState::Completed);
+}
+
+TEST(TaskConcurrencyTests, ConcurrentThenAndCompletion)
+{
+    bee::ThreadPool pool(4);
+
+    for (int round = 0; round < 100; ++round) {
+        auto task = bee::submit(pool, [round] {
+            return round;
+        });
+        auto next = task.then([](int v) {
+            return v + 1;
+        });
+        EXPECT_EQ(next.get(), round + 1);
+    }
 }
 
 } // namespace
