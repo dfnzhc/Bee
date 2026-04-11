@@ -17,8 +17,8 @@
 namespace
 {
 
-using bee::TaskState;
 using bee::Task;
+using bee::TaskState;
 
 TEST(WhenAllTests, HeterogeneousTuple)
 {
