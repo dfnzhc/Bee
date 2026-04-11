@@ -13,6 +13,7 @@
 #include <exception>
 #include <mutex>
 #include <optional>
+#include <stop_token>
 #include <type_traits>
 #include <utility>
 
@@ -43,6 +44,7 @@ struct SharedState
 
     BEE_NO_UNIQUE_ADDRESS ResultStorage result{};
     std::exception_ptr exception;
+    std::stop_token stop_token;
 
     // continuation：至多一个，由 then() 或 when_all() 设置。
     // 在任何终态（Completed、Failed、Cancelled）触发。

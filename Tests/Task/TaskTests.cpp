@@ -372,4 +372,124 @@ TEST(TaskErrorTests, ContinuationExceptionPropagates)
     EXPECT_EQ(task.state(), TaskState::Failed);
 }
 
+// =========================================================================
+// 取消测试
+// =========================================================================
+
+TEST(TaskCancellationTests, CancelBeforeExecution)
+{
+    bee::ThreadPool pool(1);
+
+    // Block the pool's single worker so our task sits in the queue.
+    std::atomic<bool> unblock{false};
+    auto blocker = bee::submit(pool, [&] {
+        while (!unblock.load(std::memory_order_acquire)) {
+            std::this_thread::yield();
+        }
+    });
+
+    std::stop_source source;
+    auto task = bee::submit(pool, [] {
+        return 42;
+    }, source.get_token());
+
+    // Cancel before the blocked worker picks up our task.
+    source.request_stop();
+    unblock.store(true, std::memory_order_release);
+    blocker.wait();
+
+    EXPECT_EQ(task.state(), TaskState::Cancelled);
+    EXPECT_THROW(task.get(), std::runtime_error);
+}
+
+TEST(TaskCancellationTests, CancelDuringExecution)
+{
+    bee::ThreadPool pool(2);
+    std::stop_source source;
+
+    auto task = bee::submit_cancellable(pool, [](std::stop_token token) -> int {
+        for (int i = 0; i < 1000000; ++i) {
+            if (token.stop_requested()) {
+                return -1;
+            }
+            std::this_thread::yield();
+        }
+        return 42;
+    }, source);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    source.request_stop();
+
+    auto result = task.get();
+    EXPECT_EQ(result, -1);
+}
+
+TEST(TaskCancellationTests, SubmitCancellablePassesToken)
+{
+    bee::ThreadPool pool(2);
+    std::stop_source source;
+
+    auto task = bee::submit_cancellable(pool, [](std::stop_token token) {
+        EXPECT_FALSE(token.stop_requested());
+    }, source);
+
+    task.get(); // should not throw
+}
+
+TEST(TaskCancellationTests, CancelledTaskState)
+{
+    bee::ThreadPool pool(1);
+
+    std::atomic<bool> unblock{false};
+    auto blocker = bee::submit(pool, [&] {
+        while (!unblock.load(std::memory_order_acquire)) {
+            std::this_thread::yield();
+        }
+    });
+
+    std::stop_source source;
+    source.request_stop(); // cancel immediately
+    auto task = bee::submit(pool, [] {
+        return 1;
+    }, source.get_token());
+
+    unblock.store(true, std::memory_order_release);
+    blocker.wait();
+    task.wait();
+
+    EXPECT_EQ(task.state(), TaskState::Cancelled);
+    EXPECT_FALSE(task.is_ready() && task.state() == TaskState::Completed);
+}
+
+TEST(TaskCancellationTests, CancelPropagatesThroughThen)
+{
+    bee::ThreadPool pool(1);
+
+    std::atomic<bool> unblock{false};
+    auto blocker = bee::submit(pool, [&] {
+        while (!unblock.load(std::memory_order_acquire)) {
+            std::this_thread::yield();
+        }
+    });
+
+    std::stop_source source;
+    source.request_stop();
+
+    std::atomic<bool> then_ran{false};
+    auto task = bee::submit(pool, [] {
+                return 1;
+            }, source.get_token())
+           .then([&](int v) {
+                then_ran.store(true);
+                return v;
+            });
+
+    unblock.store(true, std::memory_order_release);
+    blocker.wait();
+    task.wait();
+
+    EXPECT_FALSE(then_ran.load());
+    EXPECT_EQ(task.state(), TaskState::Cancelled);
+}
+
 } // namespace

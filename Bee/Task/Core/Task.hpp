@@ -9,6 +9,7 @@
 
 #include <chrono>
 #include <memory>
+#include <stop_token>
 #include <variant>
 #include <stdexcept>
 #include <type_traits>
@@ -27,6 +28,13 @@ class Task;
 
 template <typename Fn>
 auto submit(ThreadPool& pool, Fn&& fn) -> Task<std::invoke_result_t<Fn>>;
+
+template <typename Fn>
+auto submit(ThreadPool& pool, Fn&& fn, std::stop_token token) -> Task<std::invoke_result_t<Fn>>;
+
+template <typename Fn>
+    requires std::is_invocable_v<Fn, std::stop_token>
+auto submit_cancellable(ThreadPool& pool, Fn&& fn, std::stop_source& source) -> Task<std::invoke_result_t<Fn, std::stop_token>>;
 
 // =========================================================================
 // Task<T> — 异步结果的轻量句柄
@@ -222,6 +230,13 @@ private:
     // 授予创建或组合 Task 的自由函数访问权限。
     template <typename Fn>
     friend auto submit(ThreadPool& pool, Fn&& fn) -> Task<std::invoke_result_t<Fn>>;
+
+    template <typename Fn>
+    friend auto submit(ThreadPool& pool, Fn&& fn, std::stop_token token) -> Task<std::invoke_result_t<Fn>>;
+
+    template <typename Fn>
+        requires std::is_invocable_v<Fn, std::stop_token>
+    friend auto submit_cancellable(ThreadPool& pool, Fn&& fn, std::stop_source& source) -> Task<std::invoke_result_t<Fn, std::stop_token>>;
 
     template <typename U>
     friend class Task;
