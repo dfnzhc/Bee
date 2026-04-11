@@ -41,8 +41,6 @@ namespace
 
     auto complete_graph(std::shared_ptr<ExecutionContext> ctx) -> void
     {
-        ctx->executing_flag->store(false, std::memory_order_release);
-
         if (ctx->first_exception) {
             ctx->completion->fail(ctx->first_exception);
         } else if (ctx->any_cancelled.load(std::memory_order_acquire)) {
@@ -50,6 +48,8 @@ namespace
         } else {
             ctx->completion->complete();
         }
+
+        ctx->executing_flag->store(false, std::memory_order_release);
     }
 
     auto on_node_terminal(std::shared_ptr<ExecutionContext> ctx, detail::NodeId id) -> void
@@ -72,7 +72,6 @@ namespace
         for (auto& succ_id : node->successors) {
             auto& succ = (*ctx->nodes)[succ_id.value];
             if (succ->pending_deps.fetch_sub(1, std::memory_order_acq_rel) == 1) {
-                succ->state.store(NodeState::Ready, std::memory_order_release);
                 resolve_node(ctx, succ_id);
             }
         }
@@ -136,7 +135,8 @@ namespace
             }
         }
 
-        // 所有前驱已完成 — 提交至线程池
+        // 所有前驱已完成 — 转换到 Ready 状态并提交至线程池
+        node->state.store(NodeState::Ready, std::memory_order_release);
         submit_node(ctx, id);
     }
 

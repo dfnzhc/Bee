@@ -73,7 +73,8 @@ public:
     }
 
 private:
-    explicit NodeHandle(detail::NodeId id) : id_(id)
+    explicit NodeHandle(detail::NodeId id) noexcept
+        : id_(id)
     {
     }
 

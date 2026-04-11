@@ -398,7 +398,7 @@ TEST(TaskCancellationTests, CancelBeforeExecution)
     source.request_stop();
     unblock.store(true, std::memory_order_release);
     blocker.wait();
-
+    task.wait();
     EXPECT_EQ(task.state(), TaskState::Cancelled);
     EXPECT_THROW(task.get(), std::runtime_error);
 }
