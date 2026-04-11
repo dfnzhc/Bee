@@ -95,6 +95,22 @@ TEST(MoveOnlyFunctionTest, HeapAllocationForLargeCallable)
     EXPECT_EQ(fn(), 99);
 }
 
+TEST(MoveOnlyFunctionTest, MoveHeapAllocatedCallable)
+{
+    struct Large
+    {
+        std::array<std::byte, 256> data{};
+        int value = 99;
+        auto operator()() -> int { return value; }
+    };
+    static_assert(sizeof(Large) > 128, "Must exceed SBO buffer");
+
+    bee::MoveOnlyFunction<int()> fn1(Large{});
+    auto fn2 = std::move(fn1);
+    EXPECT_FALSE(fn1);
+    EXPECT_EQ(fn2(), 99);
+}
+
 // =============================================================================
 // Empty state
 // =============================================================================

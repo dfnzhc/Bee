@@ -378,4 +378,20 @@ TEST(SignalTest, MoveConstructor)
     EXPECT_EQ(count, 1);
 }
 
+TEST(SignalTest, MoveAssignment)
+{
+    Signal<void()> sig1;
+    Signal<void()> sig2;
+    int count = 0;
+    sig2.connect([&count]() { ++count; });
+
+    sig1 = std::move(sig2);
+    sig1.emit();
+    EXPECT_EQ(count, 1);
+
+    // sig2 is moved-from — emit is safe but no-op
+    sig2.emit();
+    EXPECT_EQ(count, 1);
+}
+
 } // namespace

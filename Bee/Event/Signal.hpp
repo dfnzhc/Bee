@@ -9,6 +9,7 @@
 
 #include "Event/Connection.hpp"
 #include "Base/Core/MoveOnlyFunction.hpp"
+#include "Base/Diagnostics/Log.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -143,6 +144,7 @@ public:
 
     /// 异步发射 — 将参数拷贝到共享快照中，为每个活跃槽向线程池提交一个任务。
     /// Pool 须提供 post(callable) 方法（例如 bee::ThreadPool）。
+    /// 注意：参数经 decay 后在所有提交的任务间共享，引用类型的参数会变为指向同一份共享拷贝的引用。
     template <typename Pool>
     auto emit_async(Pool& pool, Args... args) const -> void
     {
@@ -216,7 +218,16 @@ public:
 
     [[nodiscard]] auto empty() const -> bool
     {
-        return slot_count() == 0;
+        auto snapshot = slots_.load(std::memory_order_acquire);
+        if (!snapshot) {
+            return true;
+        }
+        for (const auto& slot : *snapshot) {
+            if (slot.state->active.load(std::memory_order_acquire)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     // -------------------------------------------------------------------------
@@ -256,6 +267,11 @@ private:
                 // 错误处理器自身抛异常 — 吞掉以防级联崩溃
             }
         }
+#ifndef NDEBUG
+        else {
+            LogWarn("Signal", "Slot threw an unhandled exception");
+        }
+#endif
     }
 
     /// 尽力而为的懒惰压缩 — 从列表中移除已失活的槽。

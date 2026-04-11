@@ -133,8 +133,7 @@ private:
                 vtable_ = nullptr;
                 throw;
             }
-            vtable_      = &inline_vtable<Fn>();
-            inline_mode_ = true;
+            vtable_ = &inline_vtable<Fn>();
         } else {
             try {
                 *reinterpret_cast<Fn**>(&inline_storage_) = new Fn(std::forward<CtorArgs>(args)...);
@@ -142,8 +141,7 @@ private:
                 vtable_ = nullptr;
                 throw;
             }
-            vtable_      = &heap_vtable<Fn>();
-            inline_mode_ = false;
+            vtable_ = &heap_vtable<Fn>();
         }
     }
 
@@ -151,8 +149,7 @@ private:
     {
         if (vtable_ != nullptr) {
             vtable_->destroy(storage_ptr());
-            vtable_      = nullptr;
-            inline_mode_ = true;
+            vtable_ = nullptr;
         }
     }
 
@@ -161,11 +158,9 @@ private:
         if (other.vtable_ == nullptr) {
             return;
         }
-        vtable_      = other.vtable_;
-        inline_mode_ = other.inline_mode_;
+        vtable_ = other.vtable_;
         vtable_->move_construct(storage_ptr(), other.storage_ptr());
-        other.vtable_      = nullptr;
-        other.inline_mode_ = true;
+        other.vtable_ = nullptr;
     }
 
     auto storage_ptr() noexcept -> void*
@@ -175,7 +170,6 @@ private:
 
     alignas(kInlineStorageAlign) std::byte inline_storage_[kInlineStorageSize]{};
     const VTable* vtable_{nullptr};
-    bool inline_mode_{true};
 };
 
 } // namespace bee
