@@ -9,6 +9,7 @@ bee_add_component_test(
         EnumTests.cpp
         HashTests.cpp
         LogTests.cpp
+        MoveOnlyFunctionTests.cpp
         NameofTests.cpp
         NumericTests.cpp
 )

@@ -10,3 +10,4 @@
 #include "Core/Config.hpp"
 #include "Core/Defines.hpp"
 #include "Core/Macros.hpp"
+#include "Core/MoveOnlyFunction.hpp"
