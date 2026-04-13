@@ -44,6 +44,15 @@ auto when_all(Task<Ts>&&... tasks) -> Task<std::tuple<typename Task<Ts>::value_t
 template <typename T>
 auto when_all(std::vector<Task<T>> tasks) -> Task<std::vector<T>>;
 
+template <typename T>
+struct WhenAnyResult;
+
+template <typename T>
+auto when_any(std::stop_source& source, std::vector<Task<T>> tasks) -> Task<WhenAnyResult<T>>;
+
+template <typename... Ts>
+auto when_any(std::stop_source& source, Task<Ts>&&... tasks) -> Task<std::variant<typename Task<Ts>::value_type...>>;
+
 // =========================================================================
 // Task<T> — 异步结果的轻量句柄
 // =========================================================================
@@ -251,6 +260,12 @@ private:
 
     template <typename U>
     friend auto when_all(std::vector<Task<U>> tasks) -> Task<std::vector<U>>;
+
+    template <typename U>
+    friend auto when_any(std::stop_source& source, std::vector<Task<U>> tasks) -> Task<WhenAnyResult<U>>;
+
+    template <typename... Us>
+    friend auto when_any(std::stop_source& source, Task<Us>&&... tasks) -> Task<std::variant<typename Task<Us>::value_type...>>;
 
     template <typename U>
     friend class Task;

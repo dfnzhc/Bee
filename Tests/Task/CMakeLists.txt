@@ -5,6 +5,7 @@ bee_add_component_test(
         TaskStateTests.cpp
         TaskTests.cpp
         WhenAllTests.cpp
+        WhenAnyTests.cpp
         TaskGraphTests.cpp
         TaskGraphErrorTests.cpp
         TaskGraphCancelTests.cpp

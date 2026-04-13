@@ -11,6 +11,7 @@
 #include "Task/Core/SharedState.hpp"
 #include "Task/Core/Task.hpp"
 #include "Task/Core/Submit.hpp"
+#include "Task/Core/WhenAny.hpp"
 #include "Task/Graph/NodeHandle.hpp"
 #include "Task/Graph/TaskGraph.hpp"
 #include "Task/Parallel/ForEach.hpp"
