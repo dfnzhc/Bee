@@ -209,13 +209,17 @@ public:
         auto meta = [next = next_state, fn = std::forward<Fn>(fn), prev = prev_state, &pool]() mutable {
             auto s = prev->state.load(std::memory_order_acquire);
             if (s == TaskState::Completed) {
-                pool.post([next, fn = std::move(fn), prev]() mutable {
-                    try {
-                        detail::invoke_continuation<T, R>(fn, prev.get(), next.get());
-                    } catch (...) {
-                        next->fail(std::current_exception());
-                    }
-                });
+                try {
+                    pool.post([next, fn = std::move(fn), prev]() mutable {
+                        try {
+                            detail::invoke_continuation<T, R>(fn, prev.get(), next.get());
+                        } catch (...) {
+                            next->fail(std::current_exception());
+                        }
+                    });
+                } catch (...) {
+                    next->fail(std::current_exception());
+                }
             } else if (s == TaskState::Failed) {
                 next->fail(prev->exception);
             } else {
@@ -268,7 +272,9 @@ public:
                     return false; // 已完成——不挂起
                 }
                 BEE_CHECK(!state_->has_continuation);
-                state_->continuation     = MoveOnlyFunction<void()>([handle]() mutable { handle.resume(); });
+                state_->continuation = MoveOnlyFunction<void()>([handle]() mutable {
+                    handle.resume();
+                });
                 state_->has_continuation = true;
                 return true; // 挂起直到任务完成
             }

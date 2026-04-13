@@ -173,6 +173,11 @@ private:
         return static_cast<Channel<E>&>(*it->second);
     }
 
+    /// 返回已存在的 Channel 裸指针；若不存在则返回 nullptr。
+    /// 安全性不变量：channels_ 中的条目仅在 get_or_create_channel() 中插入，从不被移除或替换。
+    /// 因此即使在 shared_lock 释放后，返回的裸指针仍然有效（unique_ptr 生命周期 >= EventBus）。
+    /// Signal 内部通过 COW atomic<shared_ptr> 保证线程安全，无需在调用方持锁。
+    /// ⚠ 若将来需要删除 Channel，此处必须同步修改为在锁内完成操作。
     template <typename E>
     auto find_channel() -> Channel<E>*
     {
