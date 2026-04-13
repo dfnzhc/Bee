@@ -8,4 +8,9 @@ bee_add_component_test(
         TaskGraphTests.cpp
         TaskGraphErrorTests.cpp
         TaskGraphCancelTests.cpp
+        ParallelForEachTests.cpp
+        ParallelTransformTests.cpp
+        ParallelReduceTests.cpp
+        ParallelScanTests.cpp
+        ParallelSortTests.cpp
 )

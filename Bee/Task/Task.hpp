@@ -13,3 +13,8 @@
 #include "Task/Core/Submit.hpp"
 #include "Task/Graph/NodeHandle.hpp"
 #include "Task/Graph/TaskGraph.hpp"
+#include "Task/Parallel/ForEach.hpp"
+#include "Task/Parallel/Transform.hpp"
+#include "Task/Parallel/Reduce.hpp"
+#include "Task/Parallel/Scan.hpp"
+#include "Task/Parallel/Sort.hpp"
