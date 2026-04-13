@@ -104,20 +104,29 @@ TEST(WhenAnyTests, RemainingTasksCancelled)
     std::stop_source source;
 
     std::atomic<bool> slow_saw_stop{false};
+    std::atomic<bool> slow_started{false};
 
     std::vector<Task<int>> tasks;
-    tasks.push_back(bee::submit(pool, [] {
-        return 1;
-    }, source.get_token()));
+    // 慢任务先入队——保证它在快任务运行前已进入自旋等待。
     tasks.push_back(bee::submit_cancellable(
             pool,
-            [&slow_saw_stop](std::stop_token token) -> int {
+            [&slow_saw_stop, &slow_started](std::stop_token token) -> int {
+                slow_started.store(true, std::memory_order_release);
                 while (!token.stop_requested())
                     std::this_thread::yield();
                 slow_saw_stop.store(true, std::memory_order_release);
                 return -1;
             },
             source));
+    // 快任务等待慢任务启动后再返回。
+    tasks.push_back(bee::submit(
+            pool,
+            [&slow_started] {
+                while (!slow_started.load(std::memory_order_acquire))
+                    std::this_thread::yield();
+                return 1;
+            },
+            source.get_token()));
 
     auto combined = bee::when_any(source, std::move(tasks));
     combined.get();

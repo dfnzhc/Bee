@@ -49,6 +49,8 @@ namespace detail
         std::shared_ptr<SharedState<ResultType>> combined;
         std::atomic<size_t> remaining;
         std::atomic<bool> first_claimed{false};
+        // 仅由 CAS 竞争的获胜者写入；仅由最后一个调用 try_finish() 的线程读取。
+        // 同步保证：`remaining` 上的 fetch_sub(acq_rel) 提供 happens-before 边。
         std::optional<ResultType> winner_result;
         std::exception_ptr winner_ex;
 
@@ -89,6 +91,9 @@ auto when_any(std::stop_source& source, std::vector<Task<T>> tasks) -> Task<When
     auto combined = std::make_shared<detail::SharedState<WhenAnyResult<T>>>();
     auto ctrl     = std::make_shared<detail::WhenAnyControl<WhenAnyResult<T>>>(combined, n);
 
+    // 按值拷贝 stop_source——拷贝与原始对象共享同一停止状态，
+    // 因此在拷贝上调用 request_stop() 同样会影响原始对象。
+    // 避免调用者作用域先于 handler 结束时产生悬垂引用。
     auto src_copy = source;
 
     for (size_t i = 0; i < n; ++i) {
