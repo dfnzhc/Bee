@@ -12,6 +12,7 @@
 #include "Task/Core/Task.hpp"
 #include "Task/Core/Submit.hpp"
 #include "Task/Core/WhenAny.hpp"
+#include "Task/Core/AsyncTask.hpp"
 #include "Task/Graph/NodeHandle.hpp"
 #include "Task/Graph/TaskGraph.hpp"
 #include "Task/Parallel/ForEach.hpp"

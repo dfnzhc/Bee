@@ -8,6 +8,7 @@
 #pragma once
 
 #include <chrono>
+#include <coroutine>
 #include <memory>
 #include <stop_token>
 #include <tuple>
@@ -239,6 +240,56 @@ public:
         }
 
         return Task<R>(next_state);
+    }
+
+    // -----------------------------------------------------------------
+    // 协程支持
+    // -----------------------------------------------------------------
+
+    /// 使 Task<T> 可被 co_await。复用与 then() 相同的 continuation 槽位。
+    /// 每个 Task 最多只能有一个消费者（then、co_await 或 when_all/when_any）。
+    auto operator co_await()
+    {
+        BEE_CHECK(state_ != nullptr);
+
+        struct TaskAwaiter
+        {
+            std::shared_ptr<detail::SharedState<T>> state_;
+
+            [[nodiscard]] auto await_ready() const noexcept -> bool
+            {
+                return state_->is_terminal();
+            }
+
+            auto await_suspend(std::coroutine_handle<> handle) -> bool
+            {
+                std::lock_guard lock(state_->mutex);
+                if (state_->is_terminal()) {
+                    return false; // 已完成——不挂起
+                }
+                BEE_CHECK(!state_->has_continuation);
+                state_->continuation     = MoveOnlyFunction<void()>([handle]() mutable { handle.resume(); });
+                state_->has_continuation = true;
+                return true; // 挂起直到任务完成
+            }
+
+            auto await_resume() -> T
+            {
+                auto s = state_->state.load(std::memory_order_acquire);
+                if (s == TaskState::Failed) {
+                    std::rethrow_exception(state_->exception);
+                }
+                if (s == TaskState::Cancelled) {
+                    throw std::runtime_error("Task was cancelled");
+                }
+                BEE_CHECK(s == TaskState::Completed);
+                if constexpr (!std::is_void_v<T>) {
+                    return std::move(*state_->result);
+                }
+            }
+        };
+
+        return TaskAwaiter{state_};
     }
 
 private:
