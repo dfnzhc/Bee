@@ -8,3 +8,6 @@
 #pragma once
 
 #include "Task/Core/TaskState.hpp"
+#include "Task/Core/SharedState.hpp"
+#include "Task/Core/Task.hpp"
+#include "Task/Core/Submit.hpp"

@@ -3,4 +3,5 @@ bee_add_component_test(
     TARGET Task.Tests
     SOURCES
         TaskStateTests.cpp
+        TaskTests.cpp
 )

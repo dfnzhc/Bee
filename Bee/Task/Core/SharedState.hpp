@@ -1,0 +1,139 @@
+/**
+ * @File SharedState.hpp
+ * @Author dfnzhc (https://github.com/dfnzhc)
+ * @Date 2026/4/11
+ * @Brief This file is part of Bee.
+ */
+
+#pragma once
+
+#include <atomic>
+#include <chrono>
+#include <condition_variable>
+#include <exception>
+#include <mutex>
+#include <optional>
+#include <type_traits>
+#include <utility>
+
+#include "Base/Core/Defines.hpp"
+#include "Base/Core/MoveOnlyFunction.hpp"
+#include "Task/Core/TaskState.hpp"
+
+namespace bee::detail
+{
+
+// =========================================================================
+// SharedState<T> — Task<T> 的内部结果/continuation存储
+// =========================================================================
+
+template<typename T>
+struct SharedState
+{
+    // 结果存储：非 void 类型使用 std::optional<T>，void 类型使用空标签。
+    struct Empty
+    {
+    };
+
+    using ResultStorage = std::conditional_t<std::is_void_v<T>, Empty, std::optional<T>>;
+
+    mutable std::mutex mutex;
+    mutable std::condition_variable cv;
+    std::atomic<TaskState> state{TaskState::Pending};
+
+    BEE_NO_UNIQUE_ADDRESS ResultStorage result{};
+    std::exception_ptr exception;
+
+    // continuation：至多一个，由 then() 或 when_all() 设置。
+    // 在任何终态（Completed、Failed、Cancelled）触发。
+    MoveOnlyFunction<void()> continuation;
+    bool has_continuation{false};
+
+    // -----------------------------------------------------------------
+    // 状态转换
+    // -----------------------------------------------------------------
+
+    auto set_running() -> void
+    {
+        state.store(TaskState::Running, std::memory_order_release);
+    }
+
+    template<typename U = T>
+        requires(!std::is_void_v<U>)
+    auto complete(U&& value) -> void
+    {
+        terminate([&] {
+            result.emplace(std::forward<U>(value));
+            state.store(TaskState::Completed, std::memory_order_release);
+        });
+    }
+
+    auto complete() -> void
+        requires std::is_void_v<T>
+    {
+        terminate([&] { state.store(TaskState::Completed, std::memory_order_release); });
+    }
+
+    auto fail(std::exception_ptr ep) -> void
+    {
+        terminate([&] {
+            exception = std::move(ep);
+            state.store(TaskState::Failed, std::memory_order_release);
+        });
+    }
+
+    auto cancel() -> void
+    {
+        terminate([&] { state.store(TaskState::Cancelled, std::memory_order_release); });
+    }
+
+    // -----------------------------------------------------------------
+    // 查询
+    // -----------------------------------------------------------------
+
+    [[nodiscard]] auto is_terminal() const noexcept -> bool
+    {
+        auto s = state.load(std::memory_order_acquire);
+        return s == TaskState::Completed || s == TaskState::Failed || s == TaskState::Cancelled;
+    }
+
+    // -----------------------------------------------------------------
+    // 阻塞等待
+    // -----------------------------------------------------------------
+
+    auto wait() const -> void
+    {
+        std::unique_lock lock(mutex);
+        cv.wait(lock, [this] { return is_terminal(); });
+    }
+
+    template<typename Rep, typename Period>
+    auto wait_for(std::chrono::duration<Rep, Period> timeout) const -> TaskState
+    {
+        std::unique_lock lock(mutex);
+        cv.wait_for(lock, timeout, [this] { return is_terminal(); });
+        return state.load(std::memory_order_acquire);
+    }
+
+private:
+    // 终态转换公共辅助：加锁设置状态、提取 continuation、通知 CV、在锁外执行 continuation。
+    template<typename SetupFn>
+    auto terminate(SetupFn&& setup) -> void
+    {
+        MoveOnlyFunction<void()> cont;
+        {
+            std::lock_guard lock(mutex);
+            setup();
+            if (has_continuation) {
+                cont             = std::move(continuation);
+                has_continuation = false;
+            }
+        }
+        cv.notify_all();
+        if (cont) {
+            cont();
+        }
+    }
+};
+
+} // namespace bee::detail
