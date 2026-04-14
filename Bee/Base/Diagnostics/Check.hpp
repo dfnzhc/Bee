@@ -31,7 +31,6 @@ void SetFailureHandler(FailureHandler handler) noexcept;
 
 namespace detail
 {
-
     extern std::atomic<FailureHandler> g_failure_handler;
 
     /// Core failure function: logs context, calls handler, debug-breaks (debug only), aborts.

@@ -29,7 +29,7 @@ enum class LogLevel : u8
     Fatal
 };
 
-BEE_ENUM_SCAN_RANGE(LogLevel, 0, 5, false)
+BEE_ENUM_SCAN_COUNT(LogLevel, 6)
 
 using LogSink = void (*)(LogLevel level, std::string_view category, std::string_view message, std::source_location location);
 
@@ -40,11 +40,6 @@ void SetLogLevel(LogLevel level) noexcept;
 [[nodiscard]] LogSink GetLogSink() noexcept;
 [[nodiscard]] LogLevel GetLogLevel() noexcept;
 void EnableDefaultLogging(LogLevel level = LogLevel::Info) noexcept;
-
-[[nodiscard]] constexpr auto LogLevelToString(LogLevel level) noexcept -> std::string_view
-{
-    return enum_to_name(level);
-}
 
 // --- Built-in sink ---
 

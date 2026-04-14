@@ -139,9 +139,9 @@ public:
     explicit ThreadPool(std::size_t thread_count = std::thread::hardware_concurrency());
     ~ThreadPool();
 
-    ThreadPool(const ThreadPool&)            = delete;
+    ThreadPool(const ThreadPool&)                    = delete;
     auto operator=(const ThreadPool&) -> ThreadPool& = delete;
-    ThreadPool(ThreadPool&&)                 = delete;
+    ThreadPool(ThreadPool&&)                         = delete;
     auto operator=(ThreadPool&&) -> ThreadPool&      = delete;
 
     // -------------------------------------------------------------------------
@@ -153,28 +153,28 @@ public:
      * @return 与任务绑定的 future。
      * @throws std::runtime_error 入队失败。
      */
-    template<typename F, typename... Args>
+    template <typename F, typename... Args>
     auto submit(F&& f, Args&&... args) -> std::future<std::invoke_result_t<std::decay_t<F>, std::decay_t<Args>...>>;
 
     /**
      * @brief 提交 fire-and-forget 任务。
      * @throws std::runtime_error 入队失败。
      */
-    template<typename F, typename... Args>
+    template <typename F, typename... Args>
     void post(F&& f, Args&&... args);
 
     /**
      * @brief 尝试提交 fire-and-forget 任务，不抛异常。
      * @return true 表示已提交；false 表示被拒绝。
      */
-    template<typename F, typename... Args>
+    template <typename F, typename... Args>
     [[nodiscard]] auto try_post(F&& f, Args&&... args) -> bool;
 
     /**
      * @brief 尝试提交有返回值的任务，不抛异常。
      * @return 成功返回 future；失败返回 nullopt。
      */
-    template<typename F, typename... Args>
+    template <typename F, typename... Args>
     [[nodiscard]] auto try_submit(F&& f, Args&&... args)
         -> std::optional<std::future<std::invoke_result_t<std::decay_t<F>, std::decay_t<Args>...>>>;
 
@@ -187,11 +187,11 @@ public:
      *
      * 若回调签名包含 CancellationToken，线程池会将 token 作为首参传入。
      */
-    template<typename F, typename... Args>
+    template <typename F, typename... Args>
     auto submit_cancellable(CancellationToken token, F&& f, Args&&... args)
         -> std::future<std::invoke_result_t<std::decay_t<F>, CancellationToken, std::decay_t<Args>...>>;
 
-    template<typename F, typename... Args>
+    template <typename F, typename... Args>
     [[nodiscard]] auto try_post_cancellable(CancellationToken token, F&& f, Args&&... args) -> bool;
 
     [[nodiscard]] static auto make_cancellation_source() -> CancellationSource;
@@ -229,10 +229,10 @@ private:
     // 常量
     // -------------------------------------------------------------------------
 
-    static constexpr std::size_t kDefaultLocalQueueCapacity  = 256;
-    static constexpr std::size_t kDefaultGlobalQueueCapacity = 4096;
-    static constexpr std::size_t kVictimSampleCount          = 4;
-    static constexpr std::size_t kGlobalProbeCount           = 4;
+    static constexpr std::size_t kDefaultLocalQueueCapacity   = 256;
+    static constexpr std::size_t kDefaultGlobalQueueCapacity  = 4096;
+    static constexpr std::size_t kVictimSampleCount           = 4;
+    static constexpr std::size_t kGlobalProbeCount            = 4;
     static constexpr std::size_t kMaxAdaptiveGlobalProbeCount = 16;
 
 public:
@@ -362,23 +362,25 @@ private:
 // Template API Implementation
 // =============================================================================
 
-template<typename F, typename... Args>
+template <typename F, typename... Args>
 auto ThreadPool::submit(F&& f, Args&&... args)
     -> std::future<std::invoke_result_t<std::decay_t<F>, std::decay_t<Args>...>>
 {
     using ReturnType = std::invoke_result_t<std::decay_t<F>, std::decay_t<Args>...>;
 
     auto packaged = std::packaged_task<ReturnType()>(
-        [fn = std::forward<F>(f), tup = std::make_tuple(std::forward<Args>(args)...)]() mutable -> ReturnType {
-            return std::apply(std::move(fn), std::move(tup));
-        });
+            [fn = std::forward<F>(f), tup = std::make_tuple(std::forward<Args>(args)...)]() mutable -> ReturnType {
+                return std::apply(std::move(fn), std::move(tup));
+            });
 
     auto future = packaged.get_future();
 
     pending_tasks_.fetch_add(1, std::memory_order_acq_rel);
     submitted_tasks_.fetch_add(1, std::memory_order_relaxed);
     try {
-        if (!enqueue_task(MoveOnlyFunction([task = std::move(packaged)]() mutable { task(); }))) {
+        if (!enqueue_task(MoveOnlyFunction([task = std::move(packaged)]() mutable {
+            task();
+        }))) {
             throw std::runtime_error("ThreadPool enqueue failed.");
         }
     } catch (...) {
@@ -389,23 +391,23 @@ auto ThreadPool::submit(F&& f, Args&&... args)
     return future;
 }
 
-template<typename F, typename... Args>
+template <typename F, typename... Args>
 void ThreadPool::post(F&& f, Args&&... args)
 {
     auto fire_and_forget =
-        [fn = std::forward<F>(f), tup = std::make_tuple(std::forward<Args>(args)...)]() mutable {
-            std::apply(std::move(fn), std::move(tup));
-        };
+            [fn = std::forward<F>(f), tup = std::make_tuple(std::forward<Args>(args)...)]() mutable {
+        std::apply(std::move(fn), std::move(tup));
+    };
 
     pending_tasks_.fetch_add(1, std::memory_order_acq_rel);
     submitted_tasks_.fetch_add(1, std::memory_order_relaxed);
     try {
         if (!enqueue_task(MoveOnlyFunction([task = std::move(fire_and_forget)]() mutable {
-                try {
-                    task();
-                } catch (...) {
-                }
-            }))) {
+            try {
+                task();
+            } catch (...) {
+            }
+        }))) {
             throw std::runtime_error("ThreadPool enqueue failed.");
         }
     } catch (...) {
@@ -414,24 +416,24 @@ void ThreadPool::post(F&& f, Args&&... args)
     }
 }
 
-template<typename F, typename... Args>
+template <typename F, typename... Args>
 auto ThreadPool::try_post(F&& f, Args&&... args) -> bool
 {
     auto fire_and_forget =
-        [fn = std::forward<F>(f), tup = std::make_tuple(std::forward<Args>(args)...)]() mutable {
-            std::apply(std::move(fn), std::move(tup));
-        };
+            [fn = std::forward<F>(f), tup = std::make_tuple(std::forward<Args>(args)...)]() mutable {
+        std::apply(std::move(fn), std::move(tup));
+    };
 
     pending_tasks_.fetch_add(1, std::memory_order_acq_rel);
     submitted_tasks_.fetch_add(1, std::memory_order_relaxed);
 
     try {
         if (!enqueue_task(MoveOnlyFunction([task = std::move(fire_and_forget)]() mutable {
-                try {
-                    task();
-                } catch (...) {
-                }
-            }))) {
+            try {
+                task();
+            } catch (...) {
+            }
+        }))) {
             rollback_failed_submission();
             return false;
         }
@@ -443,7 +445,7 @@ auto ThreadPool::try_post(F&& f, Args&&... args) -> bool
     return true;
 }
 
-template<typename F, typename... Args>
+template <typename F, typename... Args>
 auto ThreadPool::try_submit(F&& f, Args&&... args)
     -> std::optional<std::future<std::invoke_result_t<std::decay_t<F>, std::decay_t<Args>...>>>
 {
@@ -454,9 +456,9 @@ auto ThreadPool::try_submit(F&& f, Args&&... args)
 
     try {
         packaged.emplace(std::packaged_task<ReturnType()>(
-            [fn = std::forward<F>(f), tup = std::make_tuple(std::forward<Args>(args)...)]() mutable -> ReturnType {
-                return std::apply(std::move(fn), std::move(tup));
-            }));
+                [fn = std::forward<F>(f), tup = std::make_tuple(std::forward<Args>(args)...)]() mutable -> ReturnType {
+                    return std::apply(std::move(fn), std::move(tup));
+                }));
         future = packaged->get_future();
     } catch (...) {
         return std::nullopt;
@@ -466,7 +468,9 @@ auto ThreadPool::try_submit(F&& f, Args&&... args)
     submitted_tasks_.fetch_add(1, std::memory_order_relaxed);
 
     try {
-        if (!enqueue_task(MoveOnlyFunction([task = std::move(*packaged)]() mutable { task(); }))) {
+        if (!enqueue_task(MoveOnlyFunction([task = std::move(*packaged)]() mutable {
+            task();
+        }))) {
             rollback_failed_submission();
             return std::nullopt;
         }
@@ -478,29 +482,29 @@ auto ThreadPool::try_submit(F&& f, Args&&... args)
     return std::optional<std::future<ReturnType>>(std::move(*future));
 }
 
-template<typename F, typename... Args>
+template <typename F, typename... Args>
 auto ThreadPool::submit_cancellable(CancellationToken token, F&& f, Args&&... args)
     -> std::future<std::invoke_result_t<std::decay_t<F>, CancellationToken, std::decay_t<Args>...>>
 {
     using ReturnType = std::invoke_result_t<std::decay_t<F>, CancellationToken, std::decay_t<Args>...>;
 
     auto packaged = std::packaged_task<ReturnType()>(
-        [token, fn = std::forward<F>(f),
-         tup = std::make_tuple(std::forward<Args>(args)...)]() mutable -> ReturnType {
-            if (token.stop_requested()) {
-                throw make_cancelled_error();
-            }
+            [token, fn = std::forward<F>(f),
+                tup = std::make_tuple(std::forward<Args>(args)...)]() mutable -> ReturnType {
+                if (token.stop_requested()) {
+                    throw make_cancelled_error();
+                }
 
-            return std::apply(
-                [&](auto&&... unpacked) -> ReturnType {
-                    if constexpr (std::is_invocable_v<std::decay_t<F>&, CancellationToken, decltype(unpacked)...>) {
-                        return fn(token, std::forward<decltype(unpacked)>(unpacked)...);
-                    } else {
-                        return fn(std::forward<decltype(unpacked)>(unpacked)...);
-                    }
-                },
-                std::move(tup));
-        });
+                return std::apply(
+                        [&](auto&&... unpacked) -> ReturnType {
+                            if constexpr (std::is_invocable_v<std::decay_t<F>&, CancellationToken, decltype(unpacked)...>) {
+                                return fn(token, std::forward<decltype(unpacked)>(unpacked)...);
+                            } else {
+                                return fn(std::forward<decltype(unpacked)>(unpacked)...);
+                            }
+                        },
+                        std::move(tup));
+            });
 
     auto future = packaged.get_future();
 
@@ -508,7 +512,9 @@ auto ThreadPool::submit_cancellable(CancellationToken token, F&& f, Args&&... ar
     submitted_tasks_.fetch_add(1, std::memory_order_relaxed);
 
     try {
-        if (!enqueue_task(MoveOnlyFunction([task = std::move(packaged)]() mutable { task(); }))) {
+        if (!enqueue_task(MoveOnlyFunction([task = std::move(packaged)]() mutable {
+            task();
+        }))) {
             throw std::runtime_error("ThreadPool enqueue failed.");
         }
     } catch (...) {
@@ -519,24 +525,24 @@ auto ThreadPool::submit_cancellable(CancellationToken token, F&& f, Args&&... ar
     return future;
 }
 
-template<typename F, typename... Args>
+template <typename F, typename... Args>
 auto ThreadPool::try_post_cancellable(CancellationToken token, F&& f, Args&&... args) -> bool
 {
     auto work = [token, fn = std::forward<F>(f),
-                 tup = std::make_tuple(std::forward<Args>(args)...)]() mutable {
+                tup = std::make_tuple(std::forward<Args>(args)...)]() mutable {
         if (token.stop_requested()) {
             return;
         }
 
         std::apply(
-            [&](auto&&... unpacked) {
-                if constexpr (std::is_invocable_v<std::decay_t<F>&, CancellationToken, decltype(unpacked)...>) {
-                    fn(token, std::forward<decltype(unpacked)>(unpacked)...);
-                } else {
-                    fn(std::forward<decltype(unpacked)>(unpacked)...);
-                }
-            },
-            std::move(tup));
+                [&](auto&&... unpacked) {
+                    if constexpr (std::is_invocable_v<std::decay_t<F>&, CancellationToken, decltype(unpacked)...>) {
+                        fn(token, std::forward<decltype(unpacked)>(unpacked)...);
+                    } else {
+                        fn(std::forward<decltype(unpacked)>(unpacked)...);
+                    }
+                },
+                std::move(tup));
     };
 
     return try_post(std::move(work));

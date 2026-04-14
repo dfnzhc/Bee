@@ -20,10 +20,10 @@ using namespace bee;
 
 TEST(ErrorTest, SeverityToString)
 {
-    EXPECT_EQ(to_string(Severity::Recoverable), "Recoverable");
-    EXPECT_EQ(to_string(Severity::Transient), "Transient");
-    EXPECT_EQ(to_string(Severity::Fatal), "Fatal");
-    EXPECT_EQ(to_string(Severity::Bug), "Bug");
+    EXPECT_EQ(enum_to_name(Severity::Recoverable), "Recoverable");
+    EXPECT_EQ(enum_to_name(Severity::Transient), "Transient");
+    EXPECT_EQ(enum_to_name(Severity::Fatal), "Fatal");
+    EXPECT_EQ(enum_to_name(Severity::Bug), "Bug");
 }
 
 TEST(ErrorTest, SeverityValuesDistinct)

@@ -16,14 +16,13 @@ namespace bee
 
 auto Error::format() const -> std::string
 {
-    std::string result = std::format("[severity={}] {}", to_string(severity), message);
+    std::string result = std::format("[severity={}] {}", enum_to_name(severity), message);
 
     if (errc != 0) {
         result += std::format("\nerrc={}", errc);
     }
 
-    result += std::format("\nwhere={}:{} in {}",
-                          where.file_name(), where.line(), where.function_name());
+    result += std::format("\nwhere={}:{} in {}", where.file_name(), where.line(), where.function_name());
 
 #ifndef NDEBUG
     {
@@ -58,7 +57,7 @@ auto Error::format() const -> std::string
 
 [[noreturn]] void panic(Error e)
 {
-    auto details = std::format("severity={}, errc={}", to_string(e.severity), e.errc);
+    auto details = std::format("severity={}, errc={}", enum_to_name(e.severity), e.errc);
     detail::check_fail("Panic", e.message, details, e.where);
     std::abort(); // unreachable, but satisfies [[noreturn]] for all compilers
 }

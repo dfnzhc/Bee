@@ -40,12 +40,7 @@ enum class Severity : u8
     Bug,         // logic defect
 };
 
-BEE_ENUM_SCAN_RANGE(Severity, 0, 3, false)
-
-[[nodiscard]] constexpr auto to_string(Severity s) noexcept -> std::string_view
-{
-    return enum_to_name(s);
-}
+BEE_ENUM_SCAN_COUNT(Severity, 4)
 
 // ============================================================================
 // Error
@@ -150,8 +145,7 @@ template <typename T>
 template <typename Fn>
 [[nodiscard]] auto guard(Fn&& fn, std::string operation,
                          Severity exceptionSeverity = Severity::Fatal,
-                         std::source_location where = std::source_location::current())
-    -> Result<std::invoke_result_t<Fn>>
+                         std::source_location where = std::source_location::current()) -> Result<std::invoke_result_t<Fn>>
 {
     using R = std::invoke_result_t<Fn>;
     static_assert(!std::is_reference_v<R>, "guard() does not support reference returns");

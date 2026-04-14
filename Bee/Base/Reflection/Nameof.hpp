@@ -702,4 +702,6 @@ static_assert(noexcept(type_name_key<int>()));
         };                                                                   \
     }
 
+#define BEE_ENUM_SCAN_COUNT(EnumName, Count) BEE_ENUM_SCAN_RANGE(EnumName, 0, Count-1, false)
+
 } // namespace bee

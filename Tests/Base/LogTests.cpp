@@ -115,12 +115,12 @@ TEST_F(LogTest, GetLogLevelReturnsCurrentLevel)
 
 TEST_F(LogTest, LogLevelToStringAllLevels)
 {
-    EXPECT_EQ(bee::LogLevelToString(bee::LogLevel::Trace), "Trace");
-    EXPECT_EQ(bee::LogLevelToString(bee::LogLevel::Debug), "Debug");
-    EXPECT_EQ(bee::LogLevelToString(bee::LogLevel::Info), "Info");
-    EXPECT_EQ(bee::LogLevelToString(bee::LogLevel::Warn), "Warn");
-    EXPECT_EQ(bee::LogLevelToString(bee::LogLevel::Error), "Error");
-    EXPECT_EQ(bee::LogLevelToString(bee::LogLevel::Fatal), "Fatal");
+    EXPECT_EQ(bee::enum_to_name(bee::LogLevel::Trace), "Trace");
+    EXPECT_EQ(bee::enum_to_name(bee::LogLevel::Debug), "Debug");
+    EXPECT_EQ(bee::enum_to_name(bee::LogLevel::Info), "Info");
+    EXPECT_EQ(bee::enum_to_name(bee::LogLevel::Warn), "Warn");
+    EXPECT_EQ(bee::enum_to_name(bee::LogLevel::Error), "Error");
+    EXPECT_EQ(bee::enum_to_name(bee::LogLevel::Fatal), "Fatal");
 }
 
 TEST_F(LogTest, LogRawPassesSourceLocation)
