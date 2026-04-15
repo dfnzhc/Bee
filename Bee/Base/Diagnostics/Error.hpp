@@ -28,22 +28,18 @@
 namespace bee
 {
 
-// ============================================================================
-// Severity
-// ============================================================================
-
 enum class Severity : u8
 {
-    Recoverable, // caller can handle
-    Transient,   // temporary, may succeed on retry
-    Fatal,       // cannot continue
-    Bug,         // logic defect
+    Recoverable, // 调用方可处理
+    Transient,   // 临时性问题，重试可能成功
+    Fatal,       // 无法继续执行
+    Bug,         // 逻辑缺陷
 };
 
-BEE_ENUM_SCAN_COUNT(Severity, 4)
+BEE_ENUM_DEFAULT_SETUP(Severity, 4);
 
 // ============================================================================
-// Error
+// 错误对象
 // ============================================================================
 
 struct Error
@@ -84,7 +80,7 @@ using Result = std::expected<T, Error>;
 using Status = Result<std::monostate>;
 
 // ============================================================================
-// Construction utilities
+// 构造工具
 // ============================================================================
 
 [[nodiscard]] inline auto make_error(
@@ -121,13 +117,13 @@ using Status = Result<std::monostate>;
 }
 
 // ============================================================================
-// Termination
+// 终止路径
 // ============================================================================
 
-/// Unrecoverable error: formats the Error, then delegates to check_fail -> Log(Fatal) -> abort.
+/// 不可恢复错误：格式化 Error 后，委托给 check_fail -> Log(Fatal) -> abort。
 [[noreturn]] void panic(Error e);
 
-/// Returns the value if present; otherwise panics with the contained error.
+/// 若结果中有值则返回；否则使用其中携带的错误触发 panic。
 template <typename T>
 [[nodiscard]] auto value_or_panic(Result<T>&& result, std::source_location loc = std::source_location::current()) -> T
 {
@@ -140,10 +136,10 @@ template <typename T>
 }
 
 // ============================================================================
-// Exception-to-Result conversion
+// 异常到 Result 的转换
 // ============================================================================
 
-/// Calls fn inside try/catch, converting exceptions to Result<T>.
+/// 在 try/catch 中调用 fn，并将异常转换为 Result<T>。
 template <typename Fn>
 [[nodiscard]] auto guard(
         Fn&&                 fn,
@@ -171,11 +167,7 @@ template <typename Fn>
 
 } // namespace bee
 
-// ============================================================================
-// Propagation macros
-// ============================================================================
-
-/// Evaluates EXPR (must return a Result<U>). If it holds an error, propagates immediately.
+/// 计算 EXPR（必须返回 Result<U>）。若包含错误则立即向上传播。
 #define BEE_TRY(EXPR)                                                    \
     do {                                                                 \
         auto _bee_try_result_ = (EXPR);                                  \
@@ -184,7 +176,7 @@ template <typename Fn>
         }                                                                \
     } while (false)
 
-/// Evaluates EXPR (must return a Result<U>). On success, assigns to LHS. On error, propagates.
+/// 计算 EXPR（必须返回 Result<U>）。成功时赋值给 LHS；失败时向上传播。
 #define BEE_TRY_ASSIGN(LHS, EXPR)                                        \
     do {                                                                 \
         auto _bee_try_result_ = (EXPR);                                  \

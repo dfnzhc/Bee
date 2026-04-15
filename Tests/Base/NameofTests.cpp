@@ -13,6 +13,7 @@
 #include <type_traits>
 
 #include "Base/Reflection/Nameof.hpp"
+#include "Base/Reflection/Enum.hpp"
 
 namespace bee::nameof_test_samples
 {
@@ -160,9 +161,9 @@ struct EnumFlags<bee::nameof_test_samples::AutoPermission>
 namespace bee
 {
 
-BEE_ENUM_SCAN_RANGE(bee::nameof_test_samples::AutoCheckedAction, 0, 1, true)
+BEE_ENUM_SCAN_RANGE(bee::nameof_test_samples::AutoCheckedAction, 0, 1, true);
 
-BEE_ENUM_SCAN_RANGE(bee::nameof_test_samples::AutoPermission, 0, 4, false)
+BEE_ENUM_SCAN_RANGE(bee::nameof_test_samples::AutoPermission, 0, 4, false);
 
 } // namespace bee
 

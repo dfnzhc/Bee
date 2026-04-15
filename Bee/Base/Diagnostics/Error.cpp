@@ -59,7 +59,7 @@ auto Error::format() const -> std::string
 {
     auto details = std::format("severity={}, errc={}", enum_to_name(e.severity), e.errc);
     detail::check_fail("Panic", e.message, details, e.where);
-    std::abort(); // unreachable, but satisfies [[noreturn]] for all compilers
+    std::abort(); // 不可达，但可满足所有编译器对 [[noreturn]] 的要求
 }
 
 } // namespace bee

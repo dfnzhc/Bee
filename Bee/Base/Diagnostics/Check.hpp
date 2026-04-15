@@ -12,31 +12,34 @@
 
 #include <atomic>
 #include <format>
+#include <sstream>
 #include <source_location>
+#include <string>
 #include <string_view>
+#include <type_traits>
 
 namespace bee
 {
 
-/// Function pointer called on assertion/check failure, after logging, before abort.
-/// Receives the failed expression string, an optional detail message, and the source location.
+/// 断言/检查失败时调用的函数指针：在日志记录之后、进程中止之前执行。
+/// 接收失败表达式字符串、可选的详细消息以及源码位置信息。
 using FailureHandler = void (*)(std::string_view expr, std::string_view message, std::source_location loc) noexcept;
 
-// --- Control API ---
+// --- 控制接口 ---
 
 void                         SetFailureHandler(FailureHandler handler) noexcept;
 [[nodiscard]] FailureHandler GetFailureHandler() noexcept;
 
-// --- Internal failure path ---
+// --- 内部失败路径 ---
 
 namespace detail
 {
     extern std::atomic<FailureHandler> g_failure_handler;
 
-    /// Core failure function: logs context, calls handler, debug-breaks (debug only), aborts.
+    /// 核心失败函数：记录上下文日志、调用处理器、触发调试中断（仅调试构建）、然后中止进程。
     [[noreturn]] void check_fail(std::string_view check_type, std::string_view expr, std::string_view message, std::source_location loc);
 
-    /// Comparison failure: formats both values, then delegates to check_fail.
+    /// 比较失败：格式化两侧值后，委托给 check_fail。
     template <typename A, typename B>
     [[noreturn]] void check_op_fail(
             const A&             a,
@@ -49,7 +52,23 @@ namespace detail
     )
     {
         auto full_expr = std::format("{} {} {}", expr_a, op_str, expr_b);
-        auto values    = std::format("{} = {}, {} = {}", expr_a, a, expr_b, b);
+
+        std::string values;
+        if constexpr (requires(std::ostream& os, const std::remove_cvref_t<A>& lhs, const std::remove_cvref_t<B>& rhs) {
+                          os << lhs;
+                          os << rhs;
+                      }) {
+            try {
+                std::ostringstream oss;
+                oss << expr_a << " = " << a << ", " << expr_b << " = " << b;
+                values = oss.str();
+            } catch (...) {
+                values = "value formatting failed";
+            }
+        } else {
+            values = "values unavailable (types are not stream-insertable)";
+        }
+
         check_fail(check_type, full_expr, values, loc);
     }
 
@@ -57,7 +76,7 @@ namespace detail
 } // namespace bee
 
 // ============================================================================
-// Always-on checks (active in all build configurations)
+// 常驻检查（所有构建配置均启用）
 // ============================================================================
 
 #define BEE_CHECK(expr)                                                                     \
@@ -72,7 +91,7 @@ namespace detail
             ::bee::detail::check_fail("Check", #expr, (msg), std::source_location::current()); \
     } while (0)
 
-// --- Comparison check helper (internal) ---
+// --- 比较检查辅助宏（内部） ---
 
 #define BEE_DETAIL_CHECK_OP(a, b, op, op_str, check_type)                                                                      \
     do {                                                                                                                       \
@@ -90,7 +109,7 @@ namespace detail
 #define BEE_CHECK_GE(a, b) BEE_DETAIL_CHECK_OP(a, b, >=, ">=", "Check")
 
 // ============================================================================
-// Debug-only assertions (stripped in release / NDEBUG builds)
+// 仅调试断言（在 release / NDEBUG 构建中剔除）
 // ============================================================================
 
 #ifndef NDEBUG
@@ -128,7 +147,7 @@ namespace detail
 #endif
 
 // ============================================================================
-// Unreachable code marker
+// 不可达代码标记
 // ============================================================================
 
 #ifndef NDEBUG

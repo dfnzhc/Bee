@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include "Base/Reflection/Nameof.hpp"
+
 #include <bit>
 #include <type_traits>
 
@@ -95,16 +97,66 @@ template <EnumBitmask E>
     return std::has_single_bit(bits);
 }
 
-} // namespace bee
+template <typename E>
+constexpr auto enum_to_name(E value) noexcept -> std::string_view
+{
+    static_assert(std::is_enum_v<E>);
 
-#define BEE_ENABLE_ENUM_BITMASK_OPERATORS(type)                  \
-    namespace bee                                                \
-    {                                                            \
-        template <>                                              \
-        struct EnableEnumBitmaskOperators<type> : std::true_type \
-        {                                                        \
-        };                                                       \
+    constexpr auto entries = internal::ResolvedEnumEntries<E>();
+    return internal::FindEnumNameByValue(value, entries);
+}
+
+template <typename E>
+constexpr auto enum_from_name(std::string_view name) noexcept -> std::optional<E>
+{
+    static_assert(std::is_enum_v<E>);
+
+    constexpr auto entries = internal::ResolvedEnumEntries<E>();
+    return internal::FindEnumValueByName<E>(name, entries);
+}
+
+template <typename E>
+auto enum_flags_to_name(E value) -> std::string
+{
+    static_assert(std::is_enum_v<E>);
+
+    constexpr bool allow_composite = Customize::EnumFlags<E>::kEnabled;
+    constexpr auto entries         = internal::ResolvedEnumEntries<E>();
+    return internal::EnumFlagsToNameFromEntries(value, entries, allow_composite);
+}
+
+template <typename E>
+auto enum_flags_from_name(std::string_view name) -> std::optional<E>
+{
+    static_assert(std::is_enum_v<E>);
+
+    constexpr bool allow_composite = Customize::EnumFlags<E>::kEnabled;
+    constexpr auto entries         = internal::ResolvedEnumEntries<E>();
+    return internal::EnumFlagsFromNameFromEntries<E>(name, entries, allow_composite);
+}
+
+#define BEE_ENUM_SCAN_RANGE(EnumType, RangeMin, RangeMax, EnableAliasCheck) \
+    template <>                                                             \
+    struct Customize::EnumScanRange<EnumType>                               \
+    {                                                                       \
+        static constexpr int  kMin              = RangeMin;                 \
+        static constexpr int  kMax              = RangeMax;                 \
+        static constexpr bool kEnableAliasCheck = EnableAliasCheck;         \
     }
+
+#define BEE_ENUM_SCAN_COUNT(EnumType, Count) BEE_ENUM_SCAN_RANGE(EnumType, 0, Count - 1, false)
+
+#define BEE_ENABLE_ENUM_BITMASK_OPERATORS(EnumType)              \
+    template <>                                                  \
+    struct EnableEnumBitmaskOperators<EnumType> : std::true_type \
+    {                                                            \
+    }
+
+#define BEE_ENUM_DEFAULT_SETUP(EnumType, Count) \
+    BEE_ENUM_SCAN_COUNT(EnumType, Count);       \
+    BEE_ENABLE_ENUM_BITMASK_OPERATORS(EnumType)
+
+} // namespace bee
 
 template <typename E>
     requires bee::EnumBitmask<E>

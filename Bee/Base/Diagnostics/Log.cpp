@@ -11,40 +11,40 @@
 
 namespace bee::detail
 {
-std::atomic<LogSink>  g_log_sink{nullptr};
-std::atomic<LogLevel> g_log_level{LogLevel::Info};
+std::atomic<LogSink>  gLogSink{nullptr};
+std::atomic<LogLevel> gLogLevel{LogLevel::Info};
 } // namespace bee::detail
 
 namespace bee
 {
 
-void SetLogSink(LogSink sink) noexcept
+void set_log_sink(LogSink sink) noexcept
 {
-    detail::g_log_sink.store(sink, std::memory_order_release);
+    detail::gLogSink.store(sink, std::memory_order_release);
 }
 
-void SetLogLevel(LogLevel level) noexcept
+void set_log_level(LogLevel level) noexcept
 {
-    detail::g_log_level.store(level, std::memory_order_release);
+    detail::gLogLevel.store(level, std::memory_order_release);
 }
 
-LogSink GetLogSink() noexcept
+LogSink get_log_sink() noexcept
 {
-    return detail::g_log_sink.load(std::memory_order_acquire);
+    return detail::gLogSink.load(std::memory_order_acquire);
 }
 
-LogLevel GetLogLevel() noexcept
+LogLevel get_log_level() noexcept
 {
-    return detail::g_log_level.load(std::memory_order_acquire);
+    return detail::gLogLevel.load(std::memory_order_acquire);
 }
 
-void EnableDefaultLogging(LogLevel level) noexcept
+void enable_default_logging(LogLevel level) noexcept
 {
-    SetLogSink(DefaultConsoleSink);
-    SetLogLevel(level);
+    set_log_sink(default_console_sink);
+    set_log_level(level);
 }
 
-void DefaultConsoleSink(LogLevel level, std::string_view category, std::string_view message, std::source_location location)
+void default_console_sink(LogLevel level, std::string_view category, std::string_view message, std::source_location location)
 {
     std::string_view file = location.file_name();
     if (auto pos = file.find_last_of("/\\"); pos != std::string_view::npos) {

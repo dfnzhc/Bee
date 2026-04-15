@@ -40,8 +40,11 @@ enum class Plain : std::uint8_t
 
 } // namespace bee::enum_test_samples
 
-BEE_ENABLE_ENUM_BITMASK_OPERATORS(bee::enum_test_samples::Permission);
-BEE_ENABLE_ENUM_BITMASK_OPERATORS(bee::enum_test_samples::Feature);
+namespace bee
+{
+BEE_ENABLE_ENUM_BITMASK_OPERATORS(enum_test_samples::Permission);
+BEE_ENABLE_ENUM_BITMASK_OPERATORS(enum_test_samples::Feature);
+} // namespace bee
 
 TEST(EnumBitmaskTests, SupportsBitwiseOperators)
 {

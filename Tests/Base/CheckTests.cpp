@@ -10,6 +10,33 @@
 #include "Base/Diagnostics/Check.hpp"
 
 #include <cstdio>
+#include <ostream>
+#include <stdexcept>
+#include <string>
+
+namespace
+{
+
+struct NonFormattableComparable
+{
+    int value;
+
+    friend auto operator==(const NonFormattableComparable&, const NonFormattableComparable&) -> bool = default;
+};
+
+struct ThrowingStreamComparable
+{
+    int value;
+
+    friend auto operator==(const ThrowingStreamComparable&, const ThrowingStreamComparable&) -> bool = default;
+
+    friend auto operator<<(std::ostream&, const ThrowingStreamComparable&) -> std::ostream&
+    {
+        throw std::runtime_error("stream failed");
+    }
+};
+
+} // namespace
 
 // ============================================================================
 // BEE_CHECK basic
@@ -99,6 +126,20 @@ TEST(CheckDeathTest, OpMacroEvaluatesOnce)
     };
     BEE_CHECK_LE(inc(), 1);
     EXPECT_EQ(counter, 1);
+}
+
+TEST(CheckDeathTest, CheckEqWithNonFormattableValuesStillAbortsCleanly)
+{
+    NonFormattableComparable a{1};
+    NonFormattableComparable b{2};
+    EXPECT_DEATH(BEE_CHECK_EQ(a, b), "values unavailable");
+}
+
+TEST(CheckDeathTest, CheckEqWithThrowingStreamUsesFallbackMessage)
+{
+    ThrowingStreamComparable a{1};
+    ThrowingStreamComparable b{2};
+    EXPECT_DEATH(BEE_CHECK_EQ(a, b), "value formatting failed");
 }
 
 // ============================================================================
