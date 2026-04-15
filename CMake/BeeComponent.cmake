@@ -73,6 +73,7 @@ function(bee_add_component)
         endif()
         target_compile_features(${BEE_COMP_NAME} PUBLIC cxx_std_23)
     endif()
+    set_target_properties(${BEE_COMP_NAME} PROPERTIES FOLDER "Bee")
 
     set(bee_comp_all_sources ${BEE_COMP_SOURCES} ${BEE_COMP_PUBLIC_HEADERS})
     bee_group_sources(

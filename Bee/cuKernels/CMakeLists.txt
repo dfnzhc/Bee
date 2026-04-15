@@ -1,7 +1,5 @@
 include(CheckLanguage)
 
-set(CMAKE_CUDA_ARCHITECTURES "89;120" PARENT_SCOPE) # 89;90;
-
 check_language(CUDA)
 if (NOT CMAKE_CUDA_COMPILER)
     message(WARNING "CUDA compiler not found. Skipping cuKernels component.")
@@ -9,6 +7,9 @@ if (NOT CMAKE_CUDA_COMPILER)
 endif ()
 
 enable_language(CUDA)
+
+set(CMAKE_CUDA_ARCHITECTURES "89;120") # 89;90;
+set(CMAKE_CUDA_ARCHITECTURES "${CMAKE_CUDA_ARCHITECTURES}" PARENT_SCOPE)
 
 find_package(CUDAToolkit QUIET)
 if (NOT CUDAToolkit_FOUND)
@@ -152,6 +153,7 @@ target_compile_definitions(cuKernels
 set_target_properties(cuKernels PROPERTIES
         CUDA_ARCHITECTURES "${CMAKE_CUDA_ARCHITECTURES}"
         CUDA_SEPARABLE_COMPILATION OFF
+        FOLDER "Bee"
 )
 
 set(cuda_kernel_all_sources ${cuda_kernel_sources} ${cuda_kernel_public_headers})
