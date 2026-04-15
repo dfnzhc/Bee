@@ -235,14 +235,14 @@ TEST(MPMCQueueTests, ConcurrentMPMCCorrectness)
     constexpr int kItemsPerProducer = 25'000;
     constexpr int kTotalItems       = kProducers * kItemsPerProducer;
 
-    MPMCQueue<int> queue(4096);
+    MPMCQueue<int>                         queue(4096);
     std::vector<std::atomic<std::uint8_t>> seen(static_cast<size_t>(kTotalItems));
     for (auto& slot : seen) {
         slot.store(0, std::memory_order_relaxed);
     }
 
-    std::atomic<int> produced{0};
-    std::atomic<int> consumed{0};
+    std::atomic<int>  produced{0};
+    std::atomic<int>  consumed{0};
     std::atomic<bool> valid{true};
 
     std::vector<std::thread> producers;
@@ -280,7 +280,7 @@ TEST(MPMCQueueTests, ConcurrentMPMCCorrectness)
                     valid.store(false, std::memory_order_relaxed);
                     continue;
                 }
-                auto& flag          = seen[static_cast<size_t>(value)];
+                auto&      flag     = seen[static_cast<size_t>(value)];
                 const auto previous = flag.exchange(1, std::memory_order_relaxed);
                 if (previous != 0) {
                     valid.store(false, std::memory_order_relaxed);
@@ -313,10 +313,10 @@ TEST(MPMCQueueTests, ConcurrentMPMCCorrectness)
 TEST(MPMCQueueTests, CapacityOneMultipleProducersConsumers)
 {
     MPMCQueue<int> queue(4);
-    constexpr int kItemsPerProducer = 1000;
-    constexpr int kProducers        = 4;
-    constexpr int kConsumers        = 4;
-    constexpr int kTotalItems       = kProducers * kItemsPerProducer;
+    constexpr int  kItemsPerProducer = 1000;
+    constexpr int  kProducers        = 4;
+    constexpr int  kConsumers        = 4;
+    constexpr int  kTotalItems       = kProducers * kItemsPerProducer;
 
     std::vector<std::atomic<int>> seen(kTotalItems);
     for (auto& a : seen)
@@ -336,7 +336,7 @@ TEST(MPMCQueueTests, CapacityOneMultipleProducersConsumers)
         });
     }
 
-    std::atomic<int> totalConsumed{0};
+    std::atomic<int>         totalConsumed{0};
     std::vector<std::thread> consumers;
     for (int c = 0; c < kConsumers; ++c) {
         consumers.emplace_back([&queue, &seen, &totalConsumed, &producersDone]() {
@@ -345,8 +345,7 @@ TEST(MPMCQueueTests, CapacityOneMultipleProducersConsumers)
                 if (queue.try_pop(value)) {
                     seen[value].fetch_add(1, std::memory_order_relaxed);
                     totalConsumed.fetch_add(1, std::memory_order_relaxed);
-                } else if (producersDone.load(std::memory_order_acquire) == kProducers
-                           && queue.is_empty()) {
+                } else if (producersDone.load(std::memory_order_acquire) == kProducers && queue.is_empty()) {
                     break;
                 } else {
                     std::this_thread::yield();
@@ -385,7 +384,7 @@ TEST(MPMCQueueTests, TryPushOnFullReturnsFalse)
 TEST(MPMCQueueTests, AlternatingPushPop)
 {
     MPMCQueue<int> queue(4);
-    constexpr int kCount = 10000;
+    constexpr int  kCount = 10000;
 
     for (int i = 0; i < kCount; ++i) {
         ASSERT_TRUE(queue.try_push(i));

@@ -81,8 +81,8 @@ auto execute_chunks(ThreadPool& pool, size_t total, ChunkFn&& chunk_fn, std::sto
         return;
 
     std::vector<std::exception_ptr> exceptions(chunks.size());
-    std::atomic<bool> cancelled{false};
-    std::latch done(static_cast<std::ptrdiff_t>(chunks.size()));
+    std::atomic<bool>               cancelled{false};
+    std::latch                      done(static_cast<std::ptrdiff_t>(chunks.size()));
 
     for (size_t i = 0; i < chunks.size(); ++i) {
         pool.post([&, i]() {

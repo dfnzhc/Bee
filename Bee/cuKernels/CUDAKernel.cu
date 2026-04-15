@@ -5,11 +5,11 @@ namespace bee
 
 bool cuda_kernel_compiled_with_nvcc() noexcept
 {
-    #if defined(__CUDACC__)
+#if defined(__CUDACC__)
     return true;
-    #else
+#else
     return false;
-    #endif
+#endif
 }
 
 } // namespace bee

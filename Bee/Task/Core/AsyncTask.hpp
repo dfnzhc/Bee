@@ -203,7 +203,7 @@ namespace detail
             if (promise.continuation) {
                 return promise.continuation;
             }
-            
+
             // 无协程等待调用者 —— 为调用 .get ()/.wait () 的等待者释放信号量。
             promise.ready.release();
             return std::noop_coroutine();
@@ -244,9 +244,9 @@ struct AsyncTask<T>::promise_type : detail::AsyncTaskPromiseReturn<T>
     std::exception_ptr exception;
 
     std::coroutine_handle<> continuation{nullptr};
-    std::binary_semaphore ready{0};
-    std::atomic<bool> done{false};
-    std::atomic<bool> started{false};
+    std::binary_semaphore   ready{0};
+    std::atomic<bool>       done{false};
+    std::atomic<bool>       started{false};
 
     auto get_return_object() -> AsyncTask
     {

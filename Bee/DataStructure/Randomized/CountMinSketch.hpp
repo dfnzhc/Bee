@@ -55,7 +55,10 @@ public:
      * @param depth  哈希函数的个数（d，即行数）
      */
     CountMinSketch(std::size_t width, std::size_t depth)
-        : _width(width), _depth(depth), _table(width * depth, count_type{0}), _totalCount(0)
+        : _width(width)
+        , _depth(depth)
+        , _table(width * depth, count_type{0})
+        , _totalCount(0)
     {
         if (width == 0 || depth == 0)
             throw std::invalid_argument("CountMinSketch: width 和 depth 必须大于 0");
@@ -64,8 +67,8 @@ public:
         _seeds.resize(_depth);
         std::random_device rd;
         for (std::size_t i = 0; i < _depth; ++i) {
-            auto hi = static_cast<std::uint64_t>(rd()) << 32;
-            auto lo = static_cast<std::uint64_t>(rd());
+            auto hi   = static_cast<std::uint64_t>(rd()) << 32;
+            auto lo   = static_cast<std::uint64_t>(rd());
             _seeds[i] = hi | lo;
         }
     }
@@ -111,9 +114,9 @@ public:
     {
         auto h = std::hash<T>{}(item);
         for (std::size_t i = 0; i < _depth; ++i) {
-            std::size_t idx = _hash_to_index(h, i);
-            auto& cell      = _table[i * _width + idx];
-            cell            = SaturatingAdd(cell, count);
+            std::size_t idx  = _hash_to_index(h, i);
+            auto&       cell = _table[i * _width + idx];
+            cell             = SaturatingAdd(cell, count);
         }
         _totalCount = SaturatingAdd(_totalCount, count);
     }
@@ -148,7 +151,7 @@ public:
      */
     [[nodiscard]] count_type estimate(const T& item) const
     {
-        auto h            = std::hash<T>{}(item);
+        auto       h      = std::hash<T>{}(item);
         count_type result = std::numeric_limits<count_type>::max();
         for (std::size_t i = 0; i < _depth; ++i) {
             std::size_t idx = _hash_to_index(h, i);
@@ -216,11 +219,11 @@ private:
     }
 
 private:
-    std::size_t _width;
-    std::size_t _depth;
-    std::vector<count_type> _table;
+    std::size_t                _width;
+    std::size_t                _depth;
+    std::vector<count_type>    _table;
     std::vector<std::uint64_t> _seeds;
-    count_type _totalCount;
+    count_type                 _totalCount;
 };
 
 } // namespace bee

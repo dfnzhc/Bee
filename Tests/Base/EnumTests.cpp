@@ -60,8 +60,8 @@ TEST(EnumBitmaskTests, EnablesBitmaskByMacro)
 
 TEST(EnumBitmaskTests, SupportsCompoundAssignmentOperators)
 {
-    auto value = bee::enum_test_samples::Permission::Read;
-    value |= bee::enum_test_samples::Permission::Write;
+    auto value  = bee::enum_test_samples::Permission::Read;
+    value      |= bee::enum_test_samples::Permission::Write;
     EXPECT_TRUE(bee::EnumHasAll(value, bee::enum_test_samples::Permission::Read | bee::enum_test_samples::Permission::Write));
 
     value &= bee::enum_test_samples::Permission::Write;
@@ -74,7 +74,7 @@ TEST(EnumBitmaskTests, SupportsCompoundAssignmentOperators)
 TEST(EnumBitmaskTests, SupportsSetClearToggle)
 {
     auto value = bee::enum_test_samples::Permission::None;
-    value = bee::EnumSet(value, bee::enum_test_samples::Permission::Read);
+    value      = bee::EnumSet(value, bee::enum_test_samples::Permission::Read);
     EXPECT_EQ(value, bee::enum_test_samples::Permission::Read);
 
     value = bee::EnumToggle(value, bee::enum_test_samples::Permission::Write);
@@ -110,15 +110,16 @@ TEST(EnumBitmaskTests, DetectsZeroAndSingleBit)
 
 TEST(EnumBitmaskTests, CountsEnabledBits)
 {
-    const auto value = bee::enum_test_samples::Permission::Read | bee::enum_test_samples::Permission::Write |
-                       bee::enum_test_samples::Permission::Execute;
+    const auto value =
+            bee::enum_test_samples::Permission::Read | bee::enum_test_samples::Permission::Write | bee::enum_test_samples::Permission::Execute;
     EXPECT_EQ(bee::EnumBitCount(value), 3);
 }
 
 TEST(EnumBitmaskTests, ConvertsToUnderlying)
 {
-    static_assert(std::is_same_v<decltype(bee::ToUnderlying(bee::enum_test_samples::Permission::Read)),
-                                 std::underlying_type_t<bee::enum_test_samples::Permission>>);
+    static_assert(std::is_same_v<
+                  decltype(bee::ToUnderlying(bee::enum_test_samples::Permission::Read)),
+                  std::underlying_type_t<bee::enum_test_samples::Permission>>);
     EXPECT_EQ(bee::ToUnderlying(bee::enum_test_samples::Permission::Execute), 4);
 }
 

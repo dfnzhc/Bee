@@ -309,8 +309,8 @@ TEST(BaseBitOpsTests, ByteSwapWorksForUnsignedAndSigned)
 TEST(BaseBitOpsTests, EndianConversionRoundTrip)
 {
     constexpr std::uint32_t raw = 0x11223344u;
-    const auto be               = bee::ToBigEndian(raw);
-    const auto le               = bee::ToLittleEndian(raw);
+    const auto              be  = bee::ToBigEndian(raw);
+    const auto              le  = bee::ToLittleEndian(raw);
     EXPECT_EQ(bee::FromBigEndian(be), raw);
     EXPECT_EQ(bee::FromLittleEndian(le), raw);
 }

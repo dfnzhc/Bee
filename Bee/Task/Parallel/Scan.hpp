@@ -41,7 +41,7 @@ template <typename InIt, typename OutIt, typename BinaryOp>
     auto chunks = detail::partition(n, pool.thread_count());
 
     // 第一阶段：各块局部 inclusive scan（并行）
-    std::vector<ValueType> chunk_totals(chunks.size());
+    std::vector<ValueType>          chunk_totals(chunks.size());
     std::vector<std::exception_ptr> exceptions(chunks.size());
     {
         std::latch done(static_cast<std::ptrdiff_t>(chunks.size()));
@@ -79,7 +79,7 @@ template <typename InIt, typename OutIt, typename BinaryOp>
     // 第三阶段：修正遍历（并行）——为每个块加上偏移（跳过第一块）
     if (chunks.size() > 1) {
         std::vector<std::exception_ptr> fixup_exceptions(chunks.size() - 1);
-        std::latch fixup_done(static_cast<std::ptrdiff_t>(chunks.size() - 1));
+        std::latch                      fixup_done(static_cast<std::ptrdiff_t>(chunks.size() - 1));
         for (size_t i = 1; i < chunks.size(); ++i) {
             pool.post([&, i]() {
                 try {
@@ -120,8 +120,8 @@ template <typename InIt, typename OutIt, typename BinaryOp>
         throw std::runtime_error("Operation cancelled");
 
     if (n < detail::kParallelThreshold) {
-        auto in       = first;
-        auto out      = d_first;
+        auto      in  = first;
+        auto      out = d_first;
         ValueType acc = *in;
         *out          = acc;
         ++in;
@@ -135,10 +135,10 @@ template <typename InIt, typename OutIt, typename BinaryOp>
         return out;
     }
 
-    auto chunks = detail::partition(n, pool.thread_count());
-    std::vector<ValueType> chunk_totals(chunks.size());
+    auto                            chunks = detail::partition(n, pool.thread_count());
+    std::vector<ValueType>          chunk_totals(chunks.size());
     std::vector<std::exception_ptr> exceptions(chunks.size());
-    std::atomic<bool> cancelled{false};
+    std::atomic<bool>               cancelled{false};
 
     // 第一阶段
     {
@@ -181,7 +181,7 @@ template <typename InIt, typename OutIt, typename BinaryOp>
     // 第三阶段
     if (chunks.size() > 1) {
         std::vector<std::exception_ptr> fixup_exceptions(chunks.size() - 1);
-        std::latch fixup_done(static_cast<std::ptrdiff_t>(chunks.size() - 1));
+        std::latch                      fixup_done(static_cast<std::ptrdiff_t>(chunks.size() - 1));
         for (size_t i = 1; i < chunks.size(); ++i) {
             pool.post([&, i]() {
                 if (token.stop_requested()) {
@@ -232,7 +232,7 @@ template <typename InIt, typename OutIt, typename T, typename BinaryOp>
     auto chunks = detail::partition(n, pool.thread_count());
 
     // 第一阶段：各块局部归约以计算块累加总和
-    std::vector<T> chunk_sums(chunks.size());
+    std::vector<T>                  chunk_sums(chunks.size());
     std::vector<std::exception_ptr> exceptions(chunks.size());
     {
         std::latch done(static_cast<std::ptrdiff_t>(chunks.size()));
@@ -241,7 +241,7 @@ template <typename InIt, typename OutIt, typename T, typename BinaryOp>
                 try {
                     auto in_begin = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
                     auto in_end   = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
-                    T acc         = *in_begin;
+                    T    acc      = *in_begin;
                     ++in_begin;
                     for (; in_begin != in_end; ++in_begin) {
                         acc = op(acc, *in_begin);
@@ -278,7 +278,7 @@ template <typename InIt, typename OutIt, typename T, typename BinaryOp>
                     auto in_begin  = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
                     auto in_end    = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
                     auto out_begin = std::next(d_first, static_cast<std::ptrdiff_t>(chunks[i].begin));
-                    T running      = chunk_offsets[i];
+                    T    running   = chunk_offsets[i];
                     for (auto in_it = in_begin; in_it != in_end; ++in_it, ++out_begin) {
                         *out_begin = running;
                         running    = op(running, *in_it);
@@ -303,8 +303,8 @@ template <typename InIt, typename OutIt, typename T, typename BinaryOp>
 /// 带取消支持的排除式扫描。
 /// @note 取消时，输出区间可能包含部分结果。
 template <typename InIt, typename OutIt, typename T, typename BinaryOp>
-[[nodiscard]] auto parallel_exclusive_scan(ThreadPool& pool, InIt first, InIt last, OutIt d_first, T init, BinaryOp op,
-                                           std::stop_token token) -> OutIt
+[[nodiscard]] auto parallel_exclusive_scan(ThreadPool& pool, InIt first, InIt last, OutIt d_first, T init, BinaryOp op, std::stop_token token)
+        -> OutIt
 {
     const auto n = static_cast<size_t>(std::distance(first, last));
     if (n == 0)
@@ -314,9 +314,9 @@ template <typename InIt, typename OutIt, typename T, typename BinaryOp>
         throw std::runtime_error("Operation cancelled");
 
     if (n < detail::kParallelThreshold) {
-        T running   = init;
-        auto in_it  = first;
-        auto out_it = d_first;
+        T    running = init;
+        auto in_it   = first;
+        auto out_it  = d_first;
         for (; in_it != last; ++in_it, ++out_it) {
             if (token.stop_requested())
                 throw std::runtime_error("Operation cancelled");
@@ -326,11 +326,11 @@ template <typename InIt, typename OutIt, typename T, typename BinaryOp>
         return out_it;
     }
 
-    auto chunks = detail::partition(n, pool.thread_count());
+    auto              chunks = detail::partition(n, pool.thread_count());
     std::atomic<bool> cancelled{false};
 
     // 第一阶段：各块局部归约
-    std::vector<T> chunk_sums(chunks.size());
+    std::vector<T>                  chunk_sums(chunks.size());
     std::vector<std::exception_ptr> exceptions(chunks.size());
     {
         std::latch done(static_cast<std::ptrdiff_t>(chunks.size()));
@@ -344,7 +344,7 @@ template <typename InIt, typename OutIt, typename T, typename BinaryOp>
                 try {
                     auto in_begin = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
                     auto in_end   = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
-                    T acc         = *in_begin;
+                    T    acc      = *in_begin;
                     ++in_begin;
                     for (; in_begin != in_end; ++in_begin) {
                         acc = op(acc, *in_begin);
@@ -388,7 +388,7 @@ template <typename InIt, typename OutIt, typename T, typename BinaryOp>
                     auto in_begin  = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
                     auto in_end    = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
                     auto out_begin = std::next(d_first, static_cast<std::ptrdiff_t>(chunks[i].begin));
-                    T running      = chunk_offsets[i];
+                    T    running   = chunk_offsets[i];
                     for (auto in_it = in_begin; in_it != in_end; ++in_it, ++out_begin) {
                         *out_begin = running;
                         running    = op(running, *in_it);

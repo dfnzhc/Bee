@@ -1,18 +1,52 @@
 ---
 Language: Cpp
 BasedOnStyle: LLVM
+
+# --- 基础排版规则 ---
+ColumnLimit: 150
+IndentWidth: 4
+ContinuationIndentWidth: 8
+TabWidth: 4
+UseTab: Never
+MaxEmptyLinesToKeep: 1
+NamespaceIndentation: Inner
+AllowShortCaseLabelsOnASingleLine: true
+InsertNewlineAtEOF: true
 AccessModifierOffset: -4
+IndentPPDirectives: BeforeHash
+
+# --- 符号对齐风格 ---
+PointerAlignment: Left
+ReferenceAlignment: Left
 AlignConsecutiveAssignments:
   Enabled: true
   AlignCompound: true
-AlignConsecutiveDeclarations: false
-AlignEscapedNewlines: LeftWithLastLine
-AlignOperands: true
+AlignConsecutiveDeclarations: true
+AlignConsecutiveBitFields: true
 AlignTrailingComments: true
+AlignAfterOpenBracket: BlockIndent
+AlignOperands: Align
 AlignConsecutiveMacros: true
+AlignEscapedNewlines: LeftWithLastLine
+
+# --- 代码块与单行收缩控制 ---
 AllowShortFunctionsOnASingleLine: None
 AllowShortIfStatementsOnASingleLine: false
-AlwaysBreakTemplateDeclarations: Yes
+SpaceInEmptyParentheses: false
+SpacesInAngles: false
+SpacesInConditionalStatement: false
+SpacesInCStyleCastParentheses: false
+SpacesInParentheses: false
+BinPackArguments: false
+BinPackParameters: false
+AllowShortLambdasOnASingleLine: Empty
+AllowAllParametersOfDeclarationOnNextLine: false
+AlwaysBreakAfterReturnType: None
+PenaltyReturnTypeOnItsOwnLine: 10000
+BreakAfterAttributes: Never
+
+# --- 大括号换行风格 ---
+BreakBeforeBraces: Custom
 BraceWrapping:
   AfterCaseLabel: false
   AfterClass: true
@@ -31,13 +65,16 @@ BraceWrapping:
   SplitEmptyFunction: true
   SplitEmptyRecord: true
   SplitEmptyNamespace: true
-BreakBeforeBraces: Custom
-BreakConstructorInitializers: BeforeColon
-BreakConstructorInitializersBeforeComma: false
-BreakTemplateDeclarations: Yes
-ColumnLimit: 150
+
+# --- 类与模板特殊控制 ---
+BreakConstructorInitializers: BeforeComma
 ConstructorInitializerAllOnOneLineOrOnePerLine: false
-ContinuationIndentWidth: 8
+PackConstructorInitializers: Never
+AlwaysBreakTemplateDeclarations: Yes
+BreakTemplateDeclarations: Yes
+
+# --- 头文件包含与宏处理 ---
+SortIncludes: Never
 IncludeCategories:
   - Regex: '^<.*'
     Priority: 1
@@ -46,19 +83,12 @@ IncludeCategories:
   - Regex: '.*'
     Priority: 3
 IncludeIsMainRegex: '([-_](test|unittest))?$'
-IndentPPDirectives: BeforeHash
-IndentWidth: 4
-InsertNewlineAtEOF: true
 MacroBlockBegin: ''
 MacroBlockEnd: ''
-NamespaceIndentation: Inner
-PackConstructorInitializers: CurrentLine
-PointerAlignment: Left
-SortIncludes: Never
-SpaceInEmptyParentheses: false
-SpacesInAngles: false
-SpacesInConditionalStatement: false
-SpacesInCStyleCastParentheses: false
-SpacesInParentheses: false
-TabWidth: 4
+
+# --- 现代 C++ 特性优化 ---
+# Cpp11BracedListStyle: true
+# 模板声明（template <...>）后的折行处理方式。Keep 表示遵循原始代码手动折行习惯
+#BreakTemplateDeclaration: Leave
+
 ...

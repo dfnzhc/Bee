@@ -88,11 +88,11 @@ TEST(ErrorTest, WithContextDoesNotCrash)
     auto e = make_error("fail");
     e      = with_context(std::move(e), "key", "value");
     EXPECT_EQ(e.message, "fail");
-    #ifndef NDEBUG
+#ifndef NDEBUG
     ASSERT_EQ(e.context.size(), 1u);
     EXPECT_EQ(e.context[0].first, "key");
     EXPECT_EQ(e.context[0].second, "value");
-    #endif
+#endif
 }
 
 #ifndef NDEBUG
@@ -236,18 +236,24 @@ TEST(ErrorDeathTest, ValueOrPanicAbortsOnError)
 
 TEST(ErrorTest, GuardWithNonThrowingLambda)
 {
-    auto r = guard([] {
-        return 42;
-    }, "compute");
+    auto r = guard(
+            [] {
+                return 42;
+            },
+            "compute"
+    );
     EXPECT_TRUE(r.has_value());
     EXPECT_EQ(*r, 42);
 }
 
 TEST(ErrorTest, GuardWithThrowingLambda)
 {
-    auto r = guard([]() -> int {
-        throw std::runtime_error("oops");
-    }, "compute");
+    auto r = guard(
+            []() -> int {
+                throw std::runtime_error("oops");
+            },
+            "compute"
+    );
     EXPECT_FALSE(r.has_value());
     EXPECT_NE(r.error().message.find("oops"), std::string::npos);
     EXPECT_NE(r.error().message.find("compute"), std::string::npos);
@@ -256,16 +262,18 @@ TEST(ErrorTest, GuardWithThrowingLambda)
 
 TEST(ErrorTest, GuardWithVoidLambda)
 {
-    auto r = guard([] {
-    }, "noop");
+    auto r = guard([] {}, "noop");
     EXPECT_TRUE(r.has_value());
 }
 
 TEST(ErrorTest, GuardWithUnknownException)
 {
-    auto r = guard([]() -> int {
-        throw 42;
-    }, "compute");
+    auto r = guard(
+            []() -> int {
+                throw 42;
+            },
+            "compute"
+    );
     EXPECT_FALSE(r.has_value());
     EXPECT_NE(r.error().message.find("unknown exception"), std::string::npos);
 }

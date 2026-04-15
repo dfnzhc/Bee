@@ -86,8 +86,8 @@ TEST(WhenAllTests, EmptyVector)
     bee::ThreadPool pool(2);
 
     std::vector<Task<int>> empty;
-    auto combined = bee::when_all(std::move(empty));
-    auto results  = combined.get();
+    auto                   combined = bee::when_all(std::move(empty));
+    auto                   results  = combined.get();
 
     EXPECT_TRUE(results.empty());
     EXPECT_EQ(combined.state(), TaskState::Completed);
@@ -111,7 +111,7 @@ TEST(WhenAllTests, SingleTask)
 
 TEST(WhenAllTests, WithVoidTasks)
 {
-    bee::ThreadPool pool(4);
+    bee::ThreadPool  pool(4);
     std::atomic<int> counter{0};
 
     auto t1 = bee::submit(pool, [&] {

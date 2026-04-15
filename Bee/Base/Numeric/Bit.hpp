@@ -41,17 +41,17 @@ template <std::integral Int>
 {
     using UInt = std::make_unsigned_t<Int>;
 
-    #if defined(__cpp_lib_byteswap) && __cpp_lib_byteswap >= 202110L    // C++23
+#if defined(__cpp_lib_byteswap) && __cpp_lib_byteswap >= 202110L // C++23
     return static_cast<Int>(std::byteswap(static_cast<UInt>(value)));
-    #else
+#else
     UInt input  = static_cast<UInt>(value);
     UInt output = 0;
     for (std::size_t i = 0; i < sizeof(UInt); ++i) {
-        output = static_cast<UInt>((output << 8) | (input & static_cast<UInt>(0xFFu)));
+        output   = static_cast<UInt>((output << 8) | (input & static_cast<UInt>(0xFFu)));
         input  >>= 8;
     }
     return static_cast<Int>(output);
-    #endif
+#endif
 }
 
 [[nodiscard]] constexpr bool IsBigEndian() noexcept

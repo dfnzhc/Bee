@@ -8,19 +8,19 @@
 #include <thread>
 
 #if defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_X64))
-#include <immintrin.h>
+    #include <immintrin.h>
 #endif
 
 #if defined(_WIN32)
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#include <windows.h>
+    #ifndef NOMINMAX
+        #define NOMINMAX
+    #endif
+    #ifndef WIN32_LEAN_AND_MEAN
+        #define WIN32_LEAN_AND_MEAN
+    #endif
+    #include <windows.h>
 #elif defined(__APPLE__) || defined(__linux__)
-#include <pthread.h>
+    #include <pthread.h>
 #endif
 
 namespace bee
@@ -33,28 +33,28 @@ inline void thread_yield() noexcept
 
 inline void thread_pause_relaxed() noexcept
 {
-    #if defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_X64))
+#if defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_X64))
     _mm_pause();
-    #elif defined(__i386__) || defined(__x86_64__)
+#elif defined(__i386__) || defined(__x86_64__)
     __builtin_ia32_pause();
-    #elif defined(__aarch64__) || defined(__arm__)
+#elif defined(__aarch64__) || defined(__arm__)
     asm volatile("yield" ::: "memory");
-    #endif
+#endif
 }
 
 namespace internal
 {
-    #if defined(_WIN32)
+#if defined(_WIN32)
     // Win 下减少调出
     constexpr std::uint32_t kSpinPauseRepeats = 8;
     constexpr std::uint32_t kSpinYieldMask    = 0x3FF;
-    #elif defined(__linux__)
+#elif defined(__linux__)
     constexpr std::uint32_t kSpinPauseRepeats = 2;
     constexpr std::uint32_t kSpinYieldMask    = 0x7F;
-    #else
+#else
     constexpr std::uint32_t kSpinPauseRepeats = 1;
     constexpr std::uint32_t kSpinYieldMask    = 0x3F;
-    #endif
+#endif
 
     template <std::uint32_t PauseRepeats, std::uint32_t YieldMask>
     struct AdaptiveSpinPolicy
@@ -146,23 +146,23 @@ inline auto set_current_thread_name(std::string_view name) noexcept -> bool
         return false;
     }
 
-    #if defined(_WIN32)
-    constexpr auto kMaxWideLength = 64u;
-    wchar_t buffer[kMaxWideLength] = {};
-    int length = MultiByteToWideChar(CP_UTF8, 0, name.data(), static_cast<int>(name.size()), buffer, static_cast<int>(kMaxWideLength - 1));
+#if defined(_WIN32)
+    constexpr auto kMaxWideLength         = 64u;
+    wchar_t        buffer[kMaxWideLength] = {};
+    int            length = MultiByteToWideChar(CP_UTF8, 0, name.data(), static_cast<int>(name.size()), buffer, static_cast<int>(kMaxWideLength - 1));
     if (length <= 0) {
         return false;
     }
     buffer[length] = L'\0';
     return SUCCEEDED(SetThreadDescription(GetCurrentThread(), buffer));
-    #elif defined(__APPLE__)
+#elif defined(__APPLE__)
     return pthread_setname_np(std::string(name).c_str()) == 0;
-    #elif defined(__linux__)
+#elif defined(__linux__)
     return pthread_setname_np(pthread_self(), std::string(name).c_str()) == 0;
-    #else
+#else
     (void)name;
     return false;
-    #endif
+#endif
 }
 
 } // namespace bee

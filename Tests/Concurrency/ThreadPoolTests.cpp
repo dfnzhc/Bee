@@ -1,5 +1,5 @@
 /**
-* @File ThreadPoolTests.cpp
+ * @File ThreadPoolTests.cpp
  * @Author dfnzhc (https://github.com/dfnzhc)
  * @Date 2026/4/10
  * @Brief This file is part of Bee.
@@ -36,9 +36,13 @@ TEST(ThreadPoolTest, SubmitReturnsCorrectResult)
 {
     ThreadPool pool(4);
 
-    auto future = pool.submit([](int a, int b) {
-        return a + b;
-    }, 20, 22);
+    auto future = pool.submit(
+            [](int a, int b) {
+                return a + b;
+            },
+            20,
+            22
+    );
 
     EXPECT_EQ(future.get(), 42);
 }
@@ -58,7 +62,7 @@ TEST(ThreadPoolTest, PostCanProcessLargeAmountOfTasks)
 {
     ThreadPool pool(std::max(2u, std::thread::hardware_concurrency()));
 
-    constexpr std::size_t kTaskCount = 100000;
+    constexpr std::size_t    kTaskCount = 100000;
     std::atomic<std::size_t> counter{0};
 
     for (std::size_t i = 0; i < kTaskCount; ++i) {
@@ -122,9 +126,9 @@ TEST(ThreadPoolTest, ShutdownImmediateDropsQueuedTasks)
 {
     ThreadPool pool(1);
 
-    std::mutex gate_mutex;
-    std::condition_variable gate_cv;
-    bool allow_exit = false;
+    std::mutex               gate_mutex;
+    std::condition_variable  gate_cv;
+    bool                     allow_exit = false;
     std::atomic<std::size_t> executed{0};
 
     pool.post([&] {
@@ -134,13 +138,13 @@ TEST(ThreadPoolTest, ShutdownImmediateDropsQueuedTasks)
         });
     });
 
-    constexpr std::size_t kAttemptMax = 100000;
-    std::size_t queued                = 0;
-    std::size_t consecutive_failures  = 0;
+    constexpr std::size_t kAttemptMax          = 100000;
+    std::size_t           queued               = 0;
+    std::size_t           consecutive_failures = 0;
     for (std::size_t i = 0; i < kAttemptMax; ++i) {
         if (pool.try_post([&executed] {
-            executed.fetch_add(1, std::memory_order_relaxed);
-        })) {
+                executed.fetch_add(1, std::memory_order_relaxed);
+            })) {
             ++queued;
             consecutive_failures = 0;
         } else {
@@ -169,8 +173,8 @@ TEST(ThreadPoolTest, MultiProducerPostDoesNotLoseTasks)
 {
     ThreadPool pool(std::max(2u, std::thread::hardware_concurrency()));
 
-    constexpr std::size_t kProducerCount    = 8;
-    constexpr std::size_t kTasksPerProducer = 20000;
+    constexpr std::size_t    kProducerCount    = 8;
+    constexpr std::size_t    kTasksPerProducer = 20000;
     std::atomic<std::size_t> counter{0};
 
     std::vector<std::thread> producers;
@@ -204,8 +208,7 @@ TEST(ThreadPoolTest, StatsTracksSubmittedAndFinalized)
 
     constexpr std::size_t kTaskCount = 5000;
     for (std::size_t i = 0; i < kTaskCount; ++i) {
-        pool.post([] {
-        });
+        pool.post([] {});
     }
 
     pool.wait_for_tasks();
@@ -223,8 +226,7 @@ TEST(ThreadPoolTest, StatsConcurrentAccessDoesNotCrash)
 
     constexpr std::size_t kTaskCount = 10000;
     for (std::size_t i = 0; i < kTaskCount; ++i) {
-        pool.post([] {
-        });
+        pool.post([] {});
     }
 
     std::vector<std::thread> readers;
@@ -256,9 +258,9 @@ TEST(ThreadPoolTest, TryPostCanFailFastWhenQueueIsSaturated)
 {
     ThreadPool pool(1);
 
-    std::mutex gate_mutex;
+    std::mutex              gate_mutex;
     std::condition_variable gate_cv;
-    bool allow_exit = false;
+    bool                    allow_exit = false;
 
     pool.post([&] {
         std::unique_lock<std::mutex> lock(gate_mutex);
@@ -269,8 +271,7 @@ TEST(ThreadPoolTest, TryPostCanFailFastWhenQueueIsSaturated)
 
     bool saw_failure = false;
     for (std::size_t i = 0; i < 20000; ++i) {
-        if (!pool.try_post([] {
-        })) {
+        if (!pool.try_post([] {})) {
             saw_failure = true;
             break;
         }
@@ -290,9 +291,12 @@ TEST(ThreadPoolTest, TrySubmitReturnsFutureOnSuccess)
 {
     ThreadPool pool(2);
 
-    auto maybe_future = pool.try_submit([](int x) {
-        return x * 2;
-    }, 21);
+    auto maybe_future = pool.try_submit(
+            [](int x) {
+                return x * 2;
+            },
+            21
+    );
 
     ASSERT_TRUE(maybe_future.has_value());
     EXPECT_EQ(maybe_future->get(), 42);
@@ -329,7 +333,7 @@ TEST(ThreadPoolTest, TryPostCancellableSkipsWhenTokenAlreadyStopped)
     std::atomic<int> executed{0};
     ASSERT_TRUE(pool.try_post_cancellable(source.token(), [&executed](ThreadPool::CancellationToken) {
         executed.fetch_add(1, std::memory_order_relaxed);
-        }));
+    }));
 
     pool.wait_for_tasks();
     EXPECT_EQ(executed.load(std::memory_order_relaxed), 0);
@@ -339,12 +343,12 @@ TEST(ThreadPoolTest, TryPostCancellableExecutesWhenTokenNotStopped)
 {
     ThreadPool pool(2);
 
-    auto source = ThreadPool::make_cancellation_source();
+    auto             source = ThreadPool::make_cancellation_source();
     std::atomic<int> executed{0};
 
     ASSERT_TRUE(pool.try_post_cancellable(source.token(), [&executed](ThreadPool::CancellationToken) {
         executed.fetch_add(1, std::memory_order_relaxed);
-        }));
+    }));
 
     pool.wait_for_tasks();
     EXPECT_EQ(executed.load(std::memory_order_relaxed), 1);
@@ -354,12 +358,16 @@ TEST(ThreadPoolTest, TryPostCancellableWithNonTokenFunction)
 {
     ThreadPool pool(2);
 
-    auto source = ThreadPool::make_cancellation_source();
+    auto             source = ThreadPool::make_cancellation_source();
     std::atomic<int> executed{0};
 
-    ASSERT_TRUE(pool.try_post_cancellable(source.token(), [&executed](int x) {
-        executed.store(x, std::memory_order_relaxed);
-        }, 42));
+    ASSERT_TRUE(pool.try_post_cancellable(
+            source.token(),
+            [&executed](int x) {
+                executed.store(x, std::memory_order_relaxed);
+            },
+            42
+    ));
 
     pool.wait_for_tasks();
     EXPECT_EQ(executed.load(std::memory_order_relaxed), 42);
@@ -398,7 +406,7 @@ TEST(ThreadPoolTest, WorkStealingEffect)
 {
     ThreadPool pool(1);
 
-    constexpr std::size_t kTaskCount = 1000;
+    constexpr std::size_t    kTaskCount = 1000;
     std::atomic<std::size_t> counter{0};
 
     for (std::size_t i = 0; i < kTaskCount; ++i) {
@@ -423,8 +431,7 @@ TEST(ThreadPoolTest, RAIIDestructorShutdown)
     {
         ThreadPool pool(2);
         for (std::size_t i = 0; i < 100; ++i) {
-            pool.post([] {
-            });
+            pool.post([] {});
         }
     }
 }
@@ -432,8 +439,7 @@ TEST(ThreadPoolTest, RAIIDestructorShutdown)
 TEST(ThreadPoolTest, LifecyclePhaseReachesStoppedAfterShutdown)
 {
     ThreadPool pool(2);
-    pool.post([] {
-    });
+    pool.post([] {});
     pool.shutdown(ShutdownMode::Drain);
 
     const auto s = pool.stats();
@@ -464,8 +470,7 @@ TEST(ThreadPoolTest, ConcurrentShutdownIsIdempotent)
     ThreadPool pool(4);
 
     for (std::size_t i = 0; i < 100; ++i) {
-        pool.post([] {
-        });
+        pool.post([] {});
     }
 
     std::vector<std::thread> threads;
@@ -485,7 +490,7 @@ TEST(ThreadPoolTest, ShutdownImmediateWithConcurrentPosts)
 {
     ThreadPool pool(4);
 
-    std::atomic<bool> stop_flag{false};
+    std::atomic<bool>     stop_flag{false};
     constexpr std::size_t kProducers = 4;
 
     std::vector<std::thread> producers;
@@ -495,8 +500,7 @@ TEST(ThreadPoolTest, ShutdownImmediateWithConcurrentPosts)
         producers.emplace_back([&pool, &stop_flag] {
             while (!stop_flag.load(std::memory_order_acquire)) {
                 try {
-                    pool.post([] {
-                    });
+                    pool.post([] {});
                 } catch (...) {
                     break;
                 }
@@ -517,7 +521,7 @@ TEST(ThreadPoolTest, RepeatedSmallBurstsDoNotStall)
 {
     ThreadPool pool(2);
 
-    constexpr std::size_t kRounds = 5000;
+    constexpr std::size_t    kRounds = 5000;
     std::atomic<std::size_t> completed{0};
 
     for (std::size_t i = 0; i < kRounds; ++i) {
@@ -545,8 +549,7 @@ TEST(ThreadPoolTest, BurstWorkloadMaintainsTaskAccountingInvariants)
 
     for (std::size_t i = 0; i < kRounds; ++i) {
         for (std::size_t j = 0; j < kTasksPerRound; ++j) {
-            pool.post([] {
-            });
+            pool.post([] {});
         }
         pool.wait_for_tasks();
     }
@@ -561,9 +564,9 @@ TEST(ThreadPoolTest, WaitForTasksWithConcurrentTryPostFailuresDoesNotStall)
 {
     ThreadPool pool(1);
 
-    std::mutex gate_mutex;
+    std::mutex              gate_mutex;
     std::condition_variable gate_cv;
-    bool allow_exit = false;
+    bool                    allow_exit = false;
 
     pool.post([&] {
         std::unique_lock<std::mutex> lock(gate_mutex);
@@ -577,10 +580,9 @@ TEST(ThreadPoolTest, WaitForTasksWithConcurrentTryPostFailuresDoesNotStall)
     });
 
     std::atomic<bool> stop_submitter{false};
-    std::thread submitter([&] {
+    std::thread       submitter([&] {
         while (!stop_submitter.load(std::memory_order_acquire)) {
-            (void)pool.try_post([] {
-            });
+            (void)pool.try_post([] {});
         }
     });
 
@@ -600,11 +602,11 @@ TEST(ThreadPoolTest, WaitForTasksWithConcurrentTryPostFailuresDoesNotStall)
 
 TEST(ThreadPoolTest, RepeatedConcurrentShutdownAndPostingDoesNotDeadlock)
 {
-    constexpr int kRounds            = 24;
+    constexpr int         kRounds    = 24;
     constexpr std::size_t kProducers = 4;
 
     for (int round = 0; round < kRounds; ++round) {
-        ThreadPool pool(4);
+        ThreadPool        pool(4);
         std::atomic<bool> stop_flag{false};
 
         std::vector<std::thread> producers;
@@ -613,8 +615,7 @@ TEST(ThreadPoolTest, RepeatedConcurrentShutdownAndPostingDoesNotDeadlock)
             producers.emplace_back([&pool, &stop_flag] {
                 while (!stop_flag.load(std::memory_order_acquire)) {
                     try {
-                        pool.post([] {
-                        });
+                        pool.post([] {});
                     } catch (...) {
                         break;
                     }
@@ -624,10 +625,9 @@ TEST(ThreadPoolTest, RepeatedConcurrentShutdownAndPostingDoesNotDeadlock)
 
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
-        auto shutdown_future =
-                std::async(std::launch::async, [&pool] {
-                    pool.shutdown(ShutdownMode::Immediate);
-                });
+        auto shutdown_future = std::async(std::launch::async, [&pool] {
+            pool.shutdown(ShutdownMode::Immediate);
+        });
 
         stop_flag.store(true, std::memory_order_release);
 
@@ -635,8 +635,7 @@ TEST(ThreadPoolTest, RepeatedConcurrentShutdownAndPostingDoesNotDeadlock)
             t.join();
         }
 
-        ASSERT_EQ(shutdown_future.wait_for(std::chrono::seconds(5)), std::future_status::ready)
-            << "round=" << round;
+        ASSERT_EQ(shutdown_future.wait_for(std::chrono::seconds(5)), std::future_status::ready) << "round=" << round;
     }
 }
 
@@ -648,9 +647,9 @@ TEST(ThreadPoolTest, WaitForTasksForCanTimeoutAndThenComplete)
 {
     ThreadPool pool(1);
 
-    std::mutex gate_mutex;
+    std::mutex              gate_mutex;
     std::condition_variable gate_cv;
-    bool allow_exit = false;
+    bool                    allow_exit = false;
 
     pool.post([&] {
         std::unique_lock<std::mutex> lock(gate_mutex);
@@ -683,9 +682,9 @@ TEST(ThreadPoolTest, CallerRunsBackpressureCanExecuteInlineWhenSaturated)
 
     ThreadPool pool(cfg);
 
-    std::mutex gate_mutex;
+    std::mutex              gate_mutex;
     std::condition_variable gate_cv;
-    bool allow_exit = false;
+    bool                    allow_exit = false;
 
     pool.post([&] {
         std::unique_lock<std::mutex> lock(gate_mutex);
@@ -695,7 +694,7 @@ TEST(ThreadPoolTest, CallerRunsBackpressureCanExecuteInlineWhenSaturated)
     });
 
     std::atomic<int> inline_executed{0};
-    bool saw_inline = false;
+    bool             saw_inline = false;
     for (int i = 0; i < 50000; ++i) {
         (void)pool.try_post([&inline_executed] {
             inline_executed.fetch_add(1, std::memory_order_relaxed);
@@ -725,9 +724,9 @@ TEST(ThreadPoolTest, BlockBackpressureRespectsTimeoutUnderSaturation)
 
     ThreadPool pool(cfg);
 
-    std::mutex gate_mutex;
+    std::mutex              gate_mutex;
     std::condition_variable gate_cv;
-    bool allow_exit = false;
+    bool                    allow_exit = false;
 
     pool.post([&] {
         std::unique_lock<std::mutex> lock(gate_mutex);
@@ -737,17 +736,14 @@ TEST(ThreadPoolTest, BlockBackpressureRespectsTimeoutUnderSaturation)
     });
 
     for (int i = 0; i < 12000; ++i) {
-        if (!pool.try_post([] {
-        })) {
+        if (!pool.try_post([] {})) {
             break;
         }
     }
 
-    const auto begin = std::chrono::steady_clock::now();
-    const bool ok    = pool.try_post([] {
-    });
-    const auto elapsed =
-            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - begin);
+    const auto begin   = std::chrono::steady_clock::now();
+    const bool ok      = pool.try_post([] {});
+    const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - begin);
 
     {
         std::lock_guard<std::mutex> lock(gate_mutex);
@@ -767,14 +763,14 @@ TEST(ThreadPoolTest, BlockBackpressureRespectsTimeoutUnderSaturation)
 
 TEST(ThreadPoolTest, SoakMatrixModesAndThreadCountsNoDeadlock)
 {
-    constexpr std::array<std::size_t, 3> kThreadCounts{1, 2, 4};
+    constexpr std::array<std::size_t, 3>  kThreadCounts{1, 2, 4};
     constexpr std::array<ShutdownMode, 2> kModes{ShutdownMode::Drain, ShutdownMode::Immediate};
-    constexpr int kRounds = 6;
+    constexpr int                         kRounds = 6;
 
     for (auto mode : kModes) {
         for (auto threads : kThreadCounts) {
             for (int round = 0; round < kRounds; ++round) {
-                ThreadPool pool(threads);
+                ThreadPool        pool(threads);
                 std::atomic<bool> stop_flag{false};
 
                 std::vector<std::thread> producers;
@@ -783,8 +779,7 @@ TEST(ThreadPoolTest, SoakMatrixModesAndThreadCountsNoDeadlock)
                     producers.emplace_back([&pool, &stop_flag] {
                         while (!stop_flag.load(std::memory_order_acquire)) {
                             try {
-                                pool.post([] {
-                                });
+                                pool.post([] {});
                             } catch (...) {
                                 break;
                             }
@@ -794,10 +789,9 @@ TEST(ThreadPoolTest, SoakMatrixModesAndThreadCountsNoDeadlock)
 
                 std::this_thread::sleep_for(std::chrono::milliseconds(8));
 
-                auto shutdown_future =
-                        std::async(std::launch::async, [&pool, mode] {
-                            pool.shutdown(mode);
-                        });
+                auto shutdown_future = std::async(std::launch::async, [&pool, mode] {
+                    pool.shutdown(mode);
+                });
 
                 stop_flag.store(true, std::memory_order_release);
                 for (auto& t : producers) {
@@ -805,7 +799,7 @@ TEST(ThreadPoolTest, SoakMatrixModesAndThreadCountsNoDeadlock)
                 }
 
                 ASSERT_EQ(shutdown_future.wait_for(std::chrono::seconds(5)), std::future_status::ready)
-                    << "mode=" << static_cast<int>(mode) << " threads=" << threads << " round=" << round;
+                        << "mode=" << static_cast<int>(mode) << " threads=" << threads << " round=" << round;
             }
         }
     }
@@ -816,8 +810,7 @@ TEST(ThreadPoolTest, AdaptiveGlobalProbeBudgetAlwaysInValidRange)
     ThreadPool pool(4);
 
     for (std::size_t i = 0; i < 20000; ++i) {
-        pool.post([] {
-        });
+        pool.post([] {});
     }
     pool.wait_for_tasks();
 

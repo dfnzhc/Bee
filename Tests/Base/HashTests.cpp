@@ -68,14 +68,14 @@ TEST(BaseHashTests, Splitmix64AvalancheSingleBitFlip)
     auto popcount64 = [](bee::u64 x) -> int {
         int count = 0;
         while (x) {
-            count += static_cast<int>(x & 1);
+            count  += static_cast<int>(x & 1);
             x     >>= 1;
         }
         return count;
     };
 
     constexpr bee::u64 bases[] = {1, 42, 0x123456789ABCDEF0ULL, 1000, UINT64_MAX / 2};
-    constexpr int bits[]       = {0, 1, 16, 31, 63};
+    constexpr int      bits[]  = {0, 1, 16, 31, 63};
 
     int total_differing = 0;
     int test_count      = 0;
@@ -83,8 +83,8 @@ TEST(BaseHashTests, Splitmix64AvalancheSingleBitFlip)
     for (auto base : bases) {
         const auto h0 = bee::Splitmix64(base);
         for (auto bit : bits) {
-            const auto h1   = bee::Splitmix64(base ^ (bee::u64{1} << bit));
-            const int diff  = popcount64(h0 ^ h1);
+            const auto h1    = bee::Splitmix64(base ^ (bee::u64{1} << bit));
+            const int  diff  = popcount64(h0 ^ h1);
             total_differing += diff;
             ++test_count;
             EXPECT_GE(diff, 10) << "base=0x" << std::hex << base << " bit=" << bit;

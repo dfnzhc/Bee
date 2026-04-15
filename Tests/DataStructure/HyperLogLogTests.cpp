@@ -93,7 +93,7 @@ TEST(HyperLogLogTests, DuplicateInsertDoesNotChangeEstimate)
 TEST(HyperLogLogTests, SmallCardinalityEstimate)
 {
     HyperLogLog<int> hll(14);
-    int n = 100;
+    int              n = 100;
     for (int i = 0; i < n; ++i) {
         hll.insert(i);
     }
@@ -108,7 +108,7 @@ TEST(HyperLogLogTests, SmallCardinalityEstimate)
 TEST(HyperLogLogTests, MediumCardinalityEstimate)
 {
     HyperLogLog<int> hll(14);
-    int n = 10000;
+    int              n = 10000;
     for (int i = 0; i < n; ++i) {
         hll.insert(i);
     }
@@ -121,7 +121,7 @@ TEST(HyperLogLogTests, MediumCardinalityEstimate)
 TEST(HyperLogLogTests, LargeCardinalityEstimate)
 {
     HyperLogLog<int> hll(14);
-    int n = 1000000;
+    int              n = 1000000;
     for (int i = 0; i < n; ++i) {
         hll.insert(i);
     }
@@ -135,7 +135,7 @@ TEST(HyperLogLogTests, LargeCardinalityEstimate)
 TEST(HyperLogLogTests, StringElements)
 {
     HyperLogLog<std::string> hll(12);
-    int n = 5000;
+    int                      n = 5000;
     for (int i = 0; i < n; ++i) {
         hll.insert("string_" + std::to_string(i));
     }
@@ -162,7 +162,7 @@ TEST(HyperLogLogTests, StandardErrorDecreasesWithPrecision)
 TEST(HyperLogLogTests, StandardErrorFormula)
 {
     HyperLogLog<int> hll(10);
-    double expected = 1.04 / std::sqrt(1024.0);
+    double           expected = 1.04 / std::sqrt(1024.0);
     EXPECT_NEAR(hll.standard_error(), expected, 1e-10);
 }
 
@@ -258,7 +258,7 @@ TEST(HyperLogLogTests, EstimateCardinalityRoundsCorrectly)
     }
 
     std::size_t intEst = hll.cardinality();
-    double rawEst      = hll.estimate();
+    double      rawEst = hll.estimate();
     EXPECT_EQ(intEst, static_cast<std::size_t>(rawEst + 0.5));
 }
 

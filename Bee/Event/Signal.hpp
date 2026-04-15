@@ -78,8 +78,7 @@ public:
 
     /// 连接一个可调用槽。返回 Connection 句柄。
     /// 优先级：数值越小越先调用，默认为 0。
-    [[nodiscard]]
-    auto connect(MoveOnlyFunction<void(Args...)> slot, int priority = 0) -> Connection
+    [[nodiscard]] auto connect(MoveOnlyFunction<void(Args...)> slot, int priority = 0) -> Connection
     {
         auto state = std::make_shared<detail::SlotState>();
         auto cb    = std::make_shared<MoveOnlyFunction<void(Args...)>>(std::move(slot));
@@ -88,11 +87,9 @@ public:
             auto old_list = slots_.load(std::memory_order_acquire);
             auto new_list = old_list ? std::make_shared<SlotList>(*old_list) : std::make_shared<SlotList>();
 
-            auto it = std::upper_bound(
-                    new_list->begin(), new_list->end(), priority,
-                    [](int p, const Slot& s) {
-                        return p < s.priority;
-                    });
+            auto it = std::upper_bound(new_list->begin(), new_list->end(), priority, [](int p, const Slot& s) {
+                return p < s.priority;
+            });
             new_list->insert(it, Slot{state, cb, priority});
 
             if (slots_.compare_exchange_weak(old_list, new_list, std::memory_order_release, std::memory_order_acquire)) {
@@ -166,24 +163,26 @@ public:
             auto at = args_tuple;
             auto eh = err;
             try {
-                pool.post([cb = std::move(cb), st = std::move(st), at = std::move(at),
-                            eh = std::move(eh)]() mutable {
-                            if (!st->active.load(std::memory_order_acquire)) {
-                                return;
-                            }
-                            try {
-                                std::apply([&](auto&... a) {
+                pool.post([cb = std::move(cb), st = std::move(st), at = std::move(at), eh = std::move(eh)]() mutable {
+                    if (!st->active.load(std::memory_order_acquire)) {
+                        return;
+                    }
+                    try {
+                        std::apply(
+                                [&](auto&... a) {
                                     (*cb)(a...);
-                                }, *at);
+                                },
+                                *at
+                        );
+                    } catch (...) {
+                        if (eh) {
+                            try {
+                                (*eh)(std::current_exception());
                             } catch (...) {
-                                if (eh) {
-                                    try {
-                                        (*eh)(std::current_exception());
-                                    } catch (...) {
-                                    }
-                                }
                             }
-                        });
+                        }
+                    }
+                });
             } catch (...) {
                 // 线程池拒绝了任务（如 FailFast 背压策略）— 转发给错误处理器
                 if (err) {
@@ -239,9 +238,7 @@ public:
     auto set_error_handler(MoveOnlyFunction<void(std::exception_ptr)> handler) -> void
     {
         if (handler) {
-            error_handler_.store(
-                    std::make_shared<MoveOnlyFunction<void(std::exception_ptr)>>(std::move(handler)),
-                    std::memory_order_release);
+            error_handler_.store(std::make_shared<MoveOnlyFunction<void(std::exception_ptr)>>(std::move(handler)), std::memory_order_release);
         } else {
             error_handler_.store(nullptr, std::memory_order_release);
         }
@@ -250,9 +247,9 @@ public:
 private:
     struct Slot
     {
-        std::shared_ptr<detail::SlotState> state;
+        std::shared_ptr<detail::SlotState>               state;
         std::shared_ptr<MoveOnlyFunction<void(Args...)>> callback;
-        int priority = 0;
+        int                                              priority = 0;
     };
 
     using SlotList = std::vector<Slot>;
@@ -295,7 +292,7 @@ private:
         slots_.compare_exchange_strong(expected, new_list, std::memory_order_release, std::memory_order_relaxed);
     }
 
-    mutable std::atomic<std::shared_ptr<SlotList>> slots_{nullptr};
+    mutable std::atomic<std::shared_ptr<SlotList>>                           slots_{nullptr};
     std::atomic<std::shared_ptr<MoveOnlyFunction<void(std::exception_ptr)>>> error_handler_{nullptr};
 };
 

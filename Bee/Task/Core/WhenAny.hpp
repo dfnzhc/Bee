@@ -32,7 +32,7 @@ template <typename T>
 struct WhenAnyResult
 {
     size_t index; ///< 最先完成的任务的索引。
-    T value;      ///< 其结果值。
+    T      value; ///< 其结果值。
 };
 
 // =========================================================================
@@ -47,12 +47,12 @@ namespace detail
     struct WhenAnyControl
     {
         std::shared_ptr<SharedState<ResultType>> combined;
-        std::atomic<size_t> remaining;
-        std::atomic<bool> first_claimed{false};
+        std::atomic<size_t>                      remaining;
+        std::atomic<bool>                        first_claimed{false};
         // 仅由 CAS 竞争的获胜者写入；仅由最后一个调用 try_finish() 的线程读取。
         // 同步保证：`remaining` 上的 fetch_sub(acq_rel) 提供 happens-before 边。
         std::optional<ResultType> winner_result;
-        std::exception_ptr winner_ex;
+        std::exception_ptr        winner_ex;
 
         explicit WhenAnyControl(std::shared_ptr<SharedState<ResultType>> c, size_t n)
             : combined(std::move(c))
@@ -130,8 +130,7 @@ auto when_any(std::stop_source& source, std::vector<Task<T>> tasks) -> Task<When
 /// 当第一个结果到达时调用 source.request_stop()。
 /// @pre sizeof...(Ts) >= 1
 template <typename... Ts>
-auto when_any(std::stop_source& source, Task<Ts>&&... tasks)
-    -> Task<std::variant<typename Task<Ts>::value_type...>>
+auto when_any(std::stop_source& source, Task<Ts>&&... tasks) -> Task<std::variant<typename Task<Ts>::value_type...>>
 {
     using ResultType = std::variant<typename Task<Ts>::value_type...>;
     constexpr auto N = sizeof...(Ts);

@@ -87,8 +87,7 @@ TEST(BaseNumericTests, WorksWithUint16)
 TEST(BaseNumericTests, WorksWithUint64)
 {
     EXPECT_EQ(bee::SaturatingAdd(UINT64_MAX, static_cast<std::uint64_t>(1)), UINT64_MAX);
-    EXPECT_EQ(bee::SaturatingAdd(static_cast<std::uint64_t>(10), static_cast<std::uint64_t>(20)),
-              static_cast<std::uint64_t>(30));
+    EXPECT_EQ(bee::SaturatingAdd(static_cast<std::uint64_t>(10), static_cast<std::uint64_t>(20)), static_cast<std::uint64_t>(30));
 }
 
 // ── Macros.hpp ──────────────────────────────────────────────────────────────────
@@ -115,7 +114,7 @@ TEST(BaseMacrosTests, StructArray)
 {
     struct S
     {
-        int x;
+        int   x;
         float y;
     };
     S arr[7] = {};

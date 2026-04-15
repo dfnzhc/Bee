@@ -15,7 +15,7 @@ namespace bee
 
 /**
  * @brief Chase-Lev Work-Stealing Deque
- * 
+ *
  * 1) 角色分工：
  *    - owner 线程：负责 push/pop（操作 bottom_）。
  *    - stealer 线程：负责 steal（操作 top_）。
@@ -36,9 +36,8 @@ template <typename T, typename Allocator = std::allocator<T>>
 class ChaseLevDeque
 {
     // 类型是 trivial 类型，可以直接拷贝避免构造
-    static constexpr bool kTrivialFastPath = std::is_trivially_copyable_v<T> &&
-                                             std::is_trivially_destructible_v<T> &&
-                                             std::is_default_constructible_v<T>;
+    static constexpr bool kTrivialFastPath =
+            std::is_trivially_copyable_v<T> && std::is_trivially_destructible_v<T> && std::is_default_constructible_v<T>;
 
 public:
     using value_type      = T;
@@ -105,7 +104,7 @@ public:
     // =========================================================================
     // owner-only 入队
     // =========================================================================
-    
+
     template <typename... Args>
     [[nodiscard]] bool try_emplace(Args&&... args) noexcept(std::is_nothrow_constructible_v<T, Args...>)
     {
@@ -177,7 +176,7 @@ public:
     // =========================================================================
     // owner-only 出队（LIFO）
     // =========================================================================
-    
+
     [[nodiscard]] bool try_pop(T& out_value) noexcept
     {
         static_assert(std::is_nothrow_move_assignable_v<T>, "T must be nothrow move assignable");
@@ -204,9 +203,7 @@ public:
         if (top == bottom) {
             // 最后一个元素：owner 与 stealer 竞争 top。
             // CAS 成功表示 owner 获得该元素；失败表示 stealer 先一步拿走。
-            if (!_top.compare_exchange_strong(top, top + 1,
-                                              std::memory_order_seq_cst,
-                                              std::memory_order_relaxed)) {
+            if (!_top.compare_exchange_strong(top, top + 1, std::memory_order_seq_cst, std::memory_order_relaxed)) {
                 // 竞争失败，元素已被 steal，回滚并返回失败。
                 _bottom.store(bottom + 1, std::memory_order_relaxed);
                 return false;
@@ -230,7 +227,7 @@ public:
     // =========================================================================
     // stealer-only 出队（FIFO）
     // =========================================================================
-    
+
     [[nodiscard]] bool try_steal(T& out_value) noexcept
     {
         static_assert(std::is_nothrow_move_assignable_v<T>, "T must be nothrow move assignable");
@@ -244,9 +241,7 @@ public:
         }
 
         // 抢到 top 才算偷成功。
-        if (!_top.compare_exchange_strong(top, top + 1,
-                                          std::memory_order_seq_cst,
-                                          std::memory_order_relaxed)) {
+        if (!_top.compare_exchange_strong(top, top + 1, std::memory_order_seq_cst, std::memory_order_relaxed)) {
             return false;
         }
 
@@ -266,7 +261,7 @@ public:
     // =========================================================================
     // 状态访问与查询
     // =========================================================================
-    
+
     [[nodiscard]] size_type capacity() const noexcept
     {
         return _capacity;
@@ -313,8 +308,8 @@ private:
     }
 
 private:
-    size_type _capacity = 0;
-    T* _slots           = nullptr;
+    size_type                            _capacity = 0;
+    T*                                   _slots    = nullptr;
     BEE_NO_UNIQUE_ADDRESS allocator_type _allocator;
 
     alignas(BEE_CACHE_LINE_SIZE) std::atomic<size_type> _top    = {0};
@@ -323,7 +318,7 @@ private:
 
 /**
  * @brief 可动态分配 Chase-Lev Work-Stealing Deque
- * 
+ *
  * 1) 基本并发模型与 ChaseLevDeque 一致：
  *    - owner：push/pop（操作 bottom_）
  *    - stealer：steal（操作 top_）
@@ -344,9 +339,8 @@ private:
 template <typename T, typename Allocator = std::allocator<T>>
 class ChaseLevDequeDynamic
 {
-    static constexpr bool kSupportedValueType = std::is_trivially_copyable_v<T> &&
-                                                std::is_trivially_destructible_v<T> &&
-                                                std::is_default_constructible_v<T>;
+    static constexpr bool kSupportedValueType =
+            std::is_trivially_copyable_v<T> && std::is_trivially_destructible_v<T> && std::is_default_constructible_v<T>;
 
     static_assert(kSupportedValueType, "ChaseLevDequeDynamic requires trivially copyable/destructible/default-constructible T");
 
@@ -356,7 +350,7 @@ public:
     using allocator_type  = Allocator;
     using reference       = T&;
     using const_reference = const T&;
-    
+
     // =========================================================================
     // 构造与生命周期管理
     // =========================================================================
@@ -388,15 +382,15 @@ public:
     // =========================================================================
     // owner-only 入队
     // =========================================================================
-    
+
     template <typename... Args>
     [[nodiscard]] bool try_emplace(Args&&... args)
     {
         static_assert(std::is_constructible_v<T, Args&&...>, "T must be constructible with Args&&...");
 
-        auto bottom = _bottom.load(std::memory_order_relaxed);
-        auto top    = _top.load(std::memory_order_acquire);
-        auto* buf   = _buffer.load(std::memory_order_acquire);
+        auto  bottom = _bottom.load(std::memory_order_relaxed);
+        auto  top    = _top.load(std::memory_order_acquire);
+        auto* buf    = _buffer.load(std::memory_order_acquire);
 
         if ((bottom - top) >= buf->capacity) {
             buf = grow_buffer(top, bottom);
@@ -455,7 +449,7 @@ public:
     // =========================================================================
     // owner-only 出队（LIFO）
     // =========================================================================
-    
+
     [[nodiscard]] bool try_pop(T& out_value) noexcept
     {
         auto bottom = _bottom.load(std::memory_order_relaxed);
@@ -463,7 +457,7 @@ public:
             return false;
         }
 
-        auto* buf = _buffer.load(std::memory_order_acquire);
+        auto* buf  = _buffer.load(std::memory_order_acquire);
         bottom    -= 1;
         _bottom.store(bottom, std::memory_order_relaxed);
         std::atomic_thread_fence(std::memory_order_seq_cst);
@@ -475,9 +469,7 @@ public:
         }
 
         if (top == bottom) {
-            if (!_top.compare_exchange_strong(top, top + 1,
-                                              std::memory_order_seq_cst,
-                                              std::memory_order_relaxed)) {
+            if (!_top.compare_exchange_strong(top, top + 1, std::memory_order_seq_cst, std::memory_order_relaxed)) {
                 _bottom.store(bottom + 1, std::memory_order_relaxed);
                 return false;
             }
@@ -498,20 +490,18 @@ public:
     // =========================================================================
     // stealer-only 出队（FIFO）
     // =========================================================================
-    
+
     [[nodiscard]] bool try_steal(T& out_value) noexcept
     {
         auto* buf = _buffer.load(std::memory_order_acquire);
-        auto top  = _top.load(std::memory_order_acquire);
+        auto  top = _top.load(std::memory_order_acquire);
         std::atomic_thread_fence(std::memory_order_seq_cst);
         auto bottom = _bottom.load(std::memory_order_acquire);
         if (top >= bottom) {
             return false;
         }
 
-        if (!_top.compare_exchange_strong(top, top + 1,
-                                          std::memory_order_seq_cst,
-                                          std::memory_order_relaxed)) {
+        if (!_top.compare_exchange_strong(top, top + 1, std::memory_order_seq_cst, std::memory_order_relaxed)) {
             return false;
         }
 
@@ -525,7 +515,7 @@ public:
             std::this_thread::yield();
         }
     }
-    
+
     // =========================================================================
     // 状态访问与查询
     // =========================================================================
@@ -552,7 +542,7 @@ private:
     struct Buffer
     {
         size_type capacity = 0;
-        T* slots           = nullptr;
+        T*        slots    = nullptr;
     };
 
     static constexpr size_type normalize_capacity(size_type requested_capacity) noexcept
@@ -585,7 +575,7 @@ private:
 
     [[nodiscard]] Buffer* grow_buffer(size_type top, size_type bottom)
     {
-        auto* old_buffer        = _buffer.load(std::memory_order_acquire);
+        auto*      old_buffer   = _buffer.load(std::memory_order_acquire);
         const auto old_capacity = old_buffer->capacity;
 
         size_type new_capacity = old_capacity * 2;

@@ -36,9 +36,9 @@ namespace detail
         std::vector<NodeId> successors;
 
         std::atomic<NodeState> state{NodeState::Pending};
-        std::atomic<u32> pending_deps{0};
+        std::atomic<u32>       pending_deps{0};
 
-        std::any result;
+        std::any           result;
         std::exception_ptr exception;
     };
 
@@ -174,7 +174,7 @@ private:
     auto execute_impl(ThreadPool& pool, std::stop_token token) -> Task<void>;
 
     std::vector<std::unique_ptr<detail::NodeEntry>> nodes_;
-    std::atomic<bool> executing_{false};
+    std::atomic<bool>                               executing_{false};
 };
 
 } // namespace bee

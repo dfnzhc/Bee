@@ -11,7 +11,7 @@
 
 namespace bee::detail
 {
-std::atomic<LogSink> g_log_sink{nullptr};
+std::atomic<LogSink>  g_log_sink{nullptr};
 std::atomic<LogLevel> g_log_level{LogLevel::Info};
 } // namespace bee::detail
 
@@ -51,12 +51,19 @@ void DefaultConsoleSink(LogLevel level, std::string_view category, std::string_v
         file = file.substr(pos + 1);
     }
 
-    std::fprintf(stderr, "[%-5.*s][%.*s] %.*s (%.*s:%u)\n",
-                 static_cast<int>(enum_to_name(level).size()), enum_to_name(level).data(),
-                 static_cast<int>(category.size()), category.data(),
-                 static_cast<int>(message.size()), message.data(),
-                 static_cast<int>(file.size()), file.data(),
-                 location.line());
+    std::fprintf(
+            stderr,
+            "[%-5.*s][%.*s] %.*s (%.*s:%u)\n",
+            static_cast<int>(enum_to_name(level).size()),
+            enum_to_name(level).data(),
+            static_cast<int>(category.size()),
+            category.data(),
+            static_cast<int>(message.size()),
+            message.data(),
+            static_cast<int>(file.size()),
+            file.data(),
+            location.line()
+    );
 }
 
 } // namespace bee

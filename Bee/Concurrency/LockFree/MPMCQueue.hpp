@@ -19,7 +19,7 @@ namespace bee
 
 /**
  * @brief 无锁、有界的多生产者多消费者队列 - MPMCQueue
- * 
+ *
  * 1) 采用“全局票据 + 槽位序号（sequence）”协议：
  *    - 生产者通过 enqueue_pos_ 竞争一个 ticket（位置）。
  *    - 消费者通过 dequeue_pos_ 竞争一个 ticket（位置）。
@@ -53,16 +53,12 @@ namespace bee
  *    - 析构前，拥有者必须先停止所有仍可能访问该队列的线程。
  *    - 队列析构与并发 push/pop 同时发生属于未定义行为。
  */
-template <typename T,
-          typename Allocator = std::allocator<T>,
-          typename SpinPolicy = DefaultSpinPolicy,
-          bool ForceRoundUpPowerOfTwo = true>
+template <typename T, typename Allocator = std::allocator<T>, typename SpinPolicy = DefaultSpinPolicy, bool ForceRoundUpPowerOfTwo = true>
 class MPMCQueue
 {
     // 类型是 trivial 类型，可以直接拷贝避免构造
-    static constexpr bool kTrivialFastPath = std::is_trivially_copyable_v<T> &&
-                                             std::is_trivially_destructible_v<T> &&
-                                             std::is_default_constructible_v<T>;
+    static constexpr bool kTrivialFastPath =
+            std::is_trivially_copyable_v<T> && std::is_trivially_destructible_v<T> && std::is_default_constructible_v<T>;
 
 public:
     using value_type      = T;
@@ -142,7 +138,7 @@ public:
     {
         static_assert(std::is_nothrow_constructible_v<T, Args&&...>, "T must be nothrow constructible with Args&&...");
 
-        auto position            = _enqueue_pos.load(std::memory_order_relaxed);
+        auto          position   = _enqueue_pos.load(std::memory_order_relaxed);
         std::uint32_t contention = 0;
         // try_* 语义：只尝试一次“可达成功路径”；若当前不可写，快速返回 false。
         if (!try_reserve_enqueue(position, contention)) {
@@ -240,7 +236,7 @@ public:
         static_assert(std::is_nothrow_move_assignable_v<T>, "T must be nothrow move assignable");
         static_assert(std::is_nothrow_destructible_v<T>, "T must be nothrow destructible");
 
-        auto position            = _dequeue_pos.load(std::memory_order_relaxed);
+        auto          position   = _dequeue_pos.load(std::memory_order_relaxed);
         std::uint32_t contention = 0;
         // try_* 语义：若当前不可读，立即返回 false，不做长等待。
         if (!try_reserve_dequeue(position, contention)) {
@@ -381,7 +377,7 @@ private:
     {
         // 仅做“可立即成功”的保留尝试。
         for (;;) {
-            auto& cell          = cell_ref(position);
+            auto&      cell     = cell_ref(position);
             const auto sequence = cell.sequence.load(std::memory_order_acquire);
             const auto delta    = static_cast<std::intptr_t>(sequence) - static_cast<std::intptr_t>(position);
             // delta 语义：
@@ -410,7 +406,7 @@ private:
     {
         // 仅做“可立即成功”的保留尝试。
         for (;;) {
-            auto& cell          = cell_ref(position);
+            auto&      cell     = cell_ref(position);
             const auto sequence = cell.sequence.load(std::memory_order_acquire);
             const auto delta    = static_cast<std::intptr_t>(sequence) - static_cast<std::intptr_t>(position + 1);
             // delta 语义：
@@ -438,7 +434,7 @@ private:
         // 与 try_reserve_enqueue 的核心判断相同，但不会返回 false，而是退避等待。
         std::uint32_t spin_count = 0;
         while (true) {
-            auto& cell          = cell_ref(position);
+            auto&      cell     = cell_ref(position);
             const auto sequence = cell.sequence.load(std::memory_order_acquire);
             const auto delta    = static_cast<std::intptr_t>(sequence) - static_cast<std::intptr_t>(position);
             if (delta == 0) {
@@ -458,7 +454,7 @@ private:
         // 与 try_reserve_dequeue 的核心判断相同，但不会返回 false，而是退避等待。
         std::uint32_t spin_count = 0;
         while (true) {
-            auto& cell          = cell_ref(position);
+            auto&      cell     = cell_ref(position);
             const auto sequence = cell.sequence.load(std::memory_order_acquire);
             const auto delta    = static_cast<std::intptr_t>(sequence) - static_cast<std::intptr_t>(position + 1);
             if (delta == 0) {
@@ -477,10 +473,10 @@ private:
     // 固定容量（有界）
     size_type _capacity = 0;
     // 槽位数组，按 ticket 映射访问。
-    Cell* _cells = nullptr;
-    BEE_NO_UNIQUE_ADDRESS allocator_type _allocator;
+    Cell*                                     _cells = nullptr;
+    BEE_NO_UNIQUE_ADDRESS allocator_type      _allocator;
     BEE_NO_UNIQUE_ADDRESS cell_allocator_type _cell_allocator;
-    size_type _capacity_mask = 0;
+    size_type                                 _capacity_mask = 0;
 
     // 固定退避参数：工程化版本以稳定、可读为优先。
     // 可按平台经验调整，但建议保持“先小改、后观测”的节奏。

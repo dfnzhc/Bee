@@ -29,7 +29,7 @@ using bee::ThreadPool;
 
 TEST(ParallelSortTests, AlreadySorted)
 {
-    ThreadPool pool(4);
+    ThreadPool       pool(4);
     constexpr size_t N = 10000;
     std::vector<int> data(N);
     std::iota(data.begin(), data.end(), 0);
@@ -41,7 +41,7 @@ TEST(ParallelSortTests, AlreadySorted)
 
 TEST(ParallelSortTests, ReverseSorted)
 {
-    ThreadPool pool(4);
+    ThreadPool       pool(4);
     constexpr size_t N = 10000;
     std::vector<int> data(N);
     std::iota(data.rbegin(), data.rend(), 0);
@@ -53,10 +53,10 @@ TEST(ParallelSortTests, ReverseSorted)
 
 TEST(ParallelSortTests, RandomData)
 {
-    ThreadPool pool(4);
+    ThreadPool       pool(4);
     constexpr size_t N = 200'000;
     std::vector<int> data(N);
-    std::mt19937 rng(42);
+    std::mt19937     rng(42);
     std::generate(data.begin(), data.end(), [&rng] {
         return static_cast<int>(rng() % 1'000'000);
     });
@@ -71,7 +71,7 @@ TEST(ParallelSortTests, RandomData)
 
 TEST(ParallelSortTests, Duplicates)
 {
-    ThreadPool pool(4);
+    ThreadPool       pool(4);
     constexpr size_t N = 50'000;
     std::vector<int> data(N);
     // 仅 10 个不同的值。
@@ -85,7 +85,7 @@ TEST(ParallelSortTests, Duplicates)
 
 TEST(ParallelSortTests, CustomComparator)
 {
-    ThreadPool pool(4);
+    ThreadPool       pool(4);
     constexpr size_t N = 10000;
     std::vector<int> data(N);
     std::iota(data.begin(), data.end(), 0);
@@ -97,10 +97,10 @@ TEST(ParallelSortTests, CustomComparator)
 
 TEST(ParallelSortTests, Cancellation)
 {
-    ThreadPool pool(4);
+    ThreadPool       pool(4);
     constexpr size_t N = 200'000;
     std::vector<int> data(N);
-    std::mt19937 rng(123);
+    std::mt19937     rng(123);
     std::generate(data.begin(), data.end(), [&rng] {
         return static_cast<int>(rng());
     });
@@ -108,9 +108,7 @@ TEST(ParallelSortTests, Cancellation)
     std::stop_source source;
     source.request_stop();
 
-    EXPECT_THROW(
-            bee::parallel_sort(pool, data.begin(), data.end(), std::less<>{}, source.get_token()),
-            std::runtime_error);
+    EXPECT_THROW(bee::parallel_sort(pool, data.begin(), data.end(), std::less<>{}, source.get_token()), std::runtime_error);
 }
 
 } // namespace

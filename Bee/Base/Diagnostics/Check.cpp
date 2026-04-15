@@ -32,7 +32,6 @@ FailureHandler GetFailureHandler() noexcept
 
 namespace detail
 {
-
     [[noreturn]] void check_fail(std::string_view check_type, std::string_view expr, std::string_view message, std::source_location loc)
     {
         // 1. Format context string
@@ -52,10 +51,15 @@ namespace detail
             if (auto pos = file.find_last_of("/\\"); pos != std::string_view::npos)
                 file = file.substr(pos + 1);
 
-            std::fprintf(stderr, "[Fatal][Check] %.*s (%.*s:%u)\n",
-                         static_cast<int>(context.size()), context.data(),
-                         static_cast<int>(file.size()), file.data(),
-                         loc.line());
+            std::fprintf(
+                    stderr,
+                    "[Fatal][Check] %.*s (%.*s:%u)\n",
+                    static_cast<int>(context.size()),
+                    context.data(),
+                    static_cast<int>(file.size()),
+                    file.data(),
+                    loc.line()
+            );
         }
 
         // 4. Call failure handler (if installed)
@@ -65,9 +69,9 @@ namespace detail
         }
 
         // 5. Debug break (debug builds only)
-        #ifndef NDEBUG
+#ifndef NDEBUG
         BEE_DEBUG_BREAK;
-        #endif
+#endif
 
         // 6. Terminate
         std::abort();

@@ -23,17 +23,17 @@ namespace
 
     struct ExecutionContext
     {
-        ThreadPool* pool;
-        std::stop_token token;
+        ThreadPool*                                pool;
+        std::stop_token                            token;
         std::shared_ptr<detail::SharedState<void>> completion;
-        std::atomic<u32> remaining{0};
+        std::atomic<u32>                           remaining{0};
 
         std::exception_ptr first_exception;
-        std::mutex exception_mutex;
-        std::atomic<bool> any_cancelled{false};
+        std::mutex         exception_mutex;
+        std::atomic<bool>  any_cancelled{false};
 
         std::vector<std::unique_ptr<detail::NodeEntry>>* nodes;
-        std::atomic<bool>* executing_flag;
+        std::atomic<bool>*                               executing_flag;
     };
 
     // 前向声明 — resolve 与 on_terminal 之间存在相互递归。
@@ -54,8 +54,8 @@ namespace
 
     auto on_node_terminal(std::shared_ptr<ExecutionContext> ctx, detail::NodeId id) -> void
     {
-        auto& node = (*ctx->nodes)[id.value];
-        auto state = node->state.load(std::memory_order_acquire);
+        auto& node  = (*ctx->nodes)[id.value];
+        auto  state = node->state.load(std::memory_order_acquire);
 
         if (state == NodeState::Failed && node->exception) {
             std::lock_guard lock(ctx->exception_mutex);

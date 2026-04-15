@@ -93,8 +93,8 @@ TEST(CheckDeathTest, AllPassingOpChecks)
 
 TEST(CheckDeathTest, OpMacroEvaluatesOnce)
 {
-    int counter = 0;
-    auto inc    = [&]() {
+    int  counter = 0;
+    auto inc     = [&]() {
         return ++counter;
     };
     BEE_CHECK_LE(inc(), 1);
@@ -113,8 +113,7 @@ TEST(CheckTest, DefaultHandlerIsNull)
 
 TEST(CheckTest, SetAndGetHandler)
 {
-    auto handler = [](std::string_view, std::string_view, std::source_location) noexcept {
-    };
+    auto handler = [](std::string_view, std::string_view, std::source_location) noexcept {};
     bee::SetFailureHandler(handler);
     EXPECT_EQ(bee::GetFailureHandler(), handler);
     bee::SetFailureHandler(nullptr);
@@ -124,13 +123,13 @@ TEST(CheckDeathTest, FailureHandlerIsCalled)
 {
     EXPECT_DEATH(
             {
-            bee::SetFailureHandler([](std::string_view expr, std::string_view, std::source_location) noexcept {
-                std::fprintf(stderr, "HANDLER_CALLED: %.*s\n",
-                    static_cast<int>(expr.size()), expr.data());
+                bee::SetFailureHandler([](std::string_view expr, std::string_view, std::source_location) noexcept {
+                    std::fprintf(stderr, "HANDLER_CALLED: %.*s\n", static_cast<int>(expr.size()), expr.data());
                 });
-            BEE_CHECK(false);
+                BEE_CHECK(false);
             },
-            "HANDLER_CALLED: false");
+            "HANDLER_CALLED: false"
+    );
 }
 
 // ============================================================================

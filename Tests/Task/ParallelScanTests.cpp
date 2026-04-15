@@ -27,7 +27,7 @@ using bee::ThreadPool;
 
 TEST(ParallelScanTests, InclusiveSumSmall)
 {
-    ThreadPool pool(4);
+    ThreadPool       pool(4);
     std::vector<int> input = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
     std::vector<int> output(input.size());
     std::vector<int> expected(input.size());
@@ -40,7 +40,7 @@ TEST(ParallelScanTests, InclusiveSumSmall)
 
 TEST(ParallelScanTests, InclusiveSumLarge)
 {
-    ThreadPool pool(4);
+    ThreadPool       pool(4);
     constexpr size_t N = 200'000;
     std::vector<int> input(N, 1);
     std::vector<int> output(N);
@@ -56,7 +56,7 @@ TEST(ParallelScanTests, InclusiveMultiply)
 {
     ThreadPool pool(4);
     // 使用超过阈值但安全的值范围。
-    constexpr size_t N = 5000;
+    constexpr size_t    N = 5000;
     std::vector<double> input(N, 1.0);
     input[0] = 2.0;
     input[1] = 3.0;
@@ -75,7 +75,7 @@ TEST(ParallelScanTests, InclusiveMultiply)
 
 TEST(ParallelScanTests, ExclusiveSumSmall)
 {
-    ThreadPool pool(4);
+    ThreadPool       pool(4);
     std::vector<int> input = {1, 2, 3, 4, 5};
     std::vector<int> output(input.size());
     std::vector<int> expected(input.size());
@@ -88,7 +88,7 @@ TEST(ParallelScanTests, ExclusiveSumSmall)
 
 TEST(ParallelScanTests, ExclusiveSumLarge)
 {
-    ThreadPool pool(4);
+    ThreadPool       pool(4);
     constexpr size_t N = 200'000;
     std::vector<int> input(N);
     std::iota(input.begin(), input.end(), 1);
@@ -103,7 +103,7 @@ TEST(ParallelScanTests, ExclusiveSumLarge)
 
 TEST(ParallelScanTests, EmptyRange)
 {
-    ThreadPool pool(4);
+    ThreadPool       pool(4);
     std::vector<int> input;
     std::vector<int> output;
 
@@ -116,7 +116,7 @@ TEST(ParallelScanTests, EmptyRange)
 
 TEST(ParallelScanTests, CancellationInclusive)
 {
-    ThreadPool pool(4);
+    ThreadPool       pool(4);
     constexpr size_t N = 200'000;
     std::vector<int> input(N, 1);
     std::vector<int> output(N, 0);
@@ -124,14 +124,14 @@ TEST(ParallelScanTests, CancellationInclusive)
     std::stop_source source;
     source.request_stop();
 
-    EXPECT_THROW(bee::parallel_inclusive_scan(pool, input.begin(), input.end(), output.begin(), std::plus<>{},
-                     source.get_token()),
-                 std::runtime_error);
+    EXPECT_THROW(
+            bee::parallel_inclusive_scan(pool, input.begin(), input.end(), output.begin(), std::plus<>{}, source.get_token()), std::runtime_error
+    );
 }
 
 TEST(ParallelScanTests, CancellationExclusive)
 {
-    ThreadPool pool(4);
+    ThreadPool       pool(4);
     constexpr size_t N = 200'000;
     std::vector<int> input(N, 1);
     std::vector<int> output(N, 0);
@@ -139,9 +139,9 @@ TEST(ParallelScanTests, CancellationExclusive)
     std::stop_source source;
     source.request_stop();
 
-    EXPECT_THROW(bee::parallel_exclusive_scan(pool, input.begin(), input.end(), output.begin(), 0, std::plus<>{},
-                     source.get_token()),
-                 std::runtime_error);
+    EXPECT_THROW(
+            bee::parallel_exclusive_scan(pool, input.begin(), input.end(), output.begin(), 0, std::plus<>{}, source.get_token()), std::runtime_error
+    );
 }
 
 } // namespace

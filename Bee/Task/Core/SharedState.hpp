@@ -38,18 +38,18 @@ struct SharedState
 
     using ResultStorage = std::conditional_t<std::is_void_v<T>, Empty, std::optional<T>>;
 
-    mutable std::mutex mutex;
+    mutable std::mutex              mutex;
     mutable std::condition_variable cv;
-    std::atomic<TaskState> state{TaskState::Pending};
+    std::atomic<TaskState>          state{TaskState::Pending};
 
     BEE_NO_UNIQUE_ADDRESS ResultStorage result{};
-    std::exception_ptr exception;
-    std::stop_token stop_token;
+    std::exception_ptr                  exception;
+    std::stop_token                     stop_token;
 
     // continuation：至多一个，由 then() 或 when_all() 设置。
     // 在任何终态（Completed、Failed、Cancelled）触发。
     MoveOnlyFunction<void()> continuation;
-    bool has_continuation{false};
+    bool                     has_continuation{false};
 
     // -----------------------------------------------------------------
     // 状态转换
@@ -70,7 +70,8 @@ struct SharedState
         });
     }
 
-    auto complete() -> void requires std::is_void_v<T>
+    auto complete() -> void
+        requires std::is_void_v<T>
     {
         terminate([&] {
             state.store(TaskState::Completed, std::memory_order_release);

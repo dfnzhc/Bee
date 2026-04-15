@@ -20,7 +20,7 @@ namespace bee
 
 /**
  * @brief 无锁、有界的单生产者单消费者队列 - SPSCQueue
- * 
+ *
  * 1) 单生产者 / 单消费者前提：
  *    - 写端只改 _writeIdx
  *    - 读端只改 _readIdx
@@ -32,21 +32,17 @@ namespace bee
  *
  * 3) 缓存策略：
  *    - 生产者缓存 _readIdxCache，消费者缓存 _writeIdxCache，减少跨核读取对端原子索引的频率。
- *    
+ *
  * 4) 自旋策略：
  *    - 默认策略会调用 yield 换出自身
  *    - 吞吐量导向策略不会换出自身，在某些平台上更高效
  */
-template <typename T,
-          typename Allocator = std::allocator<T>,
-          bool ForceRoundUpPowerOfTwo = true,
-          typename SpinPolicy = DefaultSpinPolicy>
+template <typename T, typename Allocator = std::allocator<T>, bool ForceRoundUpPowerOfTwo = true, typename SpinPolicy = DefaultSpinPolicy>
 class BasicSPSCQueue
 {
     // 类型是 trivial 类型，可以直接拷贝避免构造
-    static constexpr bool kTrivialFastPath = std::is_trivially_copyable_v<T> &&
-                                             std::is_trivially_destructible_v<T> &&
-                                             std::is_default_constructible_v<T>;
+    static constexpr bool kTrivialFastPath =
+            std::is_trivially_copyable_v<T> && std::is_trivially_destructible_v<T> && std::is_default_constructible_v<T>;
 
 public:
     using value_type      = T;
@@ -140,9 +136,9 @@ public:
     void emplace(Args&&... args) noexcept(std::is_nothrow_constructible_v<T, Args...>)
     {
         static_assert(std::is_constructible_v<T, Args&&...>, "T must be constructible with Args&&...");
-        auto const writeIdx      = _writeIdx.load(std::memory_order_relaxed);
-        auto const nextWriteIdx  = next_index(writeIdx);
-        std::uint32_t spin_count = 0;
+        auto const    writeIdx     = _writeIdx.load(std::memory_order_relaxed);
+        auto const    nextWriteIdx = next_index(writeIdx);
+        std::uint32_t spin_count   = 0;
         // 阻塞语义：等待直到有空位。
         while (!refresh_read_cache_if_full(nextWriteIdx)) {
             SpinPolicy::wait(spin_count++);
@@ -263,8 +259,8 @@ private:
             logical_capacity = kMaxLogicalCapacity;
         }
 
-        auto internal_capacity      = logical_capacity + 1;
-        constexpr auto max_capacity = std::numeric_limits<size_type>::max();
+        auto           internal_capacity = logical_capacity + 1;
+        constexpr auto max_capacity      = std::numeric_limits<size_type>::max();
         if (internal_capacity > max_capacity) {
             internal_capacity = max_capacity;
         }
@@ -367,9 +363,9 @@ private:
     }
 
 private:
-    size_type _capacity  = 0;
-    size_type _indexMask = 0;
-    T* _slots            = nullptr;
+    size_type                       _capacity  = 0;
+    size_type                       _indexMask = 0;
+    T*                              _slots     = nullptr;
     BEE_NO_UNIQUE_ADDRESS Allocator _allocator;
 
     // 对齐布局：尽量让生产者与消费者热点字段分离。

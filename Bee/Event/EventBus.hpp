@@ -39,8 +39,7 @@ public:
 
     /// 订阅类型为 E 的事件。返回 Connection 句柄。
     template <typename E>
-    [[nodiscard]]
-    auto subscribe(MoveOnlyFunction<void(const E&)> handler, int priority = 0) -> Connection
+    [[nodiscard]] auto subscribe(MoveOnlyFunction<void(const E&)> handler, int priority = 0) -> Connection
     {
         return get_or_create_channel<E>().signal.connect(std::move(handler), priority);
     }
@@ -111,10 +110,9 @@ private:
 
     struct IChannel
     {
-        virtual ~IChannel() = default;
-        virtual auto disconnect_all() -> void = 0;
-        virtual auto apply_error_handler(
-                std::shared_ptr<MoveOnlyFunction<void(std::exception_ptr)>> handler) -> void = 0;
+        virtual ~IChannel()                                                                                           = default;
+        virtual auto disconnect_all() -> void                                                                         = 0;
+        virtual auto apply_error_handler(std::shared_ptr<MoveOnlyFunction<void(std::exception_ptr)>> handler) -> void = 0;
     };
 
     template <typename E>
@@ -127,17 +125,14 @@ private:
             signal.disconnect_all();
         }
 
-        auto apply_error_handler(
-                std::shared_ptr<MoveOnlyFunction<void(std::exception_ptr)>> handler) -> void override
+        auto apply_error_handler(std::shared_ptr<MoveOnlyFunction<void(std::exception_ptr)>> handler) -> void override
         {
             if (handler) {
                 // 将共享处理器包装一层，使 Signal 拥有自己的 MoveOnlyFunction 拷贝
                 auto h = handler;
-                signal.set_error_handler(
-                        MoveOnlyFunction<void(std::exception_ptr)>(
-                                [h = std::move(h)](std::exception_ptr ep) {
-                                    (*h)(ep);
-                                }));
+                signal.set_error_handler(MoveOnlyFunction<void(std::exception_ptr)>([h = std::move(h)](std::exception_ptr ep) {
+                    (*h)(ep);
+                }));
             }
         }
     };
@@ -154,7 +149,7 @@ private:
         // 快速路径：读锁
         {
             std::shared_lock lock(mutex_);
-            auto it = channels_.find(key);
+            auto             it = channels_.find(key);
             if (it != channels_.end()) {
                 return static_cast<Channel<E>&>(*it->second);
             }
@@ -181,9 +176,9 @@ private:
     template <typename E>
     auto find_channel() -> Channel<E>*
     {
-        auto key = std::type_index(typeid(E));
+        auto             key = std::type_index(typeid(E));
         std::shared_lock lock(mutex_);
-        auto it = channels_.find(key);
+        auto             it = channels_.find(key);
         if (it == channels_.end()) {
             return nullptr;
         }
@@ -194,9 +189,9 @@ private:
     // 数据成员
     // -------------------------------------------------------------------------
 
-    mutable std::shared_mutex mutex_;
+    mutable std::shared_mutex                                      mutex_;
     std::unordered_map<std::type_index, std::unique_ptr<IChannel>> channels_;
-    std::shared_ptr<MoveOnlyFunction<void(std::exception_ptr)>> error_handler_;
+    std::shared_ptr<MoveOnlyFunction<void(std::exception_ptr)>>    error_handler_;
 };
 
 } // namespace bee

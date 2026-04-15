@@ -137,7 +137,7 @@ TEST(SkipListTests, InsertReverseOrder)
 TEST(SkipListTests, InsertWithMoveValue)
 {
     SkipList<int, std::string> sl;
-    std::string val = "hello";
+    std::string                val = "hello";
     sl.insert(1, std::move(val));
     EXPECT_EQ(sl.at(1), "hello");
 }
@@ -332,8 +332,8 @@ TEST(SkipListTests, ConstIterator)
     sl.insert(1, 10);
     sl.insert(2, 20);
 
-    const auto& csl = sl;
-    int count       = 0;
+    const auto& csl   = sl;
+    int         count = 0;
     for (auto it = csl.begin(); it != csl.end(); ++it) {
         ++count;
     }
@@ -509,7 +509,7 @@ TEST(SkipListTests, CustomComparatorDescending)
 TEST(SkipListTests, LargeInsertAndLookup)
 {
     SkipList<int, int> sl;
-    int n = 10000;
+    int                n = 10000;
 
     for (int i = 0; i < n; ++i) {
         sl.insert(i, i * 2);
@@ -525,7 +525,7 @@ TEST(SkipListTests, LargeInsertAndLookup)
 TEST(SkipListTests, LargeInsertDeleteAndVerify)
 {
     SkipList<int, int> sl;
-    int n = 5000;
+    int                n = 5000;
 
     for (int i = 0; i < n; ++i) {
         sl.insert(i, i);
@@ -564,7 +564,7 @@ TEST(SkipListTests, LevelProperty)
 TEST(SkipListTests, ExceptionDuringInsertDoesNotMutateContainerState)
 {
     SkipList<int, AlwaysThrowOnCopy> sl;
-    const AlwaysThrowOnCopy value;
+    const AlwaysThrowOnCopy          value;
 
     for (int i = 0; i < 40; ++i) {
         EXPECT_THROW(sl.insert(i, value), std::runtime_error);
@@ -663,7 +663,7 @@ TEST(SkipListTests, OperatorBracketOnEmpty)
 TEST(SkipListTests, LargeScaleInsertEraseReinsert)
 {
     SkipList<int, int> sl;
-    constexpr int kCount = 5000;
+    constexpr int      kCount = 5000;
 
     // Phase 1: insert
     for (int i = 0; i < kCount; ++i)

@@ -29,7 +29,7 @@ using bee::Task;
 TEST(AsyncTaskTests, LazyNotStarted)
 {
     std::atomic<bool> started{false};
-    auto coro = [&started]() -> AsyncTask<int> {
+    auto              coro = [&started]() -> AsyncTask<int> {
         started.store(true);
         co_return 42;
     };
@@ -125,7 +125,7 @@ TEST(AsyncTaskTests, CoAwaitCancelledTask)
     bee::ThreadPool pool(1);
 
     std::atomic<bool> unblock{false};
-    auto blocker = bee::submit(pool, [&unblock] {
+    auto              blocker = bee::submit(pool, [&unblock] {
         while (!unblock.load(std::memory_order_acquire))
             std::this_thread::yield();
     });
@@ -134,9 +134,13 @@ TEST(AsyncTaskTests, CoAwaitCancelledTask)
     source.request_stop();
 
     auto coro = [&pool, &source]() -> AsyncTask<int> {
-        int x = co_await bee::submit(pool, [] {
-            return 1;
-        }, source.get_token());
+        int x = co_await bee::submit(
+                pool,
+                [] {
+                    return 1;
+                },
+                source.get_token()
+        );
         co_return x;
     };
 

@@ -221,14 +221,15 @@ struct EnumEntries<bee::nameof_static_assert_samples::SampleAction>
 {
     static constexpr std::array<EnumEntry<bee::nameof_static_assert_samples::SampleAction>, 2> entries = {
             EnumEntry<bee::nameof_static_assert_samples::SampleAction>{bee::nameof_static_assert_samples::SampleAction::Idle, "idle", "Idle"},
-            EnumEntry<bee::nameof_static_assert_samples::SampleAction>{bee::nameof_static_assert_samples::SampleAction::Move, "move", "Move"}};
+            EnumEntry<bee::nameof_static_assert_samples::SampleAction>{bee::nameof_static_assert_samples::SampleAction::Move, "move", "Move"}
+    };
 };
 
 template <>
 struct EnumScanRange<bee::nameof_static_assert_samples::SampleAliasCheckAction>
 {
-    static constexpr int kMin               = 0;
-    static constexpr int kMax               = 1;
+    static constexpr int  kMin              = 0;
+    static constexpr int  kMax              = 1;
     static constexpr bool kEnableAliasCheck = true;
 };
 

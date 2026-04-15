@@ -62,7 +62,7 @@ TEST(ConnectionTest, ExpiredStateReportsNotConnected)
     Connection conn;
     {
         auto state = std::make_shared<SlotState>();
-        conn = Connection(state);
+        conn       = Connection(state);
         EXPECT_TRUE(conn.connected());
     } // state destroyed
     EXPECT_FALSE(conn.connected());
@@ -73,7 +73,7 @@ TEST(ConnectionTest, DisconnectOnExpiredStateIsNoOp)
     Connection conn;
     {
         auto state = std::make_shared<SlotState>();
-        conn = Connection(state);
+        conn       = Connection(state);
     }
     conn.disconnect(); // no crash
     EXPECT_FALSE(conn.connected());
@@ -82,7 +82,7 @@ TEST(ConnectionTest, DisconnectOnExpiredStateIsNoOp)
 TEST(ConnectionTest, CopySharesState)
 {
     auto [state, conn1] = make_connection();
-    auto conn2 = conn1;
+    auto conn2          = conn1;
     EXPECT_TRUE(conn2.connected());
     conn1.disconnect();
     EXPECT_FALSE(conn2.connected()); // same underlying state
@@ -128,7 +128,7 @@ TEST(ScopedConnectionTest, ReleaseDetachesConnection)
 {
     auto [state, conn] = make_connection();
     ScopedConnection scoped(conn);
-    auto released = scoped.release();
+    auto             released = scoped.release();
     // scoped destructor does NOT disconnect (released)
     EXPECT_TRUE(released.connected());
     EXPECT_TRUE(state->active.load());

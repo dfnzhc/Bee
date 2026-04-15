@@ -132,7 +132,7 @@ TEST(ChaseLevDequeTests, BlockingPushMakesProgressAfterSteal)
 
     std::atomic<bool> producer_entered{false};
     std::atomic<bool> producer_done{false};
-    std::thread producer([&]() {
+    std::thread       producer([&]() {
         producer_entered.store(true, std::memory_order_release);
         deque.push(33);
         producer_done.store(true, std::memory_order_release);
@@ -222,7 +222,7 @@ TEST(ChaseLevDequeTests, ConcurrentOwnerAndStealersConsumeAllItems)
         flag.store(0, std::memory_order_relaxed);
     }
 
-    std::atomic<int> consumed{0};
+    std::atomic<int>  consumed{0};
     std::atomic<bool> valid{true};
 
     auto consume_value = [&](int value) {
@@ -231,7 +231,7 @@ TEST(ChaseLevDequeTests, ConcurrentOwnerAndStealersConsumeAllItems)
             return;
         }
 
-        auto& slot          = seen[static_cast<size_t>(value)];
+        auto&      slot     = seen[static_cast<size_t>(value)];
         const auto previous = slot.exchange(1, std::memory_order_relaxed);
         if (previous != 0) {
             valid.store(false, std::memory_order_relaxed);
@@ -304,9 +304,9 @@ TEST(ChaseLevDequeTests, DestructorReleasesRemainingNonTrivialElements)
 TEST(ChaseLevDequeTests, CapacityOneWithMultipleStealers)
 {
     ChaseLevDeque<int> deque(1);
-    constexpr int kRounds = 5000;
-    std::atomic<int> stolen{0};
-    std::atomic<bool> done{false};
+    constexpr int      kRounds = 5000;
+    std::atomic<int>   stolen{0};
+    std::atomic<bool>  done{false};
 
     std::vector<std::thread> stealers;
     for (int t = 0; t < 4; ++t) {
@@ -343,7 +343,7 @@ TEST(ChaseLevDequeTests, CapacityOneWithMultipleStealers)
 TEST(ChaseLevDequeTests, EmptyStealReturnsFalse)
 {
     ChaseLevDeque<int> deque(4);
-    int val = 0;
+    int                val = 0;
 
     // Steal on empty returns false
     EXPECT_FALSE(deque.try_steal(val));

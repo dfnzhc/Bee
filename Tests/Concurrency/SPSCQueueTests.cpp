@@ -178,7 +178,7 @@ TEST(SPSCQueueDynamicTests, DestructorReleasesRemainingElements)
 
 TEST(SPSCQueueDynamicTests, ConcurrentProducerConsumerPreservesOrder)
 {
-    constexpr std::uint32_t kCount = 300'000;
+    constexpr std::uint32_t  kCount = 300'000;
     SPSCQueue<std::uint32_t> queue(4096);
 
     std::vector<std::uint32_t> consumed;
@@ -224,7 +224,7 @@ TEST(SPSCQueueDynamicTests, CapacityOneStress)
     SPSCQueue<int> queue(1);
     ASSERT_EQ(queue.capacity(), 1u);
 
-    constexpr int kCount = 10000;
+    constexpr int    kCount = 10000;
     std::vector<int> consumed;
     consumed.reserve(kCount);
 
@@ -259,7 +259,7 @@ TEST(SPSCQueueDynamicTests, CapacityOneStress)
 TEST(SPSCQueueDynamicTests, EmptyPopReturnsFalse)
 {
     SPSCQueue<int> queue(4);
-    int value = 0;
+    int            value = 0;
 
     // Pop on empty returns false
     EXPECT_FALSE(queue.try_pop(value));
@@ -274,7 +274,7 @@ TEST(SPSCQueueDynamicTests, EmptyPopReturnsFalse)
 TEST(SPSCQueueDynamicTests, WrapAroundManyTimes)
 {
     SPSCQueueExact<int> queue(4);
-    constexpr int kCount = 10000;
+    constexpr int       kCount = 10000;
 
     for (int i = 0; i < kCount; ++i) {
         ASSERT_TRUE(queue.try_push(i));

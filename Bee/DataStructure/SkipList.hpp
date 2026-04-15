@@ -42,7 +42,7 @@ namespace bee
 template <std::totally_ordered Key, typename Value, typename Compare = std::less<Key>>
 class SkipList
 {
-    static constexpr int kMaxLevel       = 32;
+    static constexpr int    kMaxLevel    = 32;
     static constexpr double kProbability = 0.25; // 每层晋升概率
 
     // =========================================================================
@@ -50,13 +50,16 @@ class SkipList
     // =========================================================================
     struct Node
     {
-        Key key;
-        Value value;
-        int level;                  // 该节点的层数（1-based）
+        Key                key;
+        Value              value;
+        int                level;   // 该节点的层数（1-based）
         std::vector<Node*> forward; // forward[i] 指向第 i 层的后继节点
 
         Node(Key k, Value v, int lvl)
-            : key(std::move(k)), value(std::move(v)), level(lvl), forward(lvl, nullptr)
+            : key(std::move(k))
+            , value(std::move(v))
+            , level(lvl)
+            , forward(lvl, nullptr)
         {
         }
     };
@@ -64,11 +67,12 @@ class SkipList
     // 哨兵头节点，不存储有效数据
     struct HeadNode
     {
-        int level;
+        int                level;
         std::vector<Node*> forward;
 
         explicit HeadNode(int lvl)
-            : level(lvl), forward(lvl, nullptr)
+            : level(lvl)
+            , forward(lvl, nullptr)
         {
         }
     };
@@ -210,7 +214,10 @@ public:
      * @param comp 比较函数对象
      */
     explicit SkipList(const Compare& comp = Compare())
-        : _comp(comp), _head(kMaxLevel), _size(0), _level(1)
+        : _comp(comp)
+        , _head(kMaxLevel)
+        , _size(0)
+        , _level(1)
     {
         // 使用随机设备初始化随机数生成器
         std::random_device rd;
@@ -376,7 +383,7 @@ public:
     {
         if (it == end())
             return end();
-        Node* target = it.node();
+        Node*    target = it.node();
         iterator next(target->forward[0]);
         erase(target->key);
         return next;
@@ -551,10 +558,10 @@ public:
     }
 
 private:
-    Compare _comp;
-    HeadNode _head;
-    size_type _size;
-    int _level; // 当前最高层数
+    Compare              _comp;
+    HeadNode             _head;
+    size_type            _size;
+    int                  _level; // 当前最高层数
     mutable std::mt19937 _rng;
 
     /**
@@ -567,8 +574,8 @@ private:
     {
         // 使用位运算模拟几何分布，比 uniform_real_distribution 快数倍。
         // 每 2 位提供一次伯努利试验（kProbability = 0.25 = 1/4）。
-        int lvl          = 1;
-        std::uint32_t rn = _rng();
+        int           lvl = 1;
+        std::uint32_t rn  = _rng();
         while ((rn & 0x3u) == 0 && lvl < kMaxLevel) {
             ++lvl;
             rn >>= 2;
@@ -625,8 +632,8 @@ private:
         int newLevel = _randomLevel();
 
         // 创建新节点（RAII guard 保证异常安全）
-        auto nodeGuard = std::unique_ptr<Node>(new Node(key, std::forward<V>(value), newLevel));
-        auto* newNode  = nodeGuard.get();
+        auto  nodeGuard = std::unique_ptr<Node>(new Node(key, std::forward<V>(value), newLevel));
+        auto* newNode   = nodeGuard.get();
 
         if (newLevel > _level) {
             // 新增的高层的 update 全部指向头节点

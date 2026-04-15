@@ -16,7 +16,7 @@ template <std::totally_ordered T>
 }
 
 template <typename T, typename U>
-requires std::is_arithmetic_v<T> && std::is_arithmetic_v<U>
+    requires std::is_arithmetic_v<T> && std::is_arithmetic_v<U>
 [[nodiscard]] constexpr auto Lerp(T from, T to, U t) noexcept
 {
     if constexpr (std::is_floating_point_v<T> && std::is_floating_point_v<U>) {

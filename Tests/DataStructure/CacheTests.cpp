@@ -380,8 +380,11 @@ TEST(LFUCacheTests, EvictionIsCorrectAfterFrequencyBuildUp)
     cache.put(3, 30); // freq 1
 
     // Build up frequencies: key 1 gets freq 4, key 2 gets freq 3, key 3 stays freq 1
-    cache.get(1); cache.get(1); cache.get(1); // key 1: freq 4
-    cache.get(2); cache.get(2);               // key 2: freq 3
+    cache.get(1);
+    cache.get(1);
+    cache.get(1); // key 1: freq 4
+    cache.get(2);
+    cache.get(2); // key 2: freq 3
 
     // Insert key 4 — should evict key 3 (freq 1, the minimum)
     cache.put(4, 40);
@@ -560,7 +563,9 @@ TEST(MFUCacheTests, EvictsHighestFrequencyItem)
     cache.put(3, 30);
 
     // key 1: freq 4, key 2: freq 2, key 3: freq 1
-    cache.get(1); cache.get(1); cache.get(1);
+    cache.get(1);
+    cache.get(1);
+    cache.get(1);
     cache.get(2);
 
     // Insert 4 — should evict key 1 (highest freq = 4)
@@ -580,8 +585,12 @@ TEST(MFUCacheTests, EraseMaxFreqRecomputesCorrectly)
     cache.put(4, 40);
 
     // key 1: freq 5 (max), key 2: freq 3, key 3: freq 2, key 4: freq 1
-    cache.get(1); cache.get(1); cache.get(1); cache.get(1);
-    cache.get(2); cache.get(2);
+    cache.get(1);
+    cache.get(1);
+    cache.get(1);
+    cache.get(1);
+    cache.get(2);
+    cache.get(2);
     cache.get(3);
 
     // Erase key 1 (sole freq=5 entry). _maxFreq should recompute to 3.
@@ -1037,7 +1046,7 @@ TEST(ARCacheTests, B2GhostHitDecreasesP)
 TEST(ARCacheTests, PNeverExceedsCapacity)
 {
     constexpr std::size_t kCap = 5;
-    IntARC cache(kCap);
+    IntARC                cache(kCap);
 
     for (int round = 0; round < 50; ++round) {
         int base = round * 20;
@@ -1063,7 +1072,7 @@ TEST(ARCacheTests, PNeverExceedsCapacity)
 TEST(ARCacheTests, PNeverGoesBelowZero)
 {
     constexpr std::size_t kCap = 5;
-    IntARC cache(kCap);
+    IntARC                cache(kCap);
 
     for (int round = 0; round < 50; ++round) {
         int base = round * 20;
@@ -1092,7 +1101,7 @@ TEST(ARCacheTests, PNeverGoesBelowZero)
 TEST(ARCacheTests, GhostListsBounded)
 {
     constexpr std::size_t kCap = 10;
-    IntARC cache(kCap);
+    IntARC                cache(kCap);
 
     for (int i = 0; i < 1000; ++i) {
         cache.put(i, i);
@@ -1141,8 +1150,8 @@ TEST(MRUCacheTests, StressMRUEvictionPattern)
     // MRU should evict the most-recently-used item.
     int evictions = 0;
     for (int i = 100; i < 200; ++i) {
-        cache.get(0);     // make key 0 most recently used
-        cache.put(i, i);  // insert triggers eviction of MRU → key 0
+        cache.get(0);    // make key 0 most recently used
+        cache.put(i, i); // insert triggers eviction of MRU → key 0
         if (!cache.contains(0))
             ++evictions;
         // re-insert key 0 if evicted, to repeat the pattern

@@ -27,8 +27,8 @@ using bee::ThreadPool;
 
 TEST(ParallelReduceTests, SumOfIntegers)
 {
-    ThreadPool pool(4);
-    constexpr size_t N = 100'000;
+    ThreadPool             pool(4);
+    constexpr size_t       N = 100'000;
     std::vector<long long> data(N);
     std::iota(data.begin(), data.end(), 1LL);
 
@@ -51,7 +51,7 @@ TEST(ParallelReduceTests, ProductOfDoubles)
 
 TEST(ParallelReduceTests, EmptyRange)
 {
-    ThreadPool pool(4);
+    ThreadPool       pool(4);
     std::vector<int> data;
 
     auto result = bee::parallel_reduce(pool, data.begin(), data.end(), 42, std::plus<>{});
@@ -61,7 +61,7 @@ TEST(ParallelReduceTests, EmptyRange)
 
 TEST(ParallelReduceTests, SingleElement)
 {
-    ThreadPool pool(4);
+    ThreadPool       pool(4);
     std::vector<int> data = {7};
 
     auto result = bee::parallel_reduce(pool, data.begin(), data.end(), 0, std::plus<>{});
@@ -71,28 +71,34 @@ TEST(ParallelReduceTests, SingleElement)
 
 TEST(ParallelReduceTests, ExceptionPropagation)
 {
-    ThreadPool pool(4);
+    ThreadPool       pool(4);
     constexpr size_t N = 100'000;
     std::vector<int> data(N, 1);
 
     EXPECT_THROW(
-            bee::parallel_reduce(pool, data.begin(), data.end(), 0,
-                [](int, int) -> int { throw std::runtime_error("reduce error"); }),
-            std::runtime_error);
+            bee::parallel_reduce(
+                    pool,
+                    data.begin(),
+                    data.end(),
+                    0,
+                    [](int, int) -> int {
+                        throw std::runtime_error("reduce error");
+                    }
+            ),
+            std::runtime_error
+    );
 }
 
 TEST(ParallelReduceTests, Cancellation)
 {
-    ThreadPool pool(4);
+    ThreadPool       pool(4);
     constexpr size_t N = 200'000;
     std::vector<int> data(N, 1);
 
     std::stop_source source;
     source.request_stop();
 
-    EXPECT_THROW(
-            bee::parallel_reduce(pool, data.begin(), data.end(), 0, std::plus<>{}, source.get_token()),
-            std::runtime_error);
+    EXPECT_THROW(bee::parallel_reduce(pool, data.begin(), data.end(), 0, std::plus<>{}, source.get_token()), std::runtime_error);
 }
 
 // =========================================================================
@@ -101,17 +107,14 @@ TEST(ParallelReduceTests, Cancellation)
 
 TEST(ParallelReduceTests, TransformReduceSumOfSquares)
 {
-    ThreadPool pool(4);
+    ThreadPool       pool(4);
     constexpr size_t N = 100'000;
     std::vector<int> data(N);
     std::iota(data.begin(), data.end(), 1);
 
-    auto result = bee::parallel_transform_reduce(
-            pool, data.begin(), data.end(), 0LL,
-            std::plus<>{},
-            [](int x) -> long long {
-                return static_cast<long long>(x) * x;
-            });
+    auto result = bee::parallel_transform_reduce(pool, data.begin(), data.end(), 0LL, std::plus<>{}, [](int x) -> long long {
+        return static_cast<long long>(x) * x;
+    });
 
     // 平方和公式：N(N+1)(2N+1)/6
     long long expected = static_cast<long long>(N) * (N + 1) * (2 * N + 1) / 6;
@@ -120,29 +123,48 @@ TEST(ParallelReduceTests, TransformReduceSumOfSquares)
 
 TEST(ParallelReduceTests, TransformReduceExceptionPropagation)
 {
-    ThreadPool pool(4);
+    ThreadPool       pool(4);
     constexpr size_t N = 100'000;
     std::vector<int> data(N, 1);
 
-    EXPECT_THROW(bee::parallel_transform_reduce(
-                     pool, data.begin(), data.end(), 0LL, std::plus<>{},
-                     [](int) -> long long { throw std::runtime_error("transform error"); }),
-                 std::runtime_error);
+    EXPECT_THROW(
+            bee::parallel_transform_reduce(
+                    pool,
+                    data.begin(),
+                    data.end(),
+                    0LL,
+                    std::plus<>{},
+                    [](int) -> long long {
+                        throw std::runtime_error("transform error");
+                    }
+            ),
+            std::runtime_error
+    );
 }
 
 TEST(ParallelReduceTests, TransformReduceCancellation)
 {
-    ThreadPool pool(4);
+    ThreadPool       pool(4);
     constexpr size_t N = 200'000;
     std::vector<int> data(N, 1);
 
     std::stop_source source;
     source.request_stop();
 
-    EXPECT_THROW(bee::parallel_transform_reduce(
-                     pool, data.begin(), data.end(), 0LL, std::plus<>{},
-                     [](int x) -> long long { return x; }, source.get_token()),
-                 std::runtime_error);
+    EXPECT_THROW(
+            bee::parallel_transform_reduce(
+                    pool,
+                    data.begin(),
+                    data.end(),
+                    0LL,
+                    std::plus<>{},
+                    [](int x) -> long long {
+                        return x;
+                    },
+                    source.get_token()
+            ),
+            std::runtime_error
+    );
 }
 
 } // namespace

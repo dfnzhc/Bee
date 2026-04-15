@@ -35,11 +35,11 @@ using LogSink = void (*)(LogLevel level, std::string_view category, std::string_
 
 // --- Control API ---
 
-void SetLogSink(LogSink sink) noexcept;
-void SetLogLevel(LogLevel level) noexcept;
-[[nodiscard]] LogSink GetLogSink() noexcept;
+void                   SetLogSink(LogSink sink) noexcept;
+void                   SetLogLevel(LogLevel level) noexcept;
+[[nodiscard]] LogSink  GetLogSink() noexcept;
 [[nodiscard]] LogLevel GetLogLevel() noexcept;
-void EnableDefaultLogging(LogLevel level = LogLevel::Info) noexcept;
+void                   EnableDefaultLogging(LogLevel level = LogLevel::Info) noexcept;
 
 // --- Built-in sink ---
 
@@ -49,14 +49,13 @@ void DefaultConsoleSink(LogLevel level, std::string_view category, std::string_v
 
 namespace detail
 {
-    extern std::atomic<LogSink> g_log_sink;
+    extern std::atomic<LogSink>  g_log_sink;
     extern std::atomic<LogLevel> g_log_level;
 } // namespace detail
 
 // --- LogRaw: pre-formatted message ---
 
-inline void LogRaw(LogLevel level, std::string_view category, std::string_view message,
-                   std::source_location loc = std::source_location::current())
+inline void LogRaw(LogLevel level, std::string_view category, std::string_view message, std::source_location loc = std::source_location::current())
 {
     if (static_cast<u8>(level) < static_cast<u8>(detail::g_log_level.load(std::memory_order_relaxed)))
         return;
@@ -74,7 +73,7 @@ template <typename... Args>
 struct FormatWithLocation
 {
     std::format_string<Args...> fmt;
-    std::source_location loc;
+    std::source_location        loc;
 
     template <typename T>
     consteval FormatWithLocation(T&& f, std::source_location l = std::source_location::current())

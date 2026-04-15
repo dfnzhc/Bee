@@ -50,15 +50,19 @@ auto parallel_for_each(ThreadPool& pool, It first, It last, Fn fn, std::stop_tok
         return;
     }
 
-    detail::execute_chunks(pool, n,
-                           [first, &fn, token](size_t begin, size_t end) {
-                               auto it = std::next(first, static_cast<std::ptrdiff_t>(begin));
-                               for (size_t i = begin; i < end; ++i, ++it) {
-                                   if (token.stop_requested())
-                                       return;
-                                   fn(*it);
-                               }
-                           }, token);
+    detail::execute_chunks(
+            pool,
+            n,
+            [first, &fn, token](size_t begin, size_t end) {
+                auto it = std::next(first, static_cast<std::ptrdiff_t>(begin));
+                for (size_t i = begin; i < end; ++i, ++it) {
+                    if (token.stop_requested())
+                        return;
+                    fn(*it);
+                }
+            },
+            token
+    );
 }
 
 } // namespace bee

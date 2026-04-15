@@ -50,7 +50,7 @@ struct Resize
 
 TEST(EventBusTest, SubscribeAndPublish)
 {
-    EventBus bus;
+    EventBus   bus;
     MouseClick received{};
     bus.subscribe<MouseClick>([&received](const MouseClick& e) {
         received = e;
@@ -63,8 +63,8 @@ TEST(EventBusTest, SubscribeAndPublish)
 TEST(EventBusTest, MultipleEventTypesAreIndependent)
 {
     EventBus bus;
-    int mouse_count = 0;
-    int key_count   = 0;
+    int      mouse_count = 0;
+    int      key_count   = 0;
 
     bus.subscribe<MouseClick>([&mouse_count](const MouseClick&) {
         ++mouse_count;
@@ -83,18 +83,27 @@ TEST(EventBusTest, MultipleEventTypesAreIndependent)
 
 TEST(EventBusTest, PriorityOrdering)
 {
-    EventBus bus;
+    EventBus    bus;
     std::string order;
 
-    bus.subscribe<MouseClick>([&order](const MouseClick&) {
-        order += "B";
-    }, 10);
-    bus.subscribe<MouseClick>([&order](const MouseClick&) {
-        order += "A";
-    }, 1);
-    bus.subscribe<MouseClick>([&order](const MouseClick&) {
-        order += "C";
-    }, 100);
+    bus.subscribe<MouseClick>(
+            [&order](const MouseClick&) {
+                order += "B";
+            },
+            10
+    );
+    bus.subscribe<MouseClick>(
+            [&order](const MouseClick&) {
+                order += "A";
+            },
+            1
+    );
+    bus.subscribe<MouseClick>(
+            [&order](const MouseClick&) {
+                order += "C";
+            },
+            100
+    );
 
     bus.publish(MouseClick{});
     EXPECT_EQ(order, "ABC");
@@ -113,8 +122,8 @@ TEST(EventBusTest, PublishWithNoSubscribersIsNoOp)
 TEST(EventBusTest, ClearRemovesOnlyOneType)
 {
     EventBus bus;
-    int mouse_count = 0;
-    int key_count   = 0;
+    int      mouse_count = 0;
+    int      key_count   = 0;
 
     bus.subscribe<MouseClick>([&mouse_count](const MouseClick&) {
         ++mouse_count;
@@ -134,8 +143,8 @@ TEST(EventBusTest, ClearRemovesOnlyOneType)
 TEST(EventBusTest, ClearAllRemovesEverything)
 {
     EventBus bus;
-    int mouse_count = 0;
-    int key_count   = 0;
+    int      mouse_count = 0;
+    int      key_count   = 0;
 
     bus.subscribe<MouseClick>([&mouse_count](const MouseClick&) {
         ++mouse_count;
@@ -159,8 +168,8 @@ TEST(EventBusTest, ClearAllRemovesEverything)
 TEST(EventBusTest, DisconnectViaConnectionHandle)
 {
     EventBus bus;
-    int count = 0;
-    auto conn = bus.subscribe<MouseClick>([&count](const MouseClick&) {
+    int      count = 0;
+    auto     conn  = bus.subscribe<MouseClick>([&count](const MouseClick&) {
         ++count;
     });
     bus.publish(MouseClick{});
@@ -173,12 +182,11 @@ TEST(EventBusTest, DisconnectViaConnectionHandle)
 TEST(EventBusTest, ScopedConnectionAutoDisconnect)
 {
     EventBus bus;
-    int count = 0;
+    int      count = 0;
     {
-        ScopedConnection scoped(
-                bus.subscribe<MouseClick>([&count](const MouseClick&) {
-                    ++count;
-                }));
+        ScopedConnection scoped(bus.subscribe<MouseClick>([&count](const MouseClick&) {
+            ++count;
+        }));
         bus.publish(MouseClick{});
         EXPECT_EQ(count, 1);
     }
@@ -192,7 +200,7 @@ TEST(EventBusTest, ScopedConnectionAutoDisconnect)
 
 TEST(EventBusTest, ErrorHandlerPropagation)
 {
-    EventBus bus;
+    EventBus           bus;
     std::exception_ptr captured;
     bus.set_error_handler([&captured](std::exception_ptr ep) {
         captured = ep;
@@ -214,7 +222,7 @@ TEST(EventBusTest, ErrorHandlerPropagation)
 
 TEST(EventBusTest, ErrorHandlerAppliesToFutureChannels)
 {
-    EventBus bus;
+    EventBus           bus;
     std::exception_ptr captured;
     bus.set_error_handler([&captured](std::exception_ptr ep) {
         captured = ep;
@@ -235,12 +243,12 @@ TEST(EventBusTest, ErrorHandlerAppliesToFutureChannels)
 
 TEST(EventBusTest, ConcurrentSubscribeAndPublish)
 {
-    EventBus bus;
+    EventBus         bus;
     std::atomic<int> total{0};
 
-    constexpr int kThreads   = 8;
-    constexpr int kPerThread = 100;
-    std::atomic<bool> go{false};
+    constexpr int            kThreads   = 8;
+    constexpr int            kPerThread = 100;
+    std::atomic<bool>        go{false};
     std::vector<std::thread> threads;
 
     for (int t = 0; t < kThreads; ++t) {
@@ -250,10 +258,9 @@ TEST(EventBusTest, ConcurrentSubscribeAndPublish)
             }
             if (t % 2 == 0) {
                 for (int i = 0; i < kPerThread; ++i) {
-                    bus.subscribe<MouseClick>(
-                            [&total](const MouseClick&) {
-                                total.fetch_add(1, std::memory_order_relaxed);
-                            });
+                    bus.subscribe<MouseClick>([&total](const MouseClick&) {
+                        total.fetch_add(1, std::memory_order_relaxed);
+                    });
                 }
             } else {
                 for (int i = 0; i < kPerThread; ++i) {
@@ -277,17 +284,15 @@ TEST(EventBusTest, ConcurrentSubscribeAndPublish)
 
 TEST(EventBusTest, PublishAsyncViaThreadPool)
 {
-    EventBus bus;
+    EventBus         bus;
     std::atomic<int> sum{0};
 
-    bus.subscribe<MouseClick>(
-            [&sum](const MouseClick& e) {
-                sum.fetch_add(e.x, std::memory_order_relaxed);
-            });
-    bus.subscribe<MouseClick>(
-            [&sum](const MouseClick& e) {
-                sum.fetch_add(e.x, std::memory_order_relaxed);
-            });
+    bus.subscribe<MouseClick>([&sum](const MouseClick& e) {
+        sum.fetch_add(e.x, std::memory_order_relaxed);
+    });
+    bus.subscribe<MouseClick>([&sum](const MouseClick& e) {
+        sum.fetch_add(e.x, std::memory_order_relaxed);
+    });
 
     ThreadPool pool(2);
     bus.publish_async(pool, MouseClick{5, 0});

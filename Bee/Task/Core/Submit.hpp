@@ -84,8 +84,7 @@ auto submit(ThreadPool& pool, Fn&& fn, std::stop_token token) -> Task<std::invok
 /// 提交接收 stop_token 参数的可调用对象，用于执行中检查取消。
 template <typename Fn>
     requires std::is_invocable_v<Fn, std::stop_token>
-auto submit_cancellable(ThreadPool& pool, Fn&& fn, std::stop_source& source)
-    -> Task<std::invoke_result_t<Fn, std::stop_token>>
+auto submit_cancellable(ThreadPool& pool, Fn&& fn, std::stop_source& source) -> Task<std::invoke_result_t<Fn, std::stop_token>>
 {
     using R = std::invoke_result_t<Fn, std::stop_token>;
 

@@ -95,7 +95,7 @@ TEST(CountMinSketchTests, UpdateWithCount)
 
 TEST(CountMinSketchTests, EstimateNeverUnderestimates)
 {
-    CountMinSketch<std::string> cms(500, 7);
+    CountMinSketch<std::string>                    cms(500, 7);
     std::unordered_map<std::string, std::uint64_t> actual;
 
     // 插入一些已知频率的元素
@@ -210,7 +210,7 @@ TEST(CountMinSketchTests, SetSeedsClearsData)
 
 TEST(CountMinSketchTests, SetSeedsWrongSizeThrows)
 {
-    CountMinSketch<int> cms(100, 3);
+    CountMinSketch<int>        cms(100, 3);
     std::vector<std::uint64_t> seeds = {1, 2}; // 长度为 2，但 depth 为 3
     EXPECT_THROW(cms.set_seeds(seeds), std::invalid_argument);
 }
@@ -224,10 +224,10 @@ TEST(CountMinSketchTests, ErrorBoundIsRespected)
     // 使用较大的 sketch 来验证误差界
     double epsilon = 0.001;
     double delta   = 0.01;
-    auto cms       = CountMinSketch<int>::make_from_error_params(epsilon, delta);
+    auto   cms     = CountMinSketch<int>::make_from_error_params(epsilon, delta);
 
     std::unordered_map<int, std::uint64_t> actual;
-    int N = 100000;
+    int                                    N = 100000;
 
     for (int i = 0; i < N; ++i) {
         int key = i % 1000;

@@ -30,7 +30,7 @@ namespace bee
  *   - precision 决定寄存器个数 m = 2^p，取值范围 [4, 18]。
  *   - 每个寄存器存储观察到的最大前导零位数 + 1。
  *   - 估计时使用调和平均数，并对小基数和大基数分别做线性计数和大范围修正。
- *   
+ *
  *   https://en.wikipedia.org/wiki/HyperLogLog
  *
  * @tparam T 元素类型，需要可哈希（std::hash<T> 可用）
@@ -81,7 +81,7 @@ public:
 
         // 剩余位中计算前导零的数量 + 1（即 rho 函数）
         std::uint64_t remaining = (hash << _precision) | (std::uint64_t{1} << (_precision - 1));
-        std::uint8_t rank       = std::countl_zero(remaining) + 1;
+        std::uint8_t  rank      = std::countl_zero(remaining) + 1;
 
         // 每个寄存器保留观察到的最大 rank
         if (rank > _registers[idx]) {
@@ -117,8 +117,8 @@ public:
     [[nodiscard]] double estimate() const
     {
         // 计算调和平均数的倒数之和
-        double harmonicSum    = 0.0;
-        std::size_t zeroCount = 0;
+        double      harmonicSum = 0.0;
+        std::size_t zeroCount   = 0;
 
         for (std::size_t i = 0; i < _registerCount; ++i) {
             harmonicSum += 1.0 / static_cast<double>(std::uint64_t{1} << _registers[i]);
@@ -208,10 +208,10 @@ private:
     }
 
 private:
-    std::uint8_t _precision    = 14;
-    std::size_t _registerCount = 0;
+    std::uint8_t              _precision     = 14;
+    std::size_t               _registerCount = 0;
     std::vector<std::uint8_t> _registers;
-    double _alpha = 0.0;
+    double                    _alpha = 0.0;
 };
 
 } // namespace bee

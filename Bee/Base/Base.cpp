@@ -1,9 +1,11 @@
 #include "Base/Base.hpp"
 
-namespace bee {
+namespace bee
+{
 
-std::string_view base_name() noexcept {
+std::string_view base_name() noexcept
+{
     return "Base";
 }
 
-}  // namespace bee
+} // namespace bee

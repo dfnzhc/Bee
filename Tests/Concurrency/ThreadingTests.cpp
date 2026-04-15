@@ -61,7 +61,7 @@ TEST(BaseThreadingTests, SetCurrentThreadNameAcceptsNonEmptyName)
 
 TEST(BaseThreadingTests, ThreadIdHashDiffersAcrossThreads)
 {
-    constexpr int kThreads = 4;
+    constexpr int            kThreads = 4;
     std::vector<std::size_t> hashes(kThreads, 0);
     std::vector<std::thread> threads;
 

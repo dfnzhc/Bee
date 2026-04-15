@@ -53,16 +53,20 @@ template <typename InIt, typename OutIt, typename Fn>
         return out;
     }
 
-    detail::execute_chunks(pool, n,
-                           [first, d_first, &fn, token](size_t begin, size_t end) {
-                               auto in  = std::next(first, static_cast<std::ptrdiff_t>(begin));
-                               auto out = std::next(d_first, static_cast<std::ptrdiff_t>(begin));
-                               for (size_t i = begin; i < end; ++i, ++in, ++out) {
-                                   if (token.stop_requested())
-                                       return;
-                                   *out = fn(*in);
-                               }
-                           }, token);
+    detail::execute_chunks(
+            pool,
+            n,
+            [first, d_first, &fn, token](size_t begin, size_t end) {
+                auto in  = std::next(first, static_cast<std::ptrdiff_t>(begin));
+                auto out = std::next(d_first, static_cast<std::ptrdiff_t>(begin));
+                for (size_t i = begin; i < end; ++i, ++in, ++out) {
+                    if (token.stop_requested())
+                        return;
+                    *out = fn(*in);
+                }
+            },
+            token
+    );
 
     return std::next(d_first, static_cast<std::ptrdiff_t>(n));
 }

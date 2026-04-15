@@ -28,7 +28,7 @@ using bee::ThreadPool;
 
 TEST(ParallelForEachTests, BasicMutation)
 {
-    ThreadPool pool(4);
+    ThreadPool       pool(4);
     std::vector<int> data(10000);
     std::iota(data.begin(), data.end(), 0);
 
@@ -43,7 +43,7 @@ TEST(ParallelForEachTests, BasicMutation)
 
 TEST(ParallelForEachTests, EmptyRange)
 {
-    ThreadPool pool(4);
+    ThreadPool       pool(4);
     std::vector<int> data;
     // 不应崩溃或抛出异常。
     bee::parallel_for_each(pool, data.begin(), data.end(), [](int&) {
@@ -53,7 +53,7 @@ TEST(ParallelForEachTests, EmptyRange)
 
 TEST(ParallelForEachTests, SingleElement)
 {
-    ThreadPool pool(4);
+    ThreadPool       pool(4);
     std::vector<int> data = {42};
     bee::parallel_for_each(pool, data.begin(), data.end(), [](int& x) {
         x += 1;
@@ -63,7 +63,7 @@ TEST(ParallelForEachTests, SingleElement)
 
 TEST(ParallelForEachTests, LargeRange)
 {
-    ThreadPool pool(4);
+    ThreadPool       pool(4);
     constexpr size_t N = 200'000;
     std::vector<int> data(N, 1);
 
@@ -77,23 +77,29 @@ TEST(ParallelForEachTests, LargeRange)
 
 TEST(ParallelForEachTests, ExceptionPropagation)
 {
-    ThreadPool pool(4);
+    ThreadPool       pool(4);
     constexpr size_t N = 100'000;
     std::vector<int> data(N, 0);
 
     EXPECT_THROW(
-            bee::parallel_for_each(pool, data.begin(), data.end(), [](int& x) {
-                if (x == 0)
-                throw std::runtime_error("test error");
-                }),
-            std::runtime_error);
+            bee::parallel_for_each(
+                    pool,
+                    data.begin(),
+                    data.end(),
+                    [](int& x) {
+                        if (x == 0)
+                            throw std::runtime_error("test error");
+                    }
+            ),
+            std::runtime_error
+    );
 }
 
 TEST(ParallelForEachTests, CancellationStopsProcessing)
 {
-    ThreadPool pool(4);
-    constexpr size_t N = 200'000;
-    std::vector<int> data(N, 0);
+    ThreadPool          pool(4);
+    constexpr size_t    N = 200'000;
+    std::vector<int>    data(N, 0);
     std::atomic<size_t> processed{0};
 
     std::stop_source source;
@@ -102,12 +108,16 @@ TEST(ParallelForEachTests, CancellationStopsProcessing)
 
     EXPECT_THROW(
             bee::parallel_for_each(
-                pool,
-                data.begin(),
-                data.end(),
-                [&processed](int&) { processed.fetch_add(1, std::memory_order_relaxed); },
-                source.get_token()),
-            std::runtime_error);
+                    pool,
+                    data.begin(),
+                    data.end(),
+                    [&processed](int&) {
+                        processed.fetch_add(1, std::memory_order_relaxed);
+                    },
+                    source.get_token()
+            ),
+            std::runtime_error
+    );
 
     // 因为立即取消了，不应处理所有元素。
     EXPECT_LT(processed.load(), N);

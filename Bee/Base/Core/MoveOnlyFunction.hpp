@@ -98,13 +98,14 @@ private:
                 },
                 [](void* dst, void* src) {
                     // 原位移动构造并析构
-                    new(dst) Fn(std::move(*static_cast<Fn*>(src)));
+                    new (dst) Fn(std::move(*static_cast<Fn*>(src)));
                     static_cast<Fn*>(src)->~Fn();
                 },
                 [](void* p) {
                     // 仅析构对象，不释放内存
                     static_cast<Fn*>(p)->~Fn();
-                }};
+                },
+        };
         return vt;
     }
 
@@ -124,7 +125,8 @@ private:
                     // 释放堆对象，再将存储的指针置空
                     delete *static_cast<Fn**>(p);
                     *static_cast<Fn**>(p) = nullptr;
-                }};
+                },
+        };
         return vt;
     }
 
@@ -140,7 +142,7 @@ private:
         if constexpr (fits_inline<Fn>()) {
             // 满足小对象优化，在 inline 空间创建对象并设置 vtable
             try {
-                new(&inline_storage_) Fn(std::forward<CtorArgs>(args)...);
+                new (&inline_storage_) Fn(std::forward<CtorArgs>(args)...);
             } catch (...) {
                 vtable_ = nullptr;
                 throw;

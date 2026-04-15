@@ -35,7 +35,7 @@ using bee::ThreadPool;
 TEST(SignalTest, ConnectAndEmit)
 {
     Signal<void(int)> sig;
-    int received = 0;
+    int               received = 0;
     sig.connect([&received](int v) {
         received = v;
     });
@@ -46,7 +46,7 @@ TEST(SignalTest, ConnectAndEmit)
 TEST(SignalTest, MultipleSlots)
 {
     Signal<void()> sig;
-    int count = 0;
+    int            count = 0;
     sig.connect([&count]() {
         ++count;
     });
@@ -72,10 +72,8 @@ TEST(SignalTest, SlotCountAccuracy)
     EXPECT_EQ(sig.slot_count(), 0u);
     EXPECT_TRUE(sig.empty());
 
-    auto c1 = sig.connect([]() {
-    });
-    auto c2 = sig.connect([]() {
-    });
+    auto c1 = sig.connect([]() {});
+    auto c2 = sig.connect([]() {});
     EXPECT_EQ(sig.slot_count(), 2u);
     EXPECT_FALSE(sig.empty());
 
@@ -90,17 +88,26 @@ TEST(SignalTest, SlotCountAccuracy)
 TEST(SignalTest, PriorityOrdering)
 {
     Signal<void()> sig;
-    std::string order;
+    std::string    order;
 
-    sig.connect([&order]() {
-        order += "B";
-    }, 10);
-    sig.connect([&order]() {
-        order += "A";
-    }, 1);
-    sig.connect([&order]() {
-        order += "C";
-    }, 100);
+    sig.connect(
+            [&order]() {
+                order += "B";
+            },
+            10
+    );
+    sig.connect(
+            [&order]() {
+                order += "A";
+            },
+            1
+    );
+    sig.connect(
+            [&order]() {
+                order += "C";
+            },
+            100
+    );
 
     sig.emit();
     EXPECT_EQ(order, "ABC");
@@ -109,17 +116,26 @@ TEST(SignalTest, PriorityOrdering)
 TEST(SignalTest, StablePriorityOrdering)
 {
     Signal<void()> sig;
-    std::string order;
+    std::string    order;
 
-    sig.connect([&order]() {
-        order += "1";
-    }, 0);
-    sig.connect([&order]() {
-        order += "2";
-    }, 0);
-    sig.connect([&order]() {
-        order += "3";
-    }, 0);
+    sig.connect(
+            [&order]() {
+                order += "1";
+            },
+            0
+    );
+    sig.connect(
+            [&order]() {
+                order += "2";
+            },
+            0
+    );
+    sig.connect(
+            [&order]() {
+                order += "3";
+            },
+            0
+    );
 
     sig.emit();
     EXPECT_EQ(order, "123");
@@ -132,8 +148,8 @@ TEST(SignalTest, StablePriorityOrdering)
 TEST(SignalTest, DisconnectPreventsCallback)
 {
     Signal<void()> sig;
-    int count = 0;
-    auto conn = sig.connect([&count]() {
+    int            count = 0;
+    auto           conn  = sig.connect([&count]() {
         ++count;
     });
     conn.disconnect();
@@ -144,7 +160,7 @@ TEST(SignalTest, DisconnectPreventsCallback)
 TEST(SignalTest, DisconnectAll)
 {
     Signal<void()> sig;
-    int count = 0;
+    int            count = 0;
     sig.connect([&count]() {
         ++count;
     });
@@ -163,7 +179,7 @@ TEST(SignalTest, DisconnectAll)
 TEST(SignalTest, ScopedConnectionAutoDisconnect)
 {
     Signal<void()> sig;
-    int count = 0;
+    int            count = 0;
     {
         ScopedConnection scoped(sig.connect([&count]() {
             ++count;
@@ -178,8 +194,8 @@ TEST(SignalTest, ScopedConnectionAutoDisconnect)
 TEST(SignalTest, ScopedConnectionRelease)
 {
     Signal<void()> sig;
-    int count = 0;
-    Connection released;
+    int            count = 0;
+    Connection     released;
     {
         ScopedConnection scoped(sig.connect([&count]() {
             ++count;
@@ -196,8 +212,7 @@ TEST(SignalTest, ConnectionReflectsSignalDestruction)
     Connection conn;
     {
         Signal<void()> sig;
-        conn = sig.connect([]() {
-        });
+        conn = sig.connect([]() {});
         EXPECT_TRUE(conn.connected());
     } // sig destroyed → disconnect_all called → active set to false
     EXPECT_FALSE(conn.connected());
@@ -210,17 +225,26 @@ TEST(SignalTest, ConnectionReflectsSignalDestruction)
 TEST(SignalTest, ExceptionInSlotDoesNotStopOthers)
 {
     Signal<void()> sig;
-    int count = 0;
+    int            count = 0;
 
-    sig.connect([&count]() {
-        ++count;
-    }, 1);
-    sig.connect([]() {
-        throw std::runtime_error("boom");
-    }, 2);
-    sig.connect([&count]() {
-        ++count;
-    }, 3);
+    sig.connect(
+            [&count]() {
+                ++count;
+            },
+            1
+    );
+    sig.connect(
+            []() {
+                throw std::runtime_error("boom");
+            },
+            2
+    );
+    sig.connect(
+            [&count]() {
+                ++count;
+            },
+            3
+    );
 
     sig.emit();
     EXPECT_EQ(count, 2); // both non-throwing slots ran
@@ -228,7 +252,7 @@ TEST(SignalTest, ExceptionInSlotDoesNotStopOthers)
 
 TEST(SignalTest, ErrorHandlerReceivesException)
 {
-    Signal<void()> sig;
+    Signal<void()>     sig;
     std::exception_ptr captured;
     sig.set_error_handler([&captured](std::exception_ptr ep) {
         captured = ep;
@@ -252,15 +276,15 @@ TEST(SignalTest, ErrorHandlerReceivesException)
 
 TEST(SignalTest, ConcurrentConnectAndEmit)
 {
-    Signal<void()> sig;
+    Signal<void()>   sig;
     std::atomic<int> total{0};
 
-    constexpr int kThreads   = 8;
-    constexpr int kPerThread = 100;
-    std::atomic<bool> go{false};
+    constexpr int            kThreads   = 8;
+    constexpr int            kPerThread = 100;
+    std::atomic<bool>        go{false};
     std::vector<std::thread> threads;
-    std::vector<Connection> connections;
-    std::mutex conn_mutex;
+    std::vector<Connection>  connections;
+    std::mutex               conn_mutex;
 
     // Half the threads connect, half emit
     for (int t = 0; t < kThreads; ++t) {
@@ -270,7 +294,7 @@ TEST(SignalTest, ConcurrentConnectAndEmit)
             }
             if (t % 2 == 0) {
                 for (int i = 0; i < kPerThread; ++i) {
-                    auto c = sig.connect([&total]() {
+                    auto            c = sig.connect([&total]() {
                         total.fetch_add(1, std::memory_order_relaxed);
                     });
                     std::lock_guard lock(conn_mutex);
@@ -295,20 +319,19 @@ TEST(SignalTest, ConcurrentConnectAndEmit)
 
 TEST(SignalTest, ConcurrentDisconnectAndEmit)
 {
-    Signal<void()> sig;
+    Signal<void()>   sig;
     std::atomic<int> total{0};
-    constexpr int kSlots = 200;
+    constexpr int    kSlots = 200;
 
     std::vector<Connection> connections;
     for (int i = 0; i < kSlots; ++i) {
-        connections.push_back(
-                sig.connect([&total]() {
-                    total.fetch_add(1, std::memory_order_relaxed);
-                }));
+        connections.push_back(sig.connect([&total]() {
+            total.fetch_add(1, std::memory_order_relaxed);
+        }));
     }
 
     std::atomic<bool> go{false};
-    std::thread emitter([&]() {
+    std::thread       emitter([&]() {
         while (!go.load(std::memory_order_acquire)) {
             std::this_thread::yield();
         }
@@ -341,7 +364,7 @@ TEST(SignalTest, ConcurrentDisconnectAndEmit)
 TEST(SignalTest, EmitAsyncDispatchesToThreadPool)
 {
     Signal<void(int)> sig;
-    std::atomic<int> sum{0};
+    std::atomic<int>  sum{0};
 
     sig.connect([&sum](int v) {
         sum.fetch_add(v, std::memory_order_relaxed);
@@ -364,7 +387,7 @@ TEST(SignalTest, EmitAsyncDispatchesToThreadPool)
 TEST(SignalTest, MoveConstructor)
 {
     Signal<void()> sig1;
-    int count = 0;
+    int            count = 0;
     sig1.connect([&count]() {
         ++count;
     });
@@ -382,8 +405,10 @@ TEST(SignalTest, MoveAssignment)
 {
     Signal<void()> sig1;
     Signal<void()> sig2;
-    int count = 0;
-    sig2.connect([&count]() { ++count; });
+    int            count = 0;
+    sig2.connect([&count]() {
+        ++count;
+    });
 
     sig1 = std::move(sig2);
     sig1.emit();

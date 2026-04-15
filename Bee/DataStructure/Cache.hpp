@@ -150,8 +150,8 @@ public:
     }
 
 private:
-    size_type _capacity;
-    std::list<std::pair<Key, Value>> _list; // 前端为最近使用，后端为最久未用
+    size_type                                                                          _capacity;
+    std::list<std::pair<Key, Value>>                                                   _list; // 前端为最近使用，后端为最久未用
     std::unordered_map<Key, typename std::list<std::pair<Key, Value>>::iterator, Hash> _map;
 };
 
@@ -274,8 +274,8 @@ public:
     }
 
 private:
-    size_type _capacity;
-    std::list<std::pair<Key, Value>> _list;
+    size_type                                                                          _capacity;
+    std::list<std::pair<Key, Value>>                                                   _list;
     std::unordered_map<Key, typename std::list<std::pair<Key, Value>>::iterator, Hash> _map;
 };
 
@@ -303,8 +303,8 @@ class LFUCache
 {
     struct Entry
     {
-        Key key;
-        Value value;
+        Key         key;
+        Value       value;
         std::size_t freq;
     };
 
@@ -318,7 +318,8 @@ public:
      * @param capacity 最大容量，必须大于 0
      */
     explicit LFUCache(size_type capacity)
-        : _capacity(capacity), _minFreq(0)
+        : _capacity(capacity)
+        , _minFreq(0)
     {
         if (capacity == 0) {
             throw std::invalid_argument("LFUCache: capacity must be greater than 0");
@@ -506,8 +507,8 @@ class MFUCache
 {
     struct Entry
     {
-        Key key;
-        Value value;
+        Key         key;
+        Value       value;
         std::size_t freq;
     };
 
@@ -521,7 +522,8 @@ public:
      * @param capacity 最大容量，必须大于 0
      */
     explicit MFUCache(size_type capacity)
-        : _capacity(capacity), _maxFreq(0)
+        : _capacity(capacity)
+        , _maxFreq(0)
     {
         if (capacity == 0)
             throw std::invalid_argument("MFUCache: capacity 必须大于 0");
@@ -731,15 +733,15 @@ class ARCache
 
     struct Entry
     {
-        Key key;
-        Value value;
+        Key      key;
+        Value    value;
         ListType type;
     };
 
     // 幽灵条目不存储值
     struct GhostEntry
     {
-        Key key;
+        Key      key;
         ListType type;
     };
 
@@ -753,7 +755,8 @@ public:
      * @param capacity 最大容量（T1 + T2 的总上限），必须大于 0
      */
     explicit ARCache(size_type capacity)
-        : _capacity(capacity), _p(0)
+        : _capacity(capacity)
+        , _p(0)
     {
         if (capacity == 0)
             throw std::invalid_argument("ARCache: capacity 必须大于 0");
@@ -1024,8 +1027,8 @@ private:
     std::list<GhostEntry> _b2;
 
     // 键到迭代器的映射
-    std::unordered_map<Key, typename std::list<Entry>::iterator, Hash> _t1Map;
-    std::unordered_map<Key, typename std::list<Entry>::iterator, Hash> _t2Map;
+    std::unordered_map<Key, typename std::list<Entry>::iterator, Hash>      _t1Map;
+    std::unordered_map<Key, typename std::list<Entry>::iterator, Hash>      _t2Map;
     std::unordered_map<Key, typename std::list<GhostEntry>::iterator, Hash> _b1Map;
     std::unordered_map<Key, typename std::list<GhostEntry>::iterator, Hash> _b2Map;
 

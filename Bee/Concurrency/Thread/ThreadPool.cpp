@@ -223,8 +223,8 @@ auto ThreadPool::try_push_to_global_queues(MoveOnlyFunction& task) -> bool
         return try_once(0);
     }
 
-    const auto block_deadline = std::chrono::steady_clock::now() + config_.enqueue_block_timeout;
-    std::uint32_t spin        = 0;
+    const auto    block_deadline = std::chrono::steady_clock::now() + config_.enqueue_block_timeout;
+    std::uint32_t spin           = 0;
     while (true) {
         if (try_once(spin)) {
             return true;
@@ -257,8 +257,8 @@ auto ThreadPool::try_pop_from_global_queues(std::size_t self_index, MoveOnlyFunc
     }
 
     const std::uint32_t budget = std::max<std::uint32_t>(1u, global_probe_budget_.load(std::memory_order_relaxed));
-    const std::size_t probes   = std::min<std::size_t>(shard_count - 1, budget);
-    const std::size_t start    = global_probe_cursor_.fetch_add(1, std::memory_order_relaxed);
+    const std::size_t   probes = std::min<std::size_t>(shard_count - 1, budget);
+    const std::size_t   start  = global_probe_cursor_.fetch_add(1, std::memory_order_relaxed);
     for (std::size_t i = 1; i <= probes; ++i) {
         const std::size_t idx = (start + home + i) % shard_count;
         if (global_queues_[idx]->try_pop(task)) {
@@ -271,8 +271,8 @@ auto ThreadPool::try_pop_from_global_queues(std::size_t self_index, MoveOnlyFunc
     const std::uint32_t streak = global_miss_streak_.fetch_add(1, std::memory_order_relaxed) + 1;
     if ((streak & 0x1Fu) == 0x1Fu) {
         const std::uint32_t cur = global_probe_budget_.load(std::memory_order_relaxed);
-        const std::uint32_t cap = static_cast<std::uint32_t>(
-            std::min<std::size_t>(kMaxAdaptiveGlobalProbeCount, shard_count > 0 ? shard_count - 1 : 0));
+        const std::uint32_t cap =
+                static_cast<std::uint32_t>(std::min<std::size_t>(kMaxAdaptiveGlobalProbeCount, shard_count > 0 ? shard_count - 1 : 0));
         if (cap > 0 && cur < cap) {
             global_probe_budget_.store(cur + 1, std::memory_order_relaxed);
         }
@@ -336,16 +336,16 @@ auto ThreadPool::try_take_task(std::size_t self_index, MoveOnlyFunction& task, s
     }
 
     // 3) 从其他本地队列窃取（xorshift64 随机采样 + 轮询回退）。
-    const std::size_t total  = local_queues_.size();
-    std::size_t best_victim  = self_index;
-    std::ptrdiff_t best_load = std::numeric_limits<std::ptrdiff_t>::min();
+    const std::size_t total       = local_queues_.size();
+    std::size_t       best_victim = self_index;
+    std::ptrdiff_t    best_load   = std::numeric_limits<std::ptrdiff_t>::min();
 
     const std::size_t samples = std::min<std::size_t>(kVictimSampleCount, total > 1 ? total - 1 : 0);
     for (std::size_t s = 0; s < samples; ++s) {
         rng_state             ^= (rng_state << 12);
         rng_state             ^= (rng_state >> 25);
         rng_state             ^= (rng_state << 27);
-        std::size_t candidate = static_cast<std::size_t>(rng_state % total);
+        std::size_t candidate  = static_cast<std::size_t>(rng_state % total);
         if (candidate == self_index) {
             candidate = (candidate + 1) % total;
         }
@@ -418,10 +418,10 @@ void ThreadPool::worker_loop(std::size_t worker_index, std::stop_token st)
         }
 
         // 自适应自旋：根据 backlog 调整忙等预算。
-        bool acquired                   = false;
-        const std::size_t pending       = pending_tasks_.load(std::memory_order_relaxed);
-        const std::size_t active        = active_tasks_.load(std::memory_order_relaxed);
-        const std::size_t backlog       = pending > active ? pending - active : 0;
+        bool                acquired    = false;
+        const std::size_t   pending     = pending_tasks_.load(std::memory_order_relaxed);
+        const std::size_t   active      = active_tasks_.load(std::memory_order_relaxed);
+        const std::size_t   backlog     = pending > active ? pending - active : 0;
         const std::uint32_t spin_budget = backlog > worker_count_ ? 256u : (backlog > 0 ? 128u : 32u);
 
         std::uint32_t spin = 0;

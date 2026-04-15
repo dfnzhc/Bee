@@ -18,14 +18,14 @@ namespace
 
 struct LogEntry
 {
-    bee::LogLevel level;
-    std::string category;
-    std::string message;
+    bee::LogLevel        level;
+    std::string          category;
+    std::string          message;
     std::source_location location;
 };
 
 std::vector<LogEntry> g_captured;
-std::mutex g_captured_mutex;
+std::mutex            g_captured_mutex;
 
 void CaptureSink(bee::LogLevel level, std::string_view category, std::string_view message, std::source_location location)
 {

@@ -36,17 +36,17 @@ template <typename It, typename T, typename BinaryOp>
     if (n < detail::kParallelThreshold)
         return std::reduce(first, last, init, op);
 
-    auto chunks = detail::partition(n, pool.thread_count());
-    std::vector<T> partial_results(chunks.size());
+    auto                            chunks = detail::partition(n, pool.thread_count());
+    std::vector<T>                  partial_results(chunks.size());
     std::vector<std::exception_ptr> exceptions(chunks.size());
-    std::latch done(static_cast<std::ptrdiff_t>(chunks.size()));
+    std::latch                      done(static_cast<std::ptrdiff_t>(chunks.size()));
 
     for (size_t i = 0; i < chunks.size(); ++i) {
         pool.post([&, i]() {
             try {
                 auto it  = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
                 auto end = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
-                T acc    = *it;
+                T    acc = *it;
                 ++it;
                 for (; it != end; ++it) {
                     acc = op(acc, *it);
@@ -92,11 +92,11 @@ template <typename It, typename T, typename BinaryOp>
         return acc;
     }
 
-    auto chunks = detail::partition(n, pool.thread_count());
-    std::vector<T> partial_results(chunks.size());
+    auto                            chunks = detail::partition(n, pool.thread_count());
+    std::vector<T>                  partial_results(chunks.size());
     std::vector<std::exception_ptr> exceptions(chunks.size());
-    std::atomic<bool> cancelled{false};
-    std::latch done(static_cast<std::ptrdiff_t>(chunks.size()));
+    std::atomic<bool>               cancelled{false};
+    std::latch                      done(static_cast<std::ptrdiff_t>(chunks.size()));
 
     for (size_t i = 0; i < chunks.size(); ++i) {
         pool.post([&, i]() {
@@ -108,7 +108,7 @@ template <typename It, typename T, typename BinaryOp>
             try {
                 auto it  = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
                 auto end = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
-                T acc    = *it;
+                T    acc = *it;
                 ++it;
                 for (; it != end; ++it) {
                     if (token.stop_requested()) {
@@ -158,17 +158,17 @@ template <typename It, typename T, typename ReduceOp, typename TransformOp>
     if (n < detail::kParallelThreshold)
         return std::transform_reduce(first, last, init, reduce_op, transform_op);
 
-    auto chunks = detail::partition(n, pool.thread_count());
-    std::vector<T> partial_results(chunks.size());
+    auto                            chunks = detail::partition(n, pool.thread_count());
+    std::vector<T>                  partial_results(chunks.size());
     std::vector<std::exception_ptr> exceptions(chunks.size());
-    std::latch done(static_cast<std::ptrdiff_t>(chunks.size()));
+    std::latch                      done(static_cast<std::ptrdiff_t>(chunks.size()));
 
     for (size_t i = 0; i < chunks.size(); ++i) {
         pool.post([&, i]() {
             try {
                 auto it  = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
                 auto end = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
-                T acc    = transform_op(*it);
+                T    acc = transform_op(*it);
                 ++it;
                 for (; it != end; ++it) {
                     acc = reduce_op(acc, transform_op(*it));
@@ -197,8 +197,15 @@ template <typename It, typename T, typename ReduceOp, typename TransformOp>
 
 /// 带取消支持的并行变换归约。
 template <typename It, typename T, typename ReduceOp, typename TransformOp>
-[[nodiscard]] auto parallel_transform_reduce(ThreadPool& pool, It first, It last, T init, ReduceOp reduce_op, TransformOp transform_op,
-                                             std::stop_token token) -> T
+[[nodiscard]] auto parallel_transform_reduce(
+        ThreadPool&     pool,
+        It              first,
+        It              last,
+        T               init,
+        ReduceOp        reduce_op,
+        TransformOp     transform_op,
+        std::stop_token token
+) -> T
 {
     const auto n = static_cast<size_t>(std::distance(first, last));
     if (n == 0)
@@ -214,11 +221,11 @@ template <typename It, typename T, typename ReduceOp, typename TransformOp>
         return acc;
     }
 
-    auto chunks = detail::partition(n, pool.thread_count());
-    std::vector<T> partial_results(chunks.size());
+    auto                            chunks = detail::partition(n, pool.thread_count());
+    std::vector<T>                  partial_results(chunks.size());
     std::vector<std::exception_ptr> exceptions(chunks.size());
-    std::atomic<bool> cancelled{false};
-    std::latch done(static_cast<std::ptrdiff_t>(chunks.size()));
+    std::atomic<bool>               cancelled{false};
+    std::latch                      done(static_cast<std::ptrdiff_t>(chunks.size()));
 
     for (size_t i = 0; i < chunks.size(); ++i) {
         pool.post([&, i]() {
@@ -230,7 +237,7 @@ template <typename It, typename T, typename ReduceOp, typename TransformOp>
             try {
                 auto it  = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
                 auto end = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
-                T acc    = transform_op(*it);
+                T    acc = transform_op(*it);
                 ++it;
                 for (; it != end; ++it) {
                     if (token.stop_requested()) {
