@@ -5,7 +5,7 @@ BasedOnStyle: LLVM
 # --- 基础排版规则 ---
 ColumnLimit: 150
 IndentWidth: 4
-ContinuationIndentWidth: 8
+ContinuationIndentWidth: 4
 TabWidth: 4
 UseTab: Never
 MaxEmptyLinesToKeep: 1
@@ -39,11 +39,12 @@ SpacesInCStyleCastParentheses: false
 SpacesInParentheses: false
 BinPackArguments: false
 BinPackParameters: false
-AllowShortLambdasOnASingleLine: Empty
+AllowShortLambdasOnASingleLine: Inline
 AllowAllParametersOfDeclarationOnNextLine: false
 AlwaysBreakAfterReturnType: None
 PenaltyReturnTypeOnItsOwnLine: 10000
 BreakAfterAttributes: Never
+LambdaBodyIndentation: Signature
 
 # --- 大括号换行风格 ---
 BreakBeforeBraces: Custom

@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include <shared_mutex>
+
 #include "Base/Core/Defines.hpp"
 #include "Concurrency/Threading.hpp"
 
@@ -37,7 +39,7 @@ class ChaseLevDeque
 {
     // 类型是 trivial 类型，可以直接拷贝避免构造
     static constexpr bool kTrivialFastPath =
-            std::is_trivially_copyable_v<T> && std::is_trivially_destructible_v<T> && std::is_default_constructible_v<T>;
+        std::is_trivially_copyable_v<T> && std::is_trivially_destructible_v<T> && std::is_default_constructible_v<T>;
 
 public:
     using value_type      = T;
@@ -340,7 +342,7 @@ template <typename T, typename Allocator = std::allocator<T>>
 class ChaseLevDequeDynamic
 {
     static constexpr bool kSupportedValueType =
-            std::is_trivially_copyable_v<T> && std::is_trivially_destructible_v<T> && std::is_default_constructible_v<T>;
+        std::is_trivially_copyable_v<T> && std::is_trivially_destructible_v<T> && std::is_default_constructible_v<T>;
 
     static_assert(kSupportedValueType, "ChaseLevDequeDynamic requires trivially copyable/destructible/default-constructible T");
 
@@ -493,6 +495,8 @@ public:
 
     [[nodiscard]] bool try_steal(T& out_value) noexcept
     {
+        std::shared_lock<std::shared_mutex> guard(_buffer_guard);
+
         auto* buf = _buffer.load(std::memory_order_acquire);
         auto  top = _top.load(std::memory_order_acquire);
         std::atomic_thread_fence(std::memory_order_seq_cst);
@@ -501,11 +505,13 @@ public:
             return false;
         }
 
+        const auto ticket = top;
+        T          value  = buf->slots[ticket % buf->capacity];
         if (!_top.compare_exchange_strong(top, top + 1, std::memory_order_seq_cst, std::memory_order_relaxed)) {
             return false;
         }
 
-        out_value = std::move(buf->slots[top % buf->capacity]);
+        out_value = std::move(value);
         return true;
     }
 
@@ -575,6 +581,8 @@ private:
 
     [[nodiscard]] Buffer* grow_buffer(size_type top, size_type bottom)
     {
+        std::unique_lock<std::shared_mutex> guard(_buffer_guard);
+
         auto*      old_buffer   = _buffer.load(std::memory_order_acquire);
         const auto old_capacity = old_buffer->capacity;
 
@@ -602,6 +610,7 @@ private:
     alignas(BEE_CACHE_LINE_SIZE) std::atomic<size_type> _top    = {0};
     alignas(BEE_CACHE_LINE_SIZE) std::atomic<size_type> _bottom = {0};
     alignas(BEE_CACHE_LINE_SIZE) std::atomic<Buffer*> _buffer   = {nullptr};
+    mutable std::shared_mutex _buffer_guard;
 
     // 仅 owner 写入；保存历史 buffer 以避免并发访问时提前释放。
     std::vector<Buffer*> _retired_buffers;

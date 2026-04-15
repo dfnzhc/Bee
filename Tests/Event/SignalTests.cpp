@@ -36,9 +36,7 @@ TEST(SignalTest, ConnectAndEmit)
 {
     Signal<void(int)> sig;
     int               received = 0;
-    sig.connect([&received](int v) {
-        received = v;
-    });
+    sig.connect([&received](int v) { received = v; });
     sig.emit(42);
     EXPECT_EQ(received, 42);
 }
@@ -47,15 +45,9 @@ TEST(SignalTest, MultipleSlots)
 {
     Signal<void()> sig;
     int            count = 0;
-    sig.connect([&count]() {
-        ++count;
-    });
-    sig.connect([&count]() {
-        ++count;
-    });
-    sig.connect([&count]() {
-        ++count;
-    });
+    sig.connect([&count]() { ++count; });
+    sig.connect([&count]() { ++count; });
+    sig.connect([&count]() { ++count; });
     sig.emit();
     EXPECT_EQ(count, 3);
 }
@@ -90,24 +82,9 @@ TEST(SignalTest, PriorityOrdering)
     Signal<void()> sig;
     std::string    order;
 
-    sig.connect(
-            [&order]() {
-                order += "B";
-            },
-            10
-    );
-    sig.connect(
-            [&order]() {
-                order += "A";
-            },
-            1
-    );
-    sig.connect(
-            [&order]() {
-                order += "C";
-            },
-            100
-    );
+    sig.connect([&order]() { order += "B"; }, 10);
+    sig.connect([&order]() { order += "A"; }, 1);
+    sig.connect([&order]() { order += "C"; }, 100);
 
     sig.emit();
     EXPECT_EQ(order, "ABC");
@@ -118,24 +95,9 @@ TEST(SignalTest, StablePriorityOrdering)
     Signal<void()> sig;
     std::string    order;
 
-    sig.connect(
-            [&order]() {
-                order += "1";
-            },
-            0
-    );
-    sig.connect(
-            [&order]() {
-                order += "2";
-            },
-            0
-    );
-    sig.connect(
-            [&order]() {
-                order += "3";
-            },
-            0
-    );
+    sig.connect([&order]() { order += "1"; }, 0);
+    sig.connect([&order]() { order += "2"; }, 0);
+    sig.connect([&order]() { order += "3"; }, 0);
 
     sig.emit();
     EXPECT_EQ(order, "123");
@@ -149,9 +111,7 @@ TEST(SignalTest, DisconnectPreventsCallback)
 {
     Signal<void()> sig;
     int            count = 0;
-    auto           conn  = sig.connect([&count]() {
-        ++count;
-    });
+    auto           conn  = sig.connect([&count]() { ++count; });
     conn.disconnect();
     sig.emit();
     EXPECT_EQ(count, 0);
@@ -161,12 +121,8 @@ TEST(SignalTest, DisconnectAll)
 {
     Signal<void()> sig;
     int            count = 0;
-    sig.connect([&count]() {
-        ++count;
-    });
-    sig.connect([&count]() {
-        ++count;
-    });
+    sig.connect([&count]() { ++count; });
+    sig.connect([&count]() { ++count; });
     sig.disconnect_all();
     sig.emit();
     EXPECT_EQ(count, 0);
@@ -181,9 +137,7 @@ TEST(SignalTest, ScopedConnectionAutoDisconnect)
     Signal<void()> sig;
     int            count = 0;
     {
-        ScopedConnection scoped(sig.connect([&count]() {
-            ++count;
-        }));
+        ScopedConnection scoped(sig.connect([&count]() { ++count; }));
         sig.emit();
         EXPECT_EQ(count, 1);
     }
@@ -197,9 +151,7 @@ TEST(SignalTest, ScopedConnectionRelease)
     int            count = 0;
     Connection     released;
     {
-        ScopedConnection scoped(sig.connect([&count]() {
-            ++count;
-        }));
+        ScopedConnection scoped(sig.connect([&count]() { ++count; }));
         released = scoped.release();
     } // scoped destroyed but released, so slot still active
     sig.emit();
@@ -227,24 +179,9 @@ TEST(SignalTest, ExceptionInSlotDoesNotStopOthers)
     Signal<void()> sig;
     int            count = 0;
 
-    sig.connect(
-            [&count]() {
-                ++count;
-            },
-            1
-    );
-    sig.connect(
-            []() {
-                throw std::runtime_error("boom");
-            },
-            2
-    );
-    sig.connect(
-            [&count]() {
-                ++count;
-            },
-            3
-    );
+    sig.connect([&count]() { ++count; }, 1);
+    sig.connect([]() { throw std::runtime_error("boom"); }, 2);
+    sig.connect([&count]() { ++count; }, 3);
 
     sig.emit();
     EXPECT_EQ(count, 2); // both non-throwing slots ran
@@ -254,12 +191,8 @@ TEST(SignalTest, ErrorHandlerReceivesException)
 {
     Signal<void()>     sig;
     std::exception_ptr captured;
-    sig.set_error_handler([&captured](std::exception_ptr ep) {
-        captured = ep;
-    });
-    sig.connect([]() {
-        throw std::runtime_error("test error");
-    });
+    sig.set_error_handler([&captured](std::exception_ptr ep) { captured = ep; });
+    sig.connect([]() { throw std::runtime_error("test error"); });
 
     sig.emit();
     ASSERT_TRUE(captured != nullptr);
@@ -294,9 +227,7 @@ TEST(SignalTest, ConcurrentConnectAndEmit)
             }
             if (t % 2 == 0) {
                 for (int i = 0; i < kPerThread; ++i) {
-                    auto            c = sig.connect([&total]() {
-                        total.fetch_add(1, std::memory_order_relaxed);
-                    });
+                    auto            c = sig.connect([&total]() { total.fetch_add(1, std::memory_order_relaxed); });
                     std::lock_guard lock(conn_mutex);
                     connections.push_back(c);
                 }
@@ -325,9 +256,7 @@ TEST(SignalTest, ConcurrentDisconnectAndEmit)
 
     std::vector<Connection> connections;
     for (int i = 0; i < kSlots; ++i) {
-        connections.push_back(sig.connect([&total]() {
-            total.fetch_add(1, std::memory_order_relaxed);
-        }));
+        connections.push_back(sig.connect([&total]() { total.fetch_add(1, std::memory_order_relaxed); }));
     }
 
     std::atomic<bool> go{false};
@@ -366,12 +295,8 @@ TEST(SignalTest, EmitAsyncDispatchesToThreadPool)
     Signal<void(int)> sig;
     std::atomic<int>  sum{0};
 
-    sig.connect([&sum](int v) {
-        sum.fetch_add(v, std::memory_order_relaxed);
-    });
-    sig.connect([&sum](int v) {
-        sum.fetch_add(v, std::memory_order_relaxed);
-    });
+    sig.connect([&sum](int v) { sum.fetch_add(v, std::memory_order_relaxed); });
+    sig.connect([&sum](int v) { sum.fetch_add(v, std::memory_order_relaxed); });
 
     ThreadPool pool(2);
     sig.emit_async(pool, 10);
@@ -388,9 +313,7 @@ TEST(SignalTest, MoveConstructor)
 {
     Signal<void()> sig1;
     int            count = 0;
-    sig1.connect([&count]() {
-        ++count;
-    });
+    sig1.connect([&count]() { ++count; });
 
     Signal<void()> sig2(std::move(sig1));
     sig2.emit();
@@ -406,9 +329,7 @@ TEST(SignalTest, MoveAssignment)
     Signal<void()> sig1;
     Signal<void()> sig2;
     int            count = 0;
-    sig2.connect([&count]() {
-        ++count;
-    });
+    sig2.connect([&count]() { ++count; });
 
     sig1 = std::move(sig2);
     sig1.emit();

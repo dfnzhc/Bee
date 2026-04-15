@@ -72,9 +72,7 @@ TEST(TaskGraphTests, EmptyGraph)
 TEST(TaskGraphTests, AddRootNode)
 {
     TaskGraph graph;
-    auto      a = graph.add_node([] {
-        return 42;
-    });
+    auto      a = graph.add_node([] { return 42; });
     EXPECT_FALSE(graph.empty());
     EXPECT_EQ(graph.node_count(), 1u);
     EXPECT_FALSE(graph.has_cycle());
@@ -83,28 +81,10 @@ TEST(TaskGraphTests, AddRootNode)
 TEST(TaskGraphTests, BuildDiamondNoCycle)
 {
     TaskGraph graph;
-    auto      a = graph.add_node([] {
-        return 1;
-    });
-    auto      b = graph.add_node(
-            [](int x) {
-                return x + 1;
-            },
-            a
-    );
-    auto c = graph.add_node(
-            [](int x) {
-                return x * 2;
-            },
-            a
-    );
-    auto d = graph.add_node(
-            [](int x, int y) {
-                return x + y;
-            },
-            b,
-            c
-    );
+    auto      a = graph.add_node([] { return 1; });
+    auto      b = graph.add_node([](int x) { return x + 1; }, a);
+    auto      c = graph.add_node([](int x) { return x * 2; }, a);
+    auto      d = graph.add_node([](int x, int y) { return x + y; }, b, c);
     EXPECT_EQ(graph.node_count(), 4u);
     EXPECT_FALSE(graph.has_cycle());
 }
@@ -126,9 +106,7 @@ TEST(TaskGraphTests, SingleNodeExecute)
 {
     ThreadPool pool(2);
     TaskGraph  graph;
-    auto       a    = graph.add_node([] {
-        return 42;
-    });
+    auto       a    = graph.add_node([] { return 42; });
     auto       task = graph.execute(pool);
     task.wait();
     EXPECT_EQ(task.state(), TaskState::Completed);
@@ -139,22 +117,10 @@ TEST(TaskGraphTests, SimpleChain)
 {
     ThreadPool pool(2);
     TaskGraph  graph;
-    auto       a = graph.add_node([] {
-        return 10;
-    });
-    auto       b = graph.add_node(
-            [](int x) {
-                return x * 2;
-            },
-            a
-    );
-    auto c = graph.add_node(
-            [](int x) {
-                return x + 5;
-            },
-            b
-    );
-    auto task = graph.execute(pool);
+    auto       a    = graph.add_node([] { return 10; });
+    auto       b    = graph.add_node([](int x) { return x * 2; }, a);
+    auto       c    = graph.add_node([](int x) { return x + 5; }, b);
+    auto       task = graph.execute(pool);
     task.wait();
     EXPECT_EQ(graph.result(a), 10);
     EXPECT_EQ(graph.result(b), 20);
@@ -165,29 +131,11 @@ TEST(TaskGraphTests, DiamondDependency)
 {
     ThreadPool pool(4);
     TaskGraph  graph;
-    auto       a = graph.add_node([] {
-        return 1;
-    });
-    auto       b = graph.add_node(
-            [](int x) {
-                return x + 10;
-            },
-            a
-    );
-    auto c = graph.add_node(
-            [](int x) {
-                return x * 100;
-            },
-            a
-    );
-    auto d = graph.add_node(
-            [](int x, int y) {
-                return x + y;
-            },
-            b,
-            c
-    );
-    auto task = graph.execute(pool);
+    auto       a    = graph.add_node([] { return 1; });
+    auto       b    = graph.add_node([](int x) { return x + 10; }, a);
+    auto       c    = graph.add_node([](int x) { return x * 100; }, a);
+    auto       d    = graph.add_node([](int x, int y) { return x + y; }, b, c);
+    auto       task = graph.execute(pool);
     task.wait();
     EXPECT_EQ(graph.result(a), 1);
     EXPECT_EQ(graph.result(b), 11);
@@ -199,17 +147,10 @@ TEST(TaskGraphTests, WideFanOut)
 {
     ThreadPool                   pool(4);
     TaskGraph                    graph;
-    auto                         root = graph.add_node([] {
-        return 5;
-    });
+    auto                         root = graph.add_node([] { return 5; });
     std::vector<NodeHandle<int>> children;
     for (int i = 0; i < 10; ++i) {
-        children.push_back(graph.add_node(
-                [i](int x) {
-                    return x + i;
-                },
-                root
-        ));
+        children.push_back(graph.add_node([i](int x) { return x + i; }, root));
     }
     auto task = graph.execute(pool);
     task.wait();
@@ -224,22 +165,10 @@ TEST(TaskGraphTests, TypedDataFlow)
 {
     ThreadPool pool(2);
     TaskGraph  graph;
-    auto       a = graph.add_node([] {
-        return 42;
-    });
-    auto       b = graph.add_node(
-            [](int x) {
-                return std::to_string(x);
-            },
-            a
-    );
-    auto c = graph.add_node(
-            [](const std::string& s) {
-                return static_cast<double>(s.size());
-            },
-            b
-    );
-    auto task = graph.execute(pool);
+    auto       a    = graph.add_node([] { return 42; });
+    auto       b    = graph.add_node([](int x) { return std::to_string(x); }, a);
+    auto       c    = graph.add_node([](const std::string& s) { return static_cast<double>(s.size()); }, b);
+    auto       task = graph.execute(pool);
     task.wait();
     EXPECT_EQ(graph.result(a), 42);
     EXPECT_EQ(graph.result(b), "42");
@@ -251,16 +180,9 @@ TEST(TaskGraphTests, VoidNodesWithAddNodeAfter)
     ThreadPool       pool(2);
     TaskGraph        graph;
     std::atomic<int> counter{0};
-    auto             a = graph.add_node([&] {
-        counter.fetch_add(1, std::memory_order_relaxed);
-    });
-    auto             b = graph.add_node_after(
-            [&] {
-                counter.fetch_add(10, std::memory_order_relaxed);
-            },
-            a
-    );
-    auto task = graph.execute(pool);
+    auto             a    = graph.add_node([&] { counter.fetch_add(1, std::memory_order_relaxed); });
+    auto             b    = graph.add_node_after([&] { counter.fetch_add(10, std::memory_order_relaxed); }, a);
+    auto             task = graph.execute(pool);
     task.wait();
     EXPECT_EQ(task.state(), TaskState::Completed);
     EXPECT_EQ(counter.load(), 11);
@@ -272,37 +194,28 @@ TEST(TaskGraphTests, WideFanIn)
     TaskGraph                    graph;
     std::vector<NodeHandle<int>> roots;
     for (int i = 0; i < 10; ++i) {
-        roots.push_back(graph.add_node([i] {
-            return i;
-        }));
+        roots.push_back(graph.add_node([i] { return i; }));
     }
 
     std::atomic<int>              sum{0};
     std::vector<NodeHandle<void>> void_roots;
     for (auto& r : roots) {
-        void_roots.push_back(graph.add_node(
-                [&sum](int x) {
-                    sum.fetch_add(x, std::memory_order_relaxed);
-                },
-                r
-        ));
+        void_roots.push_back(graph.add_node([&sum](int x) { sum.fetch_add(x, std::memory_order_relaxed); }, r));
     }
 
     // Sink node depends on all void nodes
     auto sink = graph.add_node_after(
-            [&sum] {
-                return sum.load(std::memory_order_relaxed);
-            },
-            void_roots[0],
-            void_roots[1],
-            void_roots[2],
-            void_roots[3],
-            void_roots[4],
-            void_roots[5],
-            void_roots[6],
-            void_roots[7],
-            void_roots[8],
-            void_roots[9]
+        [&sum] { return sum.load(std::memory_order_relaxed); },
+        void_roots[0],
+        void_roots[1],
+        void_roots[2],
+        void_roots[3],
+        void_roots[4],
+        void_roots[5],
+        void_roots[6],
+        void_roots[7],
+        void_roots[8],
+        void_roots[9]
     );
 
     auto task = graph.execute(pool);
@@ -318,24 +231,10 @@ TEST(TaskGraphTests, MixedVoidAndTyped)
     TaskGraph        graph;
     std::atomic<int> side_effect{0};
 
-    auto producer  = graph.add_node([] {
-        return 10;
-    });
-    auto void_node = graph.add_node([&] {
-        side_effect.store(99, std::memory_order_relaxed);
-    });
-    auto consumer  = graph.add_node(
-            [](int x) {
-                return x * 3;
-            },
-            producer
-    );
-    auto final_node = graph.add_node_after(
-            [&] {
-                return side_effect.load(std::memory_order_relaxed);
-            },
-            void_node
-    );
+    auto producer   = graph.add_node([] { return 10; });
+    auto void_node  = graph.add_node([&] { side_effect.store(99, std::memory_order_relaxed); });
+    auto consumer   = graph.add_node([](int x) { return x * 3; }, producer);
+    auto final_node = graph.add_node_after([&] { return side_effect.load(std::memory_order_relaxed); }, void_node);
 
     auto task = graph.execute(pool);
     task.wait();
@@ -349,9 +248,7 @@ TEST(TaskGraphTests, ReExecution)
     ThreadPool       pool(2);
     TaskGraph        graph;
     std::atomic<int> call_count{0};
-    auto             a = graph.add_node([&] {
-        return call_count.fetch_add(1, std::memory_order_relaxed);
-    });
+    auto             a = graph.add_node([&] { return call_count.fetch_add(1, std::memory_order_relaxed); });
 
     auto task1 = graph.execute(pool);
     task1.wait();

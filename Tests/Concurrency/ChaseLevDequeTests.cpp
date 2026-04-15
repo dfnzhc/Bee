@@ -8,6 +8,7 @@
 #include <gtest/gtest.h>
 
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <thread>
@@ -353,4 +354,185 @@ TEST(ChaseLevDequeTests, EmptyStealReturnsFalse)
     ASSERT_TRUE(deque.try_steal(val));
     EXPECT_EQ(val, 42);
     EXPECT_FALSE(deque.try_steal(val));
+}
+
+TEST(ChaseLevDequeDynamicTests, GrowsAndPreservesStealOrder)
+{
+    constexpr int             kTotalItems = 2000;
+    ChaseLevDequeDynamic<int> deque(1);
+
+    for (int i = 0; i < kTotalItems; ++i) {
+        ASSERT_TRUE(deque.try_push(i));
+    }
+    EXPECT_GE(deque.capacity(), static_cast<std::size_t>(kTotalItems));
+
+    int value = 0;
+    for (int expected = 0; expected < kTotalItems; ++expected) {
+        ASSERT_TRUE(deque.try_steal(value));
+        EXPECT_EQ(value, expected);
+    }
+    EXPECT_TRUE(deque.is_empty());
+}
+
+TEST(ChaseLevDequeDynamicTests, ConcurrentOwnerAndStealersConsumeAllItemsAfterGrowth)
+{
+    constexpr int kTotalItems = 30000;
+    constexpr int kStealers   = 4;
+
+    ChaseLevDequeDynamic<int> deque(8);
+
+    std::vector<std::atomic<std::uint8_t>> seen(static_cast<std::size_t>(kTotalItems));
+    for (auto& flag : seen) {
+        flag.store(0, std::memory_order_relaxed);
+    }
+
+    std::atomic<int>  consumed{0};
+    std::atomic<bool> producer_done{false};
+    std::atomic<bool> valid{true};
+    std::atomic<bool> abort{false};
+
+    std::thread owner([&]() {
+        for (int value = 0; value < kTotalItems; ++value) {
+            while (!deque.try_push(value)) {
+                if (abort.load(std::memory_order_relaxed)) {
+                    return;
+                }
+                std::this_thread::yield();
+            }
+        }
+        producer_done.store(true, std::memory_order_release);
+    });
+
+    auto consume_value = [&](int value) {
+        if (value < 0 || value >= kTotalItems) {
+            valid.store(false, std::memory_order_relaxed);
+            abort.store(true, std::memory_order_relaxed);
+            return;
+        }
+        auto&      slot     = seen[static_cast<std::size_t>(value)];
+        const auto previous = slot.exchange(1, std::memory_order_relaxed);
+        if (previous != 0) {
+            valid.store(false, std::memory_order_relaxed);
+            abort.store(true, std::memory_order_relaxed);
+            return;
+        }
+        consumed.fetch_add(1, std::memory_order_relaxed);
+    };
+
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(1500);
+
+    std::vector<std::thread> stealers;
+    stealers.reserve(kStealers);
+    for (int i = 0; i < kStealers; ++i) {
+        stealers.emplace_back([&]() {
+            int value = 0;
+            while (!abort.load(std::memory_order_relaxed) &&
+                   (!producer_done.load(std::memory_order_acquire) || consumed.load(std::memory_order_relaxed) < kTotalItems)) {
+                if (std::chrono::steady_clock::now() >= deadline) {
+                    abort.store(true, std::memory_order_relaxed);
+                    break;
+                }
+                if (!deque.try_steal(value)) {
+                    std::this_thread::yield();
+                    continue;
+                }
+                consume_value(value);
+            }
+        });
+    }
+
+    owner.join();
+    for (auto& thread : stealers) {
+        thread.join();
+    }
+
+    EXPECT_FALSE(abort.load(std::memory_order_relaxed));
+    EXPECT_GE(deque.capacity(), 8u);
+    EXPECT_EQ(consumed.load(std::memory_order_relaxed), kTotalItems);
+    EXPECT_TRUE(valid.load(std::memory_order_relaxed));
+    EXPECT_TRUE(deque.is_empty());
+    for (const auto& flag : seen) {
+        EXPECT_EQ(flag.load(std::memory_order_relaxed), 1);
+    }
+}
+
+TEST(ChaseLevDequeDynamicTests, ConcurrentOwnerAndStealersAfterGrowthNoStallUnderStress)
+{
+    constexpr int kRounds     = 30;
+    constexpr int kTotalItems = 30000;
+    constexpr int kStealers   = 4;
+
+    for (int round = 0; round < kRounds; ++round) {
+        ChaseLevDequeDynamic<int> deque(8);
+
+        std::vector<std::atomic<std::uint8_t>> seen(static_cast<std::size_t>(kTotalItems));
+        for (auto& flag : seen) {
+            flag.store(0, std::memory_order_relaxed);
+        }
+
+        std::atomic<int>  consumed{0};
+        std::atomic<bool> producer_done{false};
+        std::atomic<bool> valid{true};
+        std::atomic<bool> abort{false};
+
+        std::thread owner([&]() {
+            for (int value = 0; value < kTotalItems; ++value) {
+                while (!deque.try_push(value)) {
+                    if (abort.load(std::memory_order_relaxed)) {
+                        return;
+                    }
+                    std::this_thread::yield();
+                }
+            }
+            producer_done.store(true, std::memory_order_release);
+        });
+
+        auto consume_value = [&](int value) {
+            if (value < 0 || value >= kTotalItems) {
+                valid.store(false, std::memory_order_relaxed);
+                abort.store(true, std::memory_order_relaxed);
+                return;
+            }
+            auto&      slot     = seen[static_cast<std::size_t>(value)];
+            const auto previous = slot.exchange(1, std::memory_order_relaxed);
+            if (previous != 0) {
+                valid.store(false, std::memory_order_relaxed);
+                abort.store(true, std::memory_order_relaxed);
+                return;
+            }
+            consumed.fetch_add(1, std::memory_order_relaxed);
+        };
+
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(1500);
+
+        std::vector<std::thread> stealers;
+        stealers.reserve(kStealers);
+        for (int i = 0; i < kStealers; ++i) {
+            stealers.emplace_back([&]() {
+                int value = 0;
+                while (!abort.load(std::memory_order_relaxed) &&
+                       (!producer_done.load(std::memory_order_acquire) || consumed.load(std::memory_order_relaxed) < kTotalItems)) {
+                    if (std::chrono::steady_clock::now() >= deadline) {
+                        abort.store(true, std::memory_order_relaxed);
+                        break;
+                    }
+                    if (!deque.try_steal(value)) {
+                        std::this_thread::yield();
+                        continue;
+                    }
+                    consume_value(value);
+                }
+            });
+        }
+
+        owner.join();
+        for (auto& thread : stealers) {
+            thread.join();
+        }
+
+        ASSERT_FALSE(abort.load(std::memory_order_relaxed)) << "round=" << round;
+        ASSERT_TRUE(valid.load(std::memory_order_relaxed)) << "round=" << round;
+        ASSERT_EQ(consumed.load(std::memory_order_relaxed), kTotalItems) << "round=" << round;
+        ASSERT_TRUE(deque.is_empty()) << "round=" << round;
+    }
 }

@@ -58,7 +58,7 @@ class MPMCQueue
 {
     // 类型是 trivial 类型，可以直接拷贝避免构造
     static constexpr bool kTrivialFastPath =
-            std::is_trivially_copyable_v<T> && std::is_trivially_destructible_v<T> && std::is_default_constructible_v<T>;
+        std::is_trivially_copyable_v<T> && std::is_trivially_destructible_v<T> && std::is_default_constructible_v<T>;
 
 public:
     using value_type      = T;

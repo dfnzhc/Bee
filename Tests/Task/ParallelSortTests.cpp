@@ -57,9 +57,7 @@ TEST(ParallelSortTests, RandomData)
     constexpr size_t N = 200'000;
     std::vector<int> data(N);
     std::mt19937     rng(42);
-    std::generate(data.begin(), data.end(), [&rng] {
-        return static_cast<int>(rng() % 1'000'000);
-    });
+    std::generate(data.begin(), data.end(), [&rng] { return static_cast<int>(rng() % 1'000'000); });
 
     auto expected = data;
     std::sort(expected.begin(), expected.end());
@@ -101,9 +99,7 @@ TEST(ParallelSortTests, Cancellation)
     constexpr size_t N = 200'000;
     std::vector<int> data(N);
     std::mt19937     rng(123);
-    std::generate(data.begin(), data.end(), [&rng] {
-        return static_cast<int>(rng());
-    });
+    std::generate(data.begin(), data.end(), [&rng] { return static_cast<int>(rng()); });
 
     std::stop_source source;
     source.request_stop();

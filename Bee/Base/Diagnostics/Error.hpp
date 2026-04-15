@@ -84,10 +84,10 @@ using Status = Result<std::monostate>;
 // ============================================================================
 
 [[nodiscard]] inline auto make_error(
-        std::string          message,
-        Severity             severity = Severity::Recoverable,
-        int                  errc     = 0,
-        std::source_location where    = std::source_location::current()
+    std::string          message,
+    Severity             severity = Severity::Recoverable,
+    int                  errc     = 0,
+    std::source_location where    = std::source_location::current()
 ) -> Error
 {
     Error e;
@@ -142,10 +142,10 @@ template <typename T>
 /// 在 try/catch 中调用 fn，并将异常转换为 Result<T>。
 template <typename Fn>
 [[nodiscard]] auto guard(
-        Fn&&                 fn,
-        std::string          operation,
-        Severity             exceptionSeverity = Severity::Fatal,
-        std::source_location where             = std::source_location::current()
+    Fn&&                 fn,
+    std::string          operation,
+    Severity             exceptionSeverity = Severity::Fatal,
+    std::source_location where             = std::source_location::current()
 ) -> Result<std::invoke_result_t<Fn>>
 {
     using R = std::invoke_result_t<Fn>;

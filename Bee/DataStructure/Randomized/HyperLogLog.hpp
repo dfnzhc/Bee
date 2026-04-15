@@ -184,9 +184,7 @@ public:
     /** @brief 检查是否为空（未插入过任何元素） */
     [[nodiscard]] bool empty() const noexcept
     {
-        return std::all_of(_registers.begin(), _registers.end(), [](std::uint8_t v) {
-            return v == 0;
-        });
+        return std::all_of(_registers.begin(), _registers.end(), [](std::uint8_t v) { return v == 0; });
     }
 
 private:

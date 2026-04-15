@@ -24,15 +24,9 @@ TEST(WhenAllTests, HeterogeneousTuple)
 {
     bee::ThreadPool pool(4);
 
-    auto t1 = bee::submit(pool, [] {
-        return 42;
-    });
-    auto t2 = bee::submit(pool, [] {
-        return std::string("hello");
-    });
-    auto t3 = bee::submit(pool, [] {
-        return 3.14;
-    });
+    auto t1 = bee::submit(pool, [] { return 42; });
+    auto t2 = bee::submit(pool, [] { return std::string("hello"); });
+    auto t3 = bee::submit(pool, [] { return 3.14; });
 
     auto combined  = bee::when_all(std::move(t1), std::move(t2), std::move(t3));
     auto [a, b, c] = combined.get();
@@ -48,9 +42,7 @@ TEST(WhenAllTests, HomogeneousVector)
 
     std::vector<Task<int>> tasks;
     for (int i = 0; i < 5; ++i) {
-        tasks.push_back(bee::submit(pool, [i] {
-            return i * 10;
-        }));
+        tasks.push_back(bee::submit(pool, [i] { return i * 10; }));
     }
 
     auto combined = bee::when_all(std::move(tasks));
@@ -66,15 +58,9 @@ TEST(WhenAllTests, OneFailsCombinedFails)
 {
     bee::ThreadPool pool(4);
 
-    auto t1 = bee::submit(pool, [] {
-        return 1;
-    });
-    auto t2 = bee::submit(pool, []() -> int {
-        throw std::runtime_error("boom");
-    });
-    auto t3 = bee::submit(pool, [] {
-        return 3;
-    });
+    auto t1 = bee::submit(pool, [] { return 1; });
+    auto t2 = bee::submit(pool, []() -> int { throw std::runtime_error("boom"); });
+    auto t3 = bee::submit(pool, [] { return 3; });
 
     auto combined = bee::when_all(std::move(t1), std::move(t2), std::move(t3));
     EXPECT_THROW(combined.get(), std::runtime_error);
@@ -98,9 +84,7 @@ TEST(WhenAllTests, SingleTask)
     bee::ThreadPool pool(2);
 
     std::vector<Task<int>> tasks;
-    tasks.push_back(bee::submit(pool, [] {
-        return 77;
-    }));
+    tasks.push_back(bee::submit(pool, [] { return 77; }));
 
     auto combined = bee::when_all(std::move(tasks));
     auto results  = combined.get();
@@ -114,12 +98,8 @@ TEST(WhenAllTests, WithVoidTasks)
     bee::ThreadPool  pool(4);
     std::atomic<int> counter{0};
 
-    auto t1 = bee::submit(pool, [&] {
-        counter.fetch_add(1);
-    });
-    auto t2 = bee::submit(pool, [&] {
-        counter.fetch_add(1);
-    });
+    auto t1 = bee::submit(pool, [&] { counter.fetch_add(1); });
+    auto t2 = bee::submit(pool, [&] { counter.fetch_add(1); });
 
     auto combined = bee::when_all(std::move(t1), std::move(t2));
     combined.get();

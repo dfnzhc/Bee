@@ -73,9 +73,7 @@ struct SharedState
     auto complete() -> void
         requires std::is_void_v<T>
     {
-        terminate([&] {
-            state.store(TaskState::Completed, std::memory_order_release);
-        });
+        terminate([&] { state.store(TaskState::Completed, std::memory_order_release); });
     }
 
     auto fail(std::exception_ptr ep) -> void
@@ -88,9 +86,7 @@ struct SharedState
 
     auto cancel() -> void
     {
-        terminate([&] {
-            state.store(TaskState::Cancelled, std::memory_order_release);
-        });
+        terminate([&] { state.store(TaskState::Cancelled, std::memory_order_release); });
     }
 
     // -----------------------------------------------------------------
@@ -110,18 +106,14 @@ struct SharedState
     auto wait() const -> void
     {
         std::unique_lock lock(mutex);
-        cv.wait(lock, [this] {
-            return is_terminal();
-        });
+        cv.wait(lock, [this] { return is_terminal(); });
     }
 
     template <typename Rep, typename Period>
     auto wait_for(std::chrono::duration<Rep, Period> timeout) const -> TaskState
     {
         std::unique_lock lock(mutex);
-        cv.wait_for(lock, timeout, [this] {
-            return is_terminal();
-        });
+        cv.wait_for(lock, timeout, [this] { return is_terminal(); });
         return state.load(std::memory_order_acquire);
     }
 

@@ -64,13 +64,13 @@ namespace detail
                 file = file.substr(pos + 1);
 
             std::fprintf(
-                    stderr,
-                    "[Fatal][Check] %.*s (%.*s:%u)\n",
-                    static_cast<int>(context.size()),
-                    context.data(),
-                    static_cast<int>(file.size()),
-                    file.data(),
-                    loc.line()
+                stderr,
+                "[Fatal][Check] %.*s (%.*s:%u)\n",
+                static_cast<int>(context.size()),
+                context.data(),
+                static_cast<int>(file.size()),
+                file.data(),
+                loc.line()
             );
         }
 

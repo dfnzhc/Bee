@@ -236,24 +236,14 @@ TEST(ErrorDeathTest, ValueOrPanicAbortsOnError)
 
 TEST(ErrorTest, GuardWithNonThrowingLambda)
 {
-    auto r = guard(
-            [] {
-                return 42;
-            },
-            "compute"
-    );
+    auto r = guard([] { return 42; }, "compute");
     EXPECT_TRUE(r.has_value());
     EXPECT_EQ(*r, 42);
 }
 
 TEST(ErrorTest, GuardWithThrowingLambda)
 {
-    auto r = guard(
-            []() -> int {
-                throw std::runtime_error("oops");
-            },
-            "compute"
-    );
+    auto r = guard([]() -> int { throw std::runtime_error("oops"); }, "compute");
     EXPECT_FALSE(r.has_value());
     EXPECT_NE(r.error().message.find("oops"), std::string::npos);
     EXPECT_NE(r.error().message.find("compute"), std::string::npos);
@@ -268,12 +258,7 @@ TEST(ErrorTest, GuardWithVoidLambda)
 
 TEST(ErrorTest, GuardWithUnknownException)
 {
-    auto r = guard(
-            []() -> int {
-                throw 42;
-            },
-            "compute"
-    );
+    auto r = guard([]() -> int { throw 42; }, "compute");
     EXPECT_FALSE(r.has_value());
     EXPECT_NE(r.error().message.find("unknown exception"), std::string::npos);
 }

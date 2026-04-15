@@ -76,16 +76,7 @@ TEST(ParallelReduceTests, ExceptionPropagation)
     std::vector<int> data(N, 1);
 
     EXPECT_THROW(
-            bee::parallel_reduce(
-                    pool,
-                    data.begin(),
-                    data.end(),
-                    0,
-                    [](int, int) -> int {
-                        throw std::runtime_error("reduce error");
-                    }
-            ),
-            std::runtime_error
+        bee::parallel_reduce(pool, data.begin(), data.end(), 0, [](int, int) -> int { throw std::runtime_error("reduce error"); }), std::runtime_error
     );
 }
 
@@ -128,17 +119,10 @@ TEST(ParallelReduceTests, TransformReduceExceptionPropagation)
     std::vector<int> data(N, 1);
 
     EXPECT_THROW(
-            bee::parallel_transform_reduce(
-                    pool,
-                    data.begin(),
-                    data.end(),
-                    0LL,
-                    std::plus<>{},
-                    [](int) -> long long {
-                        throw std::runtime_error("transform error");
-                    }
-            ),
-            std::runtime_error
+        bee::parallel_transform_reduce(
+            pool, data.begin(), data.end(), 0LL, std::plus<>{}, [](int) -> long long { throw std::runtime_error("transform error"); }
+        ),
+        std::runtime_error
     );
 }
 
@@ -152,18 +136,10 @@ TEST(ParallelReduceTests, TransformReduceCancellation)
     source.request_stop();
 
     EXPECT_THROW(
-            bee::parallel_transform_reduce(
-                    pool,
-                    data.begin(),
-                    data.end(),
-                    0LL,
-                    std::plus<>{},
-                    [](int x) -> long long {
-                        return x;
-                    },
-                    source.get_token()
-            ),
-            std::runtime_error
+        bee::parallel_transform_reduce(
+            pool, data.begin(), data.end(), 0LL, std::plus<>{}, [](int x) -> long long { return x; }, source.get_token()
+        ),
+        std::runtime_error
     );
 }
 

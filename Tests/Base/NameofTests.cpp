@@ -127,9 +127,9 @@ template <>
 struct EnumEntries<bee::nameof_test_samples::Action>
 {
     static constexpr std::array<EnumEntry<bee::nameof_test_samples::Action>, 3> entries = {
-            EnumEntry<bee::nameof_test_samples::Action>{bee::nameof_test_samples::Action::Idle, "idle", "Idle"},
-            EnumEntry<bee::nameof_test_samples::Action>{bee::nameof_test_samples::Action::Move, "move", "Move Action"},
-            EnumEntry<bee::nameof_test_samples::Action>{bee::nameof_test_samples::Action::Attack, "attack", ""}
+        EnumEntry<bee::nameof_test_samples::Action>{bee::nameof_test_samples::Action::Idle, "idle", "Idle"},
+        EnumEntry<bee::nameof_test_samples::Action>{bee::nameof_test_samples::Action::Move, "move", "Move Action"},
+        EnumEntry<bee::nameof_test_samples::Action>{bee::nameof_test_samples::Action::Attack, "attack", ""}
     };
 };
 
@@ -137,10 +137,10 @@ template <>
 struct EnumEntries<bee::nameof_test_samples::Permission>
 {
     static constexpr std::array<EnumEntry<bee::nameof_test_samples::Permission>, 4> entries = {
-            EnumEntry<bee::nameof_test_samples::Permission>{bee::nameof_test_samples::Permission::Read, "read", ""},
-            EnumEntry<bee::nameof_test_samples::Permission>{bee::nameof_test_samples::Permission::Write, "write", ""},
-            EnumEntry<bee::nameof_test_samples::Permission>{bee::nameof_test_samples::Permission::Execute, "execute", ""},
-            EnumEntry<bee::nameof_test_samples::Permission>{bee::nameof_test_samples::Permission::None, "none", ""}
+        EnumEntry<bee::nameof_test_samples::Permission>{bee::nameof_test_samples::Permission::Read, "read", ""},
+        EnumEntry<bee::nameof_test_samples::Permission>{bee::nameof_test_samples::Permission::Write, "write", ""},
+        EnumEntry<bee::nameof_test_samples::Permission>{bee::nameof_test_samples::Permission::Execute, "execute", ""},
+        EnumEntry<bee::nameof_test_samples::Permission>{bee::nameof_test_samples::Permission::None, "none", ""}
     };
 };
 
@@ -221,8 +221,8 @@ template <>
 struct EnumEntries<bee::nameof_static_assert_samples::SampleAction>
 {
     static constexpr std::array<EnumEntry<bee::nameof_static_assert_samples::SampleAction>, 2> entries = {
-            EnumEntry<bee::nameof_static_assert_samples::SampleAction>{bee::nameof_static_assert_samples::SampleAction::Idle, "idle", "Idle"},
-            EnumEntry<bee::nameof_static_assert_samples::SampleAction>{bee::nameof_static_assert_samples::SampleAction::Move, "move", "Move"}
+        EnumEntry<bee::nameof_static_assert_samples::SampleAction>{bee::nameof_static_assert_samples::SampleAction::Idle, "idle", "Idle"},
+        EnumEntry<bee::nameof_static_assert_samples::SampleAction>{bee::nameof_static_assert_samples::SampleAction::Move, "move", "Move"}
     };
 };
 

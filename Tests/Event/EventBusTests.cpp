@@ -52,9 +52,7 @@ TEST(EventBusTest, SubscribeAndPublish)
 {
     EventBus   bus;
     MouseClick received{};
-    bus.subscribe<MouseClick>([&received](const MouseClick& e) {
-        received = e;
-    });
+    bus.subscribe<MouseClick>([&received](const MouseClick& e) { received = e; });
     bus.publish(MouseClick{10, 20});
     EXPECT_EQ(received.x, 10);
     EXPECT_EQ(received.y, 20);
@@ -66,12 +64,8 @@ TEST(EventBusTest, MultipleEventTypesAreIndependent)
     int      mouse_count = 0;
     int      key_count   = 0;
 
-    bus.subscribe<MouseClick>([&mouse_count](const MouseClick&) {
-        ++mouse_count;
-    });
-    bus.subscribe<KeyPress>([&key_count](const KeyPress&) {
-        ++key_count;
-    });
+    bus.subscribe<MouseClick>([&mouse_count](const MouseClick&) { ++mouse_count; });
+    bus.subscribe<KeyPress>([&key_count](const KeyPress&) { ++key_count; });
 
     bus.publish(MouseClick{});
     bus.publish(MouseClick{});
@@ -86,24 +80,9 @@ TEST(EventBusTest, PriorityOrdering)
     EventBus    bus;
     std::string order;
 
-    bus.subscribe<MouseClick>(
-            [&order](const MouseClick&) {
-                order += "B";
-            },
-            10
-    );
-    bus.subscribe<MouseClick>(
-            [&order](const MouseClick&) {
-                order += "A";
-            },
-            1
-    );
-    bus.subscribe<MouseClick>(
-            [&order](const MouseClick&) {
-                order += "C";
-            },
-            100
-    );
+    bus.subscribe<MouseClick>([&order](const MouseClick&) { order += "B"; }, 10);
+    bus.subscribe<MouseClick>([&order](const MouseClick&) { order += "A"; }, 1);
+    bus.subscribe<MouseClick>([&order](const MouseClick&) { order += "C"; }, 100);
 
     bus.publish(MouseClick{});
     EXPECT_EQ(order, "ABC");
@@ -125,12 +104,8 @@ TEST(EventBusTest, ClearRemovesOnlyOneType)
     int      mouse_count = 0;
     int      key_count   = 0;
 
-    bus.subscribe<MouseClick>([&mouse_count](const MouseClick&) {
-        ++mouse_count;
-    });
-    bus.subscribe<KeyPress>([&key_count](const KeyPress&) {
-        ++key_count;
-    });
+    bus.subscribe<MouseClick>([&mouse_count](const MouseClick&) { ++mouse_count; });
+    bus.subscribe<KeyPress>([&key_count](const KeyPress&) { ++key_count; });
 
     bus.clear<MouseClick>();
     bus.publish(MouseClick{});
@@ -146,12 +121,8 @@ TEST(EventBusTest, ClearAllRemovesEverything)
     int      mouse_count = 0;
     int      key_count   = 0;
 
-    bus.subscribe<MouseClick>([&mouse_count](const MouseClick&) {
-        ++mouse_count;
-    });
-    bus.subscribe<KeyPress>([&key_count](const KeyPress&) {
-        ++key_count;
-    });
+    bus.subscribe<MouseClick>([&mouse_count](const MouseClick&) { ++mouse_count; });
+    bus.subscribe<KeyPress>([&key_count](const KeyPress&) { ++key_count; });
 
     bus.clear_all();
     bus.publish(MouseClick{});
@@ -169,9 +140,7 @@ TEST(EventBusTest, DisconnectViaConnectionHandle)
 {
     EventBus bus;
     int      count = 0;
-    auto     conn  = bus.subscribe<MouseClick>([&count](const MouseClick&) {
-        ++count;
-    });
+    auto     conn  = bus.subscribe<MouseClick>([&count](const MouseClick&) { ++count; });
     bus.publish(MouseClick{});
     EXPECT_EQ(count, 1);
     conn.disconnect();
@@ -184,9 +153,7 @@ TEST(EventBusTest, ScopedConnectionAutoDisconnect)
     EventBus bus;
     int      count = 0;
     {
-        ScopedConnection scoped(bus.subscribe<MouseClick>([&count](const MouseClick&) {
-            ++count;
-        }));
+        ScopedConnection scoped(bus.subscribe<MouseClick>([&count](const MouseClick&) { ++count; }));
         bus.publish(MouseClick{});
         EXPECT_EQ(count, 1);
     }
@@ -202,13 +169,9 @@ TEST(EventBusTest, ErrorHandlerPropagation)
 {
     EventBus           bus;
     std::exception_ptr captured;
-    bus.set_error_handler([&captured](std::exception_ptr ep) {
-        captured = ep;
-    });
+    bus.set_error_handler([&captured](std::exception_ptr ep) { captured = ep; });
 
-    bus.subscribe<MouseClick>([](const MouseClick&) {
-        throw std::runtime_error("bus error");
-    });
+    bus.subscribe<MouseClick>([](const MouseClick&) { throw std::runtime_error("bus error"); });
 
     bus.publish(MouseClick{});
     ASSERT_TRUE(captured != nullptr);
@@ -224,14 +187,10 @@ TEST(EventBusTest, ErrorHandlerAppliesToFutureChannels)
 {
     EventBus           bus;
     std::exception_ptr captured;
-    bus.set_error_handler([&captured](std::exception_ptr ep) {
-        captured = ep;
-    });
+    bus.set_error_handler([&captured](std::exception_ptr ep) { captured = ep; });
 
     // Subscribe AFTER setting error handler — new channel inherits it
-    bus.subscribe<Resize>([](const Resize&) {
-        throw std::runtime_error("late channel error");
-    });
+    bus.subscribe<Resize>([](const Resize&) { throw std::runtime_error("late channel error"); });
 
     bus.publish(Resize{});
     ASSERT_TRUE(captured != nullptr);
@@ -258,9 +217,7 @@ TEST(EventBusTest, ConcurrentSubscribeAndPublish)
             }
             if (t % 2 == 0) {
                 for (int i = 0; i < kPerThread; ++i) {
-                    bus.subscribe<MouseClick>([&total](const MouseClick&) {
-                        total.fetch_add(1, std::memory_order_relaxed);
-                    });
+                    bus.subscribe<MouseClick>([&total](const MouseClick&) { total.fetch_add(1, std::memory_order_relaxed); });
                 }
             } else {
                 for (int i = 0; i < kPerThread; ++i) {
@@ -287,12 +244,8 @@ TEST(EventBusTest, PublishAsyncViaThreadPool)
     EventBus         bus;
     std::atomic<int> sum{0};
 
-    bus.subscribe<MouseClick>([&sum](const MouseClick& e) {
-        sum.fetch_add(e.x, std::memory_order_relaxed);
-    });
-    bus.subscribe<MouseClick>([&sum](const MouseClick& e) {
-        sum.fetch_add(e.x, std::memory_order_relaxed);
-    });
+    bus.subscribe<MouseClick>([&sum](const MouseClick& e) { sum.fetch_add(e.x, std::memory_order_relaxed); });
+    bus.subscribe<MouseClick>([&sum](const MouseClick& e) { sum.fetch_add(e.x, std::memory_order_relaxed); });
 
     ThreadPool pool(2);
     bus.publish_async(pool, MouseClick{5, 0});

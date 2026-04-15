@@ -298,17 +298,17 @@ namespace internal
     template <typename E, int Min, int... Offsets>
     consteval auto BuildAutoEnumEntries(std::integer_sequence<int, Offsets...>)
     {
-        return std::array<Customize::EnumEntry<E>, sizeof...(Offsets)>{Customize::EnumEntry<E>{
-                static_cast<E>(Min + Offsets), ValueNameShortFromRaw(ValueNameRawImpl<static_cast<E>(Min + Offsets)>()), ""
-        }...};
+        return std::array<Customize::EnumEntry<E>, sizeof...(Offsets)>{
+            Customize::EnumEntry<E>{static_cast<E>(Min + Offsets), ValueNameShortFromRaw(ValueNameRawImpl<static_cast<E>(Min + Offsets)>()), ""}...
+        };
     }
 
     template <typename E>
     consteval auto AutoEnumEntries()
     {
         static_assert(
-                ValidEnumScanRange<Customize::EnumScanRange<E>>,
-                "EnumScanRange specialization must provide kMin (int), kMax (int), and kEnableAliasCheck (bool)."
+            ValidEnumScanRange<Customize::EnumScanRange<E>>,
+            "EnumScanRange specialization must provide kMin (int), kMax (int), and kEnableAliasCheck (bool)."
         );
         constexpr int kMin  = Customize::EnumScanRange<E>::kMin;
         constexpr int kMax  = Customize::EnumScanRange<E>::kMax;
@@ -344,8 +344,8 @@ namespace internal
             constexpr int kMax  = Customize::EnumScanRange<E>::kMax;
             constexpr int kSize = kMax - kMin + 1;
             static_assert(
-                    kSize <= kMaxAliasCheckScanCount,
-                    "Alias check is enabled with a scan range that is too large. Reduce EnumScanRange or disable alias check."
+                kSize <= kMaxAliasCheckScanCount,
+                "Alias check is enabled with a scan range that is too large. Reduce EnumScanRange or disable alias check."
             );
             return true;
         } else {
@@ -543,8 +543,7 @@ namespace internal
             constexpr auto all = AutoEnumEntries<E>();
             if constexpr (ShouldRunAliasCheck<E>()) {
                 static_assert(
-                        AutoEnumNoDuplicateNames(all),
-                        "Auto enum scan found duplicate names for different values. Please provide Customize::EnumEntries."
+                    AutoEnumNoDuplicateNames(all), "Auto enum scan found duplicate names for different values. Please provide Customize::EnumEntries."
                 );
             }
             EnumTable<E, all.size()> table;

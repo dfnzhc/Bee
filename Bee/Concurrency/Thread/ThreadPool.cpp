@@ -40,9 +40,7 @@ ThreadPool::ThreadPool(const ThreadPoolConfig& config)
 
     workers_.reserve(worker_count_);
     for (std::size_t i = 0; i < worker_count_; ++i) {
-        workers_.emplace_back([this, i](std::stop_token st) {
-            worker_loop(i, std::move(st));
-        });
+        workers_.emplace_back([this, i](std::stop_token st) { worker_loop(i, std::move(st)); });
     }
 }
 
@@ -54,25 +52,19 @@ ThreadPool::~ThreadPool()
 void ThreadPool::wait_for_tasks()
 {
     std::unique_lock lock(wait_mutex_);
-    wait_cv_.wait(lock, [this] {
-        return pending_tasks_.load(std::memory_order_acquire) == 0;
-    });
+    wait_cv_.wait(lock, [this] { return pending_tasks_.load(std::memory_order_acquire) == 0; });
 }
 
 auto ThreadPool::wait_for_tasks_for(std::chrono::milliseconds timeout) -> bool
 {
     std::unique_lock lock(wait_mutex_);
-    return wait_cv_.wait_for(lock, timeout, [this] {
-        return pending_tasks_.load(std::memory_order_acquire) == 0;
-    });
+    return wait_cv_.wait_for(lock, timeout, [this] { return pending_tasks_.load(std::memory_order_acquire) == 0; });
 }
 
 auto ThreadPool::wait_for_tasks_until(std::chrono::steady_clock::time_point deadline) -> bool
 {
     std::unique_lock lock(wait_mutex_);
-    return wait_cv_.wait_until(lock, deadline, [this] {
-        return pending_tasks_.load(std::memory_order_acquire) == 0;
-    });
+    return wait_cv_.wait_until(lock, deadline, [this] { return pending_tasks_.load(std::memory_order_acquire) == 0; });
 }
 
 void ThreadPool::shutdown()
@@ -82,15 +74,39 @@ void ThreadPool::shutdown()
 
 void ThreadPool::shutdown(ShutdownMode mode)
 {
+    const bool from_worker_thread    = (tls_current_pool_ == this);
+    auto       stop_and_wake_workers = [this]() {
+        for (auto& w : workers_) {
+            w.request_stop();
+        }
+        const auto wake_count = static_cast<std::ptrdiff_t>(workers_.size());
+        if (wake_count > 0) {
+            task_signal_.release(wake_count);
+        }
+    };
+
     LifecyclePhase expected_phase = LifecyclePhase::Running;
     if (!lifecycle_phase_.compare_exchange_strong(expected_phase, LifecyclePhase::Quiescing, std::memory_order_acq_rel)) {
+        LifecyclePhase expected_cleanup = LifecyclePhase::Stopping;
+        if (!from_worker_thread && lifecycle_phase_.compare_exchange_strong(expected_cleanup, LifecyclePhase::Draining, std::memory_order_acq_rel)) {
+            stop_and_wake_workers();
+            workers_.clear();
+            lifecycle_phase_.store(LifecyclePhase::Stopped, std::memory_order_release);
+        }
         return;
     }
     accepting_tasks_.store(false, std::memory_order_release);
 
     if (mode == ShutdownMode::Immediate) {
         drop_queued_tasks_.store(true, std::memory_order_release);
-        task_signal_.release(static_cast<std::ptrdiff_t>(workers_.size()));
+    }
+
+    // 池内 worker 触发 shutdown 时不能同步等待 pending=0 或 join workers_，
+    // 否则会形成“当前任务等待自己收尾”的死锁/自 join 风险。
+    if (from_worker_thread) {
+        stop_and_wake_workers();
+        lifecycle_phase_.store(LifecyclePhase::Stopping, std::memory_order_release);
+        return;
     }
 
     lifecycle_phase_.store(LifecyclePhase::Draining, std::memory_order_release);
@@ -109,13 +125,7 @@ void ThreadPool::shutdown(ShutdownMode mode)
         }
     }
 
-    lifecycle_phase_.store(LifecyclePhase::Stopping, std::memory_order_release);
-
-    // 请求所有 worker 退出并唤醒阻塞的信号量。
-    for (auto& w : workers_) {
-        w.request_stop();
-    }
-    task_signal_.release(static_cast<std::ptrdiff_t>(workers_.size()));
+    stop_and_wake_workers();
 
     workers_.clear();
     lifecycle_phase_.store(LifecyclePhase::Stopped, std::memory_order_release);
@@ -155,6 +165,13 @@ auto ThreadPool::enqueue_task(MoveOnlyFunction&& task) -> bool
 {
     if (!accepting_tasks_.load(std::memory_order_acquire)) {
         return false;
+    }
+
+    // 单 worker 场景下，池内任务再次 submit().get() 会形成自阻塞；
+    // 直接内联执行可保证该路径可完成。
+    if (tls_current_pool_ == this && worker_count_ == 1) {
+        execute_task(task);
+        return true;
     }
 
     // Chase-Lev push/pop 限 owner 线程；仅池内 worker 走本地队列。
@@ -272,7 +289,7 @@ auto ThreadPool::try_pop_from_global_queues(std::size_t self_index, MoveOnlyFunc
     if ((streak & 0x1Fu) == 0x1Fu) {
         const std::uint32_t cur = global_probe_budget_.load(std::memory_order_relaxed);
         const std::uint32_t cap =
-                static_cast<std::uint32_t>(std::min<std::size_t>(kMaxAdaptiveGlobalProbeCount, shard_count > 0 ? shard_count - 1 : 0));
+            static_cast<std::uint32_t>(std::min<std::size_t>(kMaxAdaptiveGlobalProbeCount, shard_count > 0 ? shard_count - 1 : 0));
         if (cap > 0 && cur < cap) {
             global_probe_budget_.store(cur + 1, std::memory_order_relaxed);
         }
@@ -285,7 +302,6 @@ void ThreadPool::notify_pending_zero() noexcept
 {
     std::lock_guard<std::mutex> lock(wait_mutex_);
     wait_cv_.notify_all();
-    task_signal_.release();
 }
 
 void ThreadPool::rollback_failed_submission() noexcept

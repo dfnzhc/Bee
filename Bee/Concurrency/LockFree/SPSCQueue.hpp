@@ -42,7 +42,7 @@ class BasicSPSCQueue
 {
     // 类型是 trivial 类型，可以直接拷贝避免构造
     static constexpr bool kTrivialFastPath =
-            std::is_trivially_copyable_v<T> && std::is_trivially_destructible_v<T> && std::is_default_constructible_v<T>;
+        std::is_trivially_copyable_v<T> && std::is_trivially_destructible_v<T> && std::is_default_constructible_v<T>;
 
 public:
     using value_type      = T;
@@ -63,8 +63,18 @@ public:
         // 只分配内存，不构造对象；对象在 push/emplace 时原位构造。
         _slots = std::allocator_traits<Allocator>::allocate(_allocator, _capacity);
         if constexpr (kTrivialFastPath) {
-            for (size_type i = 0; i < _capacity; ++i) {
-                std::allocator_traits<Allocator>::construct(_allocator, &_slots[i], T{});
+            size_type constructed = 0;
+            try {
+                for (; constructed < _capacity; ++constructed) {
+                    std::allocator_traits<Allocator>::construct(_allocator, &_slots[constructed], T{});
+                }
+            } catch (...) {
+                for (size_type i = 0; i < constructed; ++i) {
+                    std::allocator_traits<Allocator>::destroy(_allocator, &_slots[i]);
+                }
+                std::allocator_traits<Allocator>::deallocate(_allocator, _slots, _capacity);
+                _slots = nullptr;
+                throw;
             }
         }
     }

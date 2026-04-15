@@ -272,9 +272,7 @@ public:
                     return false; // 已完成——不挂起
                 }
                 BEE_CHECK(!state_->has_continuation);
-                state_->continuation     = MoveOnlyFunction<void()>([handle]() mutable {
-                    handle.resume();
-                });
+                state_->continuation     = MoveOnlyFunction<void()>([handle]() mutable { handle.resume(); });
                 state_->has_continuation = true;
                 return true; // 挂起直到任务完成
             }

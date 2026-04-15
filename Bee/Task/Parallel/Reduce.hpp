@@ -198,13 +198,13 @@ template <typename It, typename T, typename ReduceOp, typename TransformOp>
 /// 带取消支持的并行变换归约。
 template <typename It, typename T, typename ReduceOp, typename TransformOp>
 [[nodiscard]] auto parallel_transform_reduce(
-        ThreadPool&     pool,
-        It              first,
-        It              last,
-        T               init,
-        ReduceOp        reduce_op,
-        TransformOp     transform_op,
-        std::stop_token token
+    ThreadPool&     pool,
+    It              first,
+    It              last,
+    T               init,
+    ReduceOp        reduce_op,
+    TransformOp     transform_op,
+    std::stop_token token
 ) -> T
 {
     const auto n = static_cast<size_t>(std::distance(first, last));

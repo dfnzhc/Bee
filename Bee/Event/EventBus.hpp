@@ -130,9 +130,7 @@ private:
             if (handler) {
                 // 将共享处理器包装一层，使 Signal 拥有自己的 MoveOnlyFunction 拷贝
                 auto h = handler;
-                signal.set_error_handler(MoveOnlyFunction<void(std::exception_ptr)>([h = std::move(h)](std::exception_ptr ep) {
-                    (*h)(ep);
-                }));
+                signal.set_error_handler(MoveOnlyFunction<void(std::exception_ptr)>([h = std::move(h)](std::exception_ptr ep) { (*h)(ep); }));
             }
         }
     };

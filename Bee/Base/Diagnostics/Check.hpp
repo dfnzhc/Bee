@@ -42,13 +42,13 @@ namespace detail
     /// 比较失败：格式化两侧值后，委托给 check_fail。
     template <typename A, typename B>
     [[noreturn]] void check_op_fail(
-            const A&             a,
-            const B&             b,
-            std::string_view     expr_a,
-            std::string_view     expr_b,
-            std::string_view     op_str,
-            std::string_view     check_type,
-            std::source_location loc
+        const A&             a,
+        const B&             b,
+        std::string_view     expr_a,
+        std::string_view     expr_b,
+        std::string_view     op_str,
+        std::string_view     check_type,
+        std::source_location loc
     )
     {
         auto full_expr = std::format("{} {} {}", expr_a, op_str, expr_b);

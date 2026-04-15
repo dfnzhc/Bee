@@ -114,7 +114,7 @@ TEST(EnumBitmaskTests, DetectsZeroAndSingleBit)
 TEST(EnumBitmaskTests, CountsEnabledBits)
 {
     const auto value =
-            bee::enum_test_samples::Permission::Read | bee::enum_test_samples::Permission::Write | bee::enum_test_samples::Permission::Execute;
+        bee::enum_test_samples::Permission::Read | bee::enum_test_samples::Permission::Write | bee::enum_test_samples::Permission::Execute;
     EXPECT_EQ(bee::EnumBitCount(value), 3);
 }
 

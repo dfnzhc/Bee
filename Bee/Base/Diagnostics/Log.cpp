@@ -52,17 +52,17 @@ void default_console_sink(LogLevel level, std::string_view category, std::string
     }
 
     std::fprintf(
-            stderr,
-            "[%-5.*s][%.*s] %.*s (%.*s:%u)\n",
-            static_cast<int>(enum_to_name(level).size()),
-            enum_to_name(level).data(),
-            static_cast<int>(category.size()),
-            category.data(),
-            static_cast<int>(message.size()),
-            message.data(),
-            static_cast<int>(file.size()),
-            file.data(),
-            location.line()
+        stderr,
+        "[%-5.*s][%.*s] %.*s (%.*s:%u)\n",
+        static_cast<int>(enum_to_name(level).size()),
+        enum_to_name(level).data(),
+        static_cast<int>(category.size()),
+        category.data(),
+        static_cast<int>(message.size()),
+        message.data(),
+        static_cast<int>(file.size()),
+        file.data(),
+        location.line()
     );
 }
 

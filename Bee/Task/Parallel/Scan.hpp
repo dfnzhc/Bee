@@ -304,7 +304,7 @@ template <typename InIt, typename OutIt, typename T, typename BinaryOp>
 /// @note 取消时，输出区间可能包含部分结果。
 template <typename InIt, typename OutIt, typename T, typename BinaryOp>
 [[nodiscard]] auto parallel_exclusive_scan(ThreadPool& pool, InIt first, InIt last, OutIt d_first, T init, BinaryOp op, std::stop_token token)
-        -> OutIt
+    -> OutIt
 {
     const auto n = static_cast<size_t>(std::distance(first, last));
     if (n == 0)

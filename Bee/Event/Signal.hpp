@@ -87,9 +87,7 @@ public:
             auto old_list = slots_.load(std::memory_order_acquire);
             auto new_list = old_list ? std::make_shared<SlotList>(*old_list) : std::make_shared<SlotList>();
 
-            auto it = std::upper_bound(new_list->begin(), new_list->end(), priority, [](int p, const Slot& s) {
-                return p < s.priority;
-            });
+            auto it = std::upper_bound(new_list->begin(), new_list->end(), priority, [](int p, const Slot& s) { return p < s.priority; });
             new_list->insert(it, Slot{state, cb, priority});
 
             if (slots_.compare_exchange_weak(old_list, new_list, std::memory_order_release, std::memory_order_acquire)) {
@@ -168,12 +166,7 @@ public:
                         return;
                     }
                     try {
-                        std::apply(
-                                [&](auto&... a) {
-                                    (*cb)(a...);
-                                },
-                                *at
-                        );
+                        std::apply([&](auto&... a) { (*cb)(a...); }, *at);
                     } catch (...) {
                         if (eh) {
                             try {

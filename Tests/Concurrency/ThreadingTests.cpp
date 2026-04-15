@@ -66,9 +66,7 @@ TEST(BaseThreadingTests, ThreadIdHashDiffersAcrossThreads)
     std::vector<std::thread> threads;
 
     for (int i = 0; i < kThreads; ++i) {
-        threads.emplace_back([&hashes, i]() {
-            hashes[i] = bee::thread_id_hash();
-        });
+        threads.emplace_back([&hashes, i]() { hashes[i] = bee::thread_id_hash(); });
     }
 
     for (auto& t : threads)

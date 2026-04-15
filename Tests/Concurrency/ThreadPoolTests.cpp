@@ -36,13 +36,7 @@ TEST(ThreadPoolTest, SubmitReturnsCorrectResult)
 {
     ThreadPool pool(4);
 
-    auto future = pool.submit(
-            [](int a, int b) {
-                return a + b;
-            },
-            20,
-            22
-    );
+    auto future = pool.submit([](int a, int b) { return a + b; }, 20, 22);
 
     EXPECT_EQ(future.get(), 42);
 }
@@ -51,9 +45,7 @@ TEST(ThreadPoolTest, ExceptionCanPropagateToFuture)
 {
     ThreadPool pool(2);
 
-    auto future = pool.submit([]() -> int {
-        throw std::runtime_error("expected failure");
-    });
+    auto future = pool.submit([]() -> int { throw std::runtime_error("expected failure"); });
 
     EXPECT_THROW((void)future.get(), std::runtime_error);
 }
@@ -66,9 +58,7 @@ TEST(ThreadPoolTest, PostCanProcessLargeAmountOfTasks)
     std::atomic<std::size_t> counter{0};
 
     for (std::size_t i = 0; i < kTaskCount; ++i) {
-        pool.post([&counter] {
-            counter.fetch_add(1, std::memory_order_relaxed);
-        });
+        pool.post([&counter] { counter.fetch_add(1, std::memory_order_relaxed); });
     }
 
     pool.wait_for_tasks();
@@ -80,12 +70,23 @@ TEST(ThreadPoolTest, NestedSubmitWorksInsideWorkerThread)
     ThreadPool pool(4);
 
     auto outer = pool.submit([&pool] {
-        auto inner = pool.submit([] {
-            return 41;
-        });
+        auto inner = pool.submit([] { return 41; });
         return inner.get() + 1;
     });
 
+    EXPECT_EQ(outer.get(), 42);
+}
+
+TEST(ThreadPoolTest, NestedSubmitWorksWithSingleWorkerThread)
+{
+    ThreadPool pool(1);
+
+    auto outer = pool.submit([&pool] {
+        auto inner = pool.submit([] { return 41; });
+        return inner.get() + 1;
+    });
+
+    ASSERT_EQ(outer.wait_for(std::chrono::seconds(2)), std::future_status::ready);
     EXPECT_EQ(outer.get(), 42);
 }
 
@@ -133,18 +134,14 @@ TEST(ThreadPoolTest, ShutdownImmediateDropsQueuedTasks)
 
     pool.post([&] {
         std::unique_lock<std::mutex> lock(gate_mutex);
-        gate_cv.wait(lock, [&] {
-            return allow_exit;
-        });
+        gate_cv.wait(lock, [&] { return allow_exit; });
     });
 
     constexpr std::size_t kAttemptMax          = 100000;
     std::size_t           queued               = 0;
     std::size_t           consecutive_failures = 0;
     for (std::size_t i = 0; i < kAttemptMax; ++i) {
-        if (pool.try_post([&executed] {
-                executed.fetch_add(1, std::memory_order_relaxed);
-            })) {
+        if (pool.try_post([&executed] { executed.fetch_add(1, std::memory_order_relaxed); })) {
             ++queued;
             consecutive_failures = 0;
         } else {
@@ -183,9 +180,7 @@ TEST(ThreadPoolTest, MultiProducerPostDoesNotLoseTasks)
     for (std::size_t p = 0; p < kProducerCount; ++p) {
         producers.emplace_back([&pool, &counter] {
             for (std::size_t i = 0; i < kTasksPerProducer; ++i) {
-                pool.post([&counter] {
-                    counter.fetch_add(1, std::memory_order_relaxed);
-                });
+                pool.post([&counter] { counter.fetch_add(1, std::memory_order_relaxed); });
             }
         });
     }
@@ -264,9 +259,7 @@ TEST(ThreadPoolTest, TryPostCanFailFastWhenQueueIsSaturated)
 
     pool.post([&] {
         std::unique_lock<std::mutex> lock(gate_mutex);
-        gate_cv.wait(lock, [&] {
-            return allow_exit;
-        });
+        gate_cv.wait(lock, [&] { return allow_exit; });
     });
 
     bool saw_failure = false;
@@ -291,12 +284,7 @@ TEST(ThreadPoolTest, TrySubmitReturnsFutureOnSuccess)
 {
     ThreadPool pool(2);
 
-    auto maybe_future = pool.try_submit(
-            [](int x) {
-                return x * 2;
-            },
-            21
-    );
+    auto maybe_future = pool.try_submit([](int x) { return x * 2; }, 21);
 
     ASSERT_TRUE(maybe_future.has_value());
     EXPECT_EQ(maybe_future->get(), 42);
@@ -361,13 +349,7 @@ TEST(ThreadPoolTest, TryPostCancellableWithNonTokenFunction)
     auto             source = ThreadPool::make_cancellation_source();
     std::atomic<int> executed{0};
 
-    ASSERT_TRUE(pool.try_post_cancellable(
-            source.token(),
-            [&executed](int x) {
-                executed.store(x, std::memory_order_relaxed);
-            },
-            42
-    ));
+    ASSERT_TRUE(pool.try_post_cancellable(source.token(), [&executed](int x) { executed.store(x, std::memory_order_relaxed); }, 42));
 
     pool.wait_for_tasks();
     EXPECT_EQ(executed.load(std::memory_order_relaxed), 42);
@@ -410,9 +392,7 @@ TEST(ThreadPoolTest, WorkStealingEffect)
     std::atomic<std::size_t> counter{0};
 
     for (std::size_t i = 0; i < kTaskCount; ++i) {
-        pool.post([&counter] {
-            counter.fetch_add(1, std::memory_order_relaxed);
-        });
+        pool.post([&counter] { counter.fetch_add(1, std::memory_order_relaxed); });
     }
 
     pool.wait_for_tasks();
@@ -452,9 +432,7 @@ TEST(ThreadPoolTest, NestedSubmitExceptionPropagation)
     ThreadPool pool(2);
 
     auto outer = pool.submit([&pool]() -> int {
-        auto inner = pool.submit([]() -> int {
-            throw std::runtime_error("inner error");
-        });
+        auto inner = pool.submit([]() -> int { throw std::runtime_error("inner error"); });
         return inner.get();
     });
 
@@ -476,14 +454,31 @@ TEST(ThreadPoolTest, ConcurrentShutdownIsIdempotent)
     std::vector<std::thread> threads;
     threads.reserve(4);
     for (int i = 0; i < 4; ++i) {
-        threads.emplace_back([&pool] {
-            pool.shutdown(ShutdownMode::Drain);
-        });
+        threads.emplace_back([&pool] { pool.shutdown(ShutdownMode::Drain); });
     }
 
     for (auto& t : threads) {
         t.join();
     }
+}
+
+TEST(ThreadPoolTest, ShutdownFromWorkerThreadCanBeFinalizedExternally)
+{
+    ThreadPool pool(2);
+
+    auto outer = pool.submit([&pool] {
+        pool.shutdown(ShutdownMode::Drain);
+        return 7;
+    });
+
+    ASSERT_EQ(outer.wait_for(std::chrono::seconds(2)), std::future_status::ready);
+    EXPECT_EQ(outer.get(), 7);
+
+    pool.shutdown(ShutdownMode::Drain);
+
+    const auto s = pool.stats();
+    EXPECT_EQ(s.phase, LifecyclePhase::Stopped);
+    EXPECT_EQ(s.pending_tasks, 0u);
 }
 
 TEST(ThreadPoolTest, ShutdownImmediateWithConcurrentPosts)
@@ -570,14 +565,10 @@ TEST(ThreadPoolTest, WaitForTasksWithConcurrentTryPostFailuresDoesNotStall)
 
     pool.post([&] {
         std::unique_lock<std::mutex> lock(gate_mutex);
-        gate_cv.wait(lock, [&] {
-            return allow_exit;
-        });
+        gate_cv.wait(lock, [&] { return allow_exit; });
     });
 
-    auto waiter = std::async(std::launch::async, [&pool] {
-        pool.wait_for_tasks();
-    });
+    auto waiter = std::async(std::launch::async, [&pool] { pool.wait_for_tasks(); });
 
     std::atomic<bool> stop_submitter{false};
     std::thread       submitter([&] {
@@ -625,9 +616,7 @@ TEST(ThreadPoolTest, RepeatedConcurrentShutdownAndPostingDoesNotDeadlock)
 
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
-        auto shutdown_future = std::async(std::launch::async, [&pool] {
-            pool.shutdown(ShutdownMode::Immediate);
-        });
+        auto shutdown_future = std::async(std::launch::async, [&pool] { pool.shutdown(ShutdownMode::Immediate); });
 
         stop_flag.store(true, std::memory_order_release);
 
@@ -653,9 +642,7 @@ TEST(ThreadPoolTest, WaitForTasksForCanTimeoutAndThenComplete)
 
     pool.post([&] {
         std::unique_lock<std::mutex> lock(gate_mutex);
-        gate_cv.wait(lock, [&] {
-            return allow_exit;
-        });
+        gate_cv.wait(lock, [&] { return allow_exit; });
     });
 
     EXPECT_FALSE(pool.wait_for_tasks_for(std::chrono::milliseconds(10)));
@@ -688,17 +675,13 @@ TEST(ThreadPoolTest, CallerRunsBackpressureCanExecuteInlineWhenSaturated)
 
     pool.post([&] {
         std::unique_lock<std::mutex> lock(gate_mutex);
-        gate_cv.wait(lock, [&] {
-            return allow_exit;
-        });
+        gate_cv.wait(lock, [&] { return allow_exit; });
     });
 
     std::atomic<int> inline_executed{0};
     bool             saw_inline = false;
     for (int i = 0; i < 50000; ++i) {
-        (void)pool.try_post([&inline_executed] {
-            inline_executed.fetch_add(1, std::memory_order_relaxed);
-        });
+        (void)pool.try_post([&inline_executed] { inline_executed.fetch_add(1, std::memory_order_relaxed); });
         if (inline_executed.load(std::memory_order_acquire) > 0) {
             saw_inline = true;
             break;
@@ -730,9 +713,7 @@ TEST(ThreadPoolTest, BlockBackpressureRespectsTimeoutUnderSaturation)
 
     pool.post([&] {
         std::unique_lock<std::mutex> lock(gate_mutex);
-        gate_cv.wait(lock, [&] {
-            return allow_exit;
-        });
+        gate_cv.wait(lock, [&] { return allow_exit; });
     });
 
     for (int i = 0; i < 12000; ++i) {
@@ -789,9 +770,7 @@ TEST(ThreadPoolTest, SoakMatrixModesAndThreadCountsNoDeadlock)
 
                 std::this_thread::sleep_for(std::chrono::milliseconds(8));
 
-                auto shutdown_future = std::async(std::launch::async, [&pool, mode] {
-                    pool.shutdown(mode);
-                });
+                auto shutdown_future = std::async(std::launch::async, [&pool, mode] { pool.shutdown(mode); });
 
                 stop_flag.store(true, std::memory_order_release);
                 for (auto& t : producers) {
@@ -799,7 +778,7 @@ TEST(ThreadPoolTest, SoakMatrixModesAndThreadCountsNoDeadlock)
                 }
 
                 ASSERT_EQ(shutdown_future.wait_for(std::chrono::seconds(5)), std::future_status::ready)
-                        << "mode=" << static_cast<int>(mode) << " threads=" << threads << " round=" << round;
+                    << "mode=" << static_cast<int>(mode) << " threads=" << threads << " round=" << round;
             }
         }
     }

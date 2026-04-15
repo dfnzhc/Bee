@@ -125,7 +125,7 @@ TEST(ParallelScanTests, CancellationInclusive)
     source.request_stop();
 
     EXPECT_THROW(
-            bee::parallel_inclusive_scan(pool, input.begin(), input.end(), output.begin(), std::plus<>{}, source.get_token()), std::runtime_error
+        bee::parallel_inclusive_scan(pool, input.begin(), input.end(), output.begin(), std::plus<>{}, source.get_token()), std::runtime_error
     );
 }
 
@@ -140,7 +140,7 @@ TEST(ParallelScanTests, CancellationExclusive)
     source.request_stop();
 
     EXPECT_THROW(
-            bee::parallel_exclusive_scan(pool, input.begin(), input.end(), output.begin(), 0, std::plus<>{}, source.get_token()), std::runtime_error
+        bee::parallel_exclusive_scan(pool, input.begin(), input.end(), output.begin(), 0, std::plus<>{}, source.get_token()), std::runtime_error
     );
 }
 

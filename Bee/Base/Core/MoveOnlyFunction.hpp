@@ -93,18 +93,16 @@ private:
     static auto inline_vtable() -> const VTable&
     {
         static const VTable vt{
-                [](void* p, Args... args) -> R {
-                    return (*static_cast<Fn*>(p))(std::forward<Args>(args)...);
-                },
-                [](void* dst, void* src) {
-                    // 原位移动构造并析构
-                    new (dst) Fn(std::move(*static_cast<Fn*>(src)));
-                    static_cast<Fn*>(src)->~Fn();
-                },
-                [](void* p) {
-                    // 仅析构对象，不释放内存
-                    static_cast<Fn*>(p)->~Fn();
-                },
+            [](void* p, Args... args) -> R { return (*static_cast<Fn*>(p))(std::forward<Args>(args)...); },
+            [](void* dst, void* src) {
+                // 原位移动构造并析构
+                new (dst) Fn(std::move(*static_cast<Fn*>(src)));
+                static_cast<Fn*>(src)->~Fn();
+            },
+            [](void* p) {
+                // 仅析构对象，不释放内存
+                static_cast<Fn*>(p)->~Fn();
+            },
         };
         return vt;
     }
@@ -113,19 +111,17 @@ private:
     static auto heap_vtable() -> const VTable&
     {
         static const VTable vt{
-                [](void* p, Args... args) -> R {
-                    return (*(*static_cast<Fn**>(p)))(std::forward<Args>(args)...);
-                },
-                [](void* dst, void* src) {
-                    // 移动指针即可
-                    *static_cast<Fn**>(dst) = *static_cast<Fn**>(src);
-                    *static_cast<Fn**>(src) = nullptr;
-                },
-                [](void* p) {
-                    // 释放堆对象，再将存储的指针置空
-                    delete *static_cast<Fn**>(p);
-                    *static_cast<Fn**>(p) = nullptr;
-                },
+            [](void* p, Args... args) -> R { return (*(*static_cast<Fn**>(p)))(std::forward<Args>(args)...); },
+            [](void* dst, void* src) {
+                // 移动指针即可
+                *static_cast<Fn**>(dst) = *static_cast<Fn**>(src);
+                *static_cast<Fn**>(src) = nullptr;
+            },
+            [](void* p) {
+                // 释放堆对象，再将存储的指针置空
+                delete *static_cast<Fn**>(p);
+                *static_cast<Fn**>(p) = nullptr;
+            },
         };
         return vt;
     }

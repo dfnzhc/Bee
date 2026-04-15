@@ -32,9 +32,7 @@ TEST(TaskCoAwaitTests, CoAwaitSubmitInt)
     bee::ThreadPool pool(2);
 
     auto coro = [&pool]() -> AsyncTask<int> {
-        int x = co_await bee::submit(pool, [] {
-            return 42;
-        });
+        int x = co_await bee::submit(pool, [] { return 42; });
         co_return x;
     };
 
@@ -47,9 +45,7 @@ TEST(TaskCoAwaitTests, CoAwaitSubmitVoid)
     std::atomic<bool> executed{false};
 
     auto coro = [&pool, &executed]() -> AsyncTask<void> {
-        co_await bee::submit(pool, [&executed] {
-            executed.store(true);
-        });
+        co_await bee::submit(pool, [&executed] { executed.store(true); });
         co_return;
     };
 
@@ -62,9 +58,7 @@ TEST(TaskCoAwaitTests, CoAwaitFailedTask)
     bee::ThreadPool pool(2);
 
     auto coro = [&pool]() -> AsyncTask<int> {
-        int x = co_await bee::submit(pool, []() -> int {
-            throw std::runtime_error("fail");
-        });
+        int x = co_await bee::submit(pool, []() -> int { throw std::runtime_error("fail"); });
         co_return x;
     };
 
@@ -85,13 +79,7 @@ TEST(TaskCoAwaitTests, CoAwaitCancelledTask)
     source.request_stop();
 
     auto coro = [&pool, &source]() -> AsyncTask<int> {
-        int x = co_await bee::submit(
-                pool,
-                [] {
-                    return 1;
-                },
-                source.get_token()
-        );
+        int x = co_await bee::submit(pool, [] { return 1; }, source.get_token());
         co_return x;
     };
 
@@ -107,9 +95,7 @@ TEST(TaskCoAwaitTests, CoAwaitAlreadyCompleted)
     bee::ThreadPool pool(2);
 
     auto coro = [&pool]() -> AsyncTask<int> {
-        auto task = bee::submit(pool, [] {
-            return 7;
-        });
+        auto task = bee::submit(pool, [] { return 7; });
         task.wait(); // 确保在 co_await 前已完成
         int x = co_await std::move(task);
         co_return x;
@@ -123,12 +109,8 @@ TEST(TaskCoAwaitTests, CoAwaitWhenAll)
     bee::ThreadPool pool(4);
 
     auto coro = [&pool]() -> AsyncTask<int> {
-        auto t1     = bee::submit(pool, [] {
-            return 10;
-        });
-        auto t2     = bee::submit(pool, [] {
-            return 20;
-        });
+        auto t1     = bee::submit(pool, [] { return 10; });
+        auto t2     = bee::submit(pool, [] { return 20; });
         auto [a, b] = co_await bee::when_all(std::move(t1), std::move(t2));
         co_return a + b;
     };
@@ -143,25 +125,17 @@ TEST(TaskCoAwaitTests, CoAwaitWhenAny)
 
     auto coro = [&pool, &source]() -> AsyncTask<int> {
         std::vector<Task<int>> tasks;
+        tasks.push_back(bee::submit(pool, [] { return 42; }, source.get_token()));
         tasks.push_back(
-                bee::submit(
-                        pool,
-                        [] {
-                            return 42;
-                        },
-                        source.get_token()
-                )
-        );
-        tasks.push_back(
-                bee::submit_cancellable(
-                        pool,
-                        [](std::stop_token token) -> int {
-                            while (!token.stop_requested())
-                                std::this_thread::yield();
-                            return -1;
-                        },
-                        source
-                )
+            bee::submit_cancellable(
+                pool,
+                [](std::stop_token token) -> int {
+                    while (!token.stop_requested())
+                        std::this_thread::yield();
+                    return -1;
+                },
+                source
+            )
         );
 
         auto result = co_await bee::when_any(source, std::move(tasks));
@@ -176,15 +150,9 @@ TEST(TaskCoAwaitTests, MultipleCoAwaitsInChain)
     bee::ThreadPool pool(2);
 
     auto coro = [&pool]() -> AsyncTask<std::string> {
-        int  a    = co_await bee::submit(pool, [] {
-            return 10;
-        });
-        int  b    = co_await bee::submit(pool, [a] {
-            return a * 2;
-        });
-        auto text = co_await bee::submit(pool, [b] {
-            return std::to_string(b);
-        });
+        int  a    = co_await bee::submit(pool, [] { return 10; });
+        int  b    = co_await bee::submit(pool, [a] { return a * 2; });
+        auto text = co_await bee::submit(pool, [b] { return std::to_string(b); });
         co_return text;
     };
 

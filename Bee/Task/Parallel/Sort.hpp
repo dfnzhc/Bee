@@ -45,9 +45,8 @@ namespace detail
         auto mid = first + n / 2;
 
         // 左半区提交到线程池任务。
-        auto left_task = bee::submit(pool, [&pool, first, mid, comp, depth, max_depth]() {
-            parallel_merge_sort(pool, first, mid, comp, depth + 1, max_depth);
-        });
+        auto left_task =
+            bee::submit(pool, [&pool, first, mid, comp, depth, max_depth]() { parallel_merge_sort(pool, first, mid, comp, depth + 1, max_depth); });
 
         // 右半区在当前线程递归处理；确保 left_task 总是被 join 以避免数据竞争。
         std::exception_ptr right_ex;

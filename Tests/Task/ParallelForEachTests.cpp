@@ -32,9 +32,7 @@ TEST(ParallelForEachTests, BasicMutation)
     std::vector<int> data(10000);
     std::iota(data.begin(), data.end(), 0);
 
-    bee::parallel_for_each(pool, data.begin(), data.end(), [](int& x) {
-        x *= 2;
-    });
+    bee::parallel_for_each(pool, data.begin(), data.end(), [](int& x) { x *= 2; });
 
     for (int i = 0; i < 10000; ++i) {
         EXPECT_EQ(data[i], i * 2);
@@ -46,18 +44,14 @@ TEST(ParallelForEachTests, EmptyRange)
     ThreadPool       pool(4);
     std::vector<int> data;
     // 不应崩溃或抛出异常。
-    bee::parallel_for_each(pool, data.begin(), data.end(), [](int&) {
-        FAIL();
-    });
+    bee::parallel_for_each(pool, data.begin(), data.end(), [](int&) { FAIL(); });
 }
 
 TEST(ParallelForEachTests, SingleElement)
 {
     ThreadPool       pool(4);
     std::vector<int> data = {42};
-    bee::parallel_for_each(pool, data.begin(), data.end(), [](int& x) {
-        x += 1;
-    });
+    bee::parallel_for_each(pool, data.begin(), data.end(), [](int& x) { x += 1; });
     EXPECT_EQ(data[0], 43);
 }
 
@@ -68,9 +62,7 @@ TEST(ParallelForEachTests, LargeRange)
     std::vector<int> data(N, 1);
 
     std::atomic<int> sum{0};
-    bee::parallel_for_each(pool, data.begin(), data.end(), [&sum](const int& x) {
-        sum.fetch_add(x, std::memory_order_relaxed);
-    });
+    bee::parallel_for_each(pool, data.begin(), data.end(), [&sum](const int& x) { sum.fetch_add(x, std::memory_order_relaxed); });
 
     EXPECT_EQ(sum.load(), static_cast<int>(N));
 }
@@ -82,16 +74,16 @@ TEST(ParallelForEachTests, ExceptionPropagation)
     std::vector<int> data(N, 0);
 
     EXPECT_THROW(
-            bee::parallel_for_each(
-                    pool,
-                    data.begin(),
-                    data.end(),
-                    [](int& x) {
-                        if (x == 0)
-                            throw std::runtime_error("test error");
-                    }
-            ),
-            std::runtime_error
+        bee::parallel_for_each(
+            pool,
+            data.begin(),
+            data.end(),
+            [](int& x) {
+                if (x == 0)
+                    throw std::runtime_error("test error");
+            }
+        ),
+        std::runtime_error
     );
 }
 
@@ -107,16 +99,10 @@ TEST(ParallelForEachTests, CancellationStopsProcessing)
     source.request_stop();
 
     EXPECT_THROW(
-            bee::parallel_for_each(
-                    pool,
-                    data.begin(),
-                    data.end(),
-                    [&processed](int&) {
-                        processed.fetch_add(1, std::memory_order_relaxed);
-                    },
-                    source.get_token()
-            ),
-            std::runtime_error
+        bee::parallel_for_each(
+            pool, data.begin(), data.end(), [&processed](int&) { processed.fetch_add(1, std::memory_order_relaxed); }, source.get_token()
+        ),
+        std::runtime_error
     );
 
     // 因为立即取消了，不应处理所有元素。
@@ -130,9 +116,7 @@ TEST(ParallelForEachTests, SequentialFallbackCorrectness)
     std::vector<int> data(100);
     std::iota(data.begin(), data.end(), 0);
 
-    bee::parallel_for_each(pool, data.begin(), data.end(), [](int& x) {
-        x += 10;
-    });
+    bee::parallel_for_each(pool, data.begin(), data.end(), [](int& x) { x += 10; });
 
     for (int i = 0; i < 100; ++i) {
         EXPECT_EQ(data[i], i + 10);

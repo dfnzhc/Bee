@@ -48,9 +48,7 @@ TEST(AsyncTaskTests, GetStartsAndReturns)
     bee::ThreadPool pool(2);
 
     auto coro = [&pool]() -> AsyncTask<int> {
-        int x = co_await bee::submit(pool, [] {
-            return 42;
-        });
+        int x = co_await bee::submit(pool, [] { return 42; });
         co_return x;
     };
 
@@ -77,15 +75,9 @@ TEST(AsyncTaskTests, SequentialCoAwaits)
     bee::ThreadPool pool(2);
 
     auto coro = [&pool]() -> AsyncTask<int> {
-        int a = co_await bee::submit(pool, [] {
-            return 10;
-        });
-        int b = co_await bee::submit(pool, [] {
-            return 20;
-        });
-        int c = co_await bee::submit(pool, [] {
-            return 30;
-        });
+        int a = co_await bee::submit(pool, [] { return 10; });
+        int b = co_await bee::submit(pool, [] { return 20; });
+        int c = co_await bee::submit(pool, [] { return 30; });
         co_return a + b + c;
     };
 
@@ -111,9 +103,7 @@ TEST(AsyncTaskTests, CoAwaitFailedTask)
     bee::ThreadPool pool(2);
 
     auto coro = [&pool]() -> AsyncTask<int> {
-        int x = co_await bee::submit(pool, []() -> int {
-            throw std::logic_error("bad");
-        });
+        int x = co_await bee::submit(pool, []() -> int { throw std::logic_error("bad"); });
         co_return x;
     };
 
@@ -134,13 +124,7 @@ TEST(AsyncTaskTests, CoAwaitCancelledTask)
     source.request_stop();
 
     auto coro = [&pool, &source]() -> AsyncTask<int> {
-        int x = co_await bee::submit(
-                pool,
-                [] {
-                    return 1;
-                },
-                source.get_token()
-        );
+        int x = co_await bee::submit(pool, [] { return 1; }, source.get_token());
         co_return x;
     };
 
@@ -161,17 +145,13 @@ TEST(AsyncTaskTests, NestedAsyncTasks)
     bee::ThreadPool pool(2);
 
     auto inner = [&pool]() -> AsyncTask<int> {
-        int x = co_await bee::submit(pool, [] {
-            return 7;
-        });
+        int x = co_await bee::submit(pool, [] { return 7; });
         co_return x * 2;
     };
 
     auto outer = [&pool, &inner]() -> AsyncTask<int> {
         int a = co_await inner();
-        int b = co_await bee::submit(pool, [] {
-            return 3;
-        });
+        int b = co_await bee::submit(pool, [] { return 3; });
         co_return a + b;
     };
 

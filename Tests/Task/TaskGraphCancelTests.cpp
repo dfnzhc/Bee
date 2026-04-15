@@ -26,9 +26,7 @@ TEST(TaskGraphCancelTests, CancelBeforeExecution)
 {
     ThreadPool pool(2);
     TaskGraph  graph;
-    auto       a = graph.add_node([] {
-        return 42;
-    });
+    auto       a = graph.add_node([] { return 42; });
 
     std::stop_source source;
     source.request_stop();
@@ -52,12 +50,7 @@ TEST(TaskGraphCancelTests, CancelDuringExecution)
         can_proceed.wait();
         return 1;
     });
-    auto b = graph.add_node(
-            [](int x) {
-                return x + 1;
-            },
-            a
-    );
+    auto b = graph.add_node([](int x) { return x + 1; }, a);
 
     auto task = graph.execute(pool, source.get_token());
     node_started.wait();
@@ -84,18 +77,8 @@ TEST(TaskGraphCancelTests, CancelPropagation)
         node_started.count_down();
         can_proceed.wait();
     });
-    auto b = graph.add_node_after(
-            [&] {
-                run_count.fetch_add(1, std::memory_order_relaxed);
-            },
-            a
-    );
-    auto c = graph.add_node_after(
-            [&] {
-                run_count.fetch_add(1, std::memory_order_relaxed);
-            },
-            b
-    );
+    auto b = graph.add_node_after([&] { run_count.fetch_add(1, std::memory_order_relaxed); }, a);
+    auto c = graph.add_node_after([&] { run_count.fetch_add(1, std::memory_order_relaxed); }, b);
 
     auto task = graph.execute(pool, source.get_token());
     node_started.wait();
@@ -117,23 +100,16 @@ TEST(TaskGraphCancelTests, CompletedNodesUnaffected)
     std::latch gate_started(1);
     std::latch gate_proceed(1);
 
-    auto a = graph.add_node([] {
-        return 42;
-    });
+    auto a = graph.add_node([] { return 42; });
     auto b = graph.add_node(
-            [&](int x) {
-                gate_started.count_down();
-                gate_proceed.wait();
-                return x + 1;
-            },
-            a
+        [&](int x) {
+            gate_started.count_down();
+            gate_proceed.wait();
+            return x + 1;
+        },
+        a
     );
-    auto c = graph.add_node(
-            [](int x) {
-                return x * 2;
-            },
-            b
-    );
+    auto c = graph.add_node([](int x) { return x * 2; }, b);
 
     auto task = graph.execute(pool, source.get_token());
     gate_started.wait();
@@ -149,9 +125,7 @@ TEST(TaskGraphCancelTests, ReExecuteAfterCancel)
 {
     ThreadPool pool(2);
     TaskGraph  graph;
-    auto       a = graph.add_node([] {
-        return 42;
-    });
+    auto       a = graph.add_node([] { return 42; });
 
     {
         std::stop_source source;
