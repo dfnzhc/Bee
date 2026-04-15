@@ -8,7 +8,7 @@
 #pragma once
 
 #include "Base/Core/Config.hpp"
-#include "Base/Reflection/Nameof.hpp"
+#include "Base/Reflection/Enum.hpp"
 
 namespace bee
 {
@@ -34,6 +34,6 @@ enum class TaskState : u8
     Failed
 };
 
-BEE_ENUM_SCAN_RANGE(TaskState, 0, 4, false)
+BEE_ENUM_SCAN_COUNT(TaskState, 5);
 
 } // namespace bee

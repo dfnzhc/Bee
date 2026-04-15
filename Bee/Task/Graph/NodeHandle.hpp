@@ -50,7 +50,7 @@ enum class NodeState : u8
     Cancelled
 };
 
-BEE_ENUM_SCAN_RANGE(NodeState, 0, 5, false)
+BEE_ENUM_SCAN_COUNT(NodeState, 6);
 
 /**
  * @brief TaskGraph 中节点的类型化句柄。
