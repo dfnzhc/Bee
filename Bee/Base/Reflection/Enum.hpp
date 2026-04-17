@@ -98,7 +98,7 @@ template <EnumBitmask E>
 }
 
 template <typename E>
-constexpr auto enum_to_name(E value) noexcept -> std::string_view
+[[nodiscard]] constexpr auto enum_to_name(E value) noexcept -> std::string_view
 {
     static_assert(std::is_enum_v<E>);
 
@@ -107,7 +107,7 @@ constexpr auto enum_to_name(E value) noexcept -> std::string_view
 }
 
 template <typename E>
-constexpr auto enum_from_name(std::string_view name) noexcept -> std::optional<E>
+[[nodiscard]] constexpr auto enum_from_name(std::string_view name) noexcept -> std::optional<E>
 {
     static_assert(std::is_enum_v<E>);
 
@@ -116,7 +116,7 @@ constexpr auto enum_from_name(std::string_view name) noexcept -> std::optional<E
 }
 
 template <typename E>
-auto enum_flags_to_name(E value) -> std::string
+[[nodiscard]] auto enum_flags_to_name(E value) -> std::string
 {
     static_assert(std::is_enum_v<E>);
 
@@ -126,7 +126,7 @@ auto enum_flags_to_name(E value) -> std::string
 }
 
 template <typename E>
-auto enum_flags_from_name(std::string_view name) -> std::optional<E>
+[[nodiscard]] auto enum_flags_from_name(std::string_view name) -> std::optional<E>
 {
     static_assert(std::is_enum_v<E>);
 

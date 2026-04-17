@@ -72,6 +72,43 @@ namespace detail
         check_fail(check_type, full_expr, values, loc);
     }
 
+    // --- Non-fatal verification (logs warning, does NOT abort) ---
+
+    /// Non-fatal failure: logs at Warn level and returns (does NOT abort).
+    void verify_fail(std::string_view expr, std::string_view message, std::source_location loc);
+
+    /// Non-fatal comparison failure: formats values, then delegates to verify_fail.
+    template <typename A, typename B>
+    void verify_op_fail(
+        const A&             a,
+        const B&             b,
+        std::string_view     expr_a,
+        std::string_view     expr_b,
+        std::string_view     op_str,
+        std::source_location loc
+    )
+    {
+        auto full_expr = std::format("{} {} {}", expr_a, op_str, expr_b);
+
+        std::string values;
+        if constexpr (requires(std::ostream& os, const std::remove_cvref_t<A>& lhs, const std::remove_cvref_t<B>& rhs) {
+                          os << lhs;
+                          os << rhs;
+                      }) {
+            try {
+                std::ostringstream oss;
+                oss << expr_a << " = " << a << ", " << expr_b << " = " << b;
+                values = oss.str();
+            } catch (...) {
+                values = "value formatting failed";
+            }
+        } else {
+            values = "values unavailable (types are not stream-insertable)";
+        }
+
+        verify_fail(full_expr, values, loc);
+    }
+
 } // namespace detail
 } // namespace bee
 
@@ -164,3 +201,34 @@ namespace detail
         #define BEE_UNREACHABLE() ((void)0)
     #endif
 #endif
+
+// ============================================================================
+// Non-fatal verification (always enabled, logs warning, does NOT abort)
+// ============================================================================
+
+#define BEE_VERIFY(expr)                                                                       \
+    do {                                                                                       \
+        if (BEE_UNLIKELY(!(expr)))                                                             \
+            ::bee::detail::verify_fail(#expr, "", std::source_location::current());             \
+    } while (0)
+
+#define BEE_VERIFY_MSG(expr, msg)                                                              \
+    do {                                                                                       \
+        if (BEE_UNLIKELY(!(expr)))                                                             \
+            ::bee::detail::verify_fail(#expr, (msg), std::source_location::current());          \
+    } while (0)
+
+#define BEE_DETAIL_VERIFY_OP(a, b, op, op_str)                                                                       \
+    do {                                                                                                              \
+        auto&& bee_vlhs_ = (a);                                                                                       \
+        auto&& bee_vrhs_ = (b);                                                                                       \
+        if (BEE_UNLIKELY(!(bee_vlhs_ op bee_vrhs_)))                                                                  \
+            ::bee::detail::verify_op_fail(bee_vlhs_, bee_vrhs_, #a, #b, (op_str), std::source_location::current());    \
+    } while (0)
+
+#define BEE_VERIFY_EQ(a, b) BEE_DETAIL_VERIFY_OP(a, b, ==, "==")
+#define BEE_VERIFY_NE(a, b) BEE_DETAIL_VERIFY_OP(a, b, !=, "!=")
+#define BEE_VERIFY_LT(a, b) BEE_DETAIL_VERIFY_OP(a, b, <, "<")
+#define BEE_VERIFY_LE(a, b) BEE_DETAIL_VERIFY_OP(a, b, <=, "<=")
+#define BEE_VERIFY_GT(a, b) BEE_DETAIL_VERIFY_OP(a, b, >, ">")
+#define BEE_VERIFY_GE(a, b) BEE_DETAIL_VERIFY_OP(a, b, >=, ">=")

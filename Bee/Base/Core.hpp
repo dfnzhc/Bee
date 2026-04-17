@@ -9,5 +9,7 @@
 
 #include "Core/Config.hpp"
 #include "Core/Defines.hpp"
+#include "Core/InlineString.hpp"
 #include "Core/Macros.hpp"
 #include "Core/MoveOnlyFunction.hpp"
+#include "Core/Traits.hpp"

@@ -12,7 +12,7 @@
 namespace bee
 {
 
-constexpr std::string_view TrimSpaces(std::string_view text)
+[[nodiscard]] constexpr auto TrimSpaces(std::string_view text) noexcept -> std::string_view
 {
     while (!text.empty() && text.front() == ' ') {
         text.remove_prefix(1);
@@ -23,7 +23,7 @@ constexpr std::string_view TrimSpaces(std::string_view text)
     return text;
 }
 
-constexpr std::string_view Slice(std::string_view text, std::string_view prefix, std::string_view suffix, std::string_view fallback = {})
+[[nodiscard]] constexpr auto Slice(std::string_view text, std::string_view prefix, std::string_view suffix, std::string_view fallback = {}) noexcept -> std::string_view
 {
     const auto start = text.find(prefix);
     if (start == std::string_view::npos) {

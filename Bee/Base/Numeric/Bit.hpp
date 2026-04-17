@@ -15,6 +15,8 @@ template <std::unsigned_integral UInt>
     return std::has_single_bit(value);
 }
 
+/// Rounds value up to the nearest power of two.
+/// Special cases: RoundUpPowerOfTwo(0) == 1, returns 0 on overflow.
 template <std::unsigned_integral UInt>
 [[nodiscard]] constexpr auto RoundUpPowerOfTwo(UInt value) noexcept -> UInt
 {
@@ -87,12 +89,14 @@ template <std::integral Int>
 template <std::integral Int>
 [[nodiscard]] constexpr auto FromBigEndian(Int value) noexcept -> Int
 {
+    // Byte-swap is its own inverse: FromBigEndian == ToBigEndian.
     return ToBigEndian(value);
 }
 
 template <std::integral Int>
 [[nodiscard]] constexpr auto FromLittleEndian(Int value) noexcept -> Int
 {
+    // Byte-swap is its own inverse: FromLittleEndian == ToLittleEndian.
     return ToLittleEndian(value);
 }
 

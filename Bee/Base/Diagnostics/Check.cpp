@@ -89,5 +89,37 @@ namespace detail
         std::abort();
     }
 
+    void verify_fail(std::string_view expr, std::string_view message, std::source_location loc)
+    {
+        std::string context;
+        try {
+            if (message.empty()) {
+                context = std::format("Verify failed: {}", expr);
+            } else {
+                context = std::format("Verify failed: {} -- {}", expr, message);
+            }
+        } catch (...) {
+            context = "verify failure (formatting failed)";
+        }
+
+        LogRaw(LogLevel::Warn, "Verify", context, loc);
+
+        if (!get_log_sink()) {
+            std::string_view file = loc.file_name();
+            if (auto pos = file.find_last_of("/\\"); pos != std::string_view::npos)
+                file = file.substr(pos + 1);
+
+            std::fprintf(
+                stderr,
+                "[Warn][Verify] %.*s (%.*s:%u)\n",
+                static_cast<int>(context.size()),
+                context.data(),
+                static_cast<int>(file.size()),
+                file.data(),
+                loc.line()
+            );
+        }
+    }
+
 } // namespace detail
 } // namespace bee

@@ -245,8 +245,8 @@ TEST(ErrorTest, GuardWithThrowingLambda)
 {
     auto r = guard([]() -> int { throw std::runtime_error("oops"); }, "compute");
     EXPECT_FALSE(r.has_value());
-    EXPECT_NE(r.error().message.find("oops"), std::string::npos);
-    EXPECT_NE(r.error().message.find("compute"), std::string::npos);
+    EXPECT_NE(r.error().message.view().find("oops"), std::string_view::npos);
+    EXPECT_NE(r.error().message.view().find("compute"), std::string_view::npos);
     EXPECT_EQ(r.error().severity, Severity::Fatal);
 }
 
@@ -260,5 +260,135 @@ TEST(ErrorTest, GuardWithUnknownException)
 {
     auto r = guard([]() -> int { throw 42; }, "compute");
     EXPECT_FALSE(r.has_value());
-    EXPECT_NE(r.error().message.find("unknown exception"), std::string::npos);
+    EXPECT_NE(r.error().message.view().find("unknown exception"), std::string_view::npos);
+}
+
+// ============================================================================
+// BEE_TRY_CTX / BEE_TRY_ASSIGN_CTX
+// ============================================================================
+
+namespace
+{
+
+auto try_ctx_propagates_error() -> Result<int>
+{
+    BEE_TRY_CTX(fail_void(), "step", "initialization");
+    return 0;
+}
+
+auto try_ctx_success() -> Result<int>
+{
+    BEE_TRY_CTX(succeed_void(), "step", "init");
+    return 42;
+}
+
+auto try_assign_ctx_propagates_error() -> Result<int>
+{
+    int x = 0;
+    BEE_TRY_ASSIGN_CTX(x, fail_int(), "phase", "compute");
+    return x;
+}
+
+auto try_assign_ctx_success() -> Result<int>
+{
+    int x = 0;
+    BEE_TRY_ASSIGN_CTX(x, succeed_int(), "phase", "compute");
+    return x;
+}
+
+} // anonymous namespace
+
+TEST(ErrorTest, TryCtxPropagatesWithContext)
+{
+    auto r = try_ctx_propagates_error();
+    EXPECT_FALSE(r.has_value());
+    EXPECT_EQ(r.error().message, "bad void");
+#ifndef NDEBUG
+    ASSERT_GE(r.error().context.size(), 1u);
+    EXPECT_EQ(r.error().context.back().first, "step");
+    EXPECT_EQ(r.error().context.back().second, "initialization");
+#endif
+}
+
+TEST(ErrorTest, TryCtxSucceeds)
+{
+    auto r = try_ctx_success();
+    EXPECT_TRUE(r.has_value());
+    EXPECT_EQ(*r, 42);
+}
+
+TEST(ErrorTest, TryAssignCtxPropagatesWithContext)
+{
+    auto r = try_assign_ctx_propagates_error();
+    EXPECT_FALSE(r.has_value());
+    EXPECT_EQ(r.error().message, "bad");
+#ifndef NDEBUG
+    ASSERT_GE(r.error().context.size(), 1u);
+    EXPECT_EQ(r.error().context.back().first, "phase");
+    EXPECT_EQ(r.error().context.back().second, "compute");
+#endif
+}
+
+TEST(ErrorTest, TryAssignCtxSucceeds)
+{
+    auto r = try_assign_ctx_success();
+    EXPECT_TRUE(r.has_value());
+    EXPECT_EQ(*r, 42);
+}
+
+// ============================================================================
+// BEE_LOG_RESULT
+// ============================================================================
+
+namespace
+{
+
+struct ResultLogEntry
+{
+    bee::LogLevel level;
+    std::string   category;
+    std::string   message;
+};
+
+std::vector<ResultLogEntry> gResultLogs;
+std::mutex                  gResultLogsMutex;
+
+void ResultCaptureSink(bee::LogLevel level, std::string_view category, std::string_view message, std::source_location)
+{
+    std::lock_guard lock(gResultLogsMutex);
+    gResultLogs.push_back({level, std::string(category), std::string(message)});
+}
+
+} // anonymous namespace
+
+TEST(ErrorTest, LogResultOnError)
+{
+    gResultLogs.clear();
+    bee::set_log_sink(ResultCaptureSink);
+    bee::set_log_level(bee::LogLevel::Trace);
+
+    BEE_LOG_RESULT(fail_int(), "loading config");
+
+    ASSERT_EQ(gResultLogs.size(), 1u);
+    EXPECT_EQ(gResultLogs[0].level, bee::LogLevel::Error);
+    EXPECT_EQ(gResultLogs[0].category, "Result");
+    EXPECT_NE(gResultLogs[0].message.find("loading config"), std::string::npos);
+    EXPECT_NE(gResultLogs[0].message.find("bad"), std::string::npos);
+
+    bee::set_log_sink(nullptr);
+    bee::set_log_level(bee::LogLevel::Info);
+}
+
+TEST(ErrorTest, LogResultOnSuccess)
+{
+    gResultLogs.clear();
+    bee::set_log_sink(ResultCaptureSink);
+    bee::set_log_level(bee::LogLevel::Trace);
+
+    BEE_LOG_RESULT(succeed_int(), "should not log");
+
+    EXPECT_TRUE(gResultLogs.empty());
+
+    bee::set_log_sink(nullptr);
+    bee::set_log_level(bee::LogLevel::Info);
 }

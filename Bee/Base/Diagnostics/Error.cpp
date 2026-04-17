@@ -16,7 +16,7 @@ namespace bee
 
 auto Error::format() const -> std::string
 {
-    std::string result = std::format("[severity={}] {}", enum_to_name(severity), message);
+    std::string result = std::format("[severity={}] {}", enum_to_name(severity), message.view());
 
     if (errc != 0) {
         result += std::format("\nerrc={}", errc);
@@ -24,8 +24,7 @@ auto Error::format() const -> std::string
 
     result += std::format("\nwhere={}:{} in {}", where.file_name(), where.line(), where.function_name());
 
-#ifndef NDEBUG
-    {
+    if (timestamp != std::chrono::system_clock::time_point{}) {
         auto    t = std::chrono::system_clock::to_time_t(timestamp);
         std::tm tm{};
     #if defined(_WIN32)
@@ -41,15 +40,14 @@ auto Error::format() const -> std::string
     if (!context.empty()) {
         result += "\ncontext:";
         for (const auto& [k, v] : context) {
-            result += std::format("\n  - {} = {}", k, v);
+            result += std::format("\n  - {} = {}", k.view(), v.view());
         }
     }
 
-    #if defined(__cpp_lib_stacktrace)
+#if defined(__cpp_lib_stacktrace)
     if (trace.has_value()) {
         result += std::format("\nstacktrace:\n{}", std::to_string(trace.value()));
     }
-    #endif
 #endif
 
     return result;
@@ -58,7 +56,7 @@ auto Error::format() const -> std::string
 [[noreturn]] void panic(Error e)
 {
     auto details = std::format("severity={}, errc={}", enum_to_name(e.severity), e.errc);
-    detail::check_fail("Panic", e.message, details, e.where);
+    detail::check_fail("Panic", e.message.view(), details, e.where);
     std::abort(); // 不可达，但可满足所有编译器对 [[noreturn]] 的要求
 }
 

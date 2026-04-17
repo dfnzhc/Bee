@@ -9,10 +9,12 @@
 
 #include "Base/Diagnostics/Check.hpp"
 #include "Base/Core/Config.hpp"
+#include "Base/Core/InlineString.hpp"
 #include "Base/Reflection/Nameof.hpp"
 
 #include <chrono>
 #include <expected>
+#include <format>
 #include <optional>
 #include <source_location>
 #include <string>
@@ -44,17 +46,16 @@ BEE_ENUM_DEFAULT_SETUP(Severity, 4);
 
 struct Error
 {
-    std::string          message;
+    InlineString         message;
     int                  errc     = 0;
     Severity             severity = Severity::Recoverable;
     std::source_location where    = std::source_location::current();
 
-#ifndef NDEBUG
-    std::chrono::system_clock::time_point            timestamp = std::chrono::system_clock::now();
-    std::vector<std::pair<std::string, std::string>> context{};
-    #if defined(__cpp_lib_stacktrace)
+    // Always present for ABI stability; populated only in debug builds.
+    std::chrono::system_clock::time_point              timestamp{};
+    std::vector<std::pair<InlineString, InlineString>> context{};
+#if defined(__cpp_lib_stacktrace)
     std::optional<std::stacktrace> trace{};
-    #endif
 #endif
 
     [[nodiscard]] auto retryable() const noexcept -> bool
@@ -84,18 +85,19 @@ using Status = Result<std::monostate>;
 // ============================================================================
 
 [[nodiscard]] inline auto make_error(
-    std::string          message,
+    std::string_view     message,
     Severity             severity = Severity::Recoverable,
     int                  errc     = 0,
     std::source_location where    = std::source_location::current()
 ) -> Error
 {
     Error e;
-    e.message  = std::move(message);
+    e.message  = message;
     e.errc     = errc;
     e.severity = severity;
     e.where    = where;
 #ifndef NDEBUG
+    e.timestamp = std::chrono::system_clock::now();
     if (severity == Severity::Fatal || severity == Severity::Bug) {
     #if defined(__cpp_lib_stacktrace)
         e.trace = std::stacktrace::current();
@@ -105,10 +107,10 @@ using Status = Result<std::monostate>;
     return e;
 }
 
-[[nodiscard]] inline auto with_context(Error e, std::string key, std::string value) -> Error
+[[nodiscard]] inline auto with_context(Error e, std::string_view key, std::string_view value) -> Error
 {
 #ifndef NDEBUG
-    e.context.emplace_back(std::move(key), std::move(value));
+    e.context.emplace_back(InlineString(key), InlineString(value));
 #else
     (void)key;
     (void)value;
@@ -143,7 +145,7 @@ template <typename T>
 template <typename Fn>
 [[nodiscard]] auto guard(
     Fn&&                 fn,
-    std::string          operation,
+    std::string_view     operation,
     Severity             exceptionSeverity = Severity::Fatal,
     std::source_location where             = std::source_location::current()
 ) -> Result<std::invoke_result_t<Fn>>
@@ -159,9 +161,9 @@ template <typename Fn>
             return std::forward<Fn>(fn)();
         }
     } catch (const std::exception& ex) {
-        return std::unexpected(make_error(operation + ": " + ex.what(), exceptionSeverity, 0, where));
+        return std::unexpected(make_error(std::format("{}: {}", operation, ex.what()), exceptionSeverity, 0, where));
     } catch (...) {
-        return std::unexpected(make_error(operation + ": unknown exception", exceptionSeverity, 0, where));
+        return std::unexpected(make_error(std::format("{}: unknown exception", operation), exceptionSeverity, 0, where));
     }
 }
 
@@ -184,4 +186,33 @@ template <typename Fn>
             return std::unexpected(std::move(_bee_try_result_.error())); \
         }                                                                \
         (LHS) = std::move(_bee_try_result_.value());                     \
+    } while (false)
+
+/// 计算 EXPR（必须返回 Result<U>）。若包含错误则附加上下文后向上传播。
+#define BEE_TRY_CTX(EXPR, KEY, VALUE)                                                                     \
+    do {                                                                                                  \
+        auto _bee_try_result_ = (EXPR);                                                                   \
+        if (!_bee_try_result_) [[unlikely]] {                                                             \
+            return std::unexpected(::bee::with_context(std::move(_bee_try_result_.error()), (KEY), (VALUE))); \
+        }                                                                                                 \
+    } while (false)
+
+/// 计算 EXPR。成功时赋值给 LHS；失败时附加上下文后向上传播。
+#define BEE_TRY_ASSIGN_CTX(LHS, EXPR, KEY, VALUE)                                                        \
+    do {                                                                                                  \
+        auto _bee_try_result_ = (EXPR);                                                                   \
+        if (!_bee_try_result_) [[unlikely]] {                                                             \
+            return std::unexpected(::bee::with_context(std::move(_bee_try_result_.error()), (KEY), (VALUE))); \
+        }                                                                                                 \
+        (LHS) = std::move(_bee_try_result_.value());                                                      \
+    } while (false)
+
+/// 计算 EXPR（必须返回 Result<U>）。若包含错误则记录日志并继续执行。
+#define BEE_LOG_RESULT(EXPR, MSG)                                                         \
+    do {                                                                                  \
+        auto _bee_lr_ = (EXPR);                                                           \
+        if (!_bee_lr_) [[unlikely]] {                                                     \
+            auto _bee_lr_msg_ = std::format("{}: {}", (MSG), _bee_lr_.error().format());  \
+            ::bee::LogRaw(::bee::LogLevel::Error, "Result", _bee_lr_msg_);                \
+        }                                                                                 \
     } while (false)

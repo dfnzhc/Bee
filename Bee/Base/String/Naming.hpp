@@ -48,14 +48,20 @@ namespace bee
         append_underscore();
     }
 
-    while (!result.empty() && result.front() == '_') {
-        result.erase(result.begin());
+    // Strip leading and trailing underscores in one pass
+    std::size_t start = 0;
+    while (start < result.size() && result[start] == '_') {
+        ++start;
     }
-    while (!result.empty() && result.back() == '_') {
-        result.pop_back();
+    std::size_t end = result.size();
+    while (end > start && result[end - 1] == '_') {
+        --end;
     }
 
-    return result;
+    if (start == 0 && end == result.size()) {
+        return result;
+    }
+    return result.substr(start, end - start);
 }
 
 } // namespace bee

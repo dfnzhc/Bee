@@ -12,6 +12,8 @@
 namespace bee
 {
 
+/// Splitmix64 finalizer by Sebastiano Vigna.
+/// Reference: https://prng.di.unimi.it/splitmix64.c
 [[nodiscard]] constexpr u64 Splitmix64(u64 state) noexcept
 {
     auto z = state;

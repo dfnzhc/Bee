@@ -575,7 +575,7 @@ constexpr auto type_name_short() noexcept -> std::string_view
 }
 
 template <typename T>
-auto type_name_key() noexcept -> std::string_view
+auto type_name_key() -> std::string_view
 {
     // Key 基于 short 名称生成，天然继承 TypeName 覆盖链路。
     // 使用静态缓存避免热路径重复分配。
@@ -616,7 +616,7 @@ constexpr auto value_name_short() noexcept -> std::string_view
 }
 
 template <auto V>
-auto value_name_key() noexcept -> std::string_view
+auto value_name_key() -> std::string_view
 {
     const auto short_name = value_name_short<V>();
     if (short_name == internal::kUnknownEnumValueName) {
@@ -651,6 +651,5 @@ static_assert(!type_name_raw<int>().empty());
 static_assert(type_name_raw<int>() == type_name_raw<int>());
 static_assert(type_name_short<const int&>().find("int") != std::string_view::npos);
 static_assert(std::is_same_v<decltype(type_name_key<int>()), std::string_view>);
-static_assert(noexcept(type_name_key<int>()));
 
 } // namespace bee
