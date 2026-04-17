@@ -7,9 +7,10 @@
 
 #pragma once
 
-#include <shared_mutex>
+#include <limits>
 
 #include "Base/Core/Defines.hpp"
+#include "Base/Numeric/Bit.hpp"
 #include "Concurrency/Threading.hpp"
 
 namespace bee
@@ -17,6 +18,8 @@ namespace bee
 
 /**
  * @brief Chase-Lev Work-Stealing Deque
+ *
+ * 容量始终向上对齐到 2 的次幂，以便用按位与替代取模运算。
  *
  * 1) 角色分工：
  *    - owner 线程：负责 push/pop（操作 bottom_）。
@@ -54,6 +57,7 @@ public:
 
     explicit ChaseLevDeque(size_type capacity, const Allocator& allocator = Allocator())
         : _capacity(normalize_capacity(capacity))
+        , _capacity_mask(_capacity - 1)
         , _allocator(allocator)
     {
         _slots = std::allocator_traits<allocator_type>::allocate(_allocator, _capacity);
@@ -284,12 +288,17 @@ public:
 private:
     static constexpr size_type normalize_capacity(size_type requested_capacity) noexcept
     {
-        return requested_capacity == 0 ? 1 : requested_capacity;
+        auto normalized = requested_capacity == 0 ? 1 : requested_capacity;
+        auto rounded    = RoundUpPowerOfTwo(normalized);
+        if (rounded == 0) {
+            rounded = HighestPowerOfTwoLEQ(std::numeric_limits<size_type>::max());
+        }
+        return rounded;
     }
 
     [[nodiscard]] size_type slot_index(size_type ticket) const noexcept
     {
-        return ticket % _capacity;
+        return ticket & _capacity_mask;
     }
 
     template <typename... Args>
@@ -310,310 +319,13 @@ private:
     }
 
 private:
-    size_type                            _capacity = 0;
-    T*                                   _slots    = nullptr;
+    size_type                            _capacity      = 0;
+    size_type                            _capacity_mask = 0;
+    T*                                   _slots         = nullptr;
     BEE_NO_UNIQUE_ADDRESS allocator_type _allocator;
 
     alignas(BEE_CACHE_LINE_SIZE) std::atomic<size_type> _top    = {0};
     alignas(BEE_CACHE_LINE_SIZE) std::atomic<size_type> _bottom = {0};
-};
-
-/**
- * @brief 可动态分配 Chase-Lev Work-Stealing Deque
- *
- * 1) 基本并发模型与 ChaseLevDeque 一致：
- *    - owner：push/pop（操作 bottom_）
- *    - stealer：steal（操作 top_）
- *
- * 2) 扩容策略：
- *    - 仅 owner 在 push 发现“逻辑满”时触发扩容。
- *    - 扩容时复制 [top, bottom) 对应元素到新 buffer。
- *    - 新旧 buffer 并存，旧 buffer 延迟到析构统一回收，避免并发悬垂。
- *
- * 3) 类型约束：
- *    - 为保证迁移与并发访问安全，本实现要求 T 为 trivially copyable/destructible。
- *    - 这也符合 work-stealing 调度中常见的轻量任务句柄场景。
- *
- * 4) 生命周期契约：
- *    - 析构前必须停止所有访问该 deque 的线程。
- *    - 析构与并发 push/pop/steal 同时发生属于未定义行为。
- */
-template <typename T, typename Allocator = std::allocator<T>>
-class ChaseLevDequeDynamic
-{
-    static constexpr bool kSupportedValueType =
-        std::is_trivially_copyable_v<T> && std::is_trivially_destructible_v<T> && std::is_default_constructible_v<T>;
-
-    static_assert(kSupportedValueType, "ChaseLevDequeDynamic requires trivially copyable/destructible/default-constructible T");
-
-public:
-    using value_type      = T;
-    using size_type       = size_t;
-    using allocator_type  = Allocator;
-    using reference       = T&;
-    using const_reference = const T&;
-
-    // =========================================================================
-    // 构造与生命周期管理
-    // =========================================================================
-
-    explicit ChaseLevDequeDynamic(size_type capacity, const Allocator& allocator = Allocator())
-        : _allocator(allocator)
-    {
-        auto* initial = create_buffer(normalize_capacity(capacity));
-        _buffer.store(initial, std::memory_order_release);
-    }
-
-    ~ChaseLevDequeDynamic() noexcept
-    {
-        auto* current = _buffer.load(std::memory_order_relaxed);
-        if (current != nullptr) {
-            destroy_buffer(current);
-        }
-
-        for (auto* retired : _retired_buffers) {
-            destroy_buffer(retired);
-        }
-    }
-
-    ChaseLevDequeDynamic(const ChaseLevDequeDynamic&)            = delete;
-    ChaseLevDequeDynamic(ChaseLevDequeDynamic&&)                 = delete;
-    ChaseLevDequeDynamic& operator=(const ChaseLevDequeDynamic&) = delete;
-    ChaseLevDequeDynamic& operator=(ChaseLevDequeDynamic&&)      = delete;
-
-    // =========================================================================
-    // owner-only 入队
-    // =========================================================================
-
-    template <typename... Args>
-    [[nodiscard]] bool try_emplace(Args&&... args)
-    {
-        static_assert(std::is_constructible_v<T, Args&&...>, "T must be constructible with Args&&...");
-
-        auto  bottom = _bottom.load(std::memory_order_relaxed);
-        auto  top    = _top.load(std::memory_order_acquire);
-        auto* buf    = _buffer.load(std::memory_order_acquire);
-
-        if ((bottom - top) >= buf->capacity) {
-            buf = grow_buffer(top, bottom);
-            if (buf == nullptr) {
-                return false;
-            }
-        }
-
-        buf->slots[bottom % buf->capacity] = T(std::forward<Args>(args)...);
-        _bottom.store(bottom + 1, std::memory_order_release);
-        return true;
-    }
-
-    [[nodiscard]] bool try_push(const_reference value)
-    {
-        return try_emplace(value);
-    }
-
-    [[nodiscard]] bool try_push(T&& value)
-    {
-        return try_emplace(std::move(value));
-    }
-
-    template <typename P>
-        requires std::constructible_from<T, P&&>
-    [[nodiscard]] bool try_push(P&& value)
-    {
-        return try_emplace(std::forward<P>(value));
-    }
-
-    template <typename... Args>
-    void emplace(Args&&... args)
-    {
-        if (!try_emplace(std::forward<Args>(args)...)) {
-            throw std::length_error("ChaseLevDequeDynamic capacity overflow");
-        }
-    }
-
-    void push(const_reference value)
-    {
-        emplace(value);
-    }
-
-    void push(T&& value)
-    {
-        emplace(std::move(value));
-    }
-
-    template <typename P>
-        requires std::constructible_from<T, P&&>
-    void push(P&& value)
-    {
-        emplace(std::forward<P>(value));
-    }
-
-    // =========================================================================
-    // owner-only 出队（LIFO）
-    // =========================================================================
-
-    [[nodiscard]] bool try_pop(T& out_value) noexcept
-    {
-        auto bottom = _bottom.load(std::memory_order_relaxed);
-        if (bottom == 0) {
-            return false;
-        }
-
-        auto* buf  = _buffer.load(std::memory_order_acquire);
-        bottom    -= 1;
-        _bottom.store(bottom, std::memory_order_relaxed);
-        std::atomic_thread_fence(std::memory_order_seq_cst);
-
-        auto top = _top.load(std::memory_order_relaxed);
-        if (top > bottom) {
-            _bottom.store(bottom + 1, std::memory_order_relaxed);
-            return false;
-        }
-
-        if (top == bottom) {
-            if (!_top.compare_exchange_strong(top, top + 1, std::memory_order_seq_cst, std::memory_order_relaxed)) {
-                _bottom.store(bottom + 1, std::memory_order_relaxed);
-                return false;
-            }
-            _bottom.store(bottom + 1, std::memory_order_relaxed);
-        }
-
-        out_value = std::move(buf->slots[bottom % buf->capacity]);
-        return true;
-    }
-
-    void pop(T& out_value) noexcept
-    {
-        while (!try_pop(out_value)) {
-            std::this_thread::yield();
-        }
-    }
-
-    // =========================================================================
-    // stealer-only 出队（FIFO）
-    // =========================================================================
-
-    [[nodiscard]] bool try_steal(T& out_value) noexcept
-    {
-        std::shared_lock<std::shared_mutex> guard(_buffer_guard);
-
-        auto* buf = _buffer.load(std::memory_order_acquire);
-        auto  top = _top.load(std::memory_order_acquire);
-        std::atomic_thread_fence(std::memory_order_seq_cst);
-        auto bottom = _bottom.load(std::memory_order_acquire);
-        if (top >= bottom) {
-            return false;
-        }
-
-        const auto ticket = top;
-        T          value  = buf->slots[ticket % buf->capacity];
-        if (!_top.compare_exchange_strong(top, top + 1, std::memory_order_seq_cst, std::memory_order_relaxed)) {
-            return false;
-        }
-
-        out_value = std::move(value);
-        return true;
-    }
-
-    void steal(T& out_value) noexcept
-    {
-        while (!try_steal(out_value)) {
-            std::this_thread::yield();
-        }
-    }
-
-    // =========================================================================
-    // 状态访问与查询
-    // =========================================================================
-
-    [[nodiscard]] size_type capacity() const noexcept
-    {
-        auto* buf = _buffer.load(std::memory_order_acquire);
-        return (buf != nullptr) ? buf->capacity : 0;
-    }
-
-    [[nodiscard]] std::ptrdiff_t size_approx() const noexcept
-    {
-        const auto top = _top.load(std::memory_order_relaxed);
-        const auto bot = _bottom.load(std::memory_order_relaxed);
-        return static_cast<std::ptrdiff_t>(bot - top);
-    }
-
-    [[nodiscard]] bool is_empty() const noexcept
-    {
-        return size_approx() <= 0;
-    }
-
-private:
-    struct Buffer
-    {
-        size_type capacity = 0;
-        T*        slots    = nullptr;
-    };
-
-    static constexpr size_type normalize_capacity(size_type requested_capacity) noexcept
-    {
-        return requested_capacity == 0 ? 1 : requested_capacity;
-    }
-
-    [[nodiscard]] Buffer* create_buffer(size_type capacity)
-    {
-        auto* buffer     = new Buffer();
-        buffer->capacity = capacity;
-        buffer->slots    = std::allocator_traits<allocator_type>::allocate(_allocator, capacity);
-        for (size_type i = 0; i < capacity; ++i) {
-            std::allocator_traits<allocator_type>::construct(_allocator, buffer->slots + i, T{});
-        }
-        return buffer;
-    }
-
-    void destroy_buffer(Buffer* buffer) noexcept
-    {
-        if (buffer == nullptr) {
-            return;
-        }
-        for (size_type i = 0; i < buffer->capacity; ++i) {
-            std::allocator_traits<allocator_type>::destroy(_allocator, buffer->slots + i);
-        }
-        std::allocator_traits<allocator_type>::deallocate(_allocator, buffer->slots, buffer->capacity);
-        delete buffer;
-    }
-
-    [[nodiscard]] Buffer* grow_buffer(size_type top, size_type bottom)
-    {
-        std::unique_lock<std::shared_mutex> guard(_buffer_guard);
-
-        auto*      old_buffer   = _buffer.load(std::memory_order_acquire);
-        const auto old_capacity = old_buffer->capacity;
-
-        size_type new_capacity = old_capacity * 2;
-        if (new_capacity < old_capacity) {
-            // 容量溢出保护：返回失败，由上层决定如何处理。
-            return nullptr;
-        }
-
-        auto* new_buffer = create_buffer(new_capacity);
-
-        // 复制当前有效区间 [top, bottom)；ticket 保持不变，仅映射到新容量。
-        for (auto ticket = top; ticket < bottom; ++ticket) {
-            new_buffer->slots[ticket % new_capacity] = old_buffer->slots[ticket % old_capacity];
-        }
-
-        _retired_buffers.push_back(old_buffer);
-        _buffer.store(new_buffer, std::memory_order_release);
-        return new_buffer;
-    }
-
-private:
-    BEE_NO_UNIQUE_ADDRESS allocator_type _allocator;
-
-    alignas(BEE_CACHE_LINE_SIZE) std::atomic<size_type> _top    = {0};
-    alignas(BEE_CACHE_LINE_SIZE) std::atomic<size_type> _bottom = {0};
-    alignas(BEE_CACHE_LINE_SIZE) std::atomic<Buffer*> _buffer   = {nullptr};
-    mutable std::shared_mutex _buffer_guard;
-
-    // 仅 owner 写入；保存历史 buffer 以避免并发访问时提前释放。
-    std::vector<Buffer*> _retired_buffers;
 };
 
 } // namespace bee

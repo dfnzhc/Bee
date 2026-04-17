@@ -100,8 +100,8 @@ public:
 
 TEST(MPMCQueueTests, CapacityAtLeastOne)
 {
-    MPMCQueue<int> queue0(0);
-    MPMCQueue<int> queue1(1);
+    MPMCQueueBase<int> queue0(0);
+    MPMCQueueBase<int> queue1(1);
 
     EXPECT_EQ(queue0.capacity(), 1u);
     EXPECT_EQ(queue1.capacity(), 1u);
@@ -109,7 +109,7 @@ TEST(MPMCQueueTests, CapacityAtLeastOne)
 
 TEST(MPMCQueueTests, TryPushTryPopAndSize)
 {
-    MPMCQueue<int> queue(8);
+    MPMCQueueBase<int> queue(8);
     EXPECT_TRUE(queue.is_empty());
     EXPECT_FALSE(queue.is_full());
     EXPECT_EQ(queue.size_approx(), 0);
@@ -127,7 +127,7 @@ TEST(MPMCQueueTests, TryPushTryPopAndSize)
 
 TEST(MPMCQueueTests, FullConditionWithTryPush)
 {
-    MPMCQueue<int> queue(4);
+    MPMCQueueBase<int> queue(4);
 
     ASSERT_TRUE(queue.try_push(1));
     ASSERT_TRUE(queue.try_push(2));
@@ -150,7 +150,7 @@ TEST(MPMCQueueTests, ConstructorRollsBackWhenCellConstructionThrows)
     MpmcAllocatorThrowControl::Reset();
     MpmcAllocatorThrowControl::throw_on_construct = 1;
 
-    EXPECT_THROW((MPMCQueue<int, TestAllocator>(8)), std::runtime_error);
+    EXPECT_THROW((MPMCQueueBase<int, TestAllocator>(8)), std::runtime_error);
     EXPECT_EQ(MpmcAllocatorThrowControl::allocate_calls, 1);
     EXPECT_EQ(MpmcAllocatorThrowControl::deallocate_calls, 1);
     EXPECT_EQ(MpmcAllocatorThrowControl::destroy_calls, 1);
@@ -158,7 +158,7 @@ TEST(MPMCQueueTests, ConstructorRollsBackWhenCellConstructionThrows)
 
 TEST(MPMCQueueTests, PushIfNotFullAndPopIfNotEmpty)
 {
-    MPMCQueue<int> queue(2);
+    MPMCQueueBase<int> queue(2);
 
     EXPECT_TRUE(queue.push_if_not_full(10));
     EXPECT_TRUE(queue.push_if_not_full(20));
@@ -174,7 +174,7 @@ TEST(MPMCQueueTests, PushIfNotFullAndPopIfNotEmpty)
 
 TEST(MPMCQueueTests, SupportsMoveOnlyType)
 {
-    MPMCQueue<std::unique_ptr<int>> queue(2);
+    MPMCQueueBase<std::unique_ptr<int>> queue(2);
     ASSERT_TRUE(queue.try_push(std::make_unique<int>(7)));
 
     std::unique_ptr<int> output;
@@ -185,7 +185,7 @@ TEST(MPMCQueueTests, SupportsMoveOnlyType)
 
 TEST(MPMCQueueTests, BlockingPushAndPopProgress)
 {
-    MPMCQueue<int> queue(2);
+    MPMCQueueBase<int> queue(2);
     queue.push(11);
     queue.push(22);
 
@@ -235,7 +235,7 @@ TEST(MPMCQueueTests, ConcurrentMPMCCorrectness)
     constexpr int kItemsPerProducer = 25'000;
     constexpr int kTotalItems       = kProducers * kItemsPerProducer;
 
-    MPMCQueue<int>                         queue(4096);
+    MPMCQueueBase<int>                         queue(4096);
     std::vector<std::atomic<std::uint8_t>> seen(static_cast<size_t>(kTotalItems));
     for (auto& slot : seen) {
         slot.store(0, std::memory_order_relaxed);
@@ -312,7 +312,7 @@ TEST(MPMCQueueTests, ConcurrentMPMCCorrectness)
 
 TEST(MPMCQueueTests, CapacityOneMultipleProducersConsumers)
 {
-    MPMCQueue<int> queue(4);
+    MPMCQueueBase<int> queue(4);
     constexpr int  kItemsPerProducer = 1000;
     constexpr int  kProducers        = 4;
     constexpr int  kConsumers        = 4;
@@ -366,7 +366,7 @@ TEST(MPMCQueueTests, CapacityOneMultipleProducersConsumers)
 
 TEST(MPMCQueueTests, TryPushOnFullReturnsFalse)
 {
-    MPMCQueue<int> queue(2);
+    MPMCQueueBase<int> queue(2);
 
     ASSERT_TRUE(queue.try_push(1));
     ASSERT_TRUE(queue.try_push(2));
@@ -383,7 +383,7 @@ TEST(MPMCQueueTests, TryPushOnFullReturnsFalse)
 
 TEST(MPMCQueueTests, AlternatingPushPop)
 {
-    MPMCQueue<int> queue(4);
+    MPMCQueueBase<int> queue(4);
     constexpr int  kCount = 10000;
 
     for (int i = 0; i < kCount; ++i) {

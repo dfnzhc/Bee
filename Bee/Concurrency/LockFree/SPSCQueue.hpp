@@ -38,7 +38,7 @@ namespace bee
  *    - 吞吐量导向策略不会换出自身，在某些平台上更高效
  */
 template <typename T, typename Allocator = std::allocator<T>, bool ForceRoundUpPowerOfTwo = true, typename SpinPolicy = DefaultSpinPolicy>
-class BasicSPSCQueue
+class SPSCQueueBase
 {
     // 类型是 trivial 类型，可以直接拷贝避免构造
     static constexpr bool kTrivialFastPath =
@@ -55,7 +55,7 @@ public:
     // 构造与生命周期管理
     // =========================================================================
 
-    explicit BasicSPSCQueue(size_type capacity, const Allocator& allocator = Allocator())
+    explicit SPSCQueueBase(size_type capacity, const Allocator& allocator = Allocator())
         : _capacity(normalize_internal_capacity(capacity))
         , _indexMask(initial_index_mask(_capacity))
         , _allocator(allocator)
@@ -79,7 +79,7 @@ public:
         }
     }
 
-    ~BasicSPSCQueue()
+    ~SPSCQueueBase()
     {
         // 析构时清理仍在队列中的对象。
         if constexpr (kTrivialFastPath) {
@@ -97,10 +97,10 @@ public:
         std::allocator_traits<Allocator>::deallocate(_allocator, _slots, _capacity);
     }
 
-    BasicSPSCQueue(const BasicSPSCQueue&)            = delete;
-    BasicSPSCQueue(BasicSPSCQueue&&)                 = delete;
-    BasicSPSCQueue& operator=(const BasicSPSCQueue&) = delete;
-    BasicSPSCQueue& operator=(BasicSPSCQueue&&)      = delete;
+    SPSCQueueBase(const SPSCQueueBase&)            = delete;
+    SPSCQueueBase(SPSCQueueBase&&)                 = delete;
+    SPSCQueueBase& operator=(const SPSCQueueBase&) = delete;
+    SPSCQueueBase& operator=(SPSCQueueBase&&)      = delete;
 
     // =========================================================================
     // 生产者
@@ -353,6 +353,7 @@ private:
     [[nodiscard]] bool refresh_read_cache_if_full(size_type nextWriteIdx) noexcept
     {
         // 生产者局部快路径：没满时不读原子 _readIdx。
+        // 含义是：在没满的情况下，消费者的更新不会影响到生产者
         if (nextWriteIdx != _readIdxCache) {
             return true;
         }
@@ -364,6 +365,7 @@ private:
     [[nodiscard]] bool refresh_write_cache_if_empty(size_type readIdx) noexcept
     {
         // 消费者局部快路径：不空时不读原子 _writeIdx。
+        // 含义是：在没空的情况下，生产者的更新不会影响到消费者
         if (readIdx != _writeIdxCache) {
             return true;
         }
@@ -386,13 +388,13 @@ private:
 };
 
 template <typename T, typename Allocator = std::allocator<T>>
-using SPSCQueue = BasicSPSCQueue<T, Allocator>;
+using SPSCQueue = SPSCQueueBase<T, Allocator>;
 template <typename T, typename Allocator = std::allocator<T>>
-using SPSCQueueExact = BasicSPSCQueue<T, Allocator, false>;
+using SPSCQueueExact = SPSCQueueBase<T, Allocator, false>;
 
 template <typename T, typename Allocator = std::allocator<T>>
-using SPSCQueueThroughput = BasicSPSCQueue<T, Allocator, true, ThroughputSpinPolicy>;
+using SPSCQueueThroughput = SPSCQueueBase<T, Allocator, true, ThroughputSpinPolicy>;
 template <typename T, typename Allocator = std::allocator<T>>
-using SPSCQueueExactThroughput = BasicSPSCQueue<T, Allocator, false, ThroughputSpinPolicy>;
+using SPSCQueueExactThroughput = SPSCQueueBase<T, Allocator, false, ThroughputSpinPolicy>;
 
 } // namespace bee

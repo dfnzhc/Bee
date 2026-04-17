@@ -306,7 +306,7 @@ private:
     // -------------------------------------------------------------------------
 
     using LocalQueue  = ChaseLevDeque<MoveOnlyFunction>;
-    using GlobalQueue = MPMCQueue<MoveOnlyFunction>;
+    using GlobalQueue = MPMCQueueBase<MoveOnlyFunction>;
 
     ThreadPoolConfig                          config_{};
     std::size_t                               worker_count_{0};

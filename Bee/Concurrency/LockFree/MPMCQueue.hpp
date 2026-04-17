@@ -20,6 +20,8 @@ namespace bee
 /**
  * @brief 无锁、有界的多生产者多消费者队列 - MPMCQueue
  *
+ * 容量始终向上对齐到 2 的次幂，以便用按位与替代取模运算。
+ *
  * 1) 采用“全局票据 + 槽位序号（sequence）”协议：
  *    - 生产者通过 enqueue_pos_ 竞争一个 ticket（位置）。
  *    - 消费者通过 dequeue_pos_ 竞争一个 ticket（位置）。
@@ -53,8 +55,8 @@ namespace bee
  *    - 析构前，拥有者必须先停止所有仍可能访问该队列的线程。
  *    - 队列析构与并发 push/pop 同时发生属于未定义行为。
  */
-template <typename T, typename Allocator = std::allocator<T>, typename SpinPolicy = DefaultSpinPolicy, bool ForceRoundUpPowerOfTwo = true>
-class MPMCQueue
+template <typename T, typename Allocator = std::allocator<T>, typename SpinPolicy = DefaultSpinPolicy>
+class MPMCQueueBase
 {
     // 类型是 trivial 类型，可以直接拷贝避免构造
     static constexpr bool kTrivialFastPath =
@@ -71,7 +73,7 @@ public:
     // 构造与生命周期管理
     // =========================================================================
 
-    explicit MPMCQueue(size_type capacity, const Allocator& allocator = Allocator())
+    explicit MPMCQueueBase(size_type capacity, const Allocator& allocator = Allocator())
         : _capacity(normalize_capacity(capacity))
         , _allocator(allocator)
         , _cell_allocator(_allocator)
@@ -87,9 +89,9 @@ public:
                 // 初始 sequence = index，表示第 index 个 ticket 可立即写入对应槽位。
                 std::allocator_traits<cell_allocator_type>::construct(_cell_allocator, _cells + index, index);
                 ++constructed_cells;
-                if constexpr (kTrivialFastPath) {
-                    std::construct_at(_cells[index].ptr(), T{});
-                }
+                //if constexpr (kTrivialFastPath) {
+                //    std::construct_at(_cells[index].ptr(), T{});
+                //}
             }
         } catch (...) {
             for (size_type index = 0; index < constructed_cells; ++index) {
@@ -101,7 +103,7 @@ public:
         }
     }
 
-    ~MPMCQueue() noexcept
+    ~MPMCQueueBase() noexcept
     {
         if (_cells == nullptr) {
             return;
@@ -124,10 +126,10 @@ public:
         std::allocator_traits<cell_allocator_type>::deallocate(_cell_allocator, _cells, _capacity);
     }
 
-    MPMCQueue(const MPMCQueue&)            = delete;
-    MPMCQueue(MPMCQueue&&)                 = delete;
-    MPMCQueue& operator=(const MPMCQueue&) = delete;
-    MPMCQueue& operator=(MPMCQueue&&)      = delete;
+    MPMCQueueBase(const MPMCQueueBase&)            = delete;
+    MPMCQueueBase(MPMCQueueBase&&)                 = delete;
+    MPMCQueueBase& operator=(const MPMCQueueBase&) = delete;
+    MPMCQueueBase& operator=(MPMCQueueBase&&)      = delete;
 
     // =========================================================================
     // 生产者
@@ -327,27 +329,16 @@ private:
     static constexpr size_type normalize_capacity(size_type requested_capacity) noexcept
     {
         auto normalized = requested_capacity == 0 ? 1 : requested_capacity;
-        if constexpr (ForceRoundUpPowerOfTwo) {
-            auto rounded = RoundUpPowerOfTwo(normalized);
-            if (rounded == 0) {
-                rounded = HighestPowerOfTwoLEQ(std::numeric_limits<size_type>::max());
-            }
-            if (rounded >= 1) {
-                normalized = rounded;
-            }
+        auto rounded    = RoundUpPowerOfTwo(normalized);
+        if (rounded == 0) {
+            rounded = HighestPowerOfTwoLEQ(std::numeric_limits<size_type>::max());
         }
-        return normalized;
+        return rounded;
     }
 
     [[nodiscard]] size_type cell_index(size_type ticket) const noexcept
     {
-        // 与 SPSC 一致：将容量策略提升到模板参数，
-        // 让热路径在编译期确定，避免运行时分支。
-        if constexpr (ForceRoundUpPowerOfTwo) {
-            return ticket & _capacity_mask;
-        } else {
-            return ticket % _capacity;
-        }
+        return ticket & _capacity_mask;
     }
 
     [[nodiscard]] Cell& cell_ref(size_type ticket) noexcept
@@ -358,11 +349,12 @@ private:
     template <typename... Args>
     void write_value(Cell& cell, Args&&... args) noexcept(std::is_nothrow_constructible_v<T, Args...>)
     {
-        if constexpr (kTrivialFastPath) {
-            *cell.ptr() = T(std::forward<Args>(args)...);
-        } else {
-            std::construct_at(cell.ptr(), std::forward<Args>(args)...);
-        }
+        //if constexpr (kTrivialFastPath) {
+        //    *cell.ptr() = T(std::forward<Args>(args)...);
+        //} else {
+        //    std::construct_at(cell.ptr(), std::forward<Args>(args)...);
+        //}
+        std::construct_at(cell.ptr(), std::forward<Args>(args)...);
     }
 
     void read_value(Cell& cell, reference out_value) noexcept
@@ -489,13 +481,7 @@ private:
     alignas(BEE_CACHE_LINE_SIZE) std::atomic<size_type> _dequeue_pos = {0};
 };
 
-template <typename T, typename Allocator = std::allocator<T>, typename SpinPolicy = DefaultSpinPolicy>
-using MPMCQueueExact = MPMCQueue<T, Allocator, SpinPolicy, false>;
-
 template <typename T, typename Allocator = std::allocator<T>>
-using MPMCQueueThroughput = MPMCQueue<T, Allocator, ThroughputSpinPolicy, true>;
-
-template <typename T, typename Allocator = std::allocator<T>>
-using MPMCQueueExactThroughput = MPMCQueue<T, Allocator, ThroughputSpinPolicy, false>;
+using MPMCQueue = MPMCQueueBase<T, Allocator, ThroughputSpinPolicy>;
 
 } // namespace bee
