@@ -71,18 +71,20 @@ namespace bee::detail
     // safe_post_loop — 安全投递并等待
     // =====================================================================
 
+
     /// 安全地将 count 个任务投递到调度器，确保 latch 始终达到 0。
-    /// TaskFactory 签名：auto(std::size_t i) -> callable<void()>
+    /// Body 签名：auto(std::size_t i) -> void
+    /// safe_post_loop 内部将 body 包装为 post 所需的 callable。
     /// 若 post() 在第 k 次调用时抛出异常，补足剩余 N-k 次 count_down，
     /// 等待所有已投递任务完成，然后重抛异常。
-    template <Scheduler S, typename TaskFactory>
-    auto safe_post_loop(S& scheduler, std::size_t count, std::latch& done, TaskFactory&& factory) -> void
+    template <Scheduler S, typename Body>
+    auto safe_post_loop(S& scheduler, std::size_t count, std::latch& done, Body&& body) -> void
     {
         std::size_t        posted = 0;
         std::exception_ptr post_ex;
         try {
             for (std::size_t i = 0; i < count; ++i) {
-                scheduler.post(factory(i));
+                scheduler.post([&body, i]() { body(i); });
                 ++posted;
             }
         }
@@ -130,20 +132,18 @@ namespace bee::detail
         std::latch                      done(static_cast<std::ptrdiff_t>(count));
 
         safe_post_loop(scheduler, count, done, [&](std::size_t i) {
-            return [&, i]() {
-                if (token.stop_requested()) {
-                    cancelled.store(true, std::memory_order_relaxed);
-                    done.count_down();
-                    return;
-                }
-                try {
-                    chunk_fn(chunks[i].begin, chunks[i].end);
-                }
-                catch (...) {
-                    exceptions[i] = std::current_exception();
-                }
+            if (token.stop_requested()) {
+                cancelled.store(true, std::memory_order_relaxed);
                 done.count_down();
-            };
+                return;
+            }
+            try {
+                chunk_fn(chunks[i].begin, chunks[i].end);
+            }
+            catch (...) {
+                exceptions[i] = std::current_exception();
+            }
+            done.count_down();
         });
 
         rethrow_first(exceptions);

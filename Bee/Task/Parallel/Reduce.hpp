@@ -44,22 +44,20 @@ template <Scheduler S, std::random_access_iterator It, typename T, typename Bina
     std::latch                      done(static_cast<std::ptrdiff_t>(count));
 
     detail::safe_post_loop(scheduler, count, done, [&](std::size_t i) {
-        return [&, i]() {
-            try {
-                auto it  = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
-                auto end = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
-                T    acc = *it;
-                ++it;
-                for (; it != end; ++it) {
-                    acc = op(acc, *it);
-                }
-                partial_results[i] = std::move(acc);
+        try {
+            auto it  = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
+            auto end = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
+            T    acc = *it;
+            ++it;
+            for (; it != end; ++it) {
+                acc = op(acc, *it);
             }
-            catch (...) {
-                exceptions[i] = std::current_exception();
-            }
-            done.count_down();
-        };
+            partial_results[i] = std::move(acc);
+        }
+        catch (...) {
+            exceptions[i] = std::current_exception();
+        }
+        done.count_down();
     });
 
     detail::rethrow_first(exceptions);
@@ -97,31 +95,29 @@ template <Scheduler S, std::random_access_iterator It, typename T, typename Bina
     std::latch                      done(static_cast<std::ptrdiff_t>(count));
 
     detail::safe_post_loop(scheduler, count, done, [&](std::size_t i) {
-        return [&, i]() {
-            if (token.stop_requested()) {
-                cancelled.store(true, std::memory_order_relaxed);
-                done.count_down();
-                return;
-            }
-            try {
-                auto it  = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
-                auto end = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
-                T    acc = *it;
-                ++it;
-                for (; it != end; ++it) {
-                    if (token.stop_requested()) {
-                        cancelled.store(true, std::memory_order_relaxed);
-                        break;
-                    }
-                    acc = op(acc, *it);
-                }
-                partial_results[i] = std::move(acc);
-            }
-            catch (...) {
-                exceptions[i] = std::current_exception();
-            }
+        if (token.stop_requested()) {
+            cancelled.store(true, std::memory_order_relaxed);
             done.count_down();
-        };
+            return;
+        }
+        try {
+            auto it  = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
+            auto end = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
+            T    acc = *it;
+            ++it;
+            for (; it != end; ++it) {
+                if (token.stop_requested()) {
+                    cancelled.store(true, std::memory_order_relaxed);
+                    break;
+                }
+                acc = op(acc, *it);
+            }
+            partial_results[i] = std::move(acc);
+        }
+        catch (...) {
+            exceptions[i] = std::current_exception();
+        }
+        done.count_down();
     });
 
     detail::rethrow_first(exceptions);
@@ -176,22 +172,20 @@ template <Scheduler S, std::random_access_iterator It, typename T, typename Redu
     std::latch                      done(static_cast<std::ptrdiff_t>(count));
 
     detail::safe_post_loop(scheduler, count, done, [&](std::size_t i) {
-        return [&, i]() {
-            try {
-                auto it  = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
-                auto end = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
-                T    acc = transform_op(*it);
-                ++it;
-                for (; it != end; ++it) {
-                    acc = reduce_op(acc, transform_op(*it));
-                }
-                partial_results[i] = std::move(acc);
+        try {
+            auto it  = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
+            auto end = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
+            T    acc = transform_op(*it);
+            ++it;
+            for (; it != end; ++it) {
+                acc = reduce_op(acc, transform_op(*it));
             }
-            catch (...) {
-                exceptions[i] = std::current_exception();
-            }
-            done.count_down();
-        };
+            partial_results[i] = std::move(acc);
+        }
+        catch (...) {
+            exceptions[i] = std::current_exception();
+        }
+        done.count_down();
     });
 
     detail::rethrow_first(exceptions);
@@ -230,31 +224,29 @@ template <Scheduler S, std::random_access_iterator It, typename T, typename Redu
     std::latch                      done(static_cast<std::ptrdiff_t>(count));
 
     detail::safe_post_loop(scheduler, count, done, [&](std::size_t i) {
-        return [&, i]() {
-            if (token.stop_requested()) {
-                cancelled.store(true, std::memory_order_relaxed);
-                done.count_down();
-                return;
-            }
-            try {
-                auto it  = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
-                auto end = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
-                T    acc = transform_op(*it);
-                ++it;
-                for (; it != end; ++it) {
-                    if (token.stop_requested()) {
-                        cancelled.store(true, std::memory_order_relaxed);
-                        break;
-                    }
-                    acc = reduce_op(acc, transform_op(*it));
-                }
-                partial_results[i] = std::move(acc);
-            }
-            catch (...) {
-                exceptions[i] = std::current_exception();
-            }
+        if (token.stop_requested()) {
+            cancelled.store(true, std::memory_order_relaxed);
             done.count_down();
-        };
+            return;
+        }
+        try {
+            auto it  = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
+            auto end = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
+            T    acc = transform_op(*it);
+            ++it;
+            for (; it != end; ++it) {
+                if (token.stop_requested()) {
+                    cancelled.store(true, std::memory_order_relaxed);
+                    break;
+                }
+                acc = reduce_op(acc, transform_op(*it));
+            }
+            partial_results[i] = std::move(acc);
+        }
+        catch (...) {
+            exceptions[i] = std::current_exception();
+        }
+        done.count_down();
     });
 
     detail::rethrow_first(exceptions);

@@ -51,7 +51,6 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
     {
         std::latch done(static_cast<std::ptrdiff_t>(chunks.size()));
         detail::safe_post_loop(scheduler, chunks.size(), done, [&](std::size_t i) {
-            return [&, i]() {
                 try {
                     auto in_begin  = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
                     auto in_end    = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
@@ -63,7 +62,6 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
                     exceptions[i] = std::current_exception();
                 }
                 done.count_down();
-            };
         });
     }
 
@@ -80,8 +78,7 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
         std::vector<std::exception_ptr> fixup_exceptions(chunks.size() - 1);
         std::latch                      fixup_done(static_cast<std::ptrdiff_t>(chunks.size() - 1));
         detail::safe_post_loop(scheduler, chunks.size() - 1, fixup_done, [&](std::size_t idx) {
-            const std::size_t i = idx + 1;
-            return [&, i]() {
+                const std::size_t i = idx + 1;
                 try {
                     auto out_begin = std::next(d_first, static_cast<std::ptrdiff_t>(chunks[i].begin));
                     auto out_end   = std::next(d_first, static_cast<std::ptrdiff_t>(chunks[i].end));
@@ -93,7 +90,6 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
                     fixup_exceptions[idx] = std::current_exception();
                 }
                 fixup_done.count_down();
-            };
         });
 
         detail::rethrow_first(fixup_exceptions);
@@ -140,7 +136,6 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
     {
         std::latch done(static_cast<std::ptrdiff_t>(chunks.size()));
         detail::safe_post_loop(scheduler, chunks.size(), done, [&](std::size_t i) {
-            return [&, i]() {
                 if (token.stop_requested()) {
                     cancelled.store(true, std::memory_order_relaxed);
                     done.count_down();
@@ -157,7 +152,6 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
                     exceptions[i] = std::current_exception();
                 }
                 done.count_down();
-            };
         });
     }
 
@@ -176,8 +170,7 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
         std::vector<std::exception_ptr> fixup_exceptions(chunks.size() - 1);
         std::latch                      fixup_done(static_cast<std::ptrdiff_t>(chunks.size() - 1));
         detail::safe_post_loop(scheduler, chunks.size() - 1, fixup_done, [&](std::size_t idx) {
-            const std::size_t i = idx + 1;
-            return [&, i]() {
+                const std::size_t i = idx + 1;
                 if (token.stop_requested()) {
                     cancelled.store(true, std::memory_order_relaxed);
                     fixup_done.count_down();
@@ -194,7 +187,6 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
                     fixup_exceptions[idx] = std::current_exception();
                 }
                 fixup_done.count_down();
-            };
         });
 
         detail::rethrow_first(fixup_exceptions);
@@ -248,7 +240,6 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
     {
         std::latch done(static_cast<std::ptrdiff_t>(chunks.size()));
         detail::safe_post_loop(scheduler, chunks.size(), done, [&](std::size_t i) {
-            return [&, i]() {
                 try {
                     auto in_begin = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
                     auto in_end   = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
@@ -263,7 +254,6 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
                     exceptions[i] = std::current_exception();
                 }
                 done.count_down();
-            };
         });
     }
 
@@ -281,7 +271,6 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
     {
         std::latch done(static_cast<std::ptrdiff_t>(chunks.size()));
         detail::safe_post_loop(scheduler, chunks.size(), done, [&](std::size_t i) {
-            return [&, i]() {
                 try {
                     auto in_begin  = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
                     auto in_end    = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
@@ -296,7 +285,6 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
                     write_exceptions[i] = std::current_exception();
                 }
                 done.count_down();
-            };
         });
     }
 
@@ -339,7 +327,6 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
     {
         std::latch done(static_cast<std::ptrdiff_t>(chunks.size()));
         detail::safe_post_loop(scheduler, chunks.size(), done, [&](std::size_t i) {
-            return [&, i]() {
                 if (token.stop_requested()) {
                     cancelled.store(true, std::memory_order_relaxed);
                     done.count_down();
@@ -359,7 +346,6 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
                     exceptions[i] = std::current_exception();
                 }
                 done.count_down();
-            };
         });
     }
 
@@ -379,7 +365,6 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
     {
         std::latch done(static_cast<std::ptrdiff_t>(chunks.size()));
         detail::safe_post_loop(scheduler, chunks.size(), done, [&](std::size_t i) {
-            return [&, i]() {
                 if (token.stop_requested()) {
                     cancelled.store(true, std::memory_order_relaxed);
                     done.count_down();
@@ -399,7 +384,6 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
                     write_exceptions[i] = std::current_exception();
                 }
                 done.count_down();
-            };
         });
     }
 
