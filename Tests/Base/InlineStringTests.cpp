@@ -47,7 +47,7 @@ TEST(InlineStringTest, ConstructFromNullCString)
 
 TEST(InlineStringTest, ConstructFromStdString)
 {
-    std::string src = "std string content";
+    std::string  src = "std string content";
     InlineString s(src);
     EXPECT_EQ(s.view(), src);
 }
@@ -58,7 +58,7 @@ TEST(InlineStringTest, ConstructFromStdString)
 
 TEST(InlineStringTest, ShortStringStaysInline)
 {
-    std::string short_str(InlineString::kInlineCapacity, 'x');
+    std::string  short_str(InlineString::kInlineCapacity, 'x');
     InlineString s(short_str);
     EXPECT_EQ(s.size(), InlineString::kInlineCapacity);
     EXPECT_EQ(s.view(), short_str);
@@ -66,7 +66,7 @@ TEST(InlineStringTest, ShortStringStaysInline)
 
 TEST(InlineStringTest, LongStringGoesToHeap)
 {
-    std::string long_str(InlineString::kInlineCapacity + 1, 'y');
+    std::string  long_str(InlineString::kInlineCapacity + 1, 'y');
     InlineString s(long_str);
     EXPECT_EQ(s.size(), InlineString::kInlineCapacity + 1);
     EXPECT_EQ(s.view(), long_str);
@@ -74,7 +74,7 @@ TEST(InlineStringTest, LongStringGoesToHeap)
 
 TEST(InlineStringTest, VeryLongString)
 {
-    std::string very_long(1024, 'z');
+    std::string  very_long(1024, 'z');
     InlineString s(very_long);
     EXPECT_EQ(s.view(), very_long);
 }
@@ -93,7 +93,7 @@ TEST(InlineStringTest, CopyConstruct)
 
 TEST(InlineStringTest, CopyConstructHeap)
 {
-    std::string long_str(200, 'a');
+    std::string  long_str(200, 'a');
     InlineString a(long_str);
     InlineString b(a);
     EXPECT_EQ(a.view(), long_str);
@@ -109,7 +109,7 @@ TEST(InlineStringTest, MoveConstruct)
 
 TEST(InlineStringTest, MoveConstructHeap)
 {
-    std::string long_str(200, 'b');
+    std::string  long_str(200, 'b');
     InlineString a(long_str);
     InlineString b(std::move(a));
     EXPECT_EQ(b.view(), long_str);
@@ -181,7 +181,7 @@ TEST(InlineStringTest, EqualityWithNullCString)
 
 TEST(InlineStringTest, ImplicitConversionToStringView)
 {
-    InlineString s("implicit");
+    InlineString     s("implicit");
     std::string_view sv = s;
     EXPECT_EQ(sv, "implicit");
 }
@@ -189,7 +189,7 @@ TEST(InlineStringTest, ImplicitConversionToStringView)
 TEST(InlineStringTest, ExplicitStr)
 {
     InlineString s("to_string");
-    std::string str = s.str();
+    std::string  str = s.str();
     EXPECT_EQ(str, "to_string");
 }
 
@@ -201,7 +201,7 @@ TEST(InlineStringTest, DataReturnsNullTerminated)
 
 TEST(InlineStringTest, DataReturnsNullTerminatedHeap)
 {
-    std::string long_str(200, 'n');
+    std::string  long_str(200, 'n');
     InlineString s(long_str);
     EXPECT_EQ(s.data()[s.size()], '\0');
 }

@@ -189,30 +189,30 @@ template <typename Fn>
     } while (false)
 
 /// 计算 EXPR（必须返回 Result<U>）。若包含错误则附加上下文后向上传播。
-#define BEE_TRY_CTX(EXPR, KEY, VALUE)                                                                     \
-    do {                                                                                                  \
-        auto _bee_try_result_ = (EXPR);                                                                   \
-        if (!_bee_try_result_) [[unlikely]] {                                                             \
+#define BEE_TRY_CTX(EXPR, KEY, VALUE)                                                                         \
+    do {                                                                                                      \
+        auto _bee_try_result_ = (EXPR);                                                                       \
+        if (!_bee_try_result_) [[unlikely]] {                                                                 \
             return std::unexpected(::bee::with_context(std::move(_bee_try_result_.error()), (KEY), (VALUE))); \
-        }                                                                                                 \
+        }                                                                                                     \
     } while (false)
 
 /// 计算 EXPR。成功时赋值给 LHS；失败时附加上下文后向上传播。
-#define BEE_TRY_ASSIGN_CTX(LHS, EXPR, KEY, VALUE)                                                        \
-    do {                                                                                                  \
-        auto _bee_try_result_ = (EXPR);                                                                   \
-        if (!_bee_try_result_) [[unlikely]] {                                                             \
+#define BEE_TRY_ASSIGN_CTX(LHS, EXPR, KEY, VALUE)                                                             \
+    do {                                                                                                      \
+        auto _bee_try_result_ = (EXPR);                                                                       \
+        if (!_bee_try_result_) [[unlikely]] {                                                                 \
             return std::unexpected(::bee::with_context(std::move(_bee_try_result_.error()), (KEY), (VALUE))); \
-        }                                                                                                 \
-        (LHS) = std::move(_bee_try_result_.value());                                                      \
+        }                                                                                                     \
+        (LHS) = std::move(_bee_try_result_.value());                                                          \
     } while (false)
 
 /// 计算 EXPR（必须返回 Result<U>）。若包含错误则记录日志并继续执行。
-#define BEE_LOG_RESULT(EXPR, MSG)                                                         \
-    do {                                                                                  \
-        auto _bee_lr_ = (EXPR);                                                           \
-        if (!_bee_lr_) [[unlikely]] {                                                     \
-            auto _bee_lr_msg_ = std::format("{}: {}", (MSG), _bee_lr_.error().format());  \
-            ::bee::LogRaw(::bee::LogLevel::Error, "Result", _bee_lr_msg_);                \
-        }                                                                                 \
+#define BEE_LOG_RESULT(EXPR, MSG)                                                        \
+    do {                                                                                 \
+        auto _bee_lr_ = (EXPR);                                                          \
+        if (!_bee_lr_) [[unlikely]] {                                                    \
+            auto _bee_lr_msg_ = std::format("{}: {}", (MSG), _bee_lr_.error().format()); \
+            ::bee::LogRaw(::bee::LogLevel::Error, "Result", _bee_lr_msg_);               \
+        }                                                                                \
     } while (false)

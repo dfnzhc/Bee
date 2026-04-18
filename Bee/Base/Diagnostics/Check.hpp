@@ -27,8 +27,8 @@ using FailureHandler = void (*)(std::string_view expr, std::string_view message,
 
 // --- 控制接口 ---
 
-void                         SetFailureHandler(FailureHandler handler) noexcept;
-[[nodiscard]] FailureHandler GetFailureHandler() noexcept;
+void                         set_failure_handler(FailureHandler handler) noexcept;
+[[nodiscard]] FailureHandler get_failure_handler() noexcept;
 
 // --- 内部失败路径 ---
 
@@ -79,14 +79,7 @@ namespace detail
 
     /// Non-fatal comparison failure: formats values, then delegates to verify_fail.
     template <typename A, typename B>
-    void verify_op_fail(
-        const A&             a,
-        const B&             b,
-        std::string_view     expr_a,
-        std::string_view     expr_b,
-        std::string_view     op_str,
-        std::source_location loc
-    )
+    void verify_op_fail(const A& a, const B& b, std::string_view expr_a, std::string_view expr_b, std::string_view op_str, std::source_location loc)
     {
         auto full_expr = std::format("{} {} {}", expr_a, op_str, expr_b);
 
@@ -206,24 +199,24 @@ namespace detail
 // Non-fatal verification (always enabled, logs warning, does NOT abort)
 // ============================================================================
 
-#define BEE_VERIFY(expr)                                                                       \
-    do {                                                                                       \
-        if (BEE_UNLIKELY(!(expr)))                                                             \
-            ::bee::detail::verify_fail(#expr, "", std::source_location::current());             \
+#define BEE_VERIFY(expr)                                                            \
+    do {                                                                            \
+        if (BEE_UNLIKELY(!(expr)))                                                  \
+            ::bee::detail::verify_fail(#expr, "", std::source_location::current()); \
     } while (0)
 
-#define BEE_VERIFY_MSG(expr, msg)                                                              \
-    do {                                                                                       \
-        if (BEE_UNLIKELY(!(expr)))                                                             \
-            ::bee::detail::verify_fail(#expr, (msg), std::source_location::current());          \
+#define BEE_VERIFY_MSG(expr, msg)                                                      \
+    do {                                                                               \
+        if (BEE_UNLIKELY(!(expr)))                                                     \
+            ::bee::detail::verify_fail(#expr, (msg), std::source_location::current()); \
     } while (0)
 
-#define BEE_DETAIL_VERIFY_OP(a, b, op, op_str)                                                                       \
-    do {                                                                                                              \
-        auto&& bee_vlhs_ = (a);                                                                                       \
-        auto&& bee_vrhs_ = (b);                                                                                       \
-        if (BEE_UNLIKELY(!(bee_vlhs_ op bee_vrhs_)))                                                                  \
-            ::bee::detail::verify_op_fail(bee_vlhs_, bee_vrhs_, #a, #b, (op_str), std::source_location::current());    \
+#define BEE_DETAIL_VERIFY_OP(a, b, op, op_str)                                                                      \
+    do {                                                                                                            \
+        auto&& bee_vlhs_ = (a);                                                                                     \
+        auto&& bee_vrhs_ = (b);                                                                                     \
+        if (BEE_UNLIKELY(!(bee_vlhs_ op bee_vrhs_)))                                                                \
+            ::bee::detail::verify_op_fail(bee_vlhs_, bee_vrhs_, #a, #b, (op_str), std::source_location::current()); \
     } while (0)
 
 #define BEE_VERIFY_EQ(a, b) BEE_DETAIL_VERIFY_OP(a, b, ==, "==")

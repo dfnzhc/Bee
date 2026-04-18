@@ -148,24 +148,24 @@ TEST(CheckDeathTest, CheckEqWithThrowingStreamUsesFallbackMessage)
 
 TEST(CheckTest, DefaultHandlerIsNull)
 {
-    bee::SetFailureHandler(nullptr);
-    EXPECT_EQ(bee::GetFailureHandler(), nullptr);
+    bee::set_failure_handler(nullptr);
+    EXPECT_EQ(bee::get_failure_handler(), nullptr);
 }
 
 TEST(CheckTest, SetAndGetHandler)
 {
     auto handler = [](std::string_view, std::string_view, std::source_location) noexcept {
     };
-    bee::SetFailureHandler(handler);
-    EXPECT_EQ(bee::GetFailureHandler(), handler);
-    bee::SetFailureHandler(nullptr);
+    bee::set_failure_handler(handler);
+    EXPECT_EQ(bee::get_failure_handler(), handler);
+    bee::set_failure_handler(nullptr);
 }
 
 TEST(CheckDeathTest, FailureHandlerIsCalled)
 {
     EXPECT_DEATH(
         {
-            bee::SetFailureHandler([](std::string_view expr, std::string_view, std::source_location) noexcept {
+            bee::set_failure_handler([](std::string_view expr, std::string_view, std::source_location) noexcept {
                 std::fprintf(stderr, "HANDLER_CALLED: %.*s\n", static_cast<int>(expr.size()), expr.data());
             });
             BEE_CHECK(false);

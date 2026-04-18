@@ -27,11 +27,11 @@ auto Error::format() const -> std::string
     if (timestamp != std::chrono::system_clock::time_point{}) {
         auto    t = std::chrono::system_clock::to_time_t(timestamp);
         std::tm tm{};
-    #if defined(_WIN32)
+#if defined(_WIN32)
         localtime_s(&tm, &t);
-    #else
+#else
         localtime_r(&t, &tm);
-    #endif
+#endif
         char time_buf[32];
         std::strftime(time_buf, sizeof(time_buf), "%F %T", &tm);
         result += std::format("\ntimestamp={}", time_buf);

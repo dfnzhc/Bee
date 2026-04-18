@@ -103,7 +103,7 @@ void Log(LogLevel level, std::string_view category, FormatWithLocation<std::type
         return;
 
     std::array<char, detail::kLogStackBufSize> buf;
-    auto result = std::format_to_n(buf.data(), buf.size(), fmt_loc.fmt, std::forward<Args>(args)...);
+    auto                                       result = std::format_to_n(buf.data(), buf.size(), fmt_loc.fmt, std::forward<Args>(args)...);
     if (static_cast<std::size_t>(result.size) <= buf.size()) {
         sink(level, category, std::string_view(buf.data(), static_cast<std::size_t>(result.size)), fmt_loc.loc);
     } else {
@@ -118,11 +118,17 @@ namespace detail
 {
     /// Shared format+dispatch: formats into stack buffer, falls back to heap.
     template <typename... Args>
-    void log_dispatch(LogSink sink, LogLevel level, std::string_view category,
-                      std::format_string<Args...> fmt, std::source_location loc, Args&&... args)
+    void log_dispatch(
+        LogSink                     sink,
+        LogLevel                    level,
+        std::string_view            category,
+        std::format_string<Args...> fmt,
+        std::source_location        loc,
+        Args&&... args
+    )
     {
         std::array<char, kLogStackBufSize> buf;
-        auto result = std::format_to_n(buf.data(), buf.size(), fmt, std::forward<Args>(args)...);
+        auto                               result = std::format_to_n(buf.data(), buf.size(), fmt, std::forward<Args>(args)...);
         if (static_cast<std::size_t>(result.size) <= buf.size()) {
             sink(level, category, std::string_view(buf.data(), static_cast<std::size_t>(result.size)), loc);
         } else {

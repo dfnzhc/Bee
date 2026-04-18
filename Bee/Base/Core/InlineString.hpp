@@ -52,7 +52,7 @@ public:
         , on_heap_(other.on_heap_)
     {
         if (on_heap_) {
-            heap_ = other.heap_;
+            heap_          = other.heap_;
             other.heap_    = nullptr;
             other.size_    = 0;
             other.on_heap_ = false;
@@ -78,7 +78,7 @@ public:
             size_    = other.size_;
             on_heap_ = other.on_heap_;
             if (on_heap_) {
-                heap_ = other.heap_;
+                heap_          = other.heap_;
                 other.heap_    = nullptr;
                 other.size_    = 0;
                 other.on_heap_ = false;

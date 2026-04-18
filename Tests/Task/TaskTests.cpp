@@ -406,12 +406,12 @@ TEST(TaskCancellationTests, CancelPropagatesThroughThen)
 
     std::atomic<bool> then_ran{false};
     auto              task = bee::submit(
-                                 pool, [] { return 1; }, source.get_token()
+                    pool, [] { return 1; }, source.get_token()
     )
-                                 .then([&](int v) {
+                    .then([&](int v) {
                         then_ran.store(true);
                         return v;
-                                 });
+                    });
 
     unblock.store(true, std::memory_order_release);
     blocker.wait();

@@ -20,12 +20,12 @@ std::atomic<FailureHandler> g_failure_handler{nullptr};
 namespace bee
 {
 
-void SetFailureHandler(FailureHandler handler) noexcept
+void set_failure_handler(FailureHandler handler) noexcept
 {
     detail::g_failure_handler.store(handler, std::memory_order_release);
 }
 
-FailureHandler GetFailureHandler() noexcept
+FailureHandler get_failure_handler() noexcept
 {
     return detail::g_failure_handler.load(std::memory_order_acquire);
 }
