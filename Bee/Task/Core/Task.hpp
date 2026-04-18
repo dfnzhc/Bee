@@ -2,7 +2,7 @@
  * @File Task.hpp
  * @Author dfnzhc (https://github.com/dfnzhc)
  * @Date 2026/4/18
- * @Brief This file is part of Bee.
+ * @Brief Task<T> —— 惰性协程返回类型与异步结果句柄。
  */
 
 #pragma once
@@ -11,6 +11,7 @@
 #include <chrono>
 #include <coroutine>
 #include <exception>
+#include <memory>
 #include <optional>
 #include <semaphore>
 #include <tuple>
@@ -26,9 +27,13 @@
 namespace bee
 {
 
-// 前向声明
+// ── 前向声明 ────────────────────────────────────────────────────────────────
+
 template <typename T>
 class Task;
+
+template <typename T>
+struct WhenAnyResult;
 
 template <typename... Ts>
 auto when_all(Task<Ts>&&... tasks) -> Task<std::tuple<typename Task<Ts>::value_type...>>;
@@ -37,19 +42,16 @@ template <typename T>
 auto when_all(std::vector<Task<T>> tasks) -> Task<std::vector<T>>;
 
 template <typename T>
-struct WhenAnyResult;
-
-template <typename T>
 auto when_any(std::vector<Task<T>> tasks) -> Task<WhenAnyResult<T>>;
 
-// =========================================================================
-// detail — 内部辅助类型
-// =========================================================================
+// ===========================================================================
+// detail —— 内部辅助类型
+// ===========================================================================
 
 namespace detail
 {
 
-    // ── Continuation 类型推导 ──
+    // ── continuation 返回类型推导 ────────────────────────────────────────────
 
     template <typename T, typename Fn, bool IsVoid = std::is_void_v<T>>
     struct ContinuationResultImpl;
@@ -69,7 +71,10 @@ namespace detail
     template <typename T, typename Fn>
     using ContinuationResult_t = typename ContinuationResultImpl<T, Fn>::type;
 
-    // ── MSVC 要求 return_value/return_void 在不同类型中 ──
+    // ── promise 返回值基类 ──────────────────────────────────────────────────
+    //
+    // MSVC 要求 return_value 与 return_void 出现在不同类型中（不能用
+    // requires 约束在同一类内分支），这里通过基类特化拆分。
 
     template <typename T>
     struct TaskPromiseReturn
@@ -90,11 +95,33 @@ namespace detail
         }
     };
 
-    // ── TaskFinalAwaiter：修复 V1 的 UAF 问题 ──
+    // ── TaskFinalAwaiter ───────────────────────────────────────────────────
     //
-    // V1 bug: done.store(true) 后再访问 promise.continuation，
-    // 此时 .get() 调用者可能已销毁协程帧。
-    // V2 fix: 在标记终态之前读取 continuation。
+    // 协程到达 final_suspend 时的收尾逻辑，分两条路径：
+    //
+    //   · 有 continuation（被 co_await）：仅发布终态后做对称转移，不触碰
+    //     信号量。等待方是协程，它会在自身 final_suspend 时再处理。
+    //
+    //   · 无 continuation（被 get/wait 阻塞等待）：先拷贝一份 shared_ptr
+    //     持有的信号量到本地保活，再发布终态 + release 信号量。这样即使
+    //     等待方在 acquire() 返回后立刻销毁协程帧（含 promise），信号量
+    //     内部的 `WakeByAddress`/原子操作仍运作在我们本地持有的对象上，
+    //     不会出现 use-after-free。
+    //
+    // 关键：await_suspend 必须返回 `void` 而非 `coroutine_handle<>`。
+    // 实测 MSVC 在 await_suspend 返回 coroutine_handle<> 时，会把返回值
+    // 临时对象存放于协程帧中。一旦我们在 await_suspend 内 release 信号
+    // 量，等待方即可立刻销毁该帧，而编译器后续构造返回值的写入就会命中
+    // 已释放内存（ASan 可稳定复现 heap-use-after-free，其栈指向
+    // `std::coroutine_handle<>::from_address` 的构造）。
+    // 返回 void 时 MSVC 不再在帧内写入返回值，UAF 消失。
+    //
+    // 继承 continuation 路径因此不再使用对称转移，而是 eager-resume。
+    // 这会让协程调用链在当前线程上线性展开；我们的调度模型下链路通常
+    // 只有 2~3 层，可接受。
+    //
+    // 注：get/wait 不再依据 task_state 做"是否需要 acquire"的短路判断，
+    // 这是为了消除"state 已发布但 release 尚未调用"窗口造成的 UAF。
 
     struct TaskFinalAwaiter
     {
@@ -104,24 +131,33 @@ namespace detail
         }
 
         template <typename Promise>
-        auto await_suspend(std::coroutine_handle<Promise> h) noexcept -> std::coroutine_handle<>
+        auto await_suspend(std::coroutine_handle<Promise> h) noexcept -> void
         {
             auto& promise = h.promise();
 
-            // 关键：先读取 continuation，再标记终态
-            auto cont = promise.continuation;
-
-            // 确定终态类型
+            // 必须先取走 continuation：一旦发布终态/释放信号量，promise
+            // 就可能被等待方销毁。
+            auto cont        = promise.continuation;
             auto final_state = promise.exception ? TaskState::Failed : TaskState::Completed;
-            promise.task_state.store(final_state, std::memory_order_release);
 
             if (cont) {
-                return cont; // 对称转移恢复 co_await 调用者
+                // 协程等待者：发布终态后 eager-resume。
+                promise.task_state.store(final_state, std::memory_order_release);
+                cont.resume();
+                return;
             }
 
-            // 无协程等待者 — 为 .get()/.wait() 释放信号量
-            promise.ready.release();
-            return std::noop_coroutine();
+            // 阻塞等待者：
+            //   1. 将 shared_ptr<binary_semaphore> 拷贝到本地栈，锁住其生命周期；
+            //   2. 发布终态；
+            //   3. 通过本地句柄 release 信号量；
+            //   4. 返回 void —— MSVC 生成的后续代码不再写入协程帧，等待
+            //      方可立刻销毁帧而不会 UAF。
+            auto sem = promise.ready;
+            promise.task_state.store(final_state, std::memory_order_release);
+            if (sem) {
+                sem->release();
+            }
         }
 
         auto await_resume() noexcept -> void
@@ -129,25 +165,30 @@ namespace detail
         }
     };
 
-    // ── DetachedTask：即发即弃协程（when_all/when_any/AsyncScope 内部使用）──
+    // ── DetachedTask ───────────────────────────────────────────────────────
+    //
+    // 即发即弃协程，被 when_all/when_any/AsyncScope 内部用作 wrapper：
+    //   · initial_suspend = suspend_never  立即开跑
+    //   · final_suspend   = suspend_never  自动销毁帧
+    // 异常需在 wrapper 内部接住转存到控制块；逃逸到此即视为逻辑 bug。
 
     struct DetachedTask
     {
         struct promise_type
         {
             auto get_return_object() -> DetachedTask { return {}; }
-
-            auto initial_suspend() noexcept -> std::suspend_never { return {}; } // 立即启动
-
-            auto final_suspend() noexcept -> std::suspend_never { return {}; } // 自动销毁
-
+            auto initial_suspend() noexcept -> std::suspend_never { return {}; }
+            auto final_suspend() noexcept -> std::suspend_never { return {}; }
             auto return_void() -> void {}
 
-            auto unhandled_exception() -> void {} // 异常已在调用点处理
+            auto unhandled_exception() -> void
+            {
+                BEE_ASSERT(false && "DetachedTask: 异常逃逸，组合器内部逻辑有 bug");
+            }
         };
     };
 
-    // ── then() 实现辅助（前向声明，定义在 Task<T> 之后）──
+    // ── then() 实现前向声明（定义在 Task<T> 之后）───────────────────────────
 
     template <typename T, typename Fn>
     auto then_impl(Task<T> pred, Fn fn) -> Task<ContinuationResult_t<T, Fn>>;
@@ -157,19 +198,24 @@ namespace detail
 
 } // namespace detail
 
-// =========================================================================
-// Task<T> — 统一惰性协程
-// =========================================================================
+// ===========================================================================
+// Task<T> —— 惰性协程返回类型 / 异步结果句柄
+// ===========================================================================
 
-/// Task<T> 是一个惰性协程返回类型，同时也是异步结果句柄。
-///
-/// 创建时不执行（initial_suspend = suspend_always），
-/// 通过 co_await / .get() / .wait() 启动。
-///
-/// 生命周期规则：
-/// - 未启动的 Task 可安全析构
-/// - 已启动的 Task 必须在析构前完成（通过 get/wait/co_await/AsyncScope）
-/// - .get() 和 .wait() 是一次性操作
+/**
+ * @brief 惰性协程返回类型，同时充当异步结果句柄。
+ *
+ * 生命周期约定：
+ *   · 创建时不执行（initial_suspend = suspend_always）。
+ *   · 通过 co_await / get() / wait() 启动；start_if_needed 是幂等的。
+ *   · 未启动的 Task 可安全析构；已启动的 Task 必须等待至终态后销毁。
+ *   · get() / wait() 是一次性消费操作：返回后 handle 即被销毁。
+ *
+ * 同步原语：
+ *   · binary_semaphore `ready` 用于 get/wait 的阻塞等待，由 final_suspend
+ *     在"无 continuation"路径上释放。
+ *   · co_await 路径使用对称转移，不参与信号量。
+ */
 template <typename T = void>
 class [[nodiscard]] Task
 {
@@ -205,36 +251,36 @@ public:
     Task(const Task&)                    = delete;
     auto operator=(const Task&) -> Task& = delete;
 
-    // ── 阻塞访问 ──
+    // ── 阻塞访问 ────────────────────────────────────────────────────────────
 
-    /// 启动（若未启动）并阻塞直到完成。返回结果或重抛异常。
-    /// 一次性消费操作：调用后 Task 变为空（handle 销毁）。
+    /// 启动（若尚未启动）并阻塞至完成。返回结果或重抛异常。
+    /// 调用后 Task 句柄被销毁；不可再次访问。
     auto get() -> T
     {
         BEE_CHECK(handle_ != nullptr);
         start_if_needed();
 
         auto& promise = handle_.promise();
+        auto  sem     = promise.ready; // 本地保活，防止 destroy 期间 race
 
-        // 若已完成无需等待
-        if (!is_ready()) {
-            promise.ready.acquire();
-        }
+        // 必须无条件 acquire：若依据 task_state 短路，会与 final_suspend 中
+        // "store 终态 → release 信号量"的窗口对撞，导致销毁协程帧后 worker
+        // 仍在调用 ready.release() —— 这是早期版本崩溃的根因。
+        sem->acquire();
 
-        // 提取结果前先保存异常指针，确保析构正确
+        // 提取异常指针后再处理结果，避免异常路径下未定义顺序。
         auto ex = promise.exception;
 
         if constexpr (!std::is_void_v<T>) {
-            std::optional<T> result_val;
+            std::optional<T> tmp;
             if (!ex && promise.result.has_value()) {
-                result_val.emplace(std::move(*promise.result));
+                tmp.emplace(std::move(*promise.result));
             }
-            // 消费完毕：销毁协程帧
             destroy_if_valid();
             if (ex) {
                 std::rethrow_exception(ex);
             }
-            return std::move(*result_val);
+            return std::move(*tmp);
         }
         else {
             destroy_if_valid();
@@ -244,17 +290,16 @@ public:
         }
     }
 
-    /// 启动并阻塞直到终态。失败/取消时重抛异常。
-    /// 一次性消费操作：调用后 Task 变为空。
+    /// 启动并阻塞至终态。失败时重抛异常。
+    /// 一次性消费：调用后 Task 句柄被销毁。
     auto wait() -> void
     {
         BEE_CHECK(handle_ != nullptr);
         start_if_needed();
 
         auto& promise = handle_.promise();
-        if (!is_ready()) {
-            promise.ready.acquire();
-        }
+        auto  sem     = promise.ready; // 本地保活
+        sem->acquire();
 
         auto ex = promise.exception;
         destroy_if_valid();
@@ -263,35 +308,41 @@ public:
         }
     }
 
-    /// 限时等待。返回当前状态。
-    /// 注意：不消费 Task。超时返回当前状态（可能是 Running）。
+    /// 限时等待，返回当前状态。**不消费 Task**，超时后可继续 get/wait。
+    ///
+    /// 合约：
+    ///   · 同一时刻只允许一个线程在此 Task 上调用 wait_for/get/wait。
+    ///   · 不允许在已被 co_await 的 Task 上调用（co_await 已转移 handle）。
+    ///   · 由于 binary_semaphore 上限为 1，并发的 wait_for 会触发 UB。
     [[nodiscard]] auto wait_for(std::chrono::nanoseconds timeout) -> TaskState
     {
         BEE_CHECK(handle_ != nullptr);
         start_if_needed();
 
         auto& promise = handle_.promise();
+        auto  sem     = promise.ready; // 本地保活
+
+        // 已完成：直接返回，不动信号量。
         if (is_ready()) {
             return promise.task_state.load(std::memory_order_acquire);
         }
 
-        // 使用 try_acquire_for 实现限时等待
-        if (promise.ready.try_acquire_for(timeout)) {
-            // 成功获取 → 归还信号量供后续 get()/wait() 使用
-            promise.ready.release();
-            return promise.task_state.load(std::memory_order_acquire);
+        if (sem->try_acquire_for(timeout)) {
+            // 取走计数后立即归还，方便后续 get/wait 复用。
+            // 由"单一等待者"合约保证 release 不会越过上限。
+            sem->release();
         }
 
         return promise.task_state.load(std::memory_order_acquire);
     }
 
-    // ── 非阻塞查询 ──
+    // ── 非阻塞查询 ──────────────────────────────────────────────────────────
 
     [[nodiscard]] auto is_ready() const noexcept -> bool
     {
         if (!handle_) return false;
         auto s = handle_.promise().task_state.load(std::memory_order_acquire);
-        return s == TaskState::Completed || s == TaskState::Failed || s == TaskState::Cancelled;
+        return s == TaskState::Completed || s == TaskState::Failed;
     }
 
     [[nodiscard]] auto state() const noexcept -> TaskState
@@ -305,13 +356,30 @@ public:
         return handle_ != nullptr;
     }
 
-    // ── 协程支持：co_await Task<T> ──
+    // ── co_await 支持 ───────────────────────────────────────────────────────
 
-    auto operator co_await()
+    auto operator co_await() &&
     {
+        // TaskAwaiter 拥有 handle 的所有权，并在析构时销毁协程帧。
+        // 这避免了原实现中 await_resume 后无人 destroy 导致的协程帧泄漏。
         struct TaskAwaiter
         {
             handle_type handle;
+
+            explicit TaskAwaiter(handle_type h) noexcept : handle(h) {}
+
+            TaskAwaiter(TaskAwaiter&& other) noexcept : handle(std::exchange(other.handle, nullptr)) {}
+
+            TaskAwaiter(const TaskAwaiter&)                    = delete;
+            auto operator=(const TaskAwaiter&) -> TaskAwaiter& = delete;
+            auto operator=(TaskAwaiter&&) -> TaskAwaiter&      = delete;
+
+            ~TaskAwaiter()
+            {
+                if (handle) {
+                    handle.destroy();
+                }
+            }
 
             [[nodiscard]] auto await_ready() const noexcept -> bool
             {
@@ -322,15 +390,15 @@ public:
             {
                 auto& promise = handle.promise();
 
-                // co_await 仅允许在未启动的 Task 上使用。
-                // 若 Task 已被 get()/wait()/wait_for() 启动，co_await 存在
-                // TOCTOU 双重恢复竞态（continuation 设置与 FinalAwaiter 读取无同步）。
+                // co_await 仅允许在未启动的 Task 上调用：若已被 get/wait 启动，
+                // continuation 与 FinalAwaiter 之间无同步，存在 TOCTOU 双重恢复竞态。
                 bool expected = false;
-                BEE_CHECK(promise.started.compare_exchange_strong(expected, true, std::memory_order_acq_rel));
+                BEE_CHECK(promise.started.compare_exchange_strong(
+                    expected, true, std::memory_order_acq_rel));
 
                 promise.continuation = caller;
                 promise.task_state.store(TaskState::Running, std::memory_order_release);
-                return handle; // 对称转移：开始执行此 Task
+                return handle; // 对称转移：开始执行内层 Task
             }
 
             auto await_resume() -> T
@@ -351,16 +419,22 @@ public:
         return TaskAwaiter{std::exchange(handle_, nullptr)};
     }
 
-    // ── Continuation ──
+    // 兼容左值 co_await（仍要求 Task 仅在所属作用域使用一次）。
+    auto operator co_await() &
+    {
+        return std::move(*this).operator co_await();
+    }
 
-    /// 内联 continuation — 在完成线程上执行。
+    // ── continuation ────────────────────────────────────────────────────────
+
+    /// 内联 continuation：fn 在前驱完成的线程上执行。
     template <typename Fn>
     auto then(Fn&& fn) -> Task<detail::ContinuationResult_t<T, Fn>>
     {
         return detail::then_impl<T>(std::move(*this), std::forward<Fn>(fn));
     }
 
-    /// Scheduler 派发 continuation — fn 在 scheduler 线程上执行。
+    /// Scheduler 派发 continuation：fn 在 scheduler 工作线程上执行。
     template <typename S, typename Fn>
     auto then(S& scheduler, Fn&& fn) -> Task<detail::ContinuationResult_t<T, Fn>>
     {
@@ -381,14 +455,13 @@ private:
     auto start_if_needed() -> void
     {
         auto& promise = handle_.promise();
-        bool expected  = false;
+        bool expected = false;
         if (promise.started.compare_exchange_strong(expected, true, std::memory_order_acq_rel)) {
             promise.task_state.store(TaskState::Running, std::memory_order_release);
             handle_.resume();
         }
     }
 
-    // 友元声明
     template <typename U>
     friend class Task;
 
@@ -407,27 +480,27 @@ private:
     template <typename U, typename S, typename Fn>
     friend auto detail::then_impl_scheduled(Task<U> pred, S& scheduler, Fn fn)
         -> Task<detail::ContinuationResult_t<U, Fn>>;
-
 };
 
-// =========================================================================
+// ===========================================================================
 // promise_type 定义
-// =========================================================================
+// ===========================================================================
 
 template <typename T>
 struct Task<T>::promise_type : detail::TaskPromiseReturn<T>
 {
-    // ── 状态 ──
+    // 状态机
     std::atomic<TaskState> task_state{TaskState::Pending};
     std::exception_ptr     exception;
 
-    // ── 同步 ──
-    std::coroutine_handle<> continuation{nullptr};
-    std::binary_semaphore   ready{0};
-    std::atomic<bool>       started{false};
+    // 同步原语
+    std::coroutine_handle<>                continuation{nullptr};
+    // 信号量放入 shared_ptr 中，使得 worker 在 final_suspend 时可本地保活，
+    // 避免 waiter 销毁协程帧后 release() 内部唤醒操作访问悬垂内存。
+    std::shared_ptr<std::binary_semaphore> ready{std::make_shared<std::binary_semaphore>(0)};
+    std::atomic<bool>                      started{false};
 
-    // ── 协程接口 ──
-
+    // 协程接口
     auto get_return_object() -> Task
     {
         return Task{handle_type::from_promise(*this)};
@@ -449,9 +522,9 @@ struct Task<T>::promise_type : detail::TaskPromiseReturn<T>
     }
 };
 
-// =========================================================================
+// ===========================================================================
 // then() 实现
-// =========================================================================
+// ===========================================================================
 
 namespace detail
 {

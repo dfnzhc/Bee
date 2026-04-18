@@ -209,28 +209,33 @@ TEST(TaskGraphTests, TypedDataFlow)
 
 TEST(TaskGraphTests, WideFanIn)
 {
-    WorkPool                      pool(4);
-    TaskGraph                     graph;
-    std::vector<NodeHandle<int>>  roots;
+    WorkPool  pool(4);
+    TaskGraph graph;
+
+    // 10 个根节点，每个产生一个 int
+    std::vector<NodeHandle<int>> roots;
     for (int i = 0; i < 10; ++i) {
         roots.push_back(graph.node([i] { return i; }));
     }
 
-    std::atomic<int>               sum{0};
-    std::vector<NodeHandle<void>>  void_nodes;
-    for (auto& r : roots) {
-        void_nodes.push_back(graph.node([&sum](int x) { sum.fetch_add(x, std::memory_order_relaxed); }, r));
+    // 汇聚节点：通过类型化依赖链式累加，避免共享原子量
+    // 构造一棵归约树：两两求和
+    std::vector<NodeHandle<int>> level = roots;
+    while (level.size() > 1) {
+        std::vector<NodeHandle<int>> next;
+        for (std::size_t i = 0; i + 1 < level.size(); i += 2) {
+            next.push_back(graph.node([](int a, int b) { return a + b; }, level[i], level[i + 1]));
+        }
+        // 奇数个节点时，最后一个直接晋级
+        if (level.size() % 2 == 1) {
+            next.push_back(level.back());
+        }
+        level = std::move(next);
     }
-
-    // sink 依赖所有 void 节点
-    auto sink = graph.node_after(
-        [&sum] { return sum.load(std::memory_order_relaxed); },
-        void_nodes[0], void_nodes[1], void_nodes[2], void_nodes[3], void_nodes[4],
-        void_nodes[5], void_nodes[6], void_nodes[7], void_nodes[8], void_nodes[9]);
 
     auto task = graph.execute(pool);
     task.wait();
-    EXPECT_EQ(graph.result(sink), 45); // 0+1+...+9
+    EXPECT_EQ(graph.result(level[0]), 45); // 0+1+...+9
 }
 
 // =========================================================================
@@ -350,7 +355,7 @@ TEST(TaskGraphTests, ResultOfFailedNodeThrows)
 
     auto task = graph.execute(pool);
     EXPECT_THROW(task.wait(), std::runtime_error);
-    EXPECT_THROW(graph.result(a), std::logic_error);
+    EXPECT_THROW({ (void)graph.result(a); }, std::logic_error);
 }
 
 // =========================================================================
@@ -400,6 +405,33 @@ TEST(TaskGraphTests, LargeGraphStress)
     auto task = graph.execute(pool);
     task.wait();
     EXPECT_EQ(graph.result(prev), 999);
+}
+
+TEST(TaskGraphTests, DoubleExecuteThrows)
+{
+    WorkPool  pool(2);
+    TaskGraph graph;
+    auto      a = graph.node([] { return 1; });
+    (void)a;
+
+    auto task = graph.execute(pool);
+    task.wait();
+    // 第二次 execute() 创建的协程在启动时抛出异常
+    auto task2 = graph.execute(pool);
+    EXPECT_THROW(task2.wait(), std::logic_error);
+}
+
+TEST(TaskGraphTests, DotLabelEscaping)
+{
+    TaskGraph graph;
+    auto a = graph.node("node with \"quotes\"", [] { return 1; });
+    auto b = graph.node("back\\slash", [](int x) { return x; }, a);
+    (void)b;
+
+    auto dot = graph.to_dot();
+    // 引号和反斜杠应被转义
+    EXPECT_NE(dot.find("node with \\\"quotes\\\""), std::string::npos);
+    EXPECT_NE(dot.find("back\\\\slash"), std::string::npos);
 }
 
 } // namespace

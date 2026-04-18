@@ -20,20 +20,17 @@ namespace bee
  *   Pending  → Running   （可调用对象开始执行）
  *   Running  → Completed （可调用对象成功返回）
  *   Running  → Failed    （可调用对象抛出异常）
- *   Pending  → Cancelled （执行前被取消）
- *   Running  → Cancelled （协作式取消）
  *
- * 终态（Completed、Cancelled、Failed）不可逆。
+ * 终态（Completed、Failed）不可逆。
  */
 enum class TaskState : u8
 {
     Pending,
     Running,
     Completed,
-    Cancelled,
     Failed
 };
 
-BEE_ENUM_SCAN_COUNT(TaskState, 5);
+BEE_ENUM_SCAN_COUNT(TaskState, 4);
 
 } // namespace bee

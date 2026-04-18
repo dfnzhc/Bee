@@ -92,8 +92,13 @@ namespace detail
         std::mutex exception_mutex;
 
         GraphExecutionContext(std::vector<NodeEntry>& n, S& s)
-            : nodes(n), scheduler(s), counters(n.size()), remaining(n.size())
+            : nodes(n), scheduler(s), counters(n.size()), remaining(n.size() + 1)
         {
+            // 采用 "+1 trick"：remaining 初始为 N+1，由 await_suspend 在
+            // 全部根节点 post 完毕后投出最后一票。这样可避免某个工作线程
+            // 在 await_suspend 还在迭代时就把 remaining 降到 0 并 resume
+            // 父协程（违反 C++ 协程"未挂起即不得 resume"的约束，且会令
+            // TaskGraph 提前析构、nodes 引用悬垂）。
             for (std::size_t i = 0; i < n.size(); ++i) {
                 counters[i].store(n[i].predecessors.size(), std::memory_order_relaxed);
             }
@@ -144,11 +149,34 @@ namespace detail
 
         // 通知后继节点
         // note: node.result/exception 的写入通过 counters[succ].fetch_sub(acq_rel) 对后继可见
+        //
+        // 异常安全：即使 scheduler.post() 抛出（队列满/关停），也必须确保
+        // remaining 最终递减，否则协程永远不会恢复导致死锁。
+        // 策略：post 失败时忽略后继（该后继永远不会执行，但不会阻塞图的完成）。
         for (auto succ : node.successors) {
             if (ctx->counters[succ].fetch_sub(1, std::memory_order_acq_rel) == 1) {
-                ctx->scheduler.post([ctx, succ]() {
-                    run_node(ctx, succ);
-                });
+                try {
+                    ctx->scheduler.post([ctx, succ]() {
+                        run_node(ctx, succ);
+                    });
+                }
+                catch (...) {
+                    // post 失败：后继无法执行。
+                    // 将其标记为异常并递减 remaining 以防止死锁。
+                    {
+                        std::lock_guard lock(ctx->exception_mutex);
+                        if (!ctx->first_exception) {
+                            ctx->first_exception =
+                                std::make_exception_ptr(std::runtime_error("TaskGraph: failed to post successor node"));
+                        }
+                    }
+                    // 递减后继节点未能执行的 remaining 计数
+                    // 注意：后继的后继也不会执行，但 remaining 只需要所有已执行节点递减即可
+                    if (ctx->remaining.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+                        ctx->continuation.resume();
+                        return;
+                    }
+                }
             }
         }
 
@@ -176,16 +204,46 @@ namespace detail
         {
             // 复制 ctx 到局部变量：一旦 post 后工作线程可能 resume 协程，
             // 导致 GraphAwaitable 临时对象被销毁，this->ctx 悬垂。
-            auto local_ctx        = ctx;
+            auto local_ctx          = ctx;
             local_ctx->continuation = h;
 
-            // 将所有根节点（无前驱）post 到 scheduler
+            // 将所有根节点（无前驱）post 到 scheduler。
+            //
+            // 注意 1：判定"根节点"必须使用 predecessors.empty()，而不是
+            //   counters[i] == 0。原因是一旦任意一个根节点被工作线程
+            //   立刻拾取并完成，它会把自身后继的 counter 递减到 0；
+            //   如果此时本循环还在迭代，就会把这个后继误当作根节点
+            //   再次 post，造成"双重调度"：后继的后继 counter 被多扣
+            //   一次，从而在某些真实前驱尚未写 result 时就提前启动，
+            //   进而读出空 std::any → 测试端抛 bad_any_cast。
+            // 注意 2：post 失败时必须把对应的"未启动节点"从 remaining
+            //   中扣掉，否则 remaining 永远到不了 0，父协程将永久挂起。
+            std::size_t unposted = 0;
             for (std::size_t i = 0; i < local_ctx->nodes.size(); ++i) {
-                if (local_ctx->counters[i].load(std::memory_order_relaxed) == 0) {
+                if (!local_ctx->nodes[i].predecessors.empty())
+                    continue;
+                try {
                     local_ctx->scheduler.post([local_ctx, i]() {
                         run_node(local_ctx, i);
                     });
                 }
+                catch (...) {
+                    {
+                        std::lock_guard lock(local_ctx->exception_mutex);
+                        if (!local_ctx->first_exception) {
+                            local_ctx->first_exception = std::current_exception();
+                        }
+                    }
+                    ++unposted;
+                }
+            }
+
+            // "+1 trick" 的最后一票：在所有根节点 post 完毕后才把
+            // 父协程纳入计数；同时一并扣除 post 失败的节点（这些节点
+            // 永远不会执行 run_node，因此不会自行递减 remaining）。
+            const std::size_t parent_vote = unposted + 1;
+            if (local_ctx->remaining.fetch_sub(parent_vote, std::memory_order_acq_rel) == parent_vote) {
+                local_ctx->continuation.resume();
             }
         }
 
@@ -374,7 +432,17 @@ public:
         os << "    node [shape=box, style=rounded];\n";
 
         for (std::size_t i = 0; i < nodes_.size(); ++i) {
-            os << "    " << i << " [label=\"" << nodes_[i].label << "\"];\n";
+            os << "    " << i << " [label=\"";
+            // 转义 DOT 特殊字符
+            for (char c : nodes_[i].label) {
+                if (c == '"')
+                    os << "\\\"";
+                else if (c == '\\')
+                    os << "\\\\";
+                else
+                    os << c;
+            }
+            os << "\"];\n";
         }
 
         for (std::size_t i = 0; i < nodes_.size(); ++i) {
@@ -407,6 +475,7 @@ public:
 
 private:
     std::vector<detail::NodeEntry> nodes_;
+    bool executed_{false};
 
     template <typename R>
     auto add_node_impl(
@@ -450,6 +519,10 @@ private:
 template <Scheduler S>
 auto TaskGraph::execute(S& scheduler) -> Task<void>
 {
+    if (executed_)
+        throw std::logic_error("TaskGraph: execute() can only be called once");
+    executed_ = true;
+
     if (nodes_.empty())
         co_return;
 

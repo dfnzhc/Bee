@@ -50,7 +50,7 @@ concept Scheduler = requires(S& s) {
 /// 注意：fn 按值传递，避免 MSVC 协程参数生命周期 bug —
 /// 右值引用参数在协程帧中可能存储为悬垂引用。
 template <Scheduler S, typename Fn>
-auto spawn_task(S& scheduler, Fn fn) -> Task<std::invoke_result_t<Fn>>
+[[nodiscard]] auto spawn_task(S& scheduler, Fn fn) -> Task<std::invoke_result_t<Fn>>
 {
     co_await scheduler.schedule();
     if constexpr (std::is_void_v<std::invoke_result_t<Fn>>) {
