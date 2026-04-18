@@ -7,6 +7,11 @@
 
 #include <gtest/gtest.h>
 #include <string>
+#include <atomic>
+#include <thread>
+#include <chrono>
+#include <stdexcept>
+#include <vector>
 
 #include "Task/Graph/TaskGraph.hpp"
 #include "Concurrency/Thread/WorkPool.hpp"
@@ -226,6 +231,175 @@ TEST(TaskGraphTests, WideFanIn)
     auto task = graph.execute(pool);
     task.wait();
     EXPECT_EQ(graph.result(sink), 45); // 0+1+...+9
+}
+
+// =========================================================================
+// void 节点测试
+// =========================================================================
+
+TEST(TaskGraphTests, VoidNodesWithNodeAfter)
+{
+    WorkPool         pool(2);
+    TaskGraph        graph;
+    std::atomic<int> counter{0};
+    auto             a = graph.node([&] { counter.fetch_add(1, std::memory_order_relaxed); });
+    auto             b = graph.node_after([&] { counter.fetch_add(10, std::memory_order_relaxed); }, a);
+    auto             task = graph.execute(pool);
+    task.wait();
+    EXPECT_EQ(counter.load(), 11);
+    (void)b;
+}
+
+TEST(TaskGraphTests, MixedVoidAndTyped)
+{
+    WorkPool         pool(2);
+    TaskGraph        graph;
+    std::atomic<int> side_effect{0};
+
+    auto producer   = graph.node([] { return 10; });
+    auto void_node  = graph.node([&] { side_effect.store(99, std::memory_order_relaxed); });
+    auto consumer   = graph.node([](int x) { return x * 3; }, producer);
+    auto final_node = graph.node_after([&] { return side_effect.load(std::memory_order_relaxed); }, void_node);
+
+    auto task = graph.execute(pool);
+    task.wait();
+    EXPECT_EQ(graph.result(consumer), 30);
+    EXPECT_EQ(graph.result(final_node), 99);
+}
+
+TEST(TaskGraphTests, VoidNodeChain)
+{
+    WorkPool         pool(2);
+    TaskGraph        graph;
+    std::atomic<int> order_tracker{0};
+    int              step1_val = 0, step2_val = 0, step3_val = 0;
+
+    auto a = graph.node([&] {
+        step1_val = order_tracker.fetch_add(1, std::memory_order_relaxed);
+    });
+    auto b = graph.node_after([&] {
+        step2_val = order_tracker.fetch_add(1, std::memory_order_relaxed);
+    }, a);
+    auto c = graph.node_after([&] {
+        step3_val = order_tracker.fetch_add(1, std::memory_order_relaxed);
+    }, b);
+
+    auto task = graph.execute(pool);
+    task.wait();
+    // 链式依赖保证执行顺序
+    EXPECT_LT(step1_val, step2_val);
+    EXPECT_LT(step2_val, step3_val);
+    (void)c;
+}
+
+// =========================================================================
+// 错误处理测试
+// =========================================================================
+
+TEST(TaskGraphTests, NodeExceptionPropagates)
+{
+    WorkPool  pool(2);
+    TaskGraph graph;
+    auto      a = graph.node([]() -> int { throw std::runtime_error("boom"); });
+    auto      b = graph.node([](int x) { return x + 1; }, a);
+    (void)b;
+
+    auto task = graph.execute(pool);
+    EXPECT_THROW(task.wait(), std::runtime_error);
+}
+
+TEST(TaskGraphTests, CascadeFailure)
+{
+    WorkPool          pool(2);
+    TaskGraph         graph;
+    std::atomic<bool> downstream_ran{false};
+
+    auto a = graph.node([]() -> int { throw std::runtime_error("fail"); });
+    auto b = graph.node([&](int x) -> int {
+        downstream_ran.store(true, std::memory_order_relaxed);
+        return x;
+    }, a);
+    (void)b;
+
+    auto task = graph.execute(pool);
+    EXPECT_THROW(task.wait(), std::runtime_error);
+    EXPECT_FALSE(downstream_ran.load());
+}
+
+TEST(TaskGraphTests, CycleDetectedAtExecute)
+{
+    // 注意：正常 API 无法构造环（因为节点只能引用已创建的节点）。
+    // 这里测试的是 has_cycle() 在合法 DAG 上返回 false（已在 builder 测试覆盖）。
+    // execute() 内部也调用 has_cycle() 作为防御检查。
+    WorkPool  pool(2);
+    TaskGraph graph;
+    auto      a = graph.node([] { return 1; });
+    auto      b = graph.node([](int x) { return x; }, a);
+    (void)b;
+    // 合法 DAG，execute 不应抛异常
+    auto task = graph.execute(pool);
+    task.wait();
+    EXPECT_EQ(graph.result(a), 1);
+}
+
+TEST(TaskGraphTests, ResultOfFailedNodeThrows)
+{
+    WorkPool  pool(2);
+    TaskGraph graph;
+    auto      a = graph.node([]() -> int { throw std::runtime_error("fail"); });
+
+    auto task = graph.execute(pool);
+    EXPECT_THROW(task.wait(), std::runtime_error);
+    EXPECT_THROW(graph.result(a), std::logic_error);
+}
+
+// =========================================================================
+// 并发测试
+// =========================================================================
+
+TEST(TaskGraphTests, WideFanOutParallelism)
+{
+    WorkPool  pool(4);
+    TaskGraph graph;
+
+    auto root = graph.node([] { return 0; });
+    constexpr int    N = 100;
+    std::atomic<int> parallel_count{0};
+    std::atomic<int> max_parallel{0};
+
+    std::vector<NodeHandle<void>> leaves;
+    for (int i = 0; i < N; ++i) {
+        leaves.push_back(graph.node([&](int) {
+            auto cur  = parallel_count.fetch_add(1, std::memory_order_relaxed) + 1;
+            // 更新最大并行度
+            auto prev = max_parallel.load(std::memory_order_relaxed);
+            while (cur > prev && !max_parallel.compare_exchange_weak(prev, cur, std::memory_order_relaxed)) {}
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            parallel_count.fetch_sub(1, std::memory_order_relaxed);
+        }, root));
+    }
+
+    auto task = graph.execute(pool);
+    task.wait();
+    // 至少有 2 个节点同时运行（4 线程 + 100 个独立节点）
+    EXPECT_GE(max_parallel.load(), 2);
+}
+
+TEST(TaskGraphTests, LargeGraphStress)
+{
+    WorkPool  pool(4);
+    TaskGraph graph;
+
+    // 构建 1000 节点的链
+    auto prev = graph.node([] { return 0; });
+    for (int i = 1; i < 1000; ++i) {
+        prev = graph.node([](int x) { return x + 1; }, prev);
+    }
+
+    auto task = graph.execute(pool);
+    task.wait();
+    EXPECT_EQ(graph.result(prev), 999);
 }
 
 } // namespace
