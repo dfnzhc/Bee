@@ -7,7 +7,7 @@
 
 #include <gtest/gtest.h>
 
-#include "Task/Task.hpp"
+#include "Task/Core/TaskState.hpp"
 #include "Base/Reflection/Nameof.hpp"
 
 namespace
