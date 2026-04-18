@@ -7,4 +7,5 @@ bee_add_component_test(
         SchedulerTests.cpp
         ThenTests.cpp
         WhenAllTests.cpp
+        WhenAnyTests.cpp
 )
