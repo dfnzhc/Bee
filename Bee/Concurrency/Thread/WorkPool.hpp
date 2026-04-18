@@ -11,6 +11,7 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <coroutine>
 #include <cstddef>
 #include <cstdint>
 #include <future>
@@ -118,6 +119,22 @@ public:
 
     /// 关停工作池；Drain 模式会执行完剩余任务，Immediate 模式丢弃未开始的任务
     void shutdown(ShutdownMode mode = ShutdownMode::Drain);
+
+    // ── Scheduler concept 适配 ──
+
+    /// co_await pool.schedule() 将执行转移到工作线程
+    struct ScheduleAwaiter
+    {
+        WorkPool* pool;
+
+        [[nodiscard]] auto await_ready() const noexcept -> bool { return false; }
+        auto await_suspend(std::coroutine_handle<> h) -> void;
+        auto await_resume() const noexcept -> void {}
+    };
+
+    /// 返回一个 awaiter，co_await 后将执行转移到工作线程。
+    /// 这是 P2300 schedule(scheduler) 的协程等价物。
+    auto schedule() -> ScheduleAwaiter { return ScheduleAwaiter{this}; }
 
     // ── 查询 ──
 
@@ -265,6 +282,11 @@ auto WorkPool::submit(F&& f, TaskPriority pri) -> std::future<std::invoke_result
     }
 
     return future;
+}
+
+inline auto WorkPool::ScheduleAwaiter::await_suspend(std::coroutine_handle<> h) -> void
+{
+    pool->post([h]() mutable { h.resume(); });
 }
 
 inline auto WorkPool::is_worker_thread() noexcept -> bool

@@ -4,4 +4,5 @@ bee_add_component_test(
     SOURCES
         TaskStateTests.cpp
         TaskBasicTests.cpp
+        SchedulerTests.cpp
 )
