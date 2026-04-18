@@ -8,4 +8,5 @@ bee_add_component_test(
         ThenTests.cpp
         WhenAllTests.cpp
         WhenAnyTests.cpp
+        AsyncScopeTests.cpp
 )
