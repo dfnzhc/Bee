@@ -43,7 +43,7 @@ TEST(ParallelScanTests, InclusiveScanSmall)
     std::vector<int> input = {1, 2, 3, 4, 5};
     std::vector<int> output(5);
 
-    parallel_inclusive_scan(pool, input.begin(), input.end(), output.begin(), std::plus<>{});
+    (void)parallel_inclusive_scan(pool, input.begin(), input.end(), output.begin(), std::plus<>{});
 
     EXPECT_EQ(output, (std::vector<int>{1, 3, 6, 10, 15}));
 }
@@ -64,7 +64,7 @@ TEST(ParallelScanTests, InclusiveScanSingle)
     std::vector<int> input = {42};
     std::vector<int> output(1);
 
-    parallel_inclusive_scan(pool, input.begin(), input.end(), output.begin(), std::plus<>{});
+    (void)parallel_inclusive_scan(pool, input.begin(), input.end(), output.begin(), std::plus<>{});
     EXPECT_EQ(output[0], 42);
 }
 
@@ -77,7 +77,7 @@ TEST(ParallelScanTests, InclusiveScanCancellation)
     ss.request_stop();
 
     EXPECT_THROW(
-        parallel_inclusive_scan(pool, input.begin(), input.end(), output.begin(), std::plus<>{}, ss.get_token()),
+        (void)parallel_inclusive_scan(pool, input.begin(), input.end(), output.begin(), std::plus<>{}, ss.get_token()),
         std::runtime_error
     );
 }
@@ -89,7 +89,7 @@ TEST(ParallelScanTests, InclusiveScanRanges)
     std::iota(input.begin(), input.end(), 1);
     std::vector<int> output(10000);
 
-    parallel_inclusive_scan(pool, input, output.begin(), std::plus<>{});
+    (void)parallel_inclusive_scan(pool, input, output.begin(), std::plus<>{});
 
     std::vector<int> expected(10000);
     std::inclusive_scan(input.begin(), input.end(), expected.begin(), std::plus<>{});
@@ -122,7 +122,7 @@ TEST(ParallelScanTests, ExclusiveScanSmall)
     std::vector<int> input = {1, 2, 3, 4, 5};
     std::vector<int> output(5);
 
-    parallel_exclusive_scan(pool, input.begin(), input.end(), output.begin(), 0, std::plus<>{});
+    (void)parallel_exclusive_scan(pool, input.begin(), input.end(), output.begin(), 0, std::plus<>{});
 
     EXPECT_EQ(output, (std::vector<int>{0, 1, 3, 6, 10}));
 }
@@ -143,7 +143,7 @@ TEST(ParallelScanTests, ExclusiveScanWithInit)
     std::vector<int> input = {1, 2, 3};
     std::vector<int> output(3);
 
-    parallel_exclusive_scan(pool, input.begin(), input.end(), output.begin(), 100, std::plus<>{});
+    (void)parallel_exclusive_scan(pool, input.begin(), input.end(), output.begin(), 100, std::plus<>{});
 
     // exclusive_scan with init=100: [100, 101, 103]
     EXPECT_EQ(output, (std::vector<int>{100, 101, 103}));
@@ -158,7 +158,7 @@ TEST(ParallelScanTests, ExclusiveScanCancellation)
     ss.request_stop();
 
     EXPECT_THROW(
-        parallel_exclusive_scan(pool, input.begin(), input.end(), output.begin(), 0, std::plus<>{}, ss.get_token()),
+        (void)parallel_exclusive_scan(pool, input.begin(), input.end(), output.begin(), 0, std::plus<>{}, ss.get_token()),
         std::runtime_error
     );
 }
@@ -170,7 +170,7 @@ TEST(ParallelScanTests, ExclusiveScanRanges)
     std::iota(input.begin(), input.end(), 1);
     std::vector<int> output(10000);
 
-    parallel_exclusive_scan(pool, input, output.begin(), 0, std::plus<>{});
+    (void)parallel_exclusive_scan(pool, input, output.begin(), 0, std::plus<>{});
 
     std::vector<int> expected(10000);
     std::exclusive_scan(input.begin(), input.end(), expected.begin(), 0, std::plus<>{});

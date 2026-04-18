@@ -38,12 +38,13 @@ template <Scheduler S, std::random_access_iterator It, typename T, typename Bina
         return std::reduce(first, last, init, op);
 
     auto                            chunks = detail::partition(n, scheduler.thread_count());
-    std::vector<T>                  partial_results(chunks.size());
-    std::vector<std::exception_ptr> exceptions(chunks.size());
-    std::latch                      done(static_cast<std::ptrdiff_t>(chunks.size()));
+    const auto                      count  = chunks.size();
+    std::vector<T>                  partial_results(count);
+    std::vector<std::exception_ptr> exceptions(count);
+    std::latch                      done(static_cast<std::ptrdiff_t>(count));
 
-    for (std::size_t i = 0; i < chunks.size(); ++i) {
-        scheduler.post([&, i]() {
+    detail::safe_post_loop(scheduler, count, done, [&](std::size_t i) {
+        return [&, i]() {
             try {
                 auto it  = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
                 auto end = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
@@ -58,15 +59,10 @@ template <Scheduler S, std::random_access_iterator It, typename T, typename Bina
                 exceptions[i] = std::current_exception();
             }
             done.count_down();
-        });
-    }
+        };
+    });
 
-    done.wait();
-
-    for (auto& ex : exceptions) {
-        if (ex)
-            std::rethrow_exception(ex);
-    }
+    detail::rethrow_first(exceptions);
 
     T result = init;
     for (auto& partial : partial_results) {
@@ -94,13 +90,14 @@ template <Scheduler S, std::random_access_iterator It, typename T, typename Bina
     }
 
     auto                            chunks = detail::partition(n, scheduler.thread_count());
-    std::vector<T>                  partial_results(chunks.size());
-    std::vector<std::exception_ptr> exceptions(chunks.size());
+    const auto                      count  = chunks.size();
+    std::vector<T>                  partial_results(count);
+    std::vector<std::exception_ptr> exceptions(count);
     std::atomic<bool>               cancelled{false};
-    std::latch                      done(static_cast<std::ptrdiff_t>(chunks.size()));
+    std::latch                      done(static_cast<std::ptrdiff_t>(count));
 
-    for (std::size_t i = 0; i < chunks.size(); ++i) {
-        scheduler.post([&, i]() {
+    detail::safe_post_loop(scheduler, count, done, [&](std::size_t i) {
+        return [&, i]() {
             if (token.stop_requested()) {
                 cancelled.store(true, std::memory_order_relaxed);
                 done.count_down();
@@ -124,15 +121,10 @@ template <Scheduler S, std::random_access_iterator It, typename T, typename Bina
                 exceptions[i] = std::current_exception();
             }
             done.count_down();
-        });
-    }
+        };
+    });
 
-    done.wait();
-
-    for (auto& ex : exceptions) {
-        if (ex)
-            std::rethrow_exception(ex);
-    }
+    detail::rethrow_first(exceptions);
 
     if (cancelled.load(std::memory_order_acquire))
         throw std::runtime_error("Operation cancelled");
@@ -178,12 +170,13 @@ template <Scheduler S, std::random_access_iterator It, typename T, typename Redu
         return std::transform_reduce(first, last, init, reduce_op, transform_op);
 
     auto                            chunks = detail::partition(n, scheduler.thread_count());
-    std::vector<T>                  partial_results(chunks.size());
-    std::vector<std::exception_ptr> exceptions(chunks.size());
-    std::latch                      done(static_cast<std::ptrdiff_t>(chunks.size()));
+    const auto                      count  = chunks.size();
+    std::vector<T>                  partial_results(count);
+    std::vector<std::exception_ptr> exceptions(count);
+    std::latch                      done(static_cast<std::ptrdiff_t>(count));
 
-    for (std::size_t i = 0; i < chunks.size(); ++i) {
-        scheduler.post([&, i]() {
+    detail::safe_post_loop(scheduler, count, done, [&](std::size_t i) {
+        return [&, i]() {
             try {
                 auto it  = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
                 auto end = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
@@ -198,15 +191,10 @@ template <Scheduler S, std::random_access_iterator It, typename T, typename Redu
                 exceptions[i] = std::current_exception();
             }
             done.count_down();
-        });
-    }
+        };
+    });
 
-    done.wait();
-
-    for (auto& ex : exceptions) {
-        if (ex)
-            std::rethrow_exception(ex);
-    }
+    detail::rethrow_first(exceptions);
 
     T result = init;
     for (auto& partial : partial_results) {
@@ -235,13 +223,14 @@ template <Scheduler S, std::random_access_iterator It, typename T, typename Redu
     }
 
     auto                            chunks = detail::partition(n, scheduler.thread_count());
-    std::vector<T>                  partial_results(chunks.size());
-    std::vector<std::exception_ptr> exceptions(chunks.size());
+    const auto                      count  = chunks.size();
+    std::vector<T>                  partial_results(count);
+    std::vector<std::exception_ptr> exceptions(count);
     std::atomic<bool>               cancelled{false};
-    std::latch                      done(static_cast<std::ptrdiff_t>(chunks.size()));
+    std::latch                      done(static_cast<std::ptrdiff_t>(count));
 
-    for (std::size_t i = 0; i < chunks.size(); ++i) {
-        scheduler.post([&, i]() {
+    detail::safe_post_loop(scheduler, count, done, [&](std::size_t i) {
+        return [&, i]() {
             if (token.stop_requested()) {
                 cancelled.store(true, std::memory_order_relaxed);
                 done.count_down();
@@ -265,15 +254,10 @@ template <Scheduler S, std::random_access_iterator It, typename T, typename Redu
                 exceptions[i] = std::current_exception();
             }
             done.count_down();
-        });
-    }
+        };
+    });
 
-    done.wait();
-
-    for (auto& ex : exceptions) {
-        if (ex)
-            std::rethrow_exception(ex);
-    }
+    detail::rethrow_first(exceptions);
 
     if (cancelled.load(std::memory_order_acquire))
         throw std::runtime_error("Operation cancelled");

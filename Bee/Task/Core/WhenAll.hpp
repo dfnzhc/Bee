@@ -162,7 +162,7 @@ namespace detail
     struct VectorWhenAllAwaiter
     {
         std::shared_ptr<VectorWhenAllControl<T>> ctrl;
-        std::vector<Task<T>>&                    tasks;
+        std::vector<Task<T>>                     tasks;
 
         [[nodiscard]] auto await_ready() const noexcept -> bool
         {
@@ -219,7 +219,7 @@ auto when_all(std::vector<Task<T>> tasks) -> Task<std::vector<T>>
     }
 
     auto ctrl = std::make_shared<detail::VectorWhenAllControl<T>>(tasks.size());
-    co_return co_await detail::VectorWhenAllAwaiter<T>{ctrl, tasks};
+    co_return co_await detail::VectorWhenAllAwaiter<T>{ctrl, std::move(tasks)};
 }
 
 } // namespace bee

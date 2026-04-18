@@ -50,29 +50,24 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
     std::vector<std::exception_ptr> exceptions(chunks.size());
     {
         std::latch done(static_cast<std::ptrdiff_t>(chunks.size()));
-        for (std::size_t i = 0; i < chunks.size(); ++i) {
-            scheduler.post([&, i]() {
+        detail::safe_post_loop(scheduler, chunks.size(), done, [&](std::size_t i) {
+            return [&, i]() {
                 try {
                     auto in_begin  = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
                     auto in_end    = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
                     auto out_begin = std::next(d_first, static_cast<std::ptrdiff_t>(chunks[i].begin));
                     std::inclusive_scan(in_begin, in_end, out_begin, op);
-                    // 块输出的最后一个元素即为该块的累加总和
                     chunk_totals[i] = *std::next(d_first, static_cast<std::ptrdiff_t>(chunks[i].end - 1));
                 }
                 catch (...) {
                     exceptions[i] = std::current_exception();
                 }
                 done.count_down();
-            });
-        }
-        done.wait();
+            };
+        });
     }
 
-    for (auto& ex : exceptions) {
-        if (ex)
-            std::rethrow_exception(ex);
-    }
+    detail::rethrow_first(exceptions);
 
     // ── 第二阶段：串行计算块前缀偏移 ──
     std::vector<ValueType> chunk_offsets(chunks.size());
@@ -84,8 +79,9 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
     if (chunks.size() > 1) {
         std::vector<std::exception_ptr> fixup_exceptions(chunks.size() - 1);
         std::latch                      fixup_done(static_cast<std::ptrdiff_t>(chunks.size() - 1));
-        for (std::size_t i = 1; i < chunks.size(); ++i) {
-            scheduler.post([&, i]() {
+        detail::safe_post_loop(scheduler, chunks.size() - 1, fixup_done, [&](std::size_t idx) {
+            const std::size_t i = idx + 1;
+            return [&, i]() {
                 try {
                     auto out_begin = std::next(d_first, static_cast<std::ptrdiff_t>(chunks[i].begin));
                     auto out_end   = std::next(d_first, static_cast<std::ptrdiff_t>(chunks[i].end));
@@ -94,17 +90,13 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
                     }
                 }
                 catch (...) {
-                    fixup_exceptions[i - 1] = std::current_exception();
+                    fixup_exceptions[idx] = std::current_exception();
                 }
                 fixup_done.count_down();
-            });
-        }
-        fixup_done.wait();
+            };
+        });
 
-        for (auto& ex : fixup_exceptions) {
-            if (ex)
-                std::rethrow_exception(ex);
-        }
+        detail::rethrow_first(fixup_exceptions);
     }
 
     return std::next(d_first, static_cast<std::ptrdiff_t>(n));
@@ -147,8 +139,8 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
     std::vector<std::exception_ptr> exceptions(chunks.size());
     {
         std::latch done(static_cast<std::ptrdiff_t>(chunks.size()));
-        for (std::size_t i = 0; i < chunks.size(); ++i) {
-            scheduler.post([&, i]() {
+        detail::safe_post_loop(scheduler, chunks.size(), done, [&](std::size_t i) {
+            return [&, i]() {
                 if (token.stop_requested()) {
                     cancelled.store(true, std::memory_order_relaxed);
                     done.count_down();
@@ -165,15 +157,11 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
                     exceptions[i] = std::current_exception();
                 }
                 done.count_down();
-            });
-        }
-        done.wait();
+            };
+        });
     }
 
-    for (auto& ex : exceptions) {
-        if (ex)
-            std::rethrow_exception(ex);
-    }
+    detail::rethrow_first(exceptions);
     if (cancelled.load(std::memory_order_acquire))
         throw std::runtime_error("Operation cancelled");
 
@@ -187,8 +175,9 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
     if (chunks.size() > 1) {
         std::vector<std::exception_ptr> fixup_exceptions(chunks.size() - 1);
         std::latch                      fixup_done(static_cast<std::ptrdiff_t>(chunks.size() - 1));
-        for (std::size_t i = 1; i < chunks.size(); ++i) {
-            scheduler.post([&, i]() {
+        detail::safe_post_loop(scheduler, chunks.size() - 1, fixup_done, [&](std::size_t idx) {
+            const std::size_t i = idx + 1;
+            return [&, i]() {
                 if (token.stop_requested()) {
                     cancelled.store(true, std::memory_order_relaxed);
                     fixup_done.count_down();
@@ -202,17 +191,13 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
                     }
                 }
                 catch (...) {
-                    fixup_exceptions[i - 1] = std::current_exception();
+                    fixup_exceptions[idx] = std::current_exception();
                 }
                 fixup_done.count_down();
-            });
-        }
-        fixup_done.wait();
+            };
+        });
 
-        for (auto& ex : fixup_exceptions) {
-            if (ex)
-                std::rethrow_exception(ex);
-        }
+        detail::rethrow_first(fixup_exceptions);
         if (cancelled.load(std::memory_order_acquire))
             throw std::runtime_error("Operation cancelled");
     }
@@ -262,8 +247,8 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
     std::vector<std::exception_ptr> exceptions(chunks.size());
     {
         std::latch done(static_cast<std::ptrdiff_t>(chunks.size()));
-        for (std::size_t i = 0; i < chunks.size(); ++i) {
-            scheduler.post([&, i]() {
+        detail::safe_post_loop(scheduler, chunks.size(), done, [&](std::size_t i) {
+            return [&, i]() {
                 try {
                     auto in_begin = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
                     auto in_end   = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
@@ -278,15 +263,11 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
                     exceptions[i] = std::current_exception();
                 }
                 done.count_down();
-            });
-        }
-        done.wait();
+            };
+        });
     }
 
-    for (auto& ex : exceptions) {
-        if (ex)
-            std::rethrow_exception(ex);
-    }
+    detail::rethrow_first(exceptions);
 
     // ── 第二阶段：计算排除式前缀偏移 ──
     std::vector<T> chunk_offsets(chunks.size());
@@ -299,8 +280,8 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
     std::vector<std::exception_ptr> write_exceptions(chunks.size());
     {
         std::latch done(static_cast<std::ptrdiff_t>(chunks.size()));
-        for (std::size_t i = 0; i < chunks.size(); ++i) {
-            scheduler.post([&, i]() {
+        detail::safe_post_loop(scheduler, chunks.size(), done, [&](std::size_t i) {
+            return [&, i]() {
                 try {
                     auto in_begin  = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
                     auto in_end    = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
@@ -315,15 +296,11 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
                     write_exceptions[i] = std::current_exception();
                 }
                 done.count_down();
-            });
-        }
-        done.wait();
+            };
+        });
     }
 
-    for (auto& ex : write_exceptions) {
-        if (ex)
-            std::rethrow_exception(ex);
-    }
+    detail::rethrow_first(write_exceptions);
 
     return std::next(d_first, static_cast<std::ptrdiff_t>(n));
 }
@@ -361,8 +338,8 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
     std::vector<std::exception_ptr> exceptions(chunks.size());
     {
         std::latch done(static_cast<std::ptrdiff_t>(chunks.size()));
-        for (std::size_t i = 0; i < chunks.size(); ++i) {
-            scheduler.post([&, i]() {
+        detail::safe_post_loop(scheduler, chunks.size(), done, [&](std::size_t i) {
+            return [&, i]() {
                 if (token.stop_requested()) {
                     cancelled.store(true, std::memory_order_relaxed);
                     done.count_down();
@@ -382,15 +359,11 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
                     exceptions[i] = std::current_exception();
                 }
                 done.count_down();
-            });
-        }
-        done.wait();
+            };
+        });
     }
 
-    for (auto& ex : exceptions) {
-        if (ex)
-            std::rethrow_exception(ex);
-    }
+    detail::rethrow_first(exceptions);
     if (cancelled.load(std::memory_order_acquire))
         throw std::runtime_error("Operation cancelled");
 
@@ -405,8 +378,8 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
     std::vector<std::exception_ptr> write_exceptions(chunks.size());
     {
         std::latch done(static_cast<std::ptrdiff_t>(chunks.size()));
-        for (std::size_t i = 0; i < chunks.size(); ++i) {
-            scheduler.post([&, i]() {
+        detail::safe_post_loop(scheduler, chunks.size(), done, [&](std::size_t i) {
+            return [&, i]() {
                 if (token.stop_requested()) {
                     cancelled.store(true, std::memory_order_relaxed);
                     done.count_down();
@@ -426,15 +399,11 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
                     write_exceptions[i] = std::current_exception();
                 }
                 done.count_down();
-            });
-        }
-        done.wait();
+            };
+        });
     }
 
-    for (auto& ex : write_exceptions) {
-        if (ex)
-            std::rethrow_exception(ex);
-    }
+    detail::rethrow_first(write_exceptions);
     if (cancelled.load(std::memory_order_acquire))
         throw std::runtime_error("Operation cancelled");
 

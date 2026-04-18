@@ -68,6 +68,49 @@ namespace bee::detail
     constexpr std::size_t kParallelThreshold = 4096;
 
     // =====================================================================
+    // safe_post_loop — 安全投递并等待
+    // =====================================================================
+
+    /// 安全地将 count 个任务投递到调度器，确保 latch 始终达到 0。
+    /// TaskFactory 签名：auto(std::size_t i) -> callable<void()>
+    /// 若 post() 在第 k 次调用时抛出异常，补足剩余 N-k 次 count_down，
+    /// 等待所有已投递任务完成，然后重抛异常。
+    template <Scheduler S, typename TaskFactory>
+    auto safe_post_loop(S& scheduler, std::size_t count, std::latch& done, TaskFactory&& factory) -> void
+    {
+        std::size_t        posted = 0;
+        std::exception_ptr post_ex;
+        try {
+            for (std::size_t i = 0; i < count; ++i) {
+                scheduler.post(factory(i));
+                ++posted;
+            }
+        }
+        catch (...) {
+            post_ex = std::current_exception();
+            for (std::size_t j = posted; j < count; ++j)
+                done.count_down();
+        }
+
+        done.wait();
+
+        if (post_ex)
+            std::rethrow_exception(post_ex);
+    }
+
+    // =====================================================================
+    // rethrow_first — 重抛异常向量中的第一个异常
+    // =====================================================================
+
+    inline auto rethrow_first(const std::vector<std::exception_ptr>& exceptions) -> void
+    {
+        for (auto& ex : exceptions) {
+            if (ex)
+                std::rethrow_exception(ex);
+        }
+    }
+
+    // =====================================================================
     // execute_chunks — 通用并行分块执行
     // =====================================================================
 
@@ -81,12 +124,13 @@ namespace bee::detail
         if (chunks.empty())
             return;
 
-        std::vector<std::exception_ptr> exceptions(chunks.size());
+        const auto                      count = chunks.size();
+        std::vector<std::exception_ptr> exceptions(count);
         std::atomic<bool>               cancelled{false};
-        std::latch                      done(static_cast<std::ptrdiff_t>(chunks.size()));
+        std::latch                      done(static_cast<std::ptrdiff_t>(count));
 
-        for (std::size_t i = 0; i < chunks.size(); ++i) {
-            scheduler.post([&, i]() {
+        safe_post_loop(scheduler, count, done, [&](std::size_t i) {
+            return [&, i]() {
                 if (token.stop_requested()) {
                     cancelled.store(true, std::memory_order_relaxed);
                     done.count_down();
@@ -99,16 +143,10 @@ namespace bee::detail
                     exceptions[i] = std::current_exception();
                 }
                 done.count_down();
-            });
-        }
+            };
+        });
 
-        done.wait();
-
-        // 重抛第一个异常
-        for (auto& ex : exceptions) {
-            if (ex)
-                std::rethrow_exception(ex);
-        }
+        rethrow_first(exceptions);
 
         if (cancelled.load(std::memory_order_acquire))
             throw std::runtime_error("Operation cancelled");

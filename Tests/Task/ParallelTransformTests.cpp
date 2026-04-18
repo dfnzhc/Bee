@@ -73,7 +73,7 @@ TEST(ParallelTransformTests, ExceptionPropagation)
     std::vector<int> output(10000);
 
     EXPECT_THROW(
-        parallel_transform(pool, input.begin(), input.end(), output.begin(),
+        (void)parallel_transform(pool, input.begin(), input.end(), output.begin(),
             [](int) -> int { throw std::runtime_error("test"); }),
         std::runtime_error
     );
@@ -92,7 +92,7 @@ TEST(ParallelTransformTests, CancellationStopsWork)
     ss.request_stop();
 
     EXPECT_THROW(
-        parallel_transform(pool, input.begin(), input.end(), output.begin(),
+        (void)parallel_transform(pool, input.begin(), input.end(), output.begin(),
             [](int v) { return v; }, ss.get_token()),
         std::runtime_error
     );
@@ -127,7 +127,7 @@ TEST(ParallelTransformTests, RangesCancellation)
     ss.request_stop();
 
     EXPECT_THROW(
-        parallel_transform(pool, input, output.begin(),
+        (void)parallel_transform(pool, input, output.begin(),
             [](int v) { return v; }, ss.get_token()),
         std::runtime_error
     );

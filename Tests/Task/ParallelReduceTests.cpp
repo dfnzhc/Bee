@@ -71,7 +71,7 @@ TEST(ParallelReduceTests, ExceptionPropagation)
     std::vector<int> data(10000, 0);
 
     EXPECT_THROW(
-        parallel_reduce(pool, data.begin(), data.end(), 0,
+        (void)parallel_reduce(pool, data.begin(), data.end(), 0,
             [](int, int) -> int { throw std::runtime_error("test"); }),
         std::runtime_error
     );
@@ -85,7 +85,7 @@ TEST(ParallelReduceTests, Cancellation)
     ss.request_stop();
 
     EXPECT_THROW(
-        parallel_reduce(pool, data.begin(), data.end(), 0, std::plus<>{}, ss.get_token()),
+        (void)parallel_reduce(pool, data.begin(), data.end(), 0, std::plus<>{}, ss.get_token()),
         std::runtime_error
     );
 }
@@ -163,7 +163,7 @@ TEST(ParallelReduceTests, TransformReduceCancellation)
     ss.request_stop();
 
     EXPECT_THROW(
-        parallel_transform_reduce(
+        (void)parallel_transform_reduce(
             pool, data.begin(), data.end(), 0, std::plus<>{},
             [](int v) { return v; }, ss.get_token()),
         std::runtime_error

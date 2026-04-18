@@ -62,8 +62,17 @@ namespace detail
             right_ex = std::current_exception();
         }
 
-        left_task.get(); // 等待左半区完成
+        // 安全 join：捕获左侧异常而非直接抛出，确保双侧异常均被处理
+        std::exception_ptr left_ex;
+        try {
+            left_task.get();
+        }
+        catch (...) {
+            left_ex = std::current_exception();
+        }
 
+        if (left_ex)
+            std::rethrow_exception(left_ex);
         if (right_ex)
             std::rethrow_exception(right_ex);
 
@@ -98,8 +107,16 @@ namespace detail
             right_ex = std::current_exception();
         }
 
-        left_task.get();
+        std::exception_ptr left_ex;
+        try {
+            left_task.get();
+        }
+        catch (...) {
+            left_ex = std::current_exception();
+        }
 
+        if (left_ex)
+            std::rethrow_exception(left_ex);
         if (right_ex)
             std::rethrow_exception(right_ex);
 
