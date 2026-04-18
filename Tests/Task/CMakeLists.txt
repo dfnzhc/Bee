@@ -5,4 +5,5 @@ bee_add_component_test(
         TaskStateTests.cpp
         TaskBasicTests.cpp
         SchedulerTests.cpp
+        ThenTests.cpp
 )
