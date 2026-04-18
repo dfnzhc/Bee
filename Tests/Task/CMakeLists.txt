@@ -16,4 +16,5 @@ bee_add_component_test(
         ParallelScanTests.cpp
         ParallelSortTests.cpp
         ParallelVerificationTests.cpp
+        TaskGraphTests.cpp
 )

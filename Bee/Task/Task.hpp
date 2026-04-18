@@ -15,6 +15,9 @@
 #include "Task/Core/WhenAny.hpp"
 #include "Task/Core/AsyncScope.hpp"
 
+// ── Graph ──
+#include "Task/Graph/TaskGraph.hpp"
+
 // ── Parallel ──
 #include "Task/Parallel/Partitioner.hpp"
 #include "Task/Parallel/ForEach.hpp"
