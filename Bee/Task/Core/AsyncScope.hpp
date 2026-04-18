@@ -115,7 +115,11 @@ private:
         }
 
         if (pending_.fetch_sub(1, std::memory_order_acq_rel) == 1) {
-            // 最后一个任务完成，通知 join/析构
+            // 最后一个任务完成，通知 join/析构。
+            // 必须先锁 cv_mutex_ 再 notify，防止 lost wakeup：
+            // 若 join() 在 "谓词返回 false" 与 "进入 wait" 之间，
+            // 不加锁的 notify 会丢失（无人在等待集中）。
+            std::lock_guard lock(cv_mutex_);
             cv_.notify_all();
         }
     }
