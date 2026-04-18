@@ -48,7 +48,8 @@ def format_file(file_path):
         subprocess.run(['clang-format', '-i', '-style=file', file_path], check=True)
         return True
     except subprocess.CalledProcessError as e:
-        print(f"⚠️ clang-format 失败 [{file_path}]: {e}")
+        # 加上 \n 避免破坏进度条
+        print(f"\n⚠️ clang-format 失败 [{file_path}]: {e}")
         return False
 
 
@@ -61,7 +62,8 @@ def tidy_file(file_path, build_dir):
         subprocess.run(cmd, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return True
     except Exception as e:
-        print(f"⚠️ clang-tidy 异常 [{file_path}]: {e}")
+        # 加上 \n 避免破坏进度条
+        print(f"\n⚠️ clang-tidy 异常 [{file_path}]: {e}")
         return False
 
 
@@ -76,22 +78,34 @@ def main():
     check_dependencies(args.skip_tidy)
 
     files = get_source_files(args.directories)
+    total_files = len(files)
+
     if not files:
         print("ℹ️ 在指定的目录中没有找到有效的 C/C++ 源文件。")
         sys.exit(0)
 
-    print(f"🔍 找到 {len(files)} 个源文件，开始处理...")
+    print(f"🔍 找到 {total_files} 个源文件，开始处理...")
 
     for idx, file_path in enumerate(files, 1):
         filename = os.path.basename(file_path)
-        print(f"[{idx}/{len(files)}] 处理中: {filename}")
+
+        # --- 进度条逻辑 ---
+        bar_length = 30  # 进度条长度
+        filled_length = int(bar_length * idx // total_files)
+        bar = '█' * filled_length + '-' * (bar_length - filled_length)
+        percent = f"{100 * idx / total_files:.1f}"
+
+        # 使用 \r 返回行首，并设置 end="" 防止自动换行
+        # 对 filename 使用切片和 ljust 填充空格，是为了防止上一个长文件名残留在本行的末尾
+        print(f"\r[{idx}/{total_files}] |{bar}| {percent}% 处理中: {filename[:30]:<30}", end="", flush=True)
 
         if not args.skip_tidy:
             tidy_file(file_path, args.build_dir)
 
         format_file(file_path)
 
-    print("✅ 所有文件处理完毕！")
+    # 循环结束后打印一个换行符，防止最后的输出与终端提示符连在一起
+    print("\n✅ 所有文件处理完毕！")
 
 
 if __name__ == "__main__":
