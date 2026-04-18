@@ -76,6 +76,122 @@ namespace detail
         return extract_args_impl<Ts...>(inputs, std::index_sequence_for<Ts...>{});
     }
 
+    // =====================================================================
+    // GraphExecutionContext — 图执行的共享状态
+    // =====================================================================
+
+    template <Scheduler S>
+    struct GraphExecutionContext
+    {
+        std::vector<NodeEntry>& nodes;
+        S& scheduler;
+        std::vector<std::atomic<std::size_t>> counters;
+        std::atomic<std::size_t> remaining;
+        std::coroutine_handle<> continuation{nullptr};
+        std::exception_ptr first_exception{nullptr};
+        std::mutex exception_mutex;
+
+        GraphExecutionContext(std::vector<NodeEntry>& n, S& s)
+            : nodes(n), scheduler(s), counters(n.size()), remaining(n.size())
+        {
+            for (std::size_t i = 0; i < n.size(); ++i) {
+                counters[i].store(n[i].predecessors.size(), std::memory_order_relaxed);
+            }
+        }
+    };
+
+    // =====================================================================
+    // run_node — 执行单个节点并推进后继
+    // =====================================================================
+
+    template <Scheduler S>
+    auto run_node(std::shared_ptr<GraphExecutionContext<S>> ctx, std::size_t index) -> void
+    {
+        auto& node = ctx->nodes[index];
+
+        // 检查前驱是否有异常（级联失败）
+        bool predecessor_failed = false;
+        for (auto pred : node.predecessors) {
+            if (ctx->nodes[pred].exception) {
+                node.exception     = ctx->nodes[pred].exception;
+                predecessor_failed = true;
+                break;
+            }
+        }
+
+        if (!predecessor_failed) {
+            try {
+                // 收集前驱结果
+                std::vector<std::any> inputs;
+                inputs.reserve(node.predecessors.size());
+                for (auto pred : node.predecessors) {
+                    inputs.push_back(ctx->nodes[pred].result);
+                }
+                node.result = node.callable(inputs);
+            }
+            catch (...) {
+                node.exception = std::current_exception();
+            }
+        }
+
+        // 存储第一个异常（线程安全）
+        if (node.exception) {
+            std::lock_guard lock(ctx->exception_mutex);
+            if (!ctx->first_exception) {
+                ctx->first_exception = node.exception;
+            }
+        }
+
+        // 通知后继节点
+        // note: node.result/exception 的写入通过 counters[succ].fetch_sub(acq_rel) 对后继可见
+        for (auto succ : node.successors) {
+            if (ctx->counters[succ].fetch_sub(1, std::memory_order_acq_rel) == 1) {
+                ctx->scheduler.post([ctx, succ]() {
+                    run_node(ctx, succ);
+                });
+            }
+        }
+
+        // 全局计数递减
+        if (ctx->remaining.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+            ctx->continuation.resume();
+        }
+    }
+
+    // =====================================================================
+    // GraphAwaitable — 协程挂起/恢复桥接
+    // =====================================================================
+
+    template <Scheduler S>
+    struct GraphAwaitable
+    {
+        std::shared_ptr<GraphExecutionContext<S>> ctx;
+
+        [[nodiscard]] auto await_ready() const noexcept -> bool
+        {
+            return false;
+        }
+
+        auto await_suspend(std::coroutine_handle<> h) -> void
+        {
+            // 复制 ctx 到局部变量：一旦 post 后工作线程可能 resume 协程，
+            // 导致 GraphAwaitable 临时对象被销毁，this->ctx 悬垂。
+            auto local_ctx        = ctx;
+            local_ctx->continuation = h;
+
+            // 将所有根节点（无前驱）post 到 scheduler
+            for (std::size_t i = 0; i < local_ctx->nodes.size(); ++i) {
+                if (local_ctx->counters[i].load(std::memory_order_relaxed) == 0) {
+                    local_ctx->scheduler.post([local_ctx, i]() {
+                        run_node(local_ctx, i);
+                    });
+                }
+            }
+        }
+
+        auto await_resume() const noexcept -> void {}
+    };
+
 } // namespace detail
 
 // =========================================================================
@@ -326,5 +442,26 @@ private:
         }
     }
 };
+
+// =========================================================================
+// TaskGraph::execute() — 图执行入口
+// =========================================================================
+
+template <Scheduler S>
+auto TaskGraph::execute(S& scheduler) -> Task<void>
+{
+    if (nodes_.empty())
+        co_return;
+
+    if (has_cycle())
+        throw std::logic_error("TaskGraph contains a cycle");
+
+    auto ctx = std::make_shared<detail::GraphExecutionContext<S>>(nodes_, scheduler);
+
+    co_await detail::GraphAwaitable<S>{ctx};
+
+    if (ctx->first_exception)
+        std::rethrow_exception(ctx->first_exception);
+}
 
 } // namespace bee
