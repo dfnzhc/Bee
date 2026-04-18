@@ -208,7 +208,7 @@ public:
     // ── 阻塞访问 ──
 
     /// 启动（若未启动）并阻塞直到完成。返回结果或重抛异常。
-    /// 一次性操作，第二次调用 UB（BEE_CHECK 保护）。
+    /// 一次性消费操作：调用后 Task 变为空（handle 销毁）。
     auto get() -> T
     {
         BEE_CHECK(handle_ != nullptr);
@@ -221,18 +221,31 @@ public:
             promise.ready.acquire();
         }
 
-        // 重抛异常
-        if (promise.exception) {
-            std::rethrow_exception(promise.exception);
-        }
+        // 提取结果前先保存异常指针，确保析构正确
+        auto ex = promise.exception;
 
         if constexpr (!std::is_void_v<T>) {
-            BEE_CHECK(promise.result.has_value());
-            return std::move(*promise.result);
+            std::optional<T> result_val;
+            if (!ex && promise.result.has_value()) {
+                result_val.emplace(std::move(*promise.result));
+            }
+            // 消费完毕：销毁协程帧
+            destroy_if_valid();
+            if (ex) {
+                std::rethrow_exception(ex);
+            }
+            return std::move(*result_val);
+        }
+        else {
+            destroy_if_valid();
+            if (ex) {
+                std::rethrow_exception(ex);
+            }
         }
     }
 
     /// 启动并阻塞直到终态。失败/取消时重抛异常。
+    /// 一次性消费操作：调用后 Task 变为空。
     auto wait() -> void
     {
         BEE_CHECK(handle_ != nullptr);
@@ -243,12 +256,15 @@ public:
             promise.ready.acquire();
         }
 
-        if (promise.exception) {
-            std::rethrow_exception(promise.exception);
+        auto ex = promise.exception;
+        destroy_if_valid();
+        if (ex) {
+            std::rethrow_exception(ex);
         }
     }
 
     /// 限时等待。返回当前状态。
+    /// 注意：不消费 Task。超时返回当前状态（可能是 Running）。
     [[nodiscard]] auto wait_for(std::chrono::nanoseconds timeout) -> TaskState
     {
         BEE_CHECK(handle_ != nullptr);
@@ -261,6 +277,8 @@ public:
 
         // 使用 try_acquire_for 实现限时等待
         if (promise.ready.try_acquire_for(timeout)) {
+            // 成功获取 → 归还信号量供后续 get()/wait() 使用
+            promise.ready.release();
             return promise.task_state.load(std::memory_order_acquire);
         }
 
@@ -303,22 +321,16 @@ public:
             auto await_suspend(std::coroutine_handle<> caller) -> std::coroutine_handle<>
             {
                 auto& promise = handle.promise();
-                promise.continuation = caller;
 
-                // 启动（若未启动）
+                // co_await 仅允许在未启动的 Task 上使用。
+                // 若 Task 已被 get()/wait()/wait_for() 启动，co_await 存在
+                // TOCTOU 双重恢复竞态（continuation 设置与 FinalAwaiter 读取无同步）。
                 bool expected = false;
-                if (promise.started.compare_exchange_strong(expected, true, std::memory_order_acq_rel)) {
-                    promise.task_state.store(TaskState::Running, std::memory_order_release);
-                    return handle; // 对称转移：开始执行此 Task
-                }
+                BEE_CHECK(promise.started.compare_exchange_strong(expected, true, std::memory_order_acq_rel));
 
-                // 已启动 — 检查是否已完成
-                if (promise.task_state.load(std::memory_order_acquire) >= TaskState::Completed) {
-                    return caller; // 已完成，直接恢复调用者
-                }
-
-                // 正在运行 — 挂起等待
-                return std::noop_coroutine();
+                promise.continuation = caller;
+                promise.task_state.store(TaskState::Running, std::memory_order_release);
+                return handle; // 对称转移：开始执行此 Task
             }
 
             auto await_resume() -> T
@@ -396,9 +408,6 @@ private:
     friend auto detail::then_impl_scheduled(Task<U> pred, S& scheduler, Fn fn)
         -> Task<detail::ContinuationResult_t<U, Fn>>;
 
-    // when_all/when_any 内部需要访问 handle_
-    template <typename U>
-    friend auto detail_get_handle(Task<U>&) -> std::coroutine_handle<typename Task<U>::promise_type>&;
 };
 
 // =========================================================================
@@ -497,19 +506,6 @@ namespace detail
         }
     }
 
-} // namespace detail
-
-// =========================================================================
-// 内部辅助访问函数
-// =========================================================================
-
-namespace detail
-{
-    template <typename T>
-    auto detail_get_handle(Task<T>& t) -> std::coroutine_handle<typename Task<T>::promise_type>&
-    {
-        return t.handle_;
-    }
 } // namespace detail
 
 } // namespace bee

@@ -67,13 +67,18 @@ public:
         check_exception();
     }
 
-    /// 请求取消所有已 spawn 的任务。
+    /// 请求协作式取消。
+    /// 注意：这只是设置 stop_token 信号，子任务需主动检查
+    /// scope.get_stop_token() 才能响应取消。scope 本身不会
+    /// 强制终止任何任务。
     auto request_stop() -> void
     {
         stop_source_.request_stop();
     }
 
-    /// 获取 stop_token（子任务可用于检查取消请求）。
+    /// 获取 stop_token。
+    /// 子任务可在创建时捕获此 token 并轮询 stop_requested()
+    /// 以实现协作式取消。
     [[nodiscard]] auto get_stop_token() const noexcept -> std::stop_token
     {
         return stop_source_.get_token();

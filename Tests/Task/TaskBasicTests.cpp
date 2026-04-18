@@ -6,7 +6,11 @@
  */
 
 #include <gtest/gtest.h>
+#include <chrono>
+#include <thread>
+#include "Task/Core/Scheduler.hpp"
 #include "Task/Core/Task.hpp"
+#include "Concurrency/Thread/WorkPool.hpp"
 
 using namespace bee;
 
@@ -83,9 +87,9 @@ TEST(TaskBasicTests, GetPropagatesException)
 TEST(TaskBasicTests, WaitBlocksUntilComplete)
 {
     auto t = coro_return_int(99);
-    t.wait();
-    EXPECT_TRUE(t.is_ready());
-    EXPECT_EQ(t.state(), TaskState::Completed);
+    t.wait(); // 消费 Task
+    // wait() 后 Task 已空
+    EXPECT_FALSE(static_cast<bool>(t));
 }
 
 TEST(TaskBasicTests, WaitPropagatesException)
@@ -106,6 +110,25 @@ TEST(TaskBasicTests, WaitForReturnsCompletedImmediately)
     // 同步协程：wait_for 会先启动再等
     auto st = t.wait_for(std::chrono::seconds(5));
     EXPECT_EQ(st, TaskState::Completed);
+    // wait_for 不消费 Task，后续仍可 get()
+    EXPECT_EQ(t.get(), 1);
+}
+
+// ── get/wait 消费语义 ──
+
+TEST(TaskBasicTests, GetConsumesTask)
+{
+    auto t = coro_return_int(42);
+    EXPECT_EQ(t.get(), 42);
+    // get() 后 Task 已空
+    EXPECT_FALSE(static_cast<bool>(t));
+}
+
+TEST(TaskBasicTests, WaitConsumesTask)
+{
+    auto t = coro_return_void();
+    t.wait();
+    EXPECT_FALSE(static_cast<bool>(t));
 }
 
 // ── 移动语义 ──
@@ -137,4 +160,38 @@ TEST(TaskBasicTests, UnstartedTaskDestroySafely)
     { auto t = coro_return_int(1); }
     { auto t = coro_return_void(); }
     // 无崩溃即通过
+}
+
+// ── wait_for 超时场景 ──
+
+TEST(TaskBasicTests, WaitForTimesOutOnSlowTask)
+{
+    WorkPool pool(1);
+
+    auto t = spawn_task(pool, [] {
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        return 42;
+    });
+
+    // 极短超时 — 任务不可能在 1ms 内完成
+    auto st = t.wait_for(std::chrono::milliseconds(1));
+    EXPECT_EQ(st, TaskState::Running);
+
+    // 后续 get() 仍能正确获取结果
+    EXPECT_EQ(t.get(), 42);
+    pool.shutdown();
+}
+
+TEST(TaskBasicTests, WaitForSucceedsWithLongTimeout)
+{
+    WorkPool pool(1);
+
+    auto t = spawn_task(pool, [] { return 7; });
+
+    auto st = t.wait_for(std::chrono::seconds(5));
+    EXPECT_EQ(st, TaskState::Completed);
+
+    // wait_for 不消费 Task
+    EXPECT_EQ(t.get(), 7);
+    pool.shutdown();
 }

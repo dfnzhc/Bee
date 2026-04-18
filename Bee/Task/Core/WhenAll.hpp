@@ -212,6 +212,8 @@ auto when_all(Task<Ts>&&... tasks) -> Task<std::tuple<typename Task<Ts>::value_t
 template <typename T>
 auto when_all(std::vector<Task<T>> tasks) -> Task<std::vector<T>>
 {
+    static_assert(!std::is_void_v<T>, "vector when_all 不支持 void 类型，请使用 variadic when_all 或 AsyncScope");
+
     if (tasks.empty()) {
         co_return std::vector<T>{};
     }
