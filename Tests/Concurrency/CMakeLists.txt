@@ -8,4 +8,5 @@ bee_add_component_test(
         MPMCQueueTests.cpp
         ChaseLevDequeTests.cpp
         ThreadPoolTests.cpp
+        WorkPoolTests.cpp
 )

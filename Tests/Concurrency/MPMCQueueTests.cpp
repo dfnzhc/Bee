@@ -235,7 +235,7 @@ TEST(MPMCQueueTests, ConcurrentMPMCCorrectness)
     constexpr int kItemsPerProducer = 25'000;
     constexpr int kTotalItems       = kProducers * kItemsPerProducer;
 
-    MPMCQueueBase<int>                         queue(4096);
+    MPMCQueueBase<int>                     queue(4096);
     std::vector<std::atomic<std::uint8_t>> seen(static_cast<size_t>(kTotalItems));
     for (auto& slot : seen) {
         slot.store(0, std::memory_order_relaxed);
@@ -313,10 +313,10 @@ TEST(MPMCQueueTests, ConcurrentMPMCCorrectness)
 TEST(MPMCQueueTests, CapacityOneMultipleProducersConsumers)
 {
     MPMCQueueBase<int> queue(4);
-    constexpr int  kItemsPerProducer = 1000;
-    constexpr int  kProducers        = 4;
-    constexpr int  kConsumers        = 4;
-    constexpr int  kTotalItems       = kProducers * kItemsPerProducer;
+    constexpr int      kItemsPerProducer = 1000;
+    constexpr int      kProducers        = 4;
+    constexpr int      kConsumers        = 4;
+    constexpr int      kTotalItems       = kProducers * kItemsPerProducer;
 
     std::vector<std::atomic<int>> seen(kTotalItems);
     for (auto& a : seen)
@@ -384,7 +384,7 @@ TEST(MPMCQueueTests, TryPushOnFullReturnsFalse)
 TEST(MPMCQueueTests, AlternatingPushPop)
 {
     MPMCQueueBase<int> queue(4);
-    constexpr int  kCount = 10000;
+    constexpr int      kCount = 10000;
 
     for (int i = 0; i < kCount; ++i) {
         ASSERT_TRUE(queue.try_push(i));

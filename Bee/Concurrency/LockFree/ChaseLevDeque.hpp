@@ -120,7 +120,13 @@ public:
         const auto top    = _top.load(std::memory_order_acquire);
 
         // 有界版本：容量满则快速失败，不做扩容。
-        if ((bottom - top) >= _capacity) {
+        // 注意：使用 _capacity - 1 而非 _capacity 作为上限。
+        // 原因：stealer 通过 CAS top 后仍在 read/destroy 对应槽位，
+        // 若 owner 允许 bottom-top == capacity，则 slot_index(bottom) 会
+        // 与 slot_index(old_top) 重叠，导致 owner 的 placement new 与
+        // stealer 的 destroy 发生数据竞争（UB）。
+        // 保留 1 个槽位的间隔确保物理槽位不会被并发读写。
+        if ((bottom - top) >= _capacity - 1) {
             return false;
         }
 
@@ -288,7 +294,9 @@ public:
 private:
     static constexpr size_type normalize_capacity(size_type requested_capacity) noexcept
     {
-        auto normalized = requested_capacity == 0 ? 1 : requested_capacity;
+        // 最小物理容量为 2：有效容量 = 物理容量 - 1，
+        // 保留 1 个间隔槽位以避免 owner/stealer 数据竞争。
+        auto normalized = requested_capacity < 2 ? 2 : requested_capacity;
         auto rounded    = RoundUpPowerOfTwo(normalized);
         if (rounded == 0) {
             rounded = HighestPowerOfTwoLEQ(std::numeric_limits<size_type>::max());

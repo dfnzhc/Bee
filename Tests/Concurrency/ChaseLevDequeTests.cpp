@@ -54,13 +54,16 @@ struct TrackedObject
     }
 };
 
-TEST(ChaseLevDequeTests, CapacityAtLeastOne)
+TEST(ChaseLevDequeTests, CapacityAtLeastTwo)
 {
+    // 最小物理容量为 2，以保证有效容量至少为 1
     ChaseLevDeque<int> deque0(0);
     ChaseLevDeque<int> deque1(1);
+    ChaseLevDeque<int> deque2(2);
 
-    EXPECT_EQ(deque0.capacity(), 1u);
-    EXPECT_EQ(deque1.capacity(), 1u);
+    EXPECT_EQ(deque0.capacity(), 2u);
+    EXPECT_EQ(deque1.capacity(), 2u);
+    EXPECT_EQ(deque2.capacity(), 2u);
 }
 
 TEST(ChaseLevDequeTests, OwnerPushAndPopIsLifo)
@@ -103,15 +106,17 @@ TEST(ChaseLevDequeTests, StealIsFifoFromTop)
 
 TEST(ChaseLevDequeTests, FullConditionWithTryPush)
 {
-    ChaseLevDeque<int> deque(2);
+    // 有效容量 = 物理容量 - 1（保留 1 个间隔槽位以避免 owner/stealer 数据竞争）
+    ChaseLevDeque<int> deque(4); // 物理容量 4，有效容量 3
 
     ASSERT_TRUE(deque.try_push(1));
     ASSERT_TRUE(deque.try_push(2));
-    EXPECT_FALSE(deque.try_push(3));
+    ASSERT_TRUE(deque.try_push(3));
+    EXPECT_FALSE(deque.try_push(4)); // 第 4 个应失败
 
     int value = 0;
     ASSERT_TRUE(deque.try_pop(value));
-    EXPECT_EQ(value, 2);
+    EXPECT_EQ(value, 3);
 }
 
 TEST(ChaseLevDequeTests, SupportsMoveOnlyType)
@@ -127,15 +132,17 @@ TEST(ChaseLevDequeTests, SupportsMoveOnlyType)
 
 TEST(ChaseLevDequeTests, BlockingPushMakesProgressAfterSteal)
 {
-    ChaseLevDeque<int> deque(2);
+    // 有效容量 = 物理容量 - 1。物理容量 4 → 有效容量 3
+    ChaseLevDeque<int> deque(4);
     deque.push(11);
     deque.push(22);
+    deque.push(33); // 3 个元素填满有效容量
 
     std::atomic<bool> producer_entered{false};
     std::atomic<bool> producer_done{false};
     std::thread       producer([&]() {
         producer_entered.store(true, std::memory_order_release);
-        deque.push(33);
+        deque.push(44); // 阻塞：等待有空位
         producer_done.store(true, std::memory_order_release);
     });
 
@@ -149,7 +156,7 @@ TEST(ChaseLevDequeTests, BlockingPushMakesProgressAfterSteal)
     EXPECT_FALSE(producer_done.load(std::memory_order_acquire));
 
     std::vector<int> stolen;
-    stolen.reserve(3);
+    stolen.reserve(4);
     int value = 0;
 
     deque.steal(value);
@@ -162,8 +169,10 @@ TEST(ChaseLevDequeTests, BlockingPushMakesProgressAfterSteal)
     stolen.push_back(value);
     deque.steal(value);
     stolen.push_back(value);
+    deque.steal(value);
+    stolen.push_back(value);
 
-    ASSERT_EQ(stolen.size(), 3u);
+    ASSERT_EQ(stolen.size(), 4u);
     EXPECT_TRUE(deque.is_empty());
 }
 

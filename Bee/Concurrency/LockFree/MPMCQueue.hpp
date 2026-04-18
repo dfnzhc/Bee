@@ -89,9 +89,9 @@ public:
                 // 初始 sequence = index，表示第 index 个 ticket 可立即写入对应槽位。
                 std::allocator_traits<cell_allocator_type>::construct(_cell_allocator, _cells + index, index);
                 ++constructed_cells;
-                //if constexpr (kTrivialFastPath) {
-                //    std::construct_at(_cells[index].ptr(), T{});
-                //}
+                // if constexpr (kTrivialFastPath) {
+                //     std::construct_at(_cells[index].ptr(), T{});
+                // }
             }
         } catch (...) {
             for (size_type index = 0; index < constructed_cells; ++index) {
@@ -349,11 +349,11 @@ private:
     template <typename... Args>
     void write_value(Cell& cell, Args&&... args) noexcept(std::is_nothrow_constructible_v<T, Args...>)
     {
-        //if constexpr (kTrivialFastPath) {
-        //    *cell.ptr() = T(std::forward<Args>(args)...);
-        //} else {
-        //    std::construct_at(cell.ptr(), std::forward<Args>(args)...);
-        //}
+        // if constexpr (kTrivialFastPath) {
+        //     *cell.ptr() = T(std::forward<Args>(args)...);
+        // } else {
+        //     std::construct_at(cell.ptr(), std::forward<Args>(args)...);
+        // }
         std::construct_at(cell.ptr(), std::forward<Args>(args)...);
     }
 
