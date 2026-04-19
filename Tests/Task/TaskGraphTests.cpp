@@ -407,18 +407,34 @@ TEST(TaskGraphTests, LargeGraphStress)
     EXPECT_EQ(graph.result(prev), 999);
 }
 
-TEST(TaskGraphTests, DoubleExecuteThrows)
+TEST(TaskGraphTests, DoubleExecuteAllowedAndResultReadable)
 {
     WorkPool  pool(2);
     TaskGraph graph;
-    auto      a = graph.node([] { return 1; });
-    (void)a;
+    std::atomic<int> counter{0};
+    auto a = graph.node([&] { return ++counter; });
+    auto b = graph.node([](int x) { return x * 10; }, a);
 
-    auto task = graph.execute(pool);
-    task.wait();
-    // 第二次 execute() 创建的协程在启动时抛出异常
+    // 第一次执行
+    auto task1 = graph.execute(pool);
+    task1.wait();
+    EXPECT_EQ(counter.load(), 1);
+    EXPECT_EQ(graph.result(a), 1);
+    EXPECT_EQ(graph.result(b), 10);
+
+    // 第二次执行：defs_/root_indices_ 复用，runtimes 重建
     auto task2 = graph.execute(pool);
-    EXPECT_THROW(task2.wait(), std::logic_error);
+    task2.wait();
+    EXPECT_EQ(counter.load(), 2);
+    EXPECT_EQ(graph.result(a), 2);
+    EXPECT_EQ(graph.result(b), 20);
+
+    // 第三次执行，验证稳定性
+    auto task3 = graph.execute(pool);
+    task3.wait();
+    EXPECT_EQ(counter.load(), 3);
+    EXPECT_EQ(graph.result(a), 3);
+    EXPECT_EQ(graph.result(b), 30);
 }
 
 TEST(TaskGraphTests, DotLabelEscaping)

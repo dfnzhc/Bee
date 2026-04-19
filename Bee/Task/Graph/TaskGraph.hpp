@@ -496,7 +496,6 @@ private:
     std::vector<std::size_t> root_indices_;
     // 上一次 execute 的运行结果（由 execute() 完成时填充），供 result() 读取。
     mutable std::vector<detail::NodeRuntime> last_runtimes_;
-    bool executed_{false};
 
     template <typename R>
     auto add_node_impl(
@@ -545,21 +544,21 @@ private:
 template <Scheduler S>
 auto TaskGraph::execute(S& scheduler) -> Task<void>
 {
-    if (executed_)
-        throw std::logic_error("TaskGraph: execute() can only be called once");
-    executed_ = true;
-
     if (defs_.empty())
         co_return;
 
     if (has_cycle())
         throw std::logic_error("TaskGraph contains a cycle");
 
+    // 每次 execute 都创建全新的 ctx（runtimes/counters/remaining 全部重建），
+    // defs_/root_indices_ 作为只读静态拓扑复用。用户可多次调用 execute
+    // 复跑同一张图；但若 NodeDef::callable 内含有状态且不幂等（如捕获
+    // 了可变引用），其结果由调用方负责。
     auto ctx = std::make_shared<detail::GraphExecutionContext<S>>(defs_, root_indices_, scheduler);
 
     co_await detail::GraphAwaitable<S>{ctx};
 
-    // 将运行结果迁移到 TaskGraph，供 result() 读取。
+    // 将运行结果迁移到 TaskGraph，供 result() 读取（覆盖上次结果）。
     last_runtimes_ = std::move(ctx->runtimes);
 
     if (ctx->first_exception)
