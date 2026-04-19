@@ -13,7 +13,7 @@
 #include <exception>
 #include <memory>
 #include <optional>
-#include <semaphore>
+#include <thread>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -22,6 +22,7 @@
 
 #include "Base/Core/Defines.hpp"
 #include "Base/Diagnostics/Check.hpp"
+#include "Base/Sync/EventCount.hpp"
 #include "Task/Core/TaskState.hpp"
 
 namespace bee
@@ -148,15 +149,17 @@ namespace detail
             }
 
             // 阻塞等待者：
-            //   1. 将 shared_ptr<binary_semaphore> 拷贝到本地栈，锁住其生命周期；
+            //   1. 将 shared_ptr<EventCount> 拷贝到本地栈，锁住其生命周期；
+            //      这样即便等待线程在 wait 返回后立刻销毁协程帧，本线程
+            //      仍可安全完成 notify_all（EventCount 对象仍活着）；
             //   2. 发布终态；
-            //   3. 通过本地句柄 release 信号量；
+            //   3. 通过本地句柄 notify_all；
             //   4. 返回 void —— MSVC 生成的后续代码不再写入协程帧，等待
             //      方可立刻销毁帧而不会 UAF。
-            auto sem = promise.ready;
+            auto ec = promise.ready;
             promise.task_state.store(final_state, std::memory_order_release);
-            if (sem) {
-                sem->release();
+            if (ec) {
+                ec->notify_all();
             }
         }
 
@@ -261,12 +264,17 @@ public:
         start_if_needed();
 
         auto& promise = handle_.promise();
-        auto  sem     = promise.ready; // 本地保活，防止 destroy 期间 race
+        // 本地保活：确保 EventCount 至少活到本函数返回；这样即便 worker
+        // 尚在执行 notify_all，本地拷贝也能让其安全完成。
+        auto  ec      = promise.ready;
 
-        // 必须无条件 acquire：若依据 task_state 短路，会与 final_suspend 中
-        // "store 终态 → release 信号量"的窗口对撞，导致销毁协程帧后 worker
-        // 仍在调用 ready.release() —— 这是早期版本崩溃的根因。
-        sem->acquire();
+        // 使用 EventCount::await 的 check-prepare-check-wait 语义等待终态。
+        // 与旧 binary_semaphore 不同，EventCount 支持多次 notify 且允许在
+        // 已就绪后立即短路（无需"先 acquire 一次再 release"的对称配对）。
+        ec->await([&] {
+            auto s = promise.task_state.load(std::memory_order_acquire);
+            return s == TaskState::Completed || s == TaskState::Failed;
+        });
 
         // 提取异常指针后再处理结果，避免异常路径下未定义顺序。
         auto ex = promise.exception;
@@ -298,8 +306,11 @@ public:
         start_if_needed();
 
         auto& promise = handle_.promise();
-        auto  sem     = promise.ready; // 本地保活
-        sem->acquire();
+        auto  ec      = promise.ready; // 本地保活
+        ec->await([&] {
+            auto s = promise.task_state.load(std::memory_order_acquire);
+            return s == TaskState::Completed || s == TaskState::Failed;
+        });
 
         auto ex = promise.exception;
         destroy_if_valid();
@@ -311,26 +322,31 @@ public:
     /// 限时等待，返回当前状态。**不消费 Task**，超时后可继续 get/wait。
     ///
     /// 合约：
-    ///   · 同一时刻只允许一个线程在此 Task 上调用 wait_for/get/wait。
+    ///   · 同一 Task 允许并发 wait_for（EventCount 支持多 waiter）。
     ///   · 不允许在已被 co_await 的 Task 上调用（co_await 已转移 handle）。
-    ///   · 由于 binary_semaphore 上限为 1，并发的 wait_for 会触发 UB。
+    ///
+    /// 实现说明：EventCount 不直接支持 timed-wait，此处采用轮询 +
+    /// sleep_for 的保守策略（响应延迟 <= 1ms）。该路径非热路径，可接受。
     [[nodiscard]] auto wait_for(std::chrono::nanoseconds timeout) -> TaskState
     {
         BEE_CHECK(handle_ != nullptr);
         start_if_needed();
 
         auto& promise = handle_.promise();
-        auto  sem     = promise.ready; // 本地保活
+        auto  ec      = promise.ready; // 本地保活
+        (void)ec;
 
-        // 已完成：直接返回，不动信号量。
         if (is_ready()) {
             return promise.task_state.load(std::memory_order_acquire);
         }
 
-        if (sem->try_acquire_for(timeout)) {
-            // 取走计数后立即归还，方便后续 get/wait 复用。
-            // 由"单一等待者"合约保证 release 不会越过上限。
-            sem->release();
+        const auto deadline = std::chrono::steady_clock::now() + timeout;
+        constexpr auto poll_interval = std::chrono::milliseconds{1};
+        while (!is_ready()) {
+            const auto now = std::chrono::steady_clock::now();
+            if (now >= deadline) break;
+            const auto remaining = deadline - now;
+            std::this_thread::sleep_for(remaining < poll_interval ? remaining : poll_interval);
         }
 
         return promise.task_state.load(std::memory_order_acquire);
@@ -494,10 +510,13 @@ struct Task<T>::promise_type : detail::TaskPromiseReturn<T>
     std::exception_ptr     exception;
 
     // 同步原语
-    std::coroutine_handle<>                continuation{nullptr};
-    // 信号量放入 shared_ptr 中，使得 worker 在 final_suspend 时可本地保活，
-    // 避免 waiter 销毁协程帧后 release() 内部唤醒操作访问悬垂内存。
-    std::shared_ptr<std::binary_semaphore> ready{std::make_shared<std::binary_semaphore>(0)};
+    std::coroutine_handle<> continuation{nullptr};
+    // 同步原语放入 shared_ptr 中，使得 worker 在 final_suspend 时可本地保活，
+    // 避免 waiter 销毁协程帧后 notify_all() 内部访问悬垂内存。
+    //
+    // 当前为非 lazy 分配（每个 Task 一次 heap 分配）。后续若需要进一步优化，
+    // 可在此改为 atomic<shared_ptr<EventCount>> + double-check 模式。
+    std::shared_ptr<EventCount> ready{std::make_shared<EventCount>()};
     std::atomic<bool>                      started{false};
 
     // 协程接口
