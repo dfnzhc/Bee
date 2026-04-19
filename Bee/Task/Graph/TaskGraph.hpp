@@ -83,16 +83,21 @@ namespace detail
     template <Scheduler S>
     struct GraphExecutionContext
     {
+        // 静态拓扑（构建期确定，执行期 const）
         std::vector<NodeEntry>& nodes;
+        const std::vector<std::size_t>& root_indices;
         S& scheduler;
+        // 运行态
         std::vector<std::atomic<std::size_t>> counters;
         std::atomic<std::size_t> remaining;
         std::coroutine_handle<> continuation{nullptr};
         std::exception_ptr first_exception{nullptr};
         std::mutex exception_mutex;
 
-        GraphExecutionContext(std::vector<NodeEntry>& n, S& s)
-            : nodes(n), scheduler(s), counters(n.size()), remaining(n.size() + 1)
+        GraphExecutionContext(std::vector<NodeEntry>& n,
+                              const std::vector<std::size_t>& roots,
+                              S& s)
+            : nodes(n), root_indices(roots), scheduler(s), counters(n.size()), remaining(n.size() + 1)
         {
             // 采用 "+1 trick"：remaining 初始为 N+1，由 await_suspend 在
             // 全部根节点 post 完毕后投出最后一票。这样可避免某个工作线程
@@ -207,21 +212,19 @@ namespace detail
             auto local_ctx          = ctx;
             local_ctx->continuation = h;
 
-            // 将所有根节点（无前驱）post 到 scheduler。
+            // 将所有根节点 post 到 scheduler。
             //
-            // 注意 1：判定"根节点"必须使用 predecessors.empty()，而不是
-            //   counters[i] == 0。原因是一旦任意一个根节点被工作线程
-            //   立刻拾取并完成，它会把自身后继的 counter 递减到 0；
-            //   如果此时本循环还在迭代，就会把这个后继误当作根节点
-            //   再次 post，造成"双重调度"：后继的后继 counter 被多扣
-            //   一次，从而在某些真实前驱尚未写 result 时就提前启动，
-            //   进而读出空 std::any → 测试端抛 bad_any_cast。
-            // 注意 2：post 失败时必须把对应的"未启动节点"从 remaining
+            // 规范（不变式 C）：根节点判据必须是构建期确定的静态拓扑，
+            //   即 TaskGraph 维护的 root_indices_ 向量。严禁使用运行期
+            //   counter 值（例如 counters[i]==0）作为"根节点"的判据 ——
+            //   一旦某根节点被工作线程提前跑完，会把后继 counter 递减到
+            //   0，循环后续迭代若以 counter==0 判根就会把该后继误当作
+            //   根节点二次 post，进而破坏后继的后继的计数器同步，最终
+            //   在真实前驱尚未写 result 时就启动下游。
+            // 异常安全：post 失败时必须把对应的"未启动节点"从 remaining
             //   中扣掉，否则 remaining 永远到不了 0，父协程将永久挂起。
             std::size_t unposted = 0;
-            for (std::size_t i = 0; i < local_ctx->nodes.size(); ++i) {
-                if (!local_ctx->nodes[i].predecessors.empty())
-                    continue;
+            for (auto i : local_ctx->root_indices) {
                 try {
                     local_ctx->scheduler.post([local_ctx, i]() {
                         run_node(local_ctx, i);
@@ -475,6 +478,10 @@ public:
 
 private:
     std::vector<detail::NodeEntry> nodes_;
+    // 根节点索引（无前驱）—— 构建期维护，执行期 const。
+    // 规范（不变式 C）：所有"根节点"调度判据都必须读取此向量，严禁
+    // 使用运行期 counters 派生。
+    std::vector<std::size_t> root_indices_;
     bool executed_{false};
 
     template <typename R>
@@ -492,6 +499,11 @@ private:
         // 更新前驱节点的 successors
         for (auto pred : entry.predecessors) {
             nodes_[pred].successors.push_back(idx);
+        }
+
+        // 若无前驱，登记为根节点（构建期即可确定，后续不再变化）。
+        if (nodes_[idx].predecessors.empty()) {
+            root_indices_.push_back(idx);
         }
 
         return NodeHandle<R>{idx};
@@ -529,7 +541,7 @@ auto TaskGraph::execute(S& scheduler) -> Task<void>
     if (has_cycle())
         throw std::logic_error("TaskGraph contains a cycle");
 
-    auto ctx = std::make_shared<detail::GraphExecutionContext<S>>(nodes_, scheduler);
+    auto ctx = std::make_shared<detail::GraphExecutionContext<S>>(nodes_, root_indices_, scheduler);
 
     co_await detail::GraphAwaitable<S>{ctx};
 
