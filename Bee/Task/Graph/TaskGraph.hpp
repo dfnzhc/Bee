@@ -46,17 +46,27 @@ namespace detail
 {
 
     // =====================================================================
-    // NodeEntry — 节点的内部统一表示
+    // NodeDef — 节点的静态定义（构建期确定，执行期只读）
     // =====================================================================
 
-    struct NodeEntry
+    struct NodeDef
     {
-        MoveOnlyFunction<std::any(const std::vector<std::any>&)> callable;
+        // callable 逻辑上属于"定义"，但 MoveOnlyFunction::operator() 非 const，
+        // 故标 mutable 以便 GraphExecutionContext 通过 const 引用调用。
+        mutable MoveOnlyFunction<std::any(const std::vector<std::any>&)> callable;
         std::vector<std::size_t> predecessors;
         std::vector<std::size_t> successors;
+        std::string label;
+    };
+
+    // =====================================================================
+    // NodeRuntime — 节点的运行时状态（每次 execute 重新创建）
+    // =====================================================================
+
+    struct NodeRuntime
+    {
         std::any result;
         std::exception_ptr exception;
-        std::string label;
     };
 
     // =====================================================================
@@ -83,29 +93,31 @@ namespace detail
     template <Scheduler S>
     struct GraphExecutionContext
     {
-        // 静态拓扑（构建期确定，执行期 const）
-        std::vector<NodeEntry>& nodes;
+        // 静态拓扑（构建期确定，执行期 const 引用到 TaskGraph::defs_）
+        const std::vector<NodeDef>& defs;
         const std::vector<std::size_t>& root_indices;
         S& scheduler;
-        // 运行态
+        // 运行态（本次执行独占，生命周期与 ctx 绑定）
+        std::vector<NodeRuntime> runtimes;
         std::vector<std::atomic<std::size_t>> counters;
         std::atomic<std::size_t> remaining;
         std::coroutine_handle<> continuation{nullptr};
         std::exception_ptr first_exception{nullptr};
         std::mutex exception_mutex;
 
-        GraphExecutionContext(std::vector<NodeEntry>& n,
+        GraphExecutionContext(const std::vector<NodeDef>& d,
                               const std::vector<std::size_t>& roots,
                               S& s)
-            : nodes(n), root_indices(roots), scheduler(s), counters(n.size()), remaining(n.size() + 1)
+            : defs(d), root_indices(roots), scheduler(s),
+              runtimes(d.size()), counters(d.size()), remaining(d.size() + 1)
         {
             // 采用 "+1 trick"：remaining 初始为 N+1，由 await_suspend 在
             // 全部根节点 post 完毕后投出最后一票。这样可避免某个工作线程
             // 在 await_suspend 还在迭代时就把 remaining 降到 0 并 resume
             // 父协程（违反 C++ 协程"未挂起即不得 resume"的约束，且会令
-            // TaskGraph 提前析构、nodes 引用悬垂）。
-            for (std::size_t i = 0; i < n.size(); ++i) {
-                counters[i].store(n[i].predecessors.size(), std::memory_order_relaxed);
+            // TaskGraph 提前析构、defs 引用悬垂）。
+            for (std::size_t i = 0; i < d.size(); ++i) {
+                counters[i].store(d[i].predecessors.size(), std::memory_order_relaxed);
             }
         }
     };
@@ -117,13 +129,14 @@ namespace detail
     template <Scheduler S>
     auto run_node(std::shared_ptr<GraphExecutionContext<S>> ctx, std::size_t index) -> void
     {
-        auto& node = ctx->nodes[index];
+        const auto& def = ctx->defs[index];
+        auto& rt        = ctx->runtimes[index];
 
         // 检查前驱是否有异常（级联失败）
         bool predecessor_failed = false;
-        for (auto pred : node.predecessors) {
-            if (ctx->nodes[pred].exception) {
-                node.exception     = ctx->nodes[pred].exception;
+        for (auto pred : def.predecessors) {
+            if (ctx->runtimes[pred].exception) {
+                rt.exception       = ctx->runtimes[pred].exception;
                 predecessor_failed = true;
                 break;
             }
@@ -133,32 +146,32 @@ namespace detail
             try {
                 // 收集前驱结果
                 std::vector<std::any> inputs;
-                inputs.reserve(node.predecessors.size());
-                for (auto pred : node.predecessors) {
-                    inputs.push_back(ctx->nodes[pred].result);
+                inputs.reserve(def.predecessors.size());
+                for (auto pred : def.predecessors) {
+                    inputs.push_back(ctx->runtimes[pred].result);
                 }
-                node.result = node.callable(inputs);
+                rt.result = def.callable(inputs);
             }
             catch (...) {
-                node.exception = std::current_exception();
+                rt.exception = std::current_exception();
             }
         }
 
         // 存储第一个异常（线程安全）
-        if (node.exception) {
+        if (rt.exception) {
             std::lock_guard lock(ctx->exception_mutex);
             if (!ctx->first_exception) {
-                ctx->first_exception = node.exception;
+                ctx->first_exception = rt.exception;
             }
         }
 
         // 通知后继节点
-        // note: node.result/exception 的写入通过 counters[succ].fetch_sub(acq_rel) 对后继可见
+        // note: runtimes[succ].result/exception 的写入通过 counters[succ].fetch_sub(acq_rel) 对后继可见
         //
         // 异常安全：即使 scheduler.post() 抛出（队列满/关停），也必须确保
         // remaining 最终递减，否则协程永远不会恢复导致死锁。
         // 策略：post 失败时忽略后继（该后继永远不会执行，但不会阻塞图的完成）。
-        for (auto succ : node.successors) {
+        for (auto succ : def.successors) {
             if (ctx->counters[succ].fetch_sub(1, std::memory_order_acq_rel) == 1) {
                 try {
                     ctx->scheduler.post([ctx, succ]() {
@@ -175,8 +188,6 @@ namespace detail
                                 std::make_exception_ptr(std::runtime_error("TaskGraph: failed to post successor node"));
                         }
                     }
-                    // 递减后继节点未能执行的 remaining 计数
-                    // 注意：后继的后继也不会执行，但 remaining 只需要所有已执行节点递减即可
                     if (ctx->remaining.fetch_sub(1, std::memory_order_acq_rel) == 1) {
                         ctx->continuation.resume();
                         return;
@@ -269,7 +280,7 @@ public:
     {
         using R = std::invoke_result_t<Fn>;
         return add_node_impl<R>(
-            make_label<R>(nodes_.size(), ""),
+            make_label<R>(defs_.size(), ""),
             [fn = std::move(fn)](const std::vector<std::any>&) -> std::any {
                 if constexpr (std::is_void_v<R>) {
                     fn();
@@ -307,7 +318,7 @@ public:
     {
         using R = std::invoke_result_t<Fn, Deps...>;
         return add_node_impl<R>(
-            make_label<R>(nodes_.size(), ""),
+            make_label<R>(defs_.size(), ""),
             [fn = std::move(fn)](const std::vector<std::any>& inputs) -> std::any {
                 auto args = detail::extract_args<Deps...>(inputs);
                 if constexpr (std::is_void_v<R>) {
@@ -348,7 +359,7 @@ public:
     {
         using R = std::invoke_result_t<Fn>;
         return add_node_impl<R>(
-            make_label<R>(nodes_.size(), ""),
+            make_label<R>(defs_.size(), ""),
             [fn = std::move(fn)](const std::vector<std::any>&) -> std::any {
                 if constexpr (std::is_void_v<R>) {
                     fn();
@@ -384,23 +395,23 @@ public:
 
     [[nodiscard]] auto empty() const noexcept -> bool
     {
-        return nodes_.empty();
+        return defs_.empty();
     }
 
     [[nodiscard]] auto node_count() const noexcept -> std::size_t
     {
-        return nodes_.size();
+        return defs_.size();
     }
 
     [[nodiscard]] auto has_cycle() const -> bool
     {
-        if (nodes_.empty())
+        if (defs_.empty())
             return false;
 
         // Kahn 算法
-        std::vector<std::size_t> in_degree(nodes_.size(), 0);
-        for (std::size_t i = 0; i < nodes_.size(); ++i) {
-            in_degree[i] = nodes_[i].predecessors.size();
+        std::vector<std::size_t> in_degree(defs_.size(), 0);
+        for (std::size_t i = 0; i < defs_.size(); ++i) {
+            in_degree[i] = defs_[i].predecessors.size();
         }
 
         std::vector<std::size_t> queue;
@@ -415,14 +426,14 @@ public:
             auto n = queue.back();
             queue.pop_back();
             ++count;
-            for (auto s : nodes_[n].successors) {
+            for (auto s : defs_[n].successors) {
                 if (--in_degree[s] == 0) {
                     queue.push_back(s);
                 }
             }
         }
 
-        return count != nodes_.size();
+        return count != defs_.size();
     }
 
     // ===== DOT 输出 =====
@@ -434,10 +445,10 @@ public:
         os << "    rankdir=TB;\n";
         os << "    node [shape=box, style=rounded];\n";
 
-        for (std::size_t i = 0; i < nodes_.size(); ++i) {
+        for (std::size_t i = 0; i < defs_.size(); ++i) {
             os << "    " << i << " [label=\"";
             // 转义 DOT 特殊字符
-            for (char c : nodes_[i].label) {
+            for (char c : defs_[i].label) {
                 if (c == '"')
                     os << "\\\"";
                 else if (c == '\\')
@@ -448,8 +459,8 @@ public:
             os << "\"];\n";
         }
 
-        for (std::size_t i = 0; i < nodes_.size(); ++i) {
-            for (auto pred : nodes_[i].predecessors) {
+        for (std::size_t i = 0; i < defs_.size(); ++i) {
+            for (auto pred : defs_[i].predecessors) {
                 os << "    " << pred << " -> " << i << ";\n";
             }
         }
@@ -463,12 +474,12 @@ public:
     template <typename T>
     [[nodiscard]] auto result(NodeHandle<T> handle) const -> const T&
     {
-        BEE_CHECK(handle.index < nodes_.size());
-        const auto& entry = nodes_[handle.index];
-        if (entry.exception) {
+        BEE_CHECK(handle.index < last_runtimes_.size());
+        const auto& rt = last_runtimes_[handle.index];
+        if (rt.exception) {
             throw std::logic_error("TaskGraph: cannot access result of a failed node");
         }
-        return std::any_cast<const T&>(entry.result);
+        return std::any_cast<const T&>(rt.result);
     }
 
     // ===== 执行 API（Task 2 实现）=====
@@ -477,11 +488,14 @@ public:
     auto execute(S& scheduler) -> Task<void>;
 
 private:
-    std::vector<detail::NodeEntry> nodes_;
+    // 静态图定义（节点 callable + 拓扑）—— 构建期写入，执行期只读
+    std::vector<detail::NodeDef> defs_;
     // 根节点索引（无前驱）—— 构建期维护，执行期 const。
     // 规范（不变式 C）：所有"根节点"调度判据都必须读取此向量，严禁
     // 使用运行期 counters 派生。
     std::vector<std::size_t> root_indices_;
+    // 上一次 execute 的运行结果（由 execute() 完成时填充），供 result() 读取。
+    mutable std::vector<detail::NodeRuntime> last_runtimes_;
     bool executed_{false};
 
     template <typename R>
@@ -490,19 +504,19 @@ private:
         MoveOnlyFunction<std::any(const std::vector<std::any>&)> callable,
         std::vector<std::size_t> predecessors) -> NodeHandle<R>
     {
-        auto idx    = nodes_.size();
-        auto& entry = nodes_.emplace_back();
-        entry.callable     = std::move(callable);
-        entry.predecessors = std::move(predecessors);
-        entry.label        = std::move(label);
+        auto idx  = defs_.size();
+        auto& def = defs_.emplace_back();
+        def.callable     = std::move(callable);
+        def.predecessors = std::move(predecessors);
+        def.label        = std::move(label);
 
         // 更新前驱节点的 successors
-        for (auto pred : entry.predecessors) {
-            nodes_[pred].successors.push_back(idx);
+        for (auto pred : def.predecessors) {
+            defs_[pred].successors.push_back(idx);
         }
 
         // 若无前驱，登记为根节点（构建期即可确定，后续不再变化）。
-        if (nodes_[idx].predecessors.empty()) {
+        if (defs_[idx].predecessors.empty()) {
             root_indices_.push_back(idx);
         }
 
@@ -535,15 +549,18 @@ auto TaskGraph::execute(S& scheduler) -> Task<void>
         throw std::logic_error("TaskGraph: execute() can only be called once");
     executed_ = true;
 
-    if (nodes_.empty())
+    if (defs_.empty())
         co_return;
 
     if (has_cycle())
         throw std::logic_error("TaskGraph contains a cycle");
 
-    auto ctx = std::make_shared<detail::GraphExecutionContext<S>>(nodes_, root_indices_, scheduler);
+    auto ctx = std::make_shared<detail::GraphExecutionContext<S>>(defs_, root_indices_, scheduler);
 
     co_await detail::GraphAwaitable<S>{ctx};
+
+    // 将运行结果迁移到 TaskGraph，供 result() 读取。
+    last_runtimes_ = std::move(ctx->runtimes);
 
     if (ctx->first_exception)
         std::rethrow_exception(ctx->first_exception);
