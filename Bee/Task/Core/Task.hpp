@@ -72,25 +72,64 @@ namespace detail
     template <typename T, typename Fn>
     using ContinuationResult_t = typename ContinuationResultImpl<T, Fn>::type;
 
+    // ── TaskSharedState ─────────────────────────────────────────────────────
+    //
+    // Task 的"外置状态块"：所有需要跨协程帧/跨线程观察的字段集中在此。
+    // 协程 promise 只持一枚 `shared_ptr<TaskSharedState>`，从而：
+    //
+    //   · 协程帧可以被 worker 在 final_suspend 阶段安全自毁（帧自毁后，
+    //     waiter 读结果仍走 shared_ptr 指向的堆对象，彻底规避 MSVC 在
+    //     "帧写返回值"窗口内的 UAF）；
+    //   · Task<T>::get/wait 不再必须持有 handle；
+    //   · 为后续 Step B 的 FinalAwaiter 双路径（continuation 分支走
+    //     symmetric transfer，waiter 分支 worker 自毁 + noop）提供前置。
+    //
+    // 继续遵守不变式 A：该对象由 promise 持有一份、Task<T>（及 await 者）
+    // 持有一份；最后一个释放 shared_ptr 的人负责 delete。EventCount 本身
+    // 也跟随 SharedState 生命周期，不再需要单独 shared_ptr<EventCount>。
+
+    template <typename T>
+    struct TaskSharedStateBase
+    {
+        std::atomic<TaskState>  task_state{TaskState::Pending};
+        std::exception_ptr      exception;
+        EventCount              ready;
+        std::coroutine_handle<> continuation{nullptr}; // co_await 路径下由 awaiter 写入
+    };
+
+    template <typename T>
+    struct TaskSharedState : TaskSharedStateBase<T>
+    {
+        std::optional<T> result;
+    };
+
+    template <>
+    struct TaskSharedState<void> : TaskSharedStateBase<void>
+    {
+    };
+
     // ── promise 返回值基类 ──────────────────────────────────────────────────
     //
     // MSVC 要求 return_value 与 return_void 出现在不同类型中（不能用
     // requires 约束在同一类内分支），这里通过基类特化拆分。
+    // 结果直接写入 shared_ptr<TaskSharedState>，而不再保存在 promise 内。
 
     template <typename T>
     struct TaskPromiseReturn
     {
-        std::optional<T> result{};
+        std::shared_ptr<TaskSharedState<T>> state{std::make_shared<TaskSharedState<T>>()};
 
         auto return_value(T value) -> void
         {
-            result.emplace(std::move(value));
+            state->result.emplace(std::move(value));
         }
     };
 
     template <>
     struct TaskPromiseReturn<void>
     {
+        std::shared_ptr<TaskSharedState<void>> state{std::make_shared<TaskSharedState<void>>()};
+
         auto return_void() -> void
         {
         }
@@ -98,31 +137,18 @@ namespace detail
 
     // ── TaskFinalAwaiter ───────────────────────────────────────────────────
     //
-    // 协程到达 final_suspend 时的收尾逻辑，分两条路径：
+    // 协程到达 final_suspend 时的收尾逻辑。
     //
-    //   · 有 continuation（被 co_await）：仅发布终态后做对称转移，不触碰
-    //     信号量。等待方是协程，它会在自身 final_suspend 时再处理。
+    // 当前（Step A）仍维持"返回 void + eager resume/notify"的保守形态，
+    // 所有终态 / 异常 / 结果均通过 shared_ptr<TaskSharedState> 发布，因此
+    // waiter 即便在 notify_all 后立即销毁协程帧，worker 后续代码也不会
+    // 访问已释放的帧内存——它访问的是 shared_ptr 指向的堆对象。
     //
-    //   · 无 continuation（被 get/wait 阻塞等待）：先拷贝一份 shared_ptr
-    //     持有的信号量到本地保活，再发布终态 + release 信号量。这样即使
-    //     等待方在 acquire() 返回后立刻销毁协程帧（含 promise），信号量
-    //     内部的 `WakeByAddress`/原子操作仍运作在我们本地持有的对象上，
-    //     不会出现 use-after-free。
+    //   · 有 continuation（被 co_await）：发布终态后 eager resume，不触
+    //     碰 EventCount；continuation 协程自己负责最终读取结果/异常。
     //
-    // 关键：await_suspend 必须返回 `void` 而非 `coroutine_handle<>`。
-    // 实测 MSVC 在 await_suspend 返回 coroutine_handle<> 时，会把返回值
-    // 临时对象存放于协程帧中。一旦我们在 await_suspend 内 release 信号
-    // 量，等待方即可立刻销毁该帧，而编译器后续构造返回值的写入就会命中
-    // 已释放内存（ASan 可稳定复现 heap-use-after-free，其栈指向
-    // `std::coroutine_handle<>::from_address` 的构造）。
-    // 返回 void 时 MSVC 不再在帧内写入返回值，UAF 消失。
-    //
-    // 继承 continuation 路径因此不再使用对称转移，而是 eager-resume。
-    // 这会让协程调用链在当前线程上线性展开；我们的调度模型下链路通常
-    // 只有 2~3 层，可接受。
-    //
-    // 注：get/wait 不再依据 task_state 做"是否需要 acquire"的短路判断，
-    // 这是为了消除"state 已发布但 release 尚未调用"窗口造成的 UAF。
+    //   · 无 continuation（被 get/wait 阻塞等待）：发布终态 + notify_all。
+    //     通过 shared_ptr 保活 state，EventCount 不会在 notify 路径中被释放。
 
     struct TaskFinalAwaiter
     {
@@ -135,32 +161,24 @@ namespace detail
         auto await_suspend(std::coroutine_handle<Promise> h) noexcept -> void
         {
             auto& promise = h.promise();
+            auto& state   = *promise.state;
 
-            // 必须先取走 continuation：一旦发布终态/释放信号量，promise
-            // 就可能被等待方销毁。
-            auto cont        = promise.continuation;
-            auto final_state = promise.exception ? TaskState::Failed : TaskState::Completed;
+            auto cont        = state.continuation;
+            auto final_state = state.exception ? TaskState::Failed : TaskState::Completed;
 
             if (cont) {
-                // 协程等待者：发布终态后 eager-resume。
-                promise.task_state.store(final_state, std::memory_order_release);
+                state.task_state.store(final_state, std::memory_order_release);
                 cont.resume();
                 return;
             }
 
-            // 阻塞等待者：
-            //   1. 将 shared_ptr<EventCount> 拷贝到本地栈，锁住其生命周期；
-            //      这样即便等待线程在 wait 返回后立刻销毁协程帧，本线程
-            //      仍可安全完成 notify_all（EventCount 对象仍活着）；
-            //   2. 发布终态；
-            //   3. 通过本地句柄 notify_all；
-            //   4. 返回 void —— MSVC 生成的后续代码不再写入协程帧，等待
-            //      方可立刻销毁帧而不会 UAF。
-            auto ec = promise.ready;
-            promise.task_state.store(final_state, std::memory_order_release);
-            if (ec) {
-                ec->notify_all();
-            }
+            // 本地保活 state（防止 waiter 在 notify 前后销毁其 shared_ptr
+            // 引用即释放 state 对象——虽然 promise 也持一份，但这里
+            // 显式再握一份以表达"notify_all 在本地对象上完成"的不变式）。
+            auto state_keep = promise.state;
+            state.task_state.store(final_state, std::memory_order_release);
+            state.ready.notify_all();
+            (void)state_keep;
         }
 
         auto await_resume() noexcept -> void
@@ -215,9 +233,12 @@ namespace detail
  *   · get() / wait() 是一次性消费操作：返回后 handle 即被销毁。
  *
  * 同步原语：
- *   · binary_semaphore `ready` 用于 get/wait 的阻塞等待，由 final_suspend
- *     在"无 continuation"路径上释放。
- *   · co_await 路径使用对称转移，不参与信号量。
+ *   · EventCount `state->ready` 用于 get/wait 的阻塞等待，由 final_suspend
+ *     在"无 continuation"路径上 notify_all。
+ *   · co_await 路径使用 eager resume，不参与信号量。
+ *   · 所有终态字段（result / exception / task_state）均外置于
+ *     `shared_ptr<TaskSharedState>`：即便 waiter 早于 worker 销毁协程帧，
+ *     worker 后续代码仍运作在堆对象上，不会产生 UAF。
  */
 template <typename T = void>
 class [[nodiscard]] Task
@@ -263,26 +284,23 @@ public:
         BEE_CHECK(handle_ != nullptr);
         start_if_needed();
 
-        auto& promise = handle_.promise();
-        // 本地保活：确保 EventCount 至少活到本函数返回；这样即便 worker
-        // 尚在执行 notify_all，本地拷贝也能让其安全完成。
-        auto  ec      = promise.ready;
+        auto& state = *handle_.promise().state;
+        // state 已经是 shared_ptr 引用——本函数通过 promise 的 shared_ptr
+        // 访问；下面的 destroy_if_valid() 会释放协程帧，但 state 由
+        // 本地拷贝的 shared_ptr 保活。
+        auto state_keep = handle_.promise().state;
 
-        // 使用 EventCount::await 的 check-prepare-check-wait 语义等待终态。
-        // 与旧 binary_semaphore 不同，EventCount 支持多次 notify 且允许在
-        // 已就绪后立即短路（无需"先 acquire 一次再 release"的对称配对）。
-        ec->await([&] {
-            auto s = promise.task_state.load(std::memory_order_acquire);
+        state.ready.await([&] {
+            auto s = state.task_state.load(std::memory_order_acquire);
             return s == TaskState::Completed || s == TaskState::Failed;
         });
 
-        // 提取异常指针后再处理结果，避免异常路径下未定义顺序。
-        auto ex = promise.exception;
+        auto ex = state.exception;
 
         if constexpr (!std::is_void_v<T>) {
             std::optional<T> tmp;
-            if (!ex && promise.result.has_value()) {
-                tmp.emplace(std::move(*promise.result));
+            if (!ex && state.result.has_value()) {
+                tmp.emplace(std::move(*state.result));
             }
             destroy_if_valid();
             if (ex) {
@@ -305,14 +323,15 @@ public:
         BEE_CHECK(handle_ != nullptr);
         start_if_needed();
 
-        auto& promise = handle_.promise();
-        auto  ec      = promise.ready; // 本地保活
-        ec->await([&] {
-            auto s = promise.task_state.load(std::memory_order_acquire);
+        auto& state      = *handle_.promise().state;
+        auto  state_keep = handle_.promise().state;
+
+        state.ready.await([&] {
+            auto s = state.task_state.load(std::memory_order_acquire);
             return s == TaskState::Completed || s == TaskState::Failed;
         });
 
-        auto ex = promise.exception;
+        auto ex = state.exception;
         destroy_if_valid();
         if (ex) {
             std::rethrow_exception(ex);
@@ -332,15 +351,13 @@ public:
         BEE_CHECK(handle_ != nullptr);
         start_if_needed();
 
-        auto& promise = handle_.promise();
-        auto  ec      = promise.ready; // 本地保活
-        (void)ec;
+        auto& state = *handle_.promise().state;
 
         if (is_ready()) {
-            return promise.task_state.load(std::memory_order_acquire);
+            return state.task_state.load(std::memory_order_acquire);
         }
 
-        const auto deadline = std::chrono::steady_clock::now() + timeout;
+        const auto     deadline      = std::chrono::steady_clock::now() + timeout;
         constexpr auto poll_interval = std::chrono::milliseconds{1};
         while (!is_ready()) {
             const auto now = std::chrono::steady_clock::now();
@@ -349,7 +366,7 @@ public:
             std::this_thread::sleep_for(remaining < poll_interval ? remaining : poll_interval);
         }
 
-        return promise.task_state.load(std::memory_order_acquire);
+        return state.task_state.load(std::memory_order_acquire);
     }
 
     // ── 非阻塞查询 ──────────────────────────────────────────────────────────
@@ -357,14 +374,14 @@ public:
     [[nodiscard]] auto is_ready() const noexcept -> bool
     {
         if (!handle_) return false;
-        auto s = handle_.promise().task_state.load(std::memory_order_acquire);
+        auto s = handle_.promise().state->task_state.load(std::memory_order_acquire);
         return s == TaskState::Completed || s == TaskState::Failed;
     }
 
     [[nodiscard]] auto state() const noexcept -> TaskState
     {
         if (!handle_) return TaskState::Pending;
-        return handle_.promise().task_state.load(std::memory_order_acquire);
+        return handle_.promise().state->task_state.load(std::memory_order_acquire);
     }
 
     [[nodiscard]] explicit operator bool() const noexcept
@@ -405,6 +422,7 @@ public:
             auto await_suspend(std::coroutine_handle<> caller) -> std::coroutine_handle<>
             {
                 auto& promise = handle.promise();
+                auto& state   = *promise.state;
 
                 // co_await 仅允许在未启动的 Task 上调用：若已被 get/wait 启动，
                 // continuation 与 FinalAwaiter 之间无同步，存在 TOCTOU 双重恢复竞态。
@@ -412,21 +430,21 @@ public:
                 BEE_CHECK(promise.started.compare_exchange_strong(
                     expected, true, std::memory_order_acq_rel));
 
-                promise.continuation = caller;
-                promise.task_state.store(TaskState::Running, std::memory_order_release);
+                state.continuation = caller;
+                state.task_state.store(TaskState::Running, std::memory_order_release);
                 return handle; // 对称转移：开始执行内层 Task
             }
 
             auto await_resume() -> T
             {
-                auto& promise = handle.promise();
-                if (promise.exception) {
-                    std::rethrow_exception(promise.exception);
+                auto& state = *handle.promise().state;
+                if (state.exception) {
+                    std::rethrow_exception(state.exception);
                 }
 
                 if constexpr (!std::is_void_v<T>) {
-                    BEE_CHECK(promise.result.has_value());
-                    return std::move(*promise.result);
+                    BEE_CHECK(state.result.has_value());
+                    return std::move(*state.result);
                 }
             }
         };
@@ -471,9 +489,9 @@ private:
     auto start_if_needed() -> void
     {
         auto& promise = handle_.promise();
-        bool expected = false;
+        bool  expected = false;
         if (promise.started.compare_exchange_strong(expected, true, std::memory_order_acq_rel)) {
-            promise.task_state.store(TaskState::Running, std::memory_order_release);
+            promise.state->task_state.store(TaskState::Running, std::memory_order_release);
             handle_.resume();
         }
     }
@@ -505,19 +523,8 @@ private:
 template <typename T>
 struct Task<T>::promise_type : detail::TaskPromiseReturn<T>
 {
-    // 状态机
-    std::atomic<TaskState> task_state{TaskState::Pending};
-    std::exception_ptr     exception;
-
-    // 同步原语
-    std::coroutine_handle<> continuation{nullptr};
-    // 同步原语放入 shared_ptr 中，使得 worker 在 final_suspend 时可本地保活，
-    // 避免 waiter 销毁协程帧后 notify_all() 内部访问悬垂内存。
-    //
-    // 当前为非 lazy 分配（每个 Task 一次 heap 分配）。后续若需要进一步优化，
-    // 可在此改为 atomic<shared_ptr<EventCount>> + double-check 模式。
-    std::shared_ptr<EventCount> ready{std::make_shared<EventCount>()};
-    std::atomic<bool>                      started{false};
+    // 启动标记（仅此处保留于 promise；其余状态均下放到 SharedState）
+    std::atomic<bool> started{false};
 
     // 协程接口
     auto get_return_object() -> Task
@@ -537,7 +544,7 @@ struct Task<T>::promise_type : detail::TaskPromiseReturn<T>
 
     auto unhandled_exception() -> void
     {
-        exception = std::current_exception();
+        this->state->exception = std::current_exception();
     }
 };
 
