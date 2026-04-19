@@ -18,7 +18,6 @@
 #include <limits>
 #include <memory>
 #include <mutex>
-#include <semaphore>
 #include <stdexcept>
 #include <stop_token>
 #include <thread>
@@ -28,6 +27,7 @@
 
 #include "Base/Core/Defines.hpp"
 #include "Base/Core/MoveOnlyFunction.hpp"
+#include "Base/Sync/EventCount.hpp"
 #include "Concurrency/LockFree/ChaseLevDeque.hpp"
 #include "Concurrency/LockFree/MPMCQueue.hpp"
 #include "Concurrency/Threading.hpp"
@@ -211,8 +211,13 @@ private:
     alignas(BEE_CACHE_LINE_SIZE) std::atomic<bool> accepting_{true};
     std::atomic<bool> draining_{false};
 
-    // 唤醒信号量（高频访问，独占缓存行）
-    alignas(BEE_CACHE_LINE_SIZE) std::counting_semaphore<(std::numeric_limits<std::ptrdiff_t>::max)()> semaphore_{0};
+    // 工作线程空闲唤醒（高频访问，独占缓存行）。
+    // 使用 EventCount 替代 counting_semaphore：
+    //   · 统一 Bee 的 Task 同步原语（get/wait 也走 EventCount）；
+    //   · 无等待者时 notify 零 syscall 代价；
+    //   · 支持 notify_all 精确唤醒所有 waiter（关停场景）。
+    // 生产者：入队成功后 notify()；消费者：标准 prepare/wait 协议。
+    alignas(BEE_CACHE_LINE_SIZE) EventCount idle_ec_;
 
     // 计数器（各占独立缓存行，避免伪共享）
     alignas(BEE_CACHE_LINE_SIZE) std::atomic<std::size_t> pending_tasks_{0};

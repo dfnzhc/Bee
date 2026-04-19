@@ -82,13 +82,11 @@ void WorkPool::shutdown(ShutdownMode mode)
         draining_.store(true, std::memory_order_release);
     }
 
-    // 请求所有工作线程停止，并唤醒它们（信号量 release 确保睡眠中的线程能醒来）
+    // 请求所有工作线程停止，并唤醒它们（notify_all 确保睡眠中的线程能醒来）
     for (auto& w : workers_) {
         w.request_stop();
     }
-    if (worker_count_ > 0) {
-        semaphore_.release(static_cast<std::ptrdiff_t>(worker_count_));
-    }
+    idle_ec_.notify_all();
 
     // 若从工作线程内部发起关停（如任务回调中），不能自 join
     if (tls_pool_ == this) {
@@ -205,7 +203,7 @@ auto WorkPool::enqueue_task(Task&& task, TaskPriority pri) -> bool
     // 工作线程内部提交：优先推入本地 deque（忽略优先级，换取缓存局部性）
     if (tls_pool_ == this && tls_worker_index_ < local_queues_.size()) {
         if (local_queues_[tls_worker_index_]->try_push(std::move(task))) {
-            semaphore_.release();
+            idle_ec_.notify();
             return true;
         }
         // 本地队列已满，降级到全局队列
@@ -214,7 +212,7 @@ auto WorkPool::enqueue_task(Task&& task, TaskPriority pri) -> bool
     // 推入对应优先级的全局 MPMC 队列
     const std::size_t idx = priority_to_index(pri);
     if (global_queues_[idx]->try_push(std::move(task))) {
-        semaphore_.release();
+        idle_ec_.notify();
         return true;
     }
 
@@ -335,8 +333,20 @@ void WorkPool::worker_loop(std::size_t index, std::stop_token st)
             continue;
         }
 
-        // 所有自旋耗尽，阻塞在信号量上（无条件 acquire，杜绝 TOCTOU 竞态）
-        semaphore_.acquire();
+        // 所有自旋耗尽，阻塞在 EventCount 上。
+        // 严格遵循 check-prepare-check-wait：先登记等待再次检查任务/停止
+        // 信号，否则会与生产者 enqueue→notify 的时序产生 TOCTOU 竞态。
+        auto key = idle_ec_.prepare_wait();
+        if (st.stop_requested()) {
+            idle_ec_.cancel_wait();
+            break;
+        }
+        if (try_take_task(index, task, rng)) {
+            idle_ec_.cancel_wait();
+            execute_task(task);
+            continue;
+        }
+        idle_ec_.wait(key);
     }
 
     // stop 信号已收到：排空剩余可获取的任务
