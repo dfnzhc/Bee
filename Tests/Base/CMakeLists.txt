@@ -7,6 +7,7 @@ bee_add_component_test(
         CheckTests.cpp
         ErrorTests.cpp
         EnumTests.cpp
+        EventCountTests.cpp
         HashTests.cpp
         InlineStringTests.cpp
         LogTests.cpp
