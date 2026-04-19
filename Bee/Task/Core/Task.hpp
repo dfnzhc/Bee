@@ -139,16 +139,31 @@ namespace detail
     //
     // 协程到达 final_suspend 时的收尾逻辑。
     //
-    // 当前（Step A）仍维持"返回 void + eager resume/notify"的保守形态，
-    // 所有终态 / 异常 / 结果均通过 shared_ptr<TaskSharedState> 发布，因此
-    // waiter 即便在 notify_all 后立即销毁协程帧，worker 后续代码也不会
-    // 访问已释放的帧内存——它访问的是 shared_ptr 指向的堆对象。
+    // 设计说明（为什么返回 void 而非 coroutine_handle<>）：
     //
-    //   · 有 continuation（被 co_await）：发布终态后 eager resume，不触
-    //     碰 EventCount；continuation 协程自己负责最终读取结果/异常。
+    //   · 理论上，返回 coroutine_handle<> 可实现 symmetric transfer，将深
+    //     链路场景（嵌套 when_all / chained co_await）的 final_suspend
+    //     栈深压到 O(1)。
     //
-    //   · 无 continuation（被 get/wait 阻塞等待）：发布终态 + notify_all。
-    //     通过 shared_ptr 保活 state，EventCount 不会在 notify 路径中被释放。
+    //   · 但在 MSVC（实测 Debug/Release 均复现）下，await_suspend 返回
+    //     coroutine_handle<> 时，生成的机器码会把返回值临时对象回写到
+    //     协程帧内存。若 waiter 在 notify_all 后、回写完成前销毁帧，
+    //     即触发 heap-use-after-free（本仓库 checkpoint 005/006 与 P1-2
+    //     Step B 实验均稳定复现：50 轮压测 8/50 崩溃）。
+    //
+    //   · Step A 已将 result / exception / task_state 外置到 shared_ptr
+    //     指向的 SharedState；waiter 销毁帧不再影响 worker 后续访问状态。
+    //     但协程帧自身的 MSVC 回写仍是规避不掉的 UAF 根因——该改造暂时
+    //     阻塞在 MSVC codegen 行为上。
+    //
+    //   · 因此这里维持"返回 void + eager resume/notify_all"的保守形态：
+    //       - 有 continuation：发布终态后立即 cont.resume()（会消耗栈深，
+    //         但当前测试集未触及极深链路；若未来触及再考虑切 Clang 或
+    //         封装 bounce-scheduler）。
+    //       - 无 continuation：发布终态 + notify_all；本地持 shared_ptr
+    //         保活 state，waiter 销毁帧不影响 notify 路径。
+    //
+    // 相关记录见 `Doc/Task 系统设计哲学与改进路线.md` 的 P1-2 说明。
 
     struct TaskFinalAwaiter
     {
@@ -172,9 +187,6 @@ namespace detail
                 return;
             }
 
-            // 本地保活 state（防止 waiter 在 notify 前后销毁其 shared_ptr
-            // 引用即释放 state 对象——虽然 promise 也持一份，但这里
-            // 显式再握一份以表达"notify_all 在本地对象上完成"的不变式）。
             auto state_keep = promise.state;
             state.task_state.store(final_state, std::memory_order_release);
             state.ready.notify_all();
