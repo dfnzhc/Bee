@@ -15,7 +15,7 @@
 #include <vector>
 
 #include "Event/EventBus.hpp"
-#include "Concurrency/Thread/ThreadPool.hpp"
+#include "Concurrency/Thread/WorkPool.hpp"
 
 namespace
 {
@@ -24,7 +24,7 @@ using bee::Connection;
 using bee::EventBus;
 using bee::MoveOnlyFunction;
 using bee::ScopedConnection;
-using bee::ThreadPool;
+using bee::WorkPool;
 
 // Test event types
 struct MouseClick
@@ -239,7 +239,7 @@ TEST(EventBusTest, ConcurrentSubscribeAndPublish)
 // Async
 // =============================================================================
 
-TEST(EventBusTest, PublishAsyncViaThreadPool)
+TEST(EventBusTest, PublishAsyncViaWorkPool)
 {
     EventBus         bus;
     std::atomic<int> sum{0};
@@ -247,7 +247,7 @@ TEST(EventBusTest, PublishAsyncViaThreadPool)
     bus.subscribe<MouseClick>([&sum](const MouseClick& e) { sum.fetch_add(e.x, std::memory_order_relaxed); });
     bus.subscribe<MouseClick>([&sum](const MouseClick& e) { sum.fetch_add(e.x, std::memory_order_relaxed); });
 
-    ThreadPool pool(2);
+    WorkPool pool(2);
     bus.publish_async(pool, MouseClick{5, 0});
     pool.shutdown();
 

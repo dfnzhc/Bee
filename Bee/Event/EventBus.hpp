@@ -55,7 +55,7 @@ public:
     }
 
     /// 通过线程池异步分发事件。
-    /// 注意：调用方在实例化此方法前须 #include "Concurrency/Thread/ThreadPool.hpp"。
+    /// 注意：调用方在实例化此方法前须 #include "Concurrency/Thread/WorkPool.hpp"。
     template <typename E, typename Pool>
     auto publish_async(Pool& pool, const E& event) -> void
     {

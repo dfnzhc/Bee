@@ -17,7 +17,7 @@
 #include <vector>
 
 #include "Event/Signal.hpp"
-#include "Concurrency/Thread/ThreadPool.hpp"
+#include "Concurrency/Thread/WorkPool.hpp"
 
 namespace
 {
@@ -26,7 +26,7 @@ using bee::Connection;
 using bee::MoveOnlyFunction;
 using bee::ScopedConnection;
 using bee::Signal;
-using bee::ThreadPool;
+using bee::WorkPool;
 
 // =============================================================================
 // Basic functionality
@@ -290,7 +290,7 @@ TEST(SignalTest, ConcurrentDisconnectAndEmit)
 // Async emit
 // =============================================================================
 
-TEST(SignalTest, EmitAsyncDispatchesToThreadPool)
+TEST(SignalTest, EmitAsyncDispatchesToWorkPool)
 {
     Signal<void(int)> sig;
     std::atomic<int>  sum{0};
@@ -298,7 +298,7 @@ TEST(SignalTest, EmitAsyncDispatchesToThreadPool)
     sig.connect([&sum](int v) { sum.fetch_add(v, std::memory_order_relaxed); });
     sig.connect([&sum](int v) { sum.fetch_add(v, std::memory_order_relaxed); });
 
-    ThreadPool pool(2);
+    WorkPool pool(2);
     sig.emit_async(pool, 10);
     pool.shutdown();
 

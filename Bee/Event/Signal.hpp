@@ -138,7 +138,7 @@ public:
     }
 
     /// 异步发射 — 将参数拷贝到共享快照中，为每个活跃槽向线程池提交一个任务。
-    /// Pool 须提供 post(callable) 方法（例如 bee::ThreadPool）。
+    /// Pool 须提供 post(callable) 方法（例如 bee::WorkPool）。
     /// 注意：参数经 decay 后在所有提交的任务间共享，引用类型的参数会变为指向同一份共享拷贝的引用。
     template <typename Pool>
     auto emit_async(Pool& pool, Args... args) const -> void
