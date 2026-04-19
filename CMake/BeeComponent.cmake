@@ -117,3 +117,54 @@ function(bee_add_component_test)
     include(GoogleTest)
     gtest_discover_tests(${BEE_TEST_TARGET})
 endfunction()
+
+# ---------------------------------------------------------------------------
+# bee_add_component_benchmark
+#
+# 为某组件创建 google-benchmark 可执行目标。与 bee_add_component_test 对称：
+#
+#   bee_add_component_benchmark(
+#       COMPONENT Task
+#       TARGET Task.Bench
+#       SOURCES bench_task.cpp bench_workpool.cpp ...
+#   )
+#
+# 由顶层 `BEE_BUILD_BENCHMARKS` 选项控制是否启用。需要 google-benchmark
+# 由 vcpkg 或包管理器提供；未找到时跳过并给出提示，不影响主构建。
+# ---------------------------------------------------------------------------
+function(bee_add_component_benchmark)
+    set(options)
+    set(one_value_args COMPONENT TARGET)
+    set(multi_value_args SOURCES)
+
+    cmake_parse_arguments(BEE_BENCH "${options}" "${one_value_args}" "${multi_value_args}" ${ARGN})
+
+    if(NOT BEE_BUILD_BENCHMARKS)
+        return()
+    endif()
+
+    if(NOT BEE_BENCH_COMPONENT OR NOT BEE_BENCH_TARGET)
+        message(FATAL_ERROR "bee_add_component_benchmark requires COMPONENT and TARGET")
+    endif()
+
+    find_package(benchmark CONFIG QUIET)
+    if(NOT benchmark_FOUND)
+        message(STATUS "google-benchmark not found; skip ${BEE_BENCH_TARGET}.")
+        return()
+    endif()
+
+    add_executable(${BEE_BENCH_TARGET} ${BEE_BENCH_SOURCES})
+    set_target_properties(${BEE_BENCH_TARGET} PROPERTIES FOLDER "benchmarks")
+    bee_group_sources(
+        TARGET ${BEE_BENCH_TARGET}
+        BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}"
+        SOURCES ${BEE_BENCH_SOURCES}
+    )
+    target_link_libraries(${BEE_BENCH_TARGET}
+        PRIVATE
+            Bee::${BEE_BENCH_COMPONENT}
+            benchmark::benchmark
+            benchmark::benchmark_main
+    )
+    target_compile_features(${BEE_BENCH_TARGET} PRIVATE cxx_std_23)
+endfunction()

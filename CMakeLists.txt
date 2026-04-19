@@ -9,9 +9,14 @@ if(MSVC)
 endif()
 
 option(BEE_BUILD_TESTS "Build tests for Bee components" ON)
+option(BEE_BUILD_BENCHMARKS "Build benchmarks for Bee components" OFF)
 
 add_subdirectory(Bee)
 
 if(BEE_BUILD_TESTS)
     add_subdirectory(Tests)
+endif()
+
+if(BEE_BUILD_BENCHMARKS)
+    add_subdirectory(Benchmarks)
 endif()
