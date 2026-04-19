@@ -53,7 +53,9 @@ namespace detail
     {
         // callable 逻辑上属于"定义"，但 MoveOnlyFunction::operator() 非 const，
         // 故标 mutable 以便 GraphExecutionContext 通过 const 引用调用。
-        mutable MoveOnlyFunction<std::any(const std::vector<std::any>&)> callable;
+        // 第一参数是消费节点自身的索引，用于 extract_args 类型错配时
+        // 生成精确的诊断信息。
+        mutable MoveOnlyFunction<std::any(std::size_t, const std::vector<std::any>&)> callable;
         std::vector<std::size_t> predecessors;
         std::vector<std::size_t> successors;
         std::string label;
@@ -70,20 +72,81 @@ namespace detail
     };
 
     // =====================================================================
+    // graph_type_error / checked_any_cast
+    //
+    // TaskGraph 的所有用户可见 API 都以 `NodeHandle<T>` 表达类型，内部
+    // 统一用 `std::any` 做跨节点传值。正常构造路径下，producer 返回的
+    // `T` 与 consumer 声明的 `Deps...` 完全同源，不会出错。但以下情况
+    // 仍可能在运行期触发类型错配：
+    //
+    //   1. 用户直接用聚合初始化伪造 NodeHandle（`NodeHandle<U>{idx}`
+    //      指向一个返回 T 的节点）。
+    //   2. 旧的 NodeHandle 跨 TaskGraph 使用。
+    //   3. 通过 reinterpret/bit_cast 等 UB 手段绕过类型系统。
+    //
+    // 原实现直接用 `std::any_cast<T>(...)`，错配时抛出
+    // `std::bad_any_cast`——异常信息不含节点 id、不含期望/实际类型，
+    // 用户难以定位。改为在 cast 前显式比较 typeid，错配时抛出带完整
+    // 上下文的 `std::logic_error`（与 result() 失败节点的异常类型保持
+    // 一致），同时保留 `std::any_cast<T>` 在类型匹配时的快速路径。
+    //
+    // 未来若需升级为编译期保护，可把 NodeDef 改为类型化 slot
+    // （见 `Doc/Task 系统设计哲学与改进路线.md` P2 说明）。
+
+    [[noreturn]] inline auto graph_type_mismatch(
+        std::string_view where, std::size_t node_index,
+        const std::type_info& expected, const std::type_info& actual) -> void
+    {
+        auto msg = std::format(
+            "TaskGraph: 类型错配于 {}（节点 #{}）：期望 `{}`，实际 `{}`。"
+            "常见原因：NodeHandle<T> 的 T 与节点实际返回类型不一致，"
+            "或跨 TaskGraph 使用了旧的 NodeHandle。",
+            where, node_index, expected.name(), actual.name());
+        throw std::logic_error(std::move(msg));
+    }
+
+    template <typename T>
+    auto checked_any_ref(const std::any& a, std::string_view where,
+                         std::size_t node_index) -> const T&
+    {
+        if (a.type() != typeid(T)) {
+            graph_type_mismatch(where, node_index, typeid(T), a.type());
+        }
+        return *std::any_cast<T>(&a);
+    }
+
+    template <typename T>
+    auto checked_any_value(const std::any& a, std::string_view where,
+                           std::size_t node_index) -> T
+    {
+        if (a.type() != typeid(T)) {
+            graph_type_mismatch(where, node_index, typeid(T), a.type());
+        }
+        return *std::any_cast<T>(&a);
+    }
+
+    // =====================================================================
     // extract_args — 从 std::vector<std::any> 按类型提取参数元组
+    //
+    // 每个 inputs[i] 对应 predecessors[i] 的结果；若类型不匹配，通过
+    // `graph_type_mismatch` 抛出带"消费节点第 i 个输入"的诊断信息。
     // =====================================================================
 
     template <typename... Ts, std::size_t... Is>
-    auto extract_args_impl(const std::vector<std::any>& inputs, std::index_sequence<Is...>)
-        -> std::tuple<Ts...>
+    auto extract_args_impl(const std::vector<std::any>& inputs,
+                           std::size_t consumer_index,
+                           std::index_sequence<Is...>) -> std::tuple<Ts...>
     {
-        return std::tuple<Ts...>{std::any_cast<Ts>(inputs[Is])...};
+        return std::tuple<Ts...>{
+            checked_any_value<Ts>(inputs[Is], "节点输入参数", consumer_index)...};
     }
 
     template <typename... Ts>
-    auto extract_args(const std::vector<std::any>& inputs) -> std::tuple<Ts...>
+    auto extract_args(const std::vector<std::any>& inputs,
+                      std::size_t consumer_index) -> std::tuple<Ts...>
     {
-        return extract_args_impl<Ts...>(inputs, std::index_sequence_for<Ts...>{});
+        return extract_args_impl<Ts...>(
+            inputs, consumer_index, std::index_sequence_for<Ts...>{});
     }
 
     // =====================================================================
@@ -150,7 +213,7 @@ namespace detail
                 for (auto pred : def.predecessors) {
                     inputs.push_back(ctx->runtimes[pred].result);
                 }
-                rt.result = def.callable(inputs);
+                rt.result = def.callable(index, inputs);
             }
             catch (...) {
                 rt.exception = std::current_exception();
@@ -281,7 +344,7 @@ public:
         using R = std::invoke_result_t<Fn>;
         return add_node_impl<R>(
             make_label<R>(defs_.size(), ""),
-            [fn = std::move(fn)](const std::vector<std::any>&) -> std::any {
+            [fn = std::move(fn)](std::size_t, const std::vector<std::any>&) -> std::any {
                 if constexpr (std::is_void_v<R>) {
                     fn();
                     return std::any{};
@@ -299,7 +362,7 @@ public:
         using R = std::invoke_result_t<Fn>;
         return add_node_impl<R>(
             std::string(label),
-            [fn = std::move(fn)](const std::vector<std::any>&) -> std::any {
+            [fn = std::move(fn)](std::size_t, const std::vector<std::any>&) -> std::any {
                 if constexpr (std::is_void_v<R>) {
                     fn();
                     return std::any{};
@@ -319,8 +382,8 @@ public:
         using R = std::invoke_result_t<Fn, Deps...>;
         return add_node_impl<R>(
             make_label<R>(defs_.size(), ""),
-            [fn = std::move(fn)](const std::vector<std::any>& inputs) -> std::any {
-                auto args = detail::extract_args<Deps...>(inputs);
+            [fn = std::move(fn)](std::size_t idx, const std::vector<std::any>& inputs) -> std::any {
+                auto args = detail::extract_args<Deps...>(inputs, idx);
                 if constexpr (std::is_void_v<R>) {
                     std::apply(fn, std::move(args));
                     return std::any{};
@@ -339,8 +402,8 @@ public:
         using R = std::invoke_result_t<Fn, Deps...>;
         return add_node_impl<R>(
             std::string(label),
-            [fn = std::move(fn)](const std::vector<std::any>& inputs) -> std::any {
-                auto args = detail::extract_args<Deps...>(inputs);
+            [fn = std::move(fn)](std::size_t idx, const std::vector<std::any>& inputs) -> std::any {
+                auto args = detail::extract_args<Deps...>(inputs, idx);
                 if constexpr (std::is_void_v<R>) {
                     std::apply(fn, std::move(args));
                     return std::any{};
@@ -360,7 +423,7 @@ public:
         using R = std::invoke_result_t<Fn>;
         return add_node_impl<R>(
             make_label<R>(defs_.size(), ""),
-            [fn = std::move(fn)](const std::vector<std::any>&) -> std::any {
+            [fn = std::move(fn)](std::size_t, const std::vector<std::any>&) -> std::any {
                 if constexpr (std::is_void_v<R>) {
                     fn();
                     return std::any{};
@@ -379,7 +442,7 @@ public:
         using R = std::invoke_result_t<Fn>;
         return add_node_impl<R>(
             std::string(label),
-            [fn = std::move(fn)](const std::vector<std::any>&) -> std::any {
+            [fn = std::move(fn)](std::size_t, const std::vector<std::any>&) -> std::any {
                 if constexpr (std::is_void_v<R>) {
                     fn();
                     return std::any{};
@@ -479,7 +542,7 @@ public:
         if (rt.exception) {
             throw std::logic_error("TaskGraph: cannot access result of a failed node");
         }
-        return std::any_cast<const T&>(rt.result);
+        return detail::checked_any_ref<T>(rt.result, "TaskGraph::result", handle.index);
     }
 
     // ===== 执行 API（Task 2 实现）=====
@@ -500,7 +563,7 @@ private:
     template <typename R>
     auto add_node_impl(
         std::string label,
-        MoveOnlyFunction<std::any(const std::vector<std::any>&)> callable,
+        MoveOnlyFunction<std::any(std::size_t, const std::vector<std::any>&)> callable,
         std::vector<std::size_t> predecessors) -> NodeHandle<R>
     {
         auto idx  = defs_.size();

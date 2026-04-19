@@ -450,4 +450,30 @@ TEST(TaskGraphTests, DotLabelEscaping)
     EXPECT_NE(dot.find("back\\\\slash"), std::string::npos);
 }
 
+// =========================================================================
+// 类型安全诊断：result<T> 与 NodeHandle<T> 不一致时应抛出带节点 id 与
+// 期望/实际类型的 std::logic_error（而非裸 std::bad_any_cast）。
+// =========================================================================
+
+TEST(TaskGraphTests, ResultTypeMismatchDiagnostic)
+{
+    TaskGraph graph;
+    auto a = graph.node([] { return 42; });              // 节点 #0，返回 int
+    NodeHandle<double> forged{a.index};                   // 人为伪造错位类型
+
+    WorkPool pool(2);
+    auto t = graph.execute(pool);
+    t.wait();
+
+    try {
+        (void)graph.result(forged);
+        FAIL() << "expected std::logic_error";
+    }
+    catch (const std::logic_error& e) {
+        std::string msg = e.what();
+        EXPECT_NE(msg.find("TaskGraph::result"), std::string::npos);
+        EXPECT_NE(msg.find("#0"), std::string::npos);
+    }
+}
+
 } // namespace
