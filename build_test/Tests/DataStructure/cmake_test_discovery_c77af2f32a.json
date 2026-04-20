@@ -1,0 +1,895 @@
+{
+  "tests": 167,
+  "name": "AllTests",
+  "testsuites": [
+    {
+      "name": "DataStructureComponentTests",
+      "tests": 2,
+      "testsuite": [
+        {
+          "name": "ReturnsComponentName",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\DataStructureTests.cpp",
+          "line": 5
+        },
+        {
+          "name": "LinksAndUsesBaseComponent",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\DataStructureTests.cpp",
+          "line": 10
+        }
+      ]
+    },
+    {
+      "name": "CountMinSketchTests",
+      "tests": 21,
+      "testsuite": [
+        {
+          "name": "ConstructWithWidthAndDepth",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CountMinSketchTests.cpp",
+          "line": 25
+        },
+        {
+          "name": "ConstructWithZeroWidthThrows",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CountMinSketchTests.cpp",
+          "line": 34
+        },
+        {
+          "name": "ConstructWithZeroDepthThrows",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CountMinSketchTests.cpp",
+          "line": 39
+        },
+        {
+          "name": "ConstructFromErrorParams",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CountMinSketchTests.cpp",
+          "line": 44
+        },
+        {
+          "name": "InvalidEpsilonThrows",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CountMinSketchTests.cpp",
+          "line": 53
+        },
+        {
+          "name": "InvalidDeltaThrows",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CountMinSketchTests.cpp",
+          "line": 60
+        },
+        {
+          "name": "InsertAndEstimateSingleElement",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CountMinSketchTests.cpp",
+          "line": 70
+        },
+        {
+          "name": "MultipleInsertsSameElement",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CountMinSketchTests.cpp",
+          "line": 79
+        },
+        {
+          "name": "UpdateWithCount",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CountMinSketchTests.cpp",
+          "line": 88
+        },
+        {
+          "name": "EstimateNeverUnderestimates",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CountMinSketchTests.cpp",
+          "line": 96
+        },
+        {
+          "name": "UnseenElementEstimateIsZeroOrSmall",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CountMinSketchTests.cpp",
+          "line": 114
+        },
+        {
+          "name": "StringKeys",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CountMinSketchTests.cpp",
+          "line": 127
+        },
+        {
+          "name": "ClearResetsAllCounters",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CountMinSketchTests.cpp",
+          "line": 142
+        },
+        {
+          "name": "MergeTwoSketches",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CountMinSketchTests.cpp",
+          "line": 160
+        },
+        {
+          "name": "MergeDimensionMismatchThrows",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CountMinSketchTests.cpp",
+          "line": 180
+        },
+        {
+          "name": "MergeSeedMismatchThrows",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CountMinSketchTests.cpp",
+          "line": 187
+        },
+        {
+          "name": "SetSeedsClearsData",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CountMinSketchTests.cpp",
+          "line": 201
+        },
+        {
+          "name": "SetSeedsWrongSizeThrows",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CountMinSketchTests.cpp",
+          "line": 211
+        },
+        {
+          "name": "ErrorBoundIsRespected",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CountMinSketchTests.cpp",
+          "line": 222
+        },
+        {
+          "name": "UpdateSaturatesCounterAndTotalCount",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CountMinSketchTests.cpp",
+          "line": 255
+        },
+        {
+          "name": "MergeSaturatesCounterAndTotalCount",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CountMinSketchTests.cpp",
+          "line": 266
+        }
+      ]
+    },
+    {
+      "name": "HyperLogLogTests",
+      "tests": 22,
+      "testsuite": [
+        {
+          "name": "DefaultPrecision",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\HyperLogLogTests.cpp",
+          "line": 25
+        },
+        {
+          "name": "CustomPrecision",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\HyperLogLogTests.cpp",
+          "line": 33
+        },
+        {
+          "name": "PrecisionTooLowThrows",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\HyperLogLogTests.cpp",
+          "line": 40
+        },
+        {
+          "name": "PrecisionTooHighThrows",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\HyperLogLogTests.cpp",
+          "line": 46
+        },
+        {
+          "name": "MinMaxPrecision",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\HyperLogLogTests.cpp",
+          "line": 52
+        },
+        {
+          "name": "EmptyEstimateIsZeroOrNear",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\HyperLogLogTests.cpp",
+          "line": 62
+        },
+        {
+          "name": "SingleElementCardinality",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\HyperLogLogTests.cpp",
+          "line": 68
+        },
+        {
+          "name": "DuplicateInsertDoesNotChangeEstimate",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\HyperLogLogTests.cpp",
+          "line": 79
+        },
+        {
+          "name": "SmallCardinalityEstimate",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\HyperLogLogTests.cpp",
+          "line": 93
+        },
+        {
+          "name": "MediumCardinalityEstimate",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\HyperLogLogTests.cpp",
+          "line": 108
+        },
+        {
+          "name": "LargeCardinalityEstimate",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\HyperLogLogTests.cpp",
+          "line": 121
+        },
+        {
+          "name": "StringElements",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\HyperLogLogTests.cpp",
+          "line": 135
+        },
+        {
+          "name": "StandardErrorDecreasesWithPrecision",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\HyperLogLogTests.cpp",
+          "line": 152
+        },
+        {
+          "name": "StandardErrorFormula",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\HyperLogLogTests.cpp",
+          "line": 162
+        },
+        {
+          "name": "MergeDisjointSets",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\HyperLogLogTests.cpp",
+          "line": 173
+        },
+        {
+          "name": "MergeOverlappingSets",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\HyperLogLogTests.cpp",
+          "line": 193
+        },
+        {
+          "name": "MergePrecisionMismatchThrows",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\HyperLogLogTests.cpp",
+          "line": 214
+        },
+        {
+          "name": "MergeWithEmpty",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\HyperLogLogTests.cpp",
+          "line": 221
+        },
+        {
+          "name": "ClearResetsAll",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\HyperLogLogTests.cpp",
+          "line": 241
+        },
+        {
+          "name": "EstimateCardinalityRoundsCorrectly",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\HyperLogLogTests.cpp",
+          "line": 253
+        },
+        {
+          "name": "LowPrecisionEstimate",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\HyperLogLogTests.cpp",
+          "line": 269
+        },
+        {
+          "name": "InsertNegativeNumbers",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\HyperLogLogTests.cpp",
+          "line": 281
+        }
+      ]
+    },
+    {
+      "name": "SkipListTests",
+      "tests": 47,
+      "testsuite": [
+        {
+          "name": "DefaultConstruct",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 39
+        },
+        {
+          "name": "InitializerListConstruct",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 46
+        },
+        {
+          "name": "MoveConstruct",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 55
+        },
+        {
+          "name": "MoveAssign",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 68
+        },
+        {
+          "name": "InsertSingleElement",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 85
+        },
+        {
+          "name": "InsertDuplicateKeyUpdatesValue",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 97
+        },
+        {
+          "name": "InsertMultipleElements",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 108
+        },
+        {
+          "name": "InsertReverseOrder",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 121
+        },
+        {
+          "name": "InsertWithMoveValue",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 137
+        },
+        {
+          "name": "EmplaceConstruct",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 145
+        },
+        {
+          "name": "EraseExistingKey",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 157
+        },
+        {
+          "name": "EraseNonExistingKey",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 171
+        },
+        {
+          "name": "EraseAllElements",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 179
+        },
+        {
+          "name": "EraseFromEmpty",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 194
+        },
+        {
+          "name": "EraseByIterator",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 200
+        },
+        {
+          "name": "EraseFirstElement",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 219
+        },
+        {
+          "name": "EraseLastElement",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 232
+        },
+        {
+          "name": "FindExistingElement",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 247
+        },
+        {
+          "name": "FindNonExisting",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 258
+        },
+        {
+          "name": "ContainsKey",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 265
+        },
+        {
+          "name": "AtExistingKey",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 273
+        },
+        {
+          "name": "AtNonExistingKeyThrows",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 280
+        },
+        {
+          "name": "SubscriptOperatorCreatesDefault",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 286
+        },
+        {
+          "name": "SubscriptOperatorExisting",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 294
+        },
+        {
+          "name": "IteratorOrderIsSorted",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 306
+        },
+        {
+          "name": "EmptyIterator",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 323
+        },
+        {
+          "name": "ConstIterator",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 329
+        },
+        {
+          "name": "PostfixIncrement",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 343
+        },
+        {
+          "name": "LowerBound",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 361
+        },
+        {
+          "name": "LowerBoundExactMatch",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 375
+        },
+        {
+          "name": "LowerBoundBeyondAll",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 388
+        },
+        {
+          "name": "UpperBound",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 397
+        },
+        {
+          "name": "UpperBoundAll",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 411
+        },
+        {
+          "name": "RangeQuery",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 418
+        },
+        {
+          "name": "ClearRemovesAll",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 444
+        },
+        {
+          "name": "ClearThenReinsert",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 457
+        },
+        {
+          "name": "StringKeys",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 472
+        },
+        {
+          "name": "CustomComparatorDescending",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 491
+        },
+        {
+          "name": "LargeInsertAndLookup",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 509
+        },
+        {
+          "name": "LargeInsertDeleteAndVerify",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 525
+        },
+        {
+          "name": "LevelProperty",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 552
+        },
+        {
+          "name": "ExceptionDuringInsertDoesNotMutateContainerState",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 564
+        },
+        {
+          "name": "ConstLookupApisWork",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 578
+        },
+        {
+          "name": "ExtremeIntValues",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 608
+        },
+        {
+          "name": "EraseByIteratorSequential",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 634
+        },
+        {
+          "name": "OperatorBracketOnEmpty",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 653
+        },
+        {
+          "name": "LargeScaleInsertEraseReinsert",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\SkipListTests.cpp",
+          "line": 663
+        }
+      ]
+    },
+    {
+      "name": "LRUCacheTests",
+      "tests": 15,
+      "testsuite": [
+        {
+          "name": "ConstructWithZeroCapacityThrows",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 29
+        },
+        {
+          "name": "BasicPutAndGet",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 34
+        },
+        {
+          "name": "GetMissReturnsNullopt",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 49
+        },
+        {
+          "name": "EvictsLeastRecentlyUsed",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 55
+        },
+        {
+          "name": "GetUpdatesRecency",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 70
+        },
+        {
+          "name": "PutUpdatesExistingValue",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 86
+        },
+        {
+          "name": "EraseKey",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 98
+        },
+        {
+          "name": "EraseNonExisting",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 109
+        },
+        {
+          "name": "ContainsDoesNotAffectOrder",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 115
+        },
+        {
+          "name": "SizeAndCapacity",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 129
+        },
+        {
+          "name": "ClearRemovesAll",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 141
+        },
+        {
+          "name": "StringKeysAndValues",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 152
+        },
+        {
+          "name": "CapacityOne",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 163
+        },
+        {
+          "name": "RepeatedEviction",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 172
+        },
+        {
+          "name": "StressEvictionOrderWithLargeSequence",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 1122
+        }
+      ]
+    },
+    {
+      "name": "MRUCacheTests",
+      "tests": 10,
+      "testsuite": [
+        {
+          "name": "ConstructWithZeroCapacityThrows",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 188
+        },
+        {
+          "name": "BasicPutAndGet",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 193
+        },
+        {
+          "name": "EvictsMostRecentlyUsed",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 204
+        },
+        {
+          "name": "GetUpdatesRecencyThenEvicts",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 219
+        },
+        {
+          "name": "PutUpdatesExistingValue",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 237
+        },
+        {
+          "name": "EraseKey",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 249
+        },
+        {
+          "name": "EraseNonExisting",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 257
+        },
+        {
+          "name": "SizeCapacityClear",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 263
+        },
+        {
+          "name": "CapacityOne",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 275
+        },
+        {
+          "name": "StressMRUEvictionPattern",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 1139
+        }
+      ]
+    },
+    {
+      "name": "LFUCacheTests",
+      "tests": 12,
+      "testsuite": [
+        {
+          "name": "ConstructWithZeroCapacityThrows",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 289
+        },
+        {
+          "name": "BasicPutAndGet",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 294
+        },
+        {
+          "name": "EvictsLeastFrequentlyUsed",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 305
+        },
+        {
+          "name": "SameFrequencyEvictsLeastRecentlyUsed",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 323
+        },
+        {
+          "name": "PutUpdatesExistingValue",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 335
+        },
+        {
+          "name": "EraseAndClear",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 347
+        },
+        {
+          "name": "CapacityOne",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 361
+        },
+        {
+          "name": "EvictionIsCorrectAfterFrequencyBuildUp",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 372
+        },
+        {
+          "name": "EraseMinFreqItemRecomputesCorrectly",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 406
+        },
+        {
+          "name": "EvictsCorrectItemWithMixedFrequencies",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 849
+        },
+        {
+          "name": "FrequencyGapRecomputesMinCorrectly",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 876
+        },
+        {
+          "name": "LargeScaleEvictionOrder",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 905
+        }
+      ]
+    },
+    {
+      "name": "MFUCacheTests",
+      "tests": 14,
+      "testsuite": [
+        {
+          "name": "ConstructWithZeroCapacityThrows",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 436
+        },
+        {
+          "name": "BasicPutAndGet",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 441
+        },
+        {
+          "name": "EvictsMostFrequentlyUsed",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 452
+        },
+        {
+          "name": "SameFrequencyEvicts",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 475
+        },
+        {
+          "name": "PutUpdatesExistingValue",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 487
+        },
+        {
+          "name": "GetIncreasesFrequency",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 498
+        },
+        {
+          "name": "EraseKey",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 523
+        },
+        {
+          "name": "EraseNonExisting",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 532
+        },
+        {
+          "name": "ClearAll",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 538
+        },
+        {
+          "name": "CapacityOne",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 547
+        },
+        {
+          "name": "EvictsHighestFrequencyItem",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 558
+        },
+        {
+          "name": "EraseMaxFreqRecomputesCorrectly",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 579
+        },
+        {
+          "name": "EvictsCorrectItemWithDistinctFrequencies",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 937
+        },
+        {
+          "name": "FrequencyGapRecomputesMaxCorrectly",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 964
+        }
+      ]
+    },
+    {
+      "name": "ARCacheTests",
+      "tests": 24,
+      "testsuite": [
+        {
+          "name": "ConstructWithZeroCapacityThrows",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 610
+        },
+        {
+          "name": "BasicPutAndGet",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 615
+        },
+        {
+          "name": "GetMissReturnsNullopt",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 630
+        },
+        {
+          "name": "PutUpdatesExisting",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 636
+        },
+        {
+          "name": "EvictionHappensAtCapacity",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 647
+        },
+        {
+          "name": "T1ToT2Promotion",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 663
+        },
+        {
+          "name": "GhostHitAdaptsP",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 678
+        },
+        {
+          "name": "SizeAndCapacity",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 695
+        },
+        {
+          "name": "ContainsOnlyCounted",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 707
+        },
+        {
+          "name": "EraseFromT1",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 723
+        },
+        {
+          "name": "EraseFromT2",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 732
+        },
+        {
+          "name": "EraseNonExisting",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 741
+        },
+        {
+          "name": "ClearAll",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 747
+        },
+        {
+          "name": "AdaptiveBalancingWorkload",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 758
+        },
+        {
+          "name": "CapacityOne",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 779
+        },
+        {
+          "name": "ManyInsertions",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 790
+        },
+        {
+          "name": "StringKeysAndValues",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 809
+        },
+        {
+          "name": "T1T2SizesConsistent",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 821
+        },
+        {
+          "name": "PutOnT2Hit",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 832
+        },
+        {
+          "name": "B1GhostHitIncreasesP",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 997
+        },
+        {
+          "name": "B2GhostHitDecreasesP",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 1018
+        },
+        {
+          "name": "PNeverExceedsCapacity",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 1046
+        },
+        {
+          "name": "PNeverGoesBelowZero",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 1072
+        },
+        {
+          "name": "GhostListsBounded",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\DataStructure\\CacheTests.cpp",
+          "line": 1101
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "tests": 3,
+  "name": "AllTests",
+  "testsuites": [
+    {
+      "name": "CUDAKernelComponentTests",
+      "tests": 3,
+      "testsuite": [
+        {
+          "name": "ReturnsComponentName",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\cuKernels\\CUDAKernelTests.cpp",
+          "line": 14
+        },
+        {
+          "name": "ExposesCudaToolkitVersion",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\cuKernels\\CUDAKernelTests.cpp",
+          "line": 19
+        },
+        {
+          "name": "CompiledWithNvcc",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\cuKernels\\CUDAKernelTests.cpp",
+          "line": 24
+        }
+      ]
+    }
+  ]
+}

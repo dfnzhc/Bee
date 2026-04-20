@@ -1,0 +1,25 @@
+{
+	"InstallScripts" : 
+	[
+		"D:/Dev/1Project/Bee/build_test/cmake_install.cmake",
+		"D:/Dev/1Project/Bee/build_test/Bee/cmake_install.cmake",
+		"D:/Dev/1Project/Bee/build_test/Bee/Base/cmake_install.cmake",
+		"D:/Dev/1Project/Bee/build_test/Bee/Concurrency/cmake_install.cmake",
+		"D:/Dev/1Project/Bee/build_test/Bee/DataStructure/cmake_install.cmake",
+		"D:/Dev/1Project/Bee/build_test/Bee/Event/cmake_install.cmake",
+		"D:/Dev/1Project/Bee/build_test/Bee/Math/cmake_install.cmake",
+		"D:/Dev/1Project/Bee/build_test/Bee/Task/cmake_install.cmake",
+		"D:/Dev/1Project/Bee/build_test/Bee/Tensor/cmake_install.cmake",
+		"D:/Dev/1Project/Bee/build_test/Bee/cuKernels/cmake_install.cmake",
+		"D:/Dev/1Project/Bee/build_test/Tests/cmake_install.cmake",
+		"D:/Dev/1Project/Bee/build_test/Tests/Base/cmake_install.cmake",
+		"D:/Dev/1Project/Bee/build_test/Tests/Concurrency/cmake_install.cmake",
+		"D:/Dev/1Project/Bee/build_test/Tests/DataStructure/cmake_install.cmake",
+		"D:/Dev/1Project/Bee/build_test/Tests/Event/cmake_install.cmake",
+		"D:/Dev/1Project/Bee/build_test/Tests/Math/cmake_install.cmake",
+		"D:/Dev/1Project/Bee/build_test/Tests/Task/cmake_install.cmake",
+		"D:/Dev/1Project/Bee/build_test/Tests/Tensor/cmake_install.cmake",
+		"D:/Dev/1Project/Bee/build_test/Tests/cuKernels/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

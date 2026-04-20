@@ -1,0 +1,886 @@
+{
+  "tests": 158,
+  "name": "AllTests",
+  "testsuites": [
+    {
+      "name": "TaskStateTests",
+      "tests": 3,
+      "testsuite": [
+        {
+          "name": "AllValuesExist",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskStateTests.cpp",
+          "line": 18
+        },
+        {
+          "name": "EnumToNameReturnsCorrectStrings",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskStateTests.cpp",
+          "line": 26
+        },
+        {
+          "name": "EnumFromNameRoundTrips",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskStateTests.cpp",
+          "line": 34
+        }
+      ]
+    },
+    {
+      "name": "TaskBasicTests",
+      "tests": 16,
+      "testsuite": [
+        {
+          "name": "DefaultConstructIsEmpty",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskBasicTests.cpp",
+          "line": 36
+        },
+        {
+          "name": "LazyNotStartedOnCreation",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskBasicTests.cpp",
+          "line": 45
+        },
+        {
+          "name": "GetReturnsValue",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskBasicTests.cpp",
+          "line": 55
+        },
+        {
+          "name": "GetVoidCompletes",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskBasicTests.cpp",
+          "line": 61
+        },
+        {
+          "name": "GetString",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskBasicTests.cpp",
+          "line": 67
+        },
+        {
+          "name": "GetPropagatesException",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskBasicTests.cpp",
+          "line": 75
+        },
+        {
+          "name": "WaitBlocksUntilComplete",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskBasicTests.cpp",
+          "line": 87
+        },
+        {
+          "name": "WaitPropagatesException",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskBasicTests.cpp",
+          "line": 95
+        },
+        {
+          "name": "WaitForReturnsCompletedImmediately",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskBasicTests.cpp",
+          "line": 107
+        },
+        {
+          "name": "GetConsumesTask",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskBasicTests.cpp",
+          "line": 119
+        },
+        {
+          "name": "WaitConsumesTask",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskBasicTests.cpp",
+          "line": 127
+        },
+        {
+          "name": "MoveConstructTransfersOwnership",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskBasicTests.cpp",
+          "line": 136
+        },
+        {
+          "name": "MoveAssignTransfersOwnership",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskBasicTests.cpp",
+          "line": 146
+        },
+        {
+          "name": "UnstartedTaskDestroySafely",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskBasicTests.cpp",
+          "line": 158
+        },
+        {
+          "name": "WaitForTimesOutOnSlowTask",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskBasicTests.cpp",
+          "line": 167
+        },
+        {
+          "name": "WaitForSucceedsWithLongTimeout",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskBasicTests.cpp",
+          "line": 185
+        }
+      ]
+    },
+    {
+      "name": "SchedulerTests",
+      "tests": 8,
+      "testsuite": [
+        {
+          "name": "ScheduleTransfersToWorkerThread",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\SchedulerTests.cpp",
+          "line": 24
+        },
+        {
+          "name": "SpawnTaskReturnsValue",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\SchedulerTests.cpp",
+          "line": 41
+        },
+        {
+          "name": "SpawnTaskVoid",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\SchedulerTests.cpp",
+          "line": 51
+        },
+        {
+          "name": "SpawnTaskPropagatesException",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\SchedulerTests.cpp",
+          "line": 63
+        },
+        {
+          "name": "SpawnTaskRunsOnWorkerThread",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\SchedulerTests.cpp",
+          "line": 73
+        },
+        {
+          "name": "CoAwaitChainedTasks",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\SchedulerTests.cpp",
+          "line": 86
+        },
+        {
+          "name": "NestedCoAwait",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\SchedulerTests.cpp",
+          "line": 105
+        },
+        {
+          "name": "MultipleConcurrentSpawnTasks",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\SchedulerTests.cpp",
+          "line": 131
+        }
+      ]
+    },
+    {
+      "name": "ThenTests",
+      "tests": 10,
+      "testsuite": [
+        {
+          "name": "InlineThenIntToString",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ThenTests.cpp",
+          "line": 20
+        },
+        {
+          "name": "InlineThenIntToVoid",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ThenTests.cpp",
+          "line": 31
+        },
+        {
+          "name": "InlineThenVoidToInt",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ThenTests.cpp",
+          "line": 44
+        },
+        {
+          "name": "InlineThenVoidToVoid",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ThenTests.cpp",
+          "line": 55
+        },
+        {
+          "name": "ChainedThen",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ThenTests.cpp",
+          "line": 68
+        },
+        {
+          "name": "ThenPropagatesExceptionFromPredecessor",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ThenTests.cpp",
+          "line": 81
+        },
+        {
+          "name": "ThenPropagatesExceptionFromContinuation",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ThenTests.cpp",
+          "line": 93
+        },
+        {
+          "name": "SchedulerThenRunsOnWorkerThread",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ThenTests.cpp",
+          "line": 104
+        },
+        {
+          "name": "SchedulerThenVoidToVoid",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ThenTests.cpp",
+          "line": 124
+        },
+        {
+          "name": "SchedulerChainedThen",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ThenTests.cpp",
+          "line": 140
+        }
+      ]
+    },
+    {
+      "name": "WhenAllTests",
+      "tests": 11,
+      "testsuite": [
+        {
+          "name": "VariadicTwoInts",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\WhenAllTests.cpp",
+          "line": 20
+        },
+        {
+          "name": "VariadicHeterogeneous",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\WhenAllTests.cpp",
+          "line": 35
+        },
+        {
+          "name": "VariadicWithVoid",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\WhenAllTests.cpp",
+          "line": 52
+        },
+        {
+          "name": "VariadicSingleTask",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\WhenAllTests.cpp",
+          "line": 67
+        },
+        {
+          "name": "VariadicExceptionPropagation",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\WhenAllTests.cpp",
+          "line": 77
+        },
+        {
+          "name": "VectorBasic",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\WhenAllTests.cpp",
+          "line": 92
+        },
+        {
+          "name": "VectorEmpty",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\WhenAllTests.cpp",
+          "line": 111
+        },
+        {
+          "name": "VectorSingleElement",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\WhenAllTests.cpp",
+          "line": 120
+        },
+        {
+          "name": "VectorExceptionPropagation",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\WhenAllTests.cpp",
+          "line": 134
+        },
+        {
+          "name": "VectorLargeConcurrency",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\WhenAllTests.cpp",
+          "line": 151
+        },
+        {
+          "name": "VariadicMixedValueAndVoid",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\WhenAllTests.cpp",
+          "line": 174
+        }
+      ]
+    },
+    {
+      "name": "WhenAnyTests",
+      "tests": 6,
+      "testsuite": [
+        {
+          "name": "FirstToCompleteWins",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\WhenAnyTests.cpp",
+          "line": 21
+        },
+        {
+          "name": "SingleTask",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\WhenAnyTests.cpp",
+          "line": 44
+        },
+        {
+          "name": "WinnerExceptionPropagated",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\WhenAnyTests.cpp",
+          "line": 60
+        },
+        {
+          "name": "AllTasksFail",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\WhenAnyTests.cpp",
+          "line": 90
+        },
+        {
+          "name": "LargeRace",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\WhenAnyTests.cpp",
+          "line": 105
+        },
+        {
+          "name": "SynchronousTasksRace",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\WhenAnyTests.cpp",
+          "line": 126
+        }
+      ]
+    },
+    {
+      "name": "AsyncScopeTests",
+      "tests": 8,
+      "testsuite": [
+        {
+          "name": "SpawnAndJoin",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\AsyncScopeTests.cpp",
+          "line": 22
+        },
+        {
+          "name": "JoinIdempotent",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\AsyncScopeTests.cpp",
+          "line": 41
+        },
+        {
+          "name": "DestructorAutoJoins",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\AsyncScopeTests.cpp",
+          "line": 55
+        },
+        {
+          "name": "PendingCountTracking",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\AsyncScopeTests.cpp",
+          "line": 74
+        },
+        {
+          "name": "JoinRethrowsFirstException",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\AsyncScopeTests.cpp",
+          "line": 83
+        },
+        {
+          "name": "RequestStopSetsToken",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\AsyncScopeTests.cpp",
+          "line": 97
+        },
+        {
+          "name": "LargeScaleSpawn",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\AsyncScopeTests.cpp",
+          "line": 114
+        },
+        {
+          "name": "SpawnAfterJoin",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\AsyncScopeTests.cpp",
+          "line": 133
+        }
+      ]
+    },
+    {
+      "name": "PartitionerTests",
+      "tests": 10,
+      "testsuite": [
+        {
+          "name": "EmptyRange",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\PartitionerTests.cpp",
+          "line": 25
+        },
+        {
+          "name": "ZeroWorkers",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\PartitionerTests.cpp",
+          "line": 31
+        },
+        {
+          "name": "CoversEntireRange",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\PartitionerTests.cpp",
+          "line": 37
+        },
+        {
+          "name": "SmallRange",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\PartitionerTests.cpp",
+          "line": 62
+        },
+        {
+          "name": "OversubscriptionFactor",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\PartitionerTests.cpp",
+          "line": 72
+        },
+        {
+          "name": "ExecuteChunksBasic",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\PartitionerTests.cpp",
+          "line": 84
+        },
+        {
+          "name": "ExecuteChunksEmpty",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\PartitionerTests.cpp",
+          "line": 99
+        },
+        {
+          "name": "ExecuteChunksException",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\PartitionerTests.cpp",
+          "line": 111
+        },
+        {
+          "name": "ExecuteChunksCancellation",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\PartitionerTests.cpp",
+          "line": 125
+        },
+        {
+          "name": "ExecuteChunksConcurrency",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\PartitionerTests.cpp",
+          "line": 137
+        }
+      ]
+    },
+    {
+      "name": "ParallelForEachTests",
+      "tests": 8,
+      "testsuite": [
+        {
+          "name": "BasicIterator",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelForEachTests.cpp",
+          "line": 24
+        },
+        {
+          "name": "SerialFallback",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelForEachTests.cpp",
+          "line": 39
+        },
+        {
+          "name": "EmptyRange",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelForEachTests.cpp",
+          "line": 53
+        },
+        {
+          "name": "ExceptionPropagation",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelForEachTests.cpp",
+          "line": 64
+        },
+        {
+          "name": "CancellationStopsWork",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelForEachTests.cpp",
+          "line": 83
+        },
+        {
+          "name": "RangesBasic",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelForEachTests.cpp",
+          "line": 100
+        },
+        {
+          "name": "RangesEmpty",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelForEachTests.cpp",
+          "line": 114
+        },
+        {
+          "name": "RangesCancellation",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelForEachTests.cpp",
+          "line": 125
+        }
+      ]
+    },
+    {
+      "name": "ParallelTransformTests",
+      "tests": 7,
+      "testsuite": [
+        {
+          "name": "BasicIterator",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelTransformTests.cpp",
+          "line": 23
+        },
+        {
+          "name": "SerialFallback",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelTransformTests.cpp",
+          "line": 42
+        },
+        {
+          "name": "EmptyRange",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelTransformTests.cpp",
+          "line": 57
+        },
+        {
+          "name": "ExceptionPropagation",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelTransformTests.cpp",
+          "line": 69
+        },
+        {
+          "name": "CancellationStopsWork",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelTransformTests.cpp",
+          "line": 86
+        },
+        {
+          "name": "RangesBasic",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelTransformTests.cpp",
+          "line": 105
+        },
+        {
+          "name": "RangesCancellation",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelTransformTests.cpp",
+          "line": 121
+        }
+      ]
+    },
+    {
+      "name": "ParallelReduceTests",
+      "tests": 11,
+      "testsuite": [
+        {
+          "name": "SumIterator",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelReduceTests.cpp",
+          "line": 25
+        },
+        {
+          "name": "ProductSmall",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelReduceTests.cpp",
+          "line": 37
+        },
+        {
+          "name": "EmptyRange",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelReduceTests.cpp",
+          "line": 47
+        },
+        {
+          "name": "SerialFallback",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelReduceTests.cpp",
+          "line": 57
+        },
+        {
+          "name": "ExceptionPropagation",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelReduceTests.cpp",
+          "line": 68
+        },
+        {
+          "name": "Cancellation",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelReduceTests.cpp",
+          "line": 80
+        },
+        {
+          "name": "SumRanges",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelReduceTests.cpp",
+          "line": 97
+        },
+        {
+          "name": "TransformReduceBasic",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelReduceTests.cpp",
+          "line": 112
+        },
+        {
+          "name": "TransformReduceEmpty",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelReduceTests.cpp",
+          "line": 130
+        },
+        {
+          "name": "TransformReduceRanges",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelReduceTests.cpp",
+          "line": 142
+        },
+        {
+          "name": "TransformReduceCancellation",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelReduceTests.cpp",
+          "line": 158
+        }
+      ]
+    },
+    {
+      "name": "ParallelScanTests",
+      "tests": 12,
+      "testsuite": [
+        {
+          "name": "InclusiveScanBasic",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelScanTests.cpp",
+          "line": 23
+        },
+        {
+          "name": "InclusiveScanSmall",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelScanTests.cpp",
+          "line": 40
+        },
+        {
+          "name": "InclusiveScanEmpty",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelScanTests.cpp",
+          "line": 51
+        },
+        {
+          "name": "InclusiveScanSingle",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelScanTests.cpp",
+          "line": 61
+        },
+        {
+          "name": "InclusiveScanCancellation",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelScanTests.cpp",
+          "line": 71
+        },
+        {
+          "name": "InclusiveScanRanges",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelScanTests.cpp",
+          "line": 85
+        },
+        {
+          "name": "ExclusiveScanBasic",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelScanTests.cpp",
+          "line": 103
+        },
+        {
+          "name": "ExclusiveScanSmall",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelScanTests.cpp",
+          "line": 119
+        },
+        {
+          "name": "ExclusiveScanEmpty",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelScanTests.cpp",
+          "line": 130
+        },
+        {
+          "name": "ExclusiveScanWithInit",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelScanTests.cpp",
+          "line": 140
+        },
+        {
+          "name": "ExclusiveScanCancellation",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelScanTests.cpp",
+          "line": 152
+        },
+        {
+          "name": "ExclusiveScanRanges",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelScanTests.cpp",
+          "line": 166
+        }
+      ]
+    },
+    {
+      "name": "ParallelSortTests",
+      "tests": 12,
+      "testsuite": [
+        {
+          "name": "BasicDefaultComp",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelSortTests.cpp",
+          "line": 25
+        },
+        {
+          "name": "CustomComparator",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelSortTests.cpp",
+          "line": 40
+        },
+        {
+          "name": "AlreadySorted",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelSortTests.cpp",
+          "line": 54
+        },
+        {
+          "name": "ReverseSorted",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelSortTests.cpp",
+          "line": 65
+        },
+        {
+          "name": "SerialFallback",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelSortTests.cpp",
+          "line": 77
+        },
+        {
+          "name": "EmptyRange",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelSortTests.cpp",
+          "line": 87
+        },
+        {
+          "name": "SingleElement",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelSortTests.cpp",
+          "line": 97
+        },
+        {
+          "name": "AllEqual",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelSortTests.cpp",
+          "line": 107
+        },
+        {
+          "name": "Cancellation",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelSortTests.cpp",
+          "line": 121
+        },
+        {
+          "name": "RangesBasic",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelSortTests.cpp",
+          "line": 142
+        },
+        {
+          "name": "RangesCustomComp",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelSortTests.cpp",
+          "line": 155
+        },
+        {
+          "name": "LargeDataCorrectnessCheck",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelSortTests.cpp",
+          "line": 168
+        }
+      ]
+    },
+    {
+      "name": "ParallelVerificationTests",
+      "tests": 9,
+      "testsuite": [
+        {
+          "name": "ForEachUsesMultipleThreads",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelVerificationTests.cpp",
+          "line": 27
+        },
+        {
+          "name": "TransformUsesMultipleThreads",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelVerificationTests.cpp",
+          "line": 44
+        },
+        {
+          "name": "ReduceUsesMultipleThreads",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelVerificationTests.cpp",
+          "line": 63
+        },
+        {
+          "name": "SortUsesMultipleThreads",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelVerificationTests.cpp",
+          "line": 86
+        },
+        {
+          "name": "ForEachInFlightCancellation",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelVerificationTests.cpp",
+          "line": 104
+        },
+        {
+          "name": "TransformInFlightCancellation",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelVerificationTests.cpp",
+          "line": 128
+        },
+        {
+          "name": "ReduceInFlightCancellation",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelVerificationTests.cpp",
+          "line": 152
+        },
+        {
+          "name": "SortInFlightCancellation",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelVerificationTests.cpp",
+          "line": 175
+        },
+        {
+          "name": "ScanInFlightCancellation",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\ParallelVerificationTests.cpp",
+          "line": 197
+        }
+      ]
+    },
+    {
+      "name": "TaskGraphTests",
+      "tests": 27,
+      "testsuite": [
+        {
+          "name": "EmptyGraph",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskGraphTests.cpp",
+          "line": 31
+        },
+        {
+          "name": "SingleRootNode",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskGraphTests.cpp",
+          "line": 39
+        },
+        {
+          "name": "DiamondNoCycle",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskGraphTests.cpp",
+          "line": 49
+        },
+        {
+          "name": "NodeCountIncremental",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskGraphTests.cpp",
+          "line": 61
+        },
+        {
+          "name": "HasCycleReturnsFalseForDAG",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskGraphTests.cpp",
+          "line": 74
+        },
+        {
+          "name": "ToDotEmptyGraph",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskGraphTests.cpp",
+          "line": 90
+        },
+        {
+          "name": "ToDotWithLabels",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskGraphTests.cpp",
+          "line": 99
+        },
+        {
+          "name": "ToDotAutoLabel",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskGraphTests.cpp",
+          "line": 116
+        },
+        {
+          "name": "EmptyGraphExecute",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskGraphTests.cpp",
+          "line": 131
+        },
+        {
+          "name": "SingleNodeExecute",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskGraphTests.cpp",
+          "line": 139
+        },
+        {
+          "name": "SimpleChain",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskGraphTests.cpp",
+          "line": 149
+        },
+        {
+          "name": "DiamondDependency",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskGraphTests.cpp",
+          "line": 163
+        },
+        {
+          "name": "WideFanOut",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskGraphTests.cpp",
+          "line": 179
+        },
+        {
+          "name": "TypedDataFlow",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskGraphTests.cpp",
+          "line": 196
+        },
+        {
+          "name": "WideFanIn",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskGraphTests.cpp",
+          "line": 210
+        },
+        {
+          "name": "VoidNodesWithNodeAfter",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskGraphTests.cpp",
+          "line": 245
+        },
+        {
+          "name": "MixedVoidAndTyped",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskGraphTests.cpp",
+          "line": 258
+        },
+        {
+          "name": "VoidNodeChain",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskGraphTests.cpp",
+          "line": 275
+        },
+        {
+          "name": "NodeExceptionPropagates",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskGraphTests.cpp",
+          "line": 304
+        },
+        {
+          "name": "CascadeFailure",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskGraphTests.cpp",
+          "line": 316
+        },
+        {
+          "name": "CycleDetectedAtExecute",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskGraphTests.cpp",
+          "line": 334
+        },
+        {
+          "name": "ResultOfFailedNodeThrows",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskGraphTests.cpp",
+          "line": 350
+        },
+        {
+          "name": "WideFanOutParallelism",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskGraphTests.cpp",
+          "line": 365
+        },
+        {
+          "name": "LargeGraphStress",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskGraphTests.cpp",
+          "line": 394
+        },
+        {
+          "name": "DoubleExecuteAllowedAndResultReadable",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskGraphTests.cpp",
+          "line": 410
+        },
+        {
+          "name": "DotLabelEscaping",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskGraphTests.cpp",
+          "line": 440
+        },
+        {
+          "name": "ResultTypeMismatchDiagnostic",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Task\\TaskGraphTests.cpp",
+          "line": 458
+        }
+      ]
+    }
+  ]
+}

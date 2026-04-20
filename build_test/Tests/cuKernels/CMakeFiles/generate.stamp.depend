@@ -1,0 +1,13 @@
+# CMake generation dependency list for this directory.
+C:/Program Files/CMake/share/cmake-4.2/Modules/CMakeCUDAInformation.cmake
+C:/Program Files/CMake/share/cmake-4.2/Modules/CMakeCommonLanguageInclude.cmake
+C:/Program Files/CMake/share/cmake-4.2/Modules/CheckLanguage.cmake
+C:/Program Files/CMake/share/cmake-4.2/Modules/Compiler/CMakeCommonCompilerMacros.cmake
+C:/Program Files/CMake/share/cmake-4.2/Modules/Compiler/NVIDIA-CUDA.cmake
+C:/Program Files/CMake/share/cmake-4.2/Modules/Compiler/NVIDIA.cmake
+C:/Program Files/CMake/share/cmake-4.2/Modules/GoogleTest.cmake
+C:/Program Files/CMake/share/cmake-4.2/Modules/Platform/Windows-MSVC.cmake
+C:/Program Files/CMake/share/cmake-4.2/Modules/Platform/Windows-NVIDIA-CUDA.cmake
+D:/Dev/1Project/Bee/Tests/cuKernels/CMakeLists.txt
+D:/Dev/1Project/Bee/build_test/CMakeFiles/4.2.0-rc4/CMakeCUDACompiler.cmake
+D:/Dev/1Project/Bee/build_test/CMakeFiles/cmake.verify_globs

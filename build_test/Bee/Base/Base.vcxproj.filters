@@ -1,0 +1,100 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="D:\Dev\1Project\Bee\Bee\Base\Base.cpp" />
+    <ClCompile Include="D:\Dev\1Project\Bee\Bee\Base\Diagnostics\Check.cpp">
+      <Filter>Diagnostics</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Dev\1Project\Bee\Bee\Base\Diagnostics\Error.cpp">
+      <Filter>Diagnostics</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Dev\1Project\Bee\Bee\Base\Diagnostics\Log.cpp">
+      <Filter>Diagnostics</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="D:\Dev\1Project\Bee\Bee\Base\Base.hpp" />
+    <ClInclude Include="D:\Dev\1Project\Bee\Bee\Base\Core.hpp" />
+    <ClInclude Include="D:\Dev\1Project\Bee\Bee\Base\Core\Config.hpp">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Dev\1Project\Bee\Bee\Base\Core\Defines.hpp">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Dev\1Project\Bee\Bee\Base\Core\InlineString.hpp">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Dev\1Project\Bee\Bee\Base\Core\Macros.hpp">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Dev\1Project\Bee\Bee\Base\Core\MoveOnlyFunction.hpp">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Dev\1Project\Bee\Bee\Base\Core\Traits.hpp">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Dev\1Project\Bee\Bee\Base\Diagnostics.hpp" />
+    <ClInclude Include="D:\Dev\1Project\Bee\Bee\Base\Diagnostics\Check.hpp">
+      <Filter>Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Dev\1Project\Bee\Bee\Base\Diagnostics\Error.hpp">
+      <Filter>Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Dev\1Project\Bee\Bee\Base\Diagnostics\Log.hpp">
+      <Filter>Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Dev\1Project\Bee\Bee\Base\Numeric.hpp" />
+    <ClInclude Include="D:\Dev\1Project\Bee\Bee\Base\Numeric\Bit.hpp">
+      <Filter>Numeric</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Dev\1Project\Bee\Bee\Base\Numeric\Hash.hpp">
+      <Filter>Numeric</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Dev\1Project\Bee\Bee\Base\Numeric\Numeric.hpp">
+      <Filter>Numeric</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Dev\1Project\Bee\Bee\Base\Reflection.hpp" />
+    <ClInclude Include="D:\Dev\1Project\Bee\Bee\Base\Reflection\Enum.hpp">
+      <Filter>Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Dev\1Project\Bee\Bee\Base\Reflection\Nameof.hpp">
+      <Filter>Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Dev\1Project\Bee\Bee\Base\String.hpp" />
+    <ClInclude Include="D:\Dev\1Project\Bee\Bee\Base\String\Ascii.hpp">
+      <Filter>String</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Dev\1Project\Bee\Bee\Base\String\Naming.hpp">
+      <Filter>String</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Dev\1Project\Bee\Bee\Base\String\Text.hpp">
+      <Filter>String</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Dev\1Project\Bee\Bee\Base\Sync\EventCount.hpp">
+      <Filter>Sync</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="D:\Dev\1Project\Bee\Bee\Base\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Core">
+      <UniqueIdentifier>{A82B5935-9142-33DF-AB18-58A91E276BBA}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Diagnostics">
+      <UniqueIdentifier>{E00A1B46-A7DA-36FA-8760-B7E2DA6BE106}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Numeric">
+      <UniqueIdentifier>{E74E59F5-D2A2-3DDC-9241-60700F4567E5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Reflection">
+      <UniqueIdentifier>{F31B778C-0AD0-3CE2-8D8D-D9E213CB2525}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="String">
+      <UniqueIdentifier>{FAABCEEA-F012-324E-AA9B-DE3F9BE15CEC}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Sync">
+      <UniqueIdentifier>{BB0ACEDB-96E8-312D-99F9-CC216F7BDA47}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

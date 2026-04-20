@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="D:\Dev\1Project\Bee\build_test\CMakeFiles\eb00e546dd10682a1d7b4509739f21f1\generate.stamp.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{B1B315EA-2567-3771-B960-073041DF903B}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

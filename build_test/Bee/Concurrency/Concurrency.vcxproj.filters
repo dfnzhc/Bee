@@ -1,0 +1,36 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="D:\Dev\1Project\Bee\Bee\Concurrency\Concurrency.cpp" />
+    <ClCompile Include="D:\Dev\1Project\Bee\Bee\Concurrency\Thread\WorkPool.cpp">
+      <Filter>Thread</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="D:\Dev\1Project\Bee\Bee\Concurrency\Concurrency.hpp" />
+    <ClInclude Include="D:\Dev\1Project\Bee\Bee\Concurrency\LockFree\ChaseLevDeque.hpp">
+      <Filter>LockFree</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Dev\1Project\Bee\Bee\Concurrency\LockFree\MPMCQueue.hpp">
+      <Filter>LockFree</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Dev\1Project\Bee\Bee\Concurrency\LockFree\SPSCQueue.hpp">
+      <Filter>LockFree</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Dev\1Project\Bee\Bee\Concurrency\Thread\WorkPool.hpp">
+      <Filter>Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Dev\1Project\Bee\Bee\Concurrency\Threading.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="D:\Dev\1Project\Bee\Bee\Concurrency\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="LockFree">
+      <UniqueIdentifier>{181431B7-6C8B-3543-B1AA-4E192B1288A0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Thread">
+      <UniqueIdentifier>{BE5E7631-7384-3441-A4B5-A66EF1FD5430}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

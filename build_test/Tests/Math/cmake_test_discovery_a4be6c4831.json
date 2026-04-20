@@ -1,0 +1,27 @@
+{
+  "tests": 3,
+  "name": "AllTests",
+  "testsuites": [
+    {
+      "name": "MathComponentTests",
+      "tests": 3,
+      "testsuite": [
+        {
+          "name": "ClampKeepsValueInRange",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Math\\MathTests.cpp",
+          "line": 6
+        },
+        {
+          "name": "LerpInterpolates",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Math\\MathTests.cpp",
+          "line": 13
+        },
+        {
+          "name": "DetectsPowerOfTwo",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Math\\MathTests.cpp",
+          "line": 19
+        }
+      ]
+    }
+  ]
+}

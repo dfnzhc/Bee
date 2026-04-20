@@ -1,0 +1,17 @@
+{
+  "tests": 1,
+  "name": "AllTests",
+  "testsuites": [
+    {
+      "name": "TensorComponentTests",
+      "tests": 1,
+      "testsuite": [
+        {
+          "name": "ReturnsComponentName",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Tensor\\TensorSkeletonTests.cpp",
+          "line": 5
+        }
+      ]
+    }
+  ]
+}

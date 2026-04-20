@@ -1,0 +1,5 @@
+if(EXISTS "D:/Dev/1Project/Bee/build_test/Tests/cuKernels/cuKernels.Tests[1]_tests.cmake")
+  include("D:/Dev/1Project/Bee/build_test/Tests/cuKernels/cuKernels.Tests[1]_tests.cmake")
+else()
+  add_test(cuKernels.Tests_NOT_BUILT cuKernels.Tests_NOT_BUILT)
+endif()

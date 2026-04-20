@@ -1,0 +1,1695 @@
+{
+  "tests": 303,
+  "name": "AllTests",
+  "testsuites": [
+    {
+      "name": "CheckDeathTest",
+      "tests": 16,
+      "testsuite": [
+        {
+          "name": "CheckFailsOnFalse",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\CheckTests.cpp",
+          "line": 45
+        },
+        {
+          "name": "CheckPassesOnTrue",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\CheckTests.cpp",
+          "line": 50
+        },
+        {
+          "name": "CheckMsgShowsMessage",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\CheckTests.cpp",
+          "line": 58
+        },
+        {
+          "name": "CheckMsgPassesOnTrue",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\CheckTests.cpp",
+          "line": 63
+        },
+        {
+          "name": "CheckEqFailsWithValues",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\CheckTests.cpp",
+          "line": 73
+        },
+        {
+          "name": "CheckEqPasses",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\CheckTests.cpp",
+          "line": 79
+        },
+        {
+          "name": "CheckNeFails",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\CheckTests.cpp",
+          "line": 86
+        },
+        {
+          "name": "CheckLtFails",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\CheckTests.cpp",
+          "line": 91
+        },
+        {
+          "name": "CheckLeFails",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\CheckTests.cpp",
+          "line": 96
+        },
+        {
+          "name": "CheckGtFails",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\CheckTests.cpp",
+          "line": 101
+        },
+        {
+          "name": "CheckGeFails",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\CheckTests.cpp",
+          "line": 106
+        },
+        {
+          "name": "AllPassingOpChecks",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\CheckTests.cpp",
+          "line": 111
+        },
+        {
+          "name": "OpMacroEvaluatesOnce",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\CheckTests.cpp",
+          "line": 121
+        },
+        {
+          "name": "CheckEqWithNonFormattableValuesStillAbortsCleanly",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\CheckTests.cpp",
+          "line": 131
+        },
+        {
+          "name": "CheckEqWithThrowingStreamUsesFallbackMessage",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\CheckTests.cpp",
+          "line": 138
+        },
+        {
+          "name": "FailureHandlerIsCalled",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\CheckTests.cpp",
+          "line": 164
+        }
+      ]
+    },
+    {
+      "name": "ErrorDeathTest",
+      "tests": 2,
+      "testsuite": [
+        {
+          "name": "PanicAborts",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\ErrorTests.cpp",
+          "line": 216
+        },
+        {
+          "name": "ValueOrPanicAbortsOnError",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\ErrorTests.cpp",
+          "line": 227
+        }
+      ]
+    },
+    {
+      "name": "BaseComponentTests",
+      "tests": 1,
+      "testsuite": [
+        {
+          "name": "ReturnsComponentName",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseTests.cpp",
+          "line": 13
+        }
+      ]
+    },
+    {
+      "name": "BaseHashTests",
+      "tests": 11,
+      "testsuite": [
+        {
+          "name": "Splitmix64ZeroInput",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseTests.cpp",
+          "line": 20
+        },
+        {
+          "name": "DifferentInputsProduceDifferentOutputs",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseTests.cpp",
+          "line": 26
+        },
+        {
+          "name": "ConstexprEvaluation",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseTests.cpp",
+          "line": 33
+        },
+        {
+          "name": "NoCollisionsForSmallInputRange",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseTests.cpp",
+          "line": 39
+        },
+        {
+          "name": "Splitmix64Deterministic",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\HashTests.cpp",
+          "line": 27
+        },
+        {
+          "name": "Splitmix64DifferentInputsDifferentOutputs",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\HashTests.cpp",
+          "line": 34
+        },
+        {
+          "name": "Splitmix64ZeroIsFixedPoint",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\HashTests.cpp",
+          "line": 42
+        },
+        {
+          "name": "Splitmix64KnownValues",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\HashTests.cpp",
+          "line": 47
+        },
+        {
+          "name": "Splitmix64MaxInput",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\HashTests.cpp",
+          "line": 54
+        },
+        {
+          "name": "Splitmix64NonZeroInputsProduceNonZero",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\HashTests.cpp",
+          "line": 60
+        },
+        {
+          "name": "Splitmix64AvalancheSingleBitFlip",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\HashTests.cpp",
+          "line": 66
+        }
+      ]
+    },
+    {
+      "name": "BaseNumericTests",
+      "tests": 21,
+      "testsuite": [
+        {
+          "name": "NormalAddition",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseTests.cpp",
+          "line": 50
+        },
+        {
+          "name": "SaturatesAtMaxPlusOne",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseTests.cpp",
+          "line": 55
+        },
+        {
+          "name": "SaturatesAtMaxPlusMax",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseTests.cpp",
+          "line": 60
+        },
+        {
+          "name": "NearMaxDoesNotSaturate",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseTests.cpp",
+          "line": 65
+        },
+        {
+          "name": "ZeroPlusZero",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseTests.cpp",
+          "line": 70
+        },
+        {
+          "name": "WorksWithUint8",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseTests.cpp",
+          "line": 75
+        },
+        {
+          "name": "WorksWithUint16",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseTests.cpp",
+          "line": 81
+        },
+        {
+          "name": "WorksWithUint64",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseTests.cpp",
+          "line": 87
+        },
+        {
+          "name": "SaturatingAddNoOverflowUint8",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NumericTests.cpp",
+          "line": 28
+        },
+        {
+          "name": "SaturatingAddExactMaxUint8",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NumericTests.cpp",
+          "line": 33
+        },
+        {
+          "name": "SaturatingAddOverflowSaturatesUint8",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NumericTests.cpp",
+          "line": 38
+        },
+        {
+          "name": "SaturatingAddBothZero",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NumericTests.cpp",
+          "line": 43
+        },
+        {
+          "name": "SaturatingAddOneZero",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NumericTests.cpp",
+          "line": 48
+        },
+        {
+          "name": "SaturatingAddMaxPlusZero",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NumericTests.cpp",
+          "line": 54
+        },
+        {
+          "name": "SaturatingAddMaxPlusOne",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NumericTests.cpp",
+          "line": 59
+        },
+        {
+          "name": "SaturatingAddMaxPlusMax",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NumericTests.cpp",
+          "line": 64
+        },
+        {
+          "name": "SaturatingAddUint16NoOverflow",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NumericTests.cpp",
+          "line": 69
+        },
+        {
+          "name": "SaturatingAddUint16Overflow",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NumericTests.cpp",
+          "line": 74
+        },
+        {
+          "name": "SaturatingAddUint64NoOverflow",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NumericTests.cpp",
+          "line": 79
+        },
+        {
+          "name": "SaturatingAddUint64Overflow",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NumericTests.cpp",
+          "line": 84
+        },
+        {
+          "name": "SaturatingAddUint64MaxPlusOne",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NumericTests.cpp",
+          "line": 89
+        }
+      ]
+    },
+    {
+      "name": "BaseMacrosTests",
+      "tests": 4,
+      "testsuite": [
+        {
+          "name": "IntArraySize",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseTests.cpp",
+          "line": 95
+        },
+        {
+          "name": "CharArraySize",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseTests.cpp",
+          "line": 101
+        },
+        {
+          "name": "SingleElementArray",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseTests.cpp",
+          "line": 107
+        },
+        {
+          "name": "StructArray",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseTests.cpp",
+          "line": 113
+        }
+      ]
+    },
+    {
+      "name": "BaseConfigTests",
+      "tests": 4,
+      "testsuite": [
+        {
+          "name": "SignedTypeSizes",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseTests.cpp",
+          "line": 126
+        },
+        {
+          "name": "UnsignedTypeSizes",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseTests.cpp",
+          "line": 134
+        },
+        {
+          "name": "SignedTypesAreSigned",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseTests.cpp",
+          "line": 142
+        },
+        {
+          "name": "UnsignedTypesAreUnsigned",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseTests.cpp",
+          "line": 150
+        }
+      ]
+    },
+    {
+      "name": "BaseTextTests",
+      "tests": 17,
+      "testsuite": [
+        {
+          "name": "TrimSpacesRemovesLeadingAndTrailingSpaces",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 23
+        },
+        {
+          "name": "SliceExtractsTokenBetweenMarkers",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 28
+        },
+        {
+          "name": "TrimSpacesEmptyString",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 33
+        },
+        {
+          "name": "TrimSpacesOnlySpaces",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 38
+        },
+        {
+          "name": "TrimSpacesSingleNonSpaceChar",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 43
+        },
+        {
+          "name": "TrimSpacesNoSpaces",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 48
+        },
+        {
+          "name": "TrimSpacesLeadingOnly",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 53
+        },
+        {
+          "name": "TrimSpacesTrailingOnly",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 58
+        },
+        {
+          "name": "TrimSpacesTabsNotTrimmed",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 63
+        },
+        {
+          "name": "TrimSpacesSingleSpace",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 68
+        },
+        {
+          "name": "SlicePrefixNotFound",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 73
+        },
+        {
+          "name": "SlicePrefixNotFoundCustomFallback",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 78
+        },
+        {
+          "name": "SliceSuffixNotFound",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 83
+        },
+        {
+          "name": "SliceEmptyPrefixAndSuffix",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 88
+        },
+        {
+          "name": "SliceAdjacentMarkersReturnsFallback",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 93
+        },
+        {
+          "name": "SliceNestedMarkersFindsFirst",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 98
+        },
+        {
+          "name": "SliceEmptyInput",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 103
+        }
+      ]
+    },
+    {
+      "name": "BaseAsciiTests",
+      "tests": 13,
+      "testsuite": [
+        {
+          "name": "ClassifiesAsciiCharacters",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 112
+        },
+        {
+          "name": "BoundaryCharsUpperRange",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 120
+        },
+        {
+          "name": "BoundaryCharsLowerRange",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 128
+        },
+        {
+          "name": "BoundaryCharsDigitRange",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 136
+        },
+        {
+          "name": "NullCharClassification",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 144
+        },
+        {
+          "name": "MaxAsciiCharClassification",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 152
+        },
+        {
+          "name": "IsAsciiAlphaLettersReturnTrue",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 160
+        },
+        {
+          "name": "IsAsciiAlphaDigitsReturnFalse",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 168
+        },
+        {
+          "name": "IsAsciiAlphaSpecialReturnFalse",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 174
+        },
+        {
+          "name": "ToAsciiLowerAlreadyLowercaseUnchanged",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 182
+        },
+        {
+          "name": "ToAsciiLowerDigitsUnchanged",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 188
+        },
+        {
+          "name": "ToAsciiLowerSpecialCharsUnchanged",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 194
+        },
+        {
+          "name": "ToAsciiLowerAllUppercaseConversions",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 202
+        }
+      ]
+    },
+    {
+      "name": "BaseNamingTests",
+      "tests": 13,
+      "testsuite": [
+        {
+          "name": "ToSnakeCaseConvertsPascalCase",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 212
+        },
+        {
+          "name": "ToSnakeCaseEmptyString",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 217
+        },
+        {
+          "name": "ToSnakeCaseAlreadySnake",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 222
+        },
+        {
+          "name": "ToSnakeCaseCamelCase",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 227
+        },
+        {
+          "name": "ToSnakeCaseConsecutiveCapitals",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 232
+        },
+        {
+          "name": "ToSnakeCaseConsecutiveCapitalsInMiddle",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 237
+        },
+        {
+          "name": "ToSnakeCaseAllUppercase",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 242
+        },
+        {
+          "name": "ToSnakeCaseSingleUpperChar",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 247
+        },
+        {
+          "name": "ToSnakeCaseSingleLowerChar",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 252
+        },
+        {
+          "name": "ToSnakeCaseDigitsAtEnd",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 257
+        },
+        {
+          "name": "ToSnakeCaseLeadingUnderscores",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 262
+        },
+        {
+          "name": "ToSnakeCaseTrailingUnderscores",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 267
+        },
+        {
+          "name": "ToSnakeCaseMixedDelimiters",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 272
+        }
+      ]
+    },
+    {
+      "name": "BaseBitOpsTests",
+      "tests": 26,
+      "testsuite": [
+        {
+          "name": "PowerOfTwoUtilitiesWork",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 281
+        },
+        {
+          "name": "SupportsDifferentUnsignedTypes",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 291
+        },
+        {
+          "name": "ReturnsZeroWhenBitCeilWouldOverflow",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 297
+        },
+        {
+          "name": "ByteSwapWorksForUnsignedAndSigned",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 302
+        },
+        {
+          "name": "EndianConversionRoundTrip",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 309
+        },
+        {
+          "name": "IsPowerOfTwoAllPowersUint8",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 318
+        },
+        {
+          "name": "IsPowerOfTwoAllPowersUint16",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 324
+        },
+        {
+          "name": "IsPowerOfTwoAllPowersUint32",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 330
+        },
+        {
+          "name": "IsPowerOfTwoAllPowersUint64",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 336
+        },
+        {
+          "name": "IsPowerOfTwoMaxValues",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 342
+        },
+        {
+          "name": "RoundUpPowerOfTwoZeroReturnsOne",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 350
+        },
+        {
+          "name": "RoundUpPowerOfTwoOneReturnsOne",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 355
+        },
+        {
+          "name": "RoundUpPowerOfTwoExactPowers",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 360
+        },
+        {
+          "name": "RoundUpPowerOfTwoUint64Large",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 367
+        },
+        {
+          "name": "RoundUpPowerOfTwoUint64Overflow",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 374
+        },
+        {
+          "name": "HighestPowerOfTwoLEQZero",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 380
+        },
+        {
+          "name": "HighestPowerOfTwoLEQOne",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 385
+        },
+        {
+          "name": "HighestPowerOfTwoLEQExactPowers",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 390
+        },
+        {
+          "name": "ByteSwapUint8Identity",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 396
+        },
+        {
+          "name": "ByteSwapUint64",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 401
+        },
+        {
+          "name": "ByteSwapZero",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 406
+        },
+        {
+          "name": "ByteSwapNegativeInt16",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 412
+        },
+        {
+          "name": "EndianMutualExclusivity",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 419
+        },
+        {
+          "name": "EndianRoundTripInt16",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 425
+        },
+        {
+          "name": "EndianRoundTripInt64",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 432
+        },
+        {
+          "name": "NativeEndianIsIdentity",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\BaseUtilsTests.cpp",
+          "line": 439
+        }
+      ]
+    },
+    {
+      "name": "CheckTest",
+      "tests": 3,
+      "testsuite": [
+        {
+          "name": "DefaultHandlerIsNull",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\CheckTests.cpp",
+          "line": 149
+        },
+        {
+          "name": "SetAndGetHandler",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\CheckTests.cpp",
+          "line": 155
+        },
+        {
+          "name": "AssertPassesInDebug",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\CheckTests.cpp",
+          "line": 201
+        }
+      ]
+    },
+    {
+      "name": "ErrorTest",
+      "tests": 26,
+      "testsuite": [
+        {
+          "name": "SeverityToString",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\ErrorTests.cpp",
+          "line": 21
+        },
+        {
+          "name": "SeverityValuesDistinct",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\ErrorTests.cpp",
+          "line": 29
+        },
+        {
+          "name": "MakeErrorDefaults",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\ErrorTests.cpp",
+          "line": 40
+        },
+        {
+          "name": "MakeErrorWithAllParams",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\ErrorTests.cpp",
+          "line": 48
+        },
+        {
+          "name": "Retryable",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\ErrorTests.cpp",
+          "line": 56
+        },
+        {
+          "name": "Unrecoverable",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\ErrorTests.cpp",
+          "line": 64
+        },
+        {
+          "name": "FormatContainsCoreFields",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\ErrorTests.cpp",
+          "line": 72
+        },
+        {
+          "name": "WithContextDoesNotCrash",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\ErrorTests.cpp",
+          "line": 86
+        },
+        {
+          "name": "ResultWithValue",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\ErrorTests.cpp",
+          "line": 113
+        },
+        {
+          "name": "ResultWithError",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\ErrorTests.cpp",
+          "line": 120
+        },
+        {
+          "name": "StatusSuccess",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\ErrorTests.cpp",
+          "line": 127
+        },
+        {
+          "name": "StatusFailure",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\ErrorTests.cpp",
+          "line": 133
+        },
+        {
+          "name": "TrySuccess",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\ErrorTests.cpp",
+          "line": 190
+        },
+        {
+          "name": "TryPropagatesOnFailure",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\ErrorTests.cpp",
+          "line": 197
+        },
+        {
+          "name": "TryAssignPropagatesOnFailure",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\ErrorTests.cpp",
+          "line": 204
+        },
+        {
+          "name": "ValueOrPanicReturnsValue",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\ErrorTests.cpp",
+          "line": 221
+        },
+        {
+          "name": "GuardWithNonThrowingLambda",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\ErrorTests.cpp",
+          "line": 237
+        },
+        {
+          "name": "GuardWithThrowingLambda",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\ErrorTests.cpp",
+          "line": 244
+        },
+        {
+          "name": "GuardWithVoidLambda",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\ErrorTests.cpp",
+          "line": 253
+        },
+        {
+          "name": "GuardWithUnknownException",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\ErrorTests.cpp",
+          "line": 259
+        },
+        {
+          "name": "TryCtxPropagatesWithContext",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\ErrorTests.cpp",
+          "line": 301
+        },
+        {
+          "name": "TryCtxSucceeds",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\ErrorTests.cpp",
+          "line": 313
+        },
+        {
+          "name": "TryAssignCtxPropagatesWithContext",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\ErrorTests.cpp",
+          "line": 320
+        },
+        {
+          "name": "TryAssignCtxSucceeds",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\ErrorTests.cpp",
+          "line": 332
+        },
+        {
+          "name": "LogResultOnError",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\ErrorTests.cpp",
+          "line": 364
+        },
+        {
+          "name": "LogResultOnSuccess",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\ErrorTests.cpp",
+          "line": 382
+        }
+      ]
+    },
+    {
+      "name": "EnumBitmaskTests",
+      "tests": 11,
+      "testsuite": [
+        {
+          "name": "SupportsBitwiseOperators",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\EnumTests.cpp",
+          "line": 49
+        },
+        {
+          "name": "EnablesBitmaskByMacro",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\EnumTests.cpp",
+          "line": 57
+        },
+        {
+          "name": "SupportsCompoundAssignmentOperators",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\EnumTests.cpp",
+          "line": 64
+        },
+        {
+          "name": "SupportsSetClearToggle",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\EnumTests.cpp",
+          "line": 77
+        },
+        {
+          "name": "ClearAbsentFlagKeepsValue",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\EnumTests.cpp",
+          "line": 90
+        },
+        {
+          "name": "DetectsHasAllHasAnyHasNone",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\EnumTests.cpp",
+          "line": 97
+        },
+        {
+          "name": "DetectsZeroAndSingleBit",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\EnumTests.cpp",
+          "line": 106
+        },
+        {
+          "name": "CountsEnabledBits",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\EnumTests.cpp",
+          "line": 114
+        },
+        {
+          "name": "ConvertsToUnderlying",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\EnumTests.cpp",
+          "line": 121
+        },
+        {
+          "name": "SupportsAndNotOperators",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\EnumTests.cpp",
+          "line": 129
+        },
+        {
+          "name": "HandlesHighBitForUnsignedUnderlying",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\EnumTests.cpp",
+          "line": 136
+        }
+      ]
+    },
+    {
+      "name": "EventCountTests",
+      "tests": 7,
+      "testsuite": [
+        {
+          "name": "NotifyNoWaitersIsNoOp",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\EventCountTests.cpp",
+          "line": 23
+        },
+        {
+          "name": "CancelWaitDoesNotDeadlock",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\EventCountTests.cpp",
+          "line": 32
+        },
+        {
+          "name": "SingleWaiterAwakenedByNotify",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\EventCountTests.cpp",
+          "line": 42
+        },
+        {
+          "name": "AwaitHelperMatchesManualPattern",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\EventCountTests.cpp",
+          "line": 70
+        },
+        {
+          "name": "AwaitReturnsImmediatelyIfPredicateTrue",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\EventCountTests.cpp",
+          "line": 87
+        },
+        {
+          "name": "NotifyAllWakesEveryWaiter",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\EventCountTests.cpp",
+          "line": 99
+        },
+        {
+          "name": "ProducerConsumerStress",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\EventCountTests.cpp",
+          "line": 125
+        }
+      ]
+    },
+    {
+      "name": "InlineStringTest",
+      "tests": 23,
+      "testsuite": [
+        {
+          "name": "DefaultConstructEmpty",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\InlineStringTests.cpp",
+          "line": 21
+        },
+        {
+          "name": "ConstructFromStringView",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\InlineStringTests.cpp",
+          "line": 29
+        },
+        {
+          "name": "ConstructFromCString",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\InlineStringTests.cpp",
+          "line": 36
+        },
+        {
+          "name": "ConstructFromNullCString",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\InlineStringTests.cpp",
+          "line": 42
+        },
+        {
+          "name": "ConstructFromStdString",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\InlineStringTests.cpp",
+          "line": 48
+        },
+        {
+          "name": "ShortStringStaysInline",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\InlineStringTests.cpp",
+          "line": 59
+        },
+        {
+          "name": "LongStringGoesToHeap",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\InlineStringTests.cpp",
+          "line": 67
+        },
+        {
+          "name": "VeryLongString",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\InlineStringTests.cpp",
+          "line": 75
+        },
+        {
+          "name": "CopyConstruct",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\InlineStringTests.cpp",
+          "line": 86
+        },
+        {
+          "name": "CopyConstructHeap",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\InlineStringTests.cpp",
+          "line": 94
+        },
+        {
+          "name": "MoveConstruct",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\InlineStringTests.cpp",
+          "line": 103
+        },
+        {
+          "name": "MoveConstructHeap",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\InlineStringTests.cpp",
+          "line": 110
+        },
+        {
+          "name": "CopyAssign",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\InlineStringTests.cpp",
+          "line": 119
+        },
+        {
+          "name": "MoveAssign",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\InlineStringTests.cpp",
+          "line": 127
+        },
+        {
+          "name": "AssignFromStringView",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\InlineStringTests.cpp",
+          "line": 135
+        },
+        {
+          "name": "EqualityWithInlineString",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\InlineStringTests.cpp",
+          "line": 146
+        },
+        {
+          "name": "EqualityWithStringView",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\InlineStringTests.cpp",
+          "line": 155
+        },
+        {
+          "name": "EqualityWithCString",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\InlineStringTests.cpp",
+          "line": 162
+        },
+        {
+          "name": "EqualityWithNullCString",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\InlineStringTests.cpp",
+          "line": 169
+        },
+        {
+          "name": "ImplicitConversionToStringView",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\InlineStringTests.cpp",
+          "line": 182
+        },
+        {
+          "name": "ExplicitStr",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\InlineStringTests.cpp",
+          "line": 189
+        },
+        {
+          "name": "DataReturnsNullTerminated",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\InlineStringTests.cpp",
+          "line": 196
+        },
+        {
+          "name": "DataReturnsNullTerminatedHeap",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\InlineStringTests.cpp",
+          "line": 202
+        }
+      ]
+    },
+    {
+      "name": "LogTest",
+      "tests": 18,
+      "testsuite": [
+        {
+          "name": "DefaultSinkIsNull",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\LogTests.cpp",
+          "line": 81
+        },
+        {
+          "name": "CustomSinkReceivesMessages",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\LogTests.cpp",
+          "line": 88
+        },
+        {
+          "name": "LevelFiltering",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\LogTests.cpp",
+          "line": 99
+        },
+        {
+          "name": "SetLogSinkNullDisables",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\LogTests.cpp",
+          "line": 117
+        },
+        {
+          "name": "GetLogSinkReturnsCurrentSink",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\LogTests.cpp",
+          "line": 128
+        },
+        {
+          "name": "GetLogLevelReturnsCurrentLevel",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\LogTests.cpp",
+          "line": 135
+        },
+        {
+          "name": "LogLevelToStringAllLevels",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\LogTests.cpp",
+          "line": 141
+        },
+        {
+          "name": "LogRawPassesSourceLocation",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\LogTests.cpp",
+          "line": 151
+        },
+        {
+          "name": "LogFormatWithArgs",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\LogTests.cpp",
+          "line": 161
+        },
+        {
+          "name": "LogFormatMultipleArgs",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\LogTests.cpp",
+          "line": 171
+        },
+        {
+          "name": "LogFormatNoArgs",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\LogTests.cpp",
+          "line": 180
+        },
+        {
+          "name": "ConvenienceLogInfo",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\LogTests.cpp",
+          "line": 189
+        },
+        {
+          "name": "ConvenienceLogError",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\LogTests.cpp",
+          "line": 199
+        },
+        {
+          "name": "EnableDefaultLoggingSetsLevelAndSink",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\LogTests.cpp",
+          "line": 209
+        },
+        {
+          "name": "DefaultConsoleSinkDoesNotCrash",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\LogTests.cpp",
+          "line": 216
+        },
+        {
+          "name": "FormatLevelFilteringStillWorks",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\LogTests.cpp",
+          "line": 223
+        },
+        {
+          "name": "ConvenienceLogDoesNotFormatWhenFilteredOut",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\LogTests.cpp",
+          "line": 235
+        },
+        {
+          "name": "ConvenienceLogFormatsWhenLevelPasses",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\LogTests.cpp",
+          "line": 246
+        }
+      ]
+    },
+    {
+      "name": "MoveOnlyFunctionTest",
+      "tests": 11,
+      "testsuite": [
+        {
+          "name": "VoidNoArgs",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\MoveOnlyFunctionTests.cpp",
+          "line": 23
+        },
+        {
+          "name": "ReturnValueWithArgs",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\MoveOnlyFunctionTests.cpp",
+          "line": 32
+        },
+        {
+          "name": "ConstRefArg",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\MoveOnlyFunctionTests.cpp",
+          "line": 38
+        },
+        {
+          "name": "FunctionPointer",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\MoveOnlyFunctionTests.cpp",
+          "line": 44
+        },
+        {
+          "name": "MoveOnlyCapture",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\MoveOnlyFunctionTests.cpp",
+          "line": 54
+        },
+        {
+          "name": "MoveTransfersOwnership",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\MoveOnlyFunctionTests.cpp",
+          "line": 61
+        },
+        {
+          "name": "MoveAssignment",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\MoveOnlyFunctionTests.cpp",
+          "line": 70
+        },
+        {
+          "name": "HeapAllocationForLargeCallable",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\MoveOnlyFunctionTests.cpp",
+          "line": 83
+        },
+        {
+          "name": "MoveHeapAllocatedCallable",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\MoveOnlyFunctionTests.cpp",
+          "line": 100
+        },
+        {
+          "name": "DefaultConstructedIsEmpty",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\MoveOnlyFunctionTests.cpp",
+          "line": 123
+        },
+        {
+          "name": "VoidReturnType",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\MoveOnlyFunctionTests.cpp",
+          "line": 129
+        }
+      ]
+    },
+    {
+      "name": "NameofTypeNameRawTests",
+      "tests": 8,
+      "testsuite": [
+        {
+          "name": "ReturnsStringViewAtCompileTime",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 299
+        },
+        {
+          "name": "PreservesFundamentalTypeToken",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 306
+        },
+        {
+          "name": "PreservesNamespaceForUserType",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 312
+        },
+        {
+          "name": "PreservesTemplateStructure",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 319
+        },
+        {
+          "name": "DistinguishesCvRefQualifiedTypes",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 326
+        },
+        {
+          "name": "SupportsEnumTypeName",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 333
+        },
+        {
+          "name": "IsDeterministicForSameType",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 339
+        },
+        {
+          "name": "DoesNotReturnUnsupportedSentinelForKnownCompiler",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 346
+        }
+      ]
+    },
+    {
+      "name": "NameofTypeNameShortTests",
+      "tests": 8,
+      "testsuite": [
+        {
+          "name": "ReturnsStringViewAtCompileTime",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 352
+        },
+        {
+          "name": "RemovesNamespaceForUserType",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 359
+        },
+        {
+          "name": "PreservesTemplateStructure",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 366
+        },
+        {
+          "name": "PreservesTemplateTypeWhenTemplateArgumentHasNamespace",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 373
+        },
+        {
+          "name": "CollapsesCvRefToBaseTypeName",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 380
+        },
+        {
+          "name": "IsDeterministicForSameType",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 388
+        },
+        {
+          "name": "UsesCustomizeTypeNameOverride",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 395
+        },
+        {
+          "name": "UsesCustomizeTypeNameOverrideForCvRef",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 400
+        }
+      ]
+    },
+    {
+      "name": "NameofTypeNameKeyTests",
+      "tests": 6,
+      "testsuite": [
+        {
+          "name": "ConvertsFundamentalTypeToStableKey",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 405
+        },
+        {
+          "name": "ConvertsPascalCaseToSnakeCase",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 411
+        },
+        {
+          "name": "RemovesNamespaceAndCvRef",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 416
+        },
+        {
+          "name": "ConvertsTemplateTypeToSnakeCaseKey",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 421
+        },
+        {
+          "name": "IsDeterministicForSameType",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 429
+        },
+        {
+          "name": "UsesCustomizeTypeNameAsKeySource",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 436
+        }
+      ]
+    },
+    {
+      "name": "NameofTypeNameDisplayTests",
+      "tests": 8,
+      "testsuite": [
+        {
+          "name": "ReturnsStringViewAtCompileTime",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 441
+        },
+        {
+          "name": "DefaultsToShortNameForUserType",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 448
+        },
+        {
+          "name": "KeepsTemplateReadability",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 456
+        },
+        {
+          "name": "IsDeterministicForSameType",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 463
+        },
+        {
+          "name": "UsesCustomizeDisplayNameOverride",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 470
+        },
+        {
+          "name": "KeepsShortNameWhenNoCustomizeOverride",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 475
+        },
+        {
+          "name": "FallsBackToCustomizeTypeNameWhenNoDisplayName",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 482
+        },
+        {
+          "name": "PrefersDisplayNameOverTypeName",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 487
+        }
+      ]
+    },
+    {
+      "name": "NameofValueNameShortTests",
+      "tests": 2,
+      "testsuite": [
+        {
+          "name": "ReturnsStableEntryName",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 492
+        },
+        {
+          "name": "ReturnsUnknownSentinelWhenValueNotRegistered",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 497
+        }
+      ]
+    },
+    {
+      "name": "NameofValueNameKeyTests",
+      "tests": 1,
+      "testsuite": [
+        {
+          "name": "ConvertsStableNameToSnakeCase",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 502
+        }
+      ]
+    },
+    {
+      "name": "NameofValueNameDisplayTests",
+      "tests": 2,
+      "testsuite": [
+        {
+          "name": "UsesDisplayTextWhenProvided",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 507
+        },
+        {
+          "name": "FallsBackToStableNameWhenDisplayTextMissing",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 512
+        }
+      ]
+    },
+    {
+      "name": "NameofEnumBridgeTests",
+      "tests": 4,
+      "testsuite": [
+        {
+          "name": "EnumToNameResolvesRegisteredValue",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 517
+        },
+        {
+          "name": "EnumToNameReturnsUnknownForUnregisteredValue",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 522
+        },
+        {
+          "name": "EnumFromNameParsesRegisteredValue",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 527
+        },
+        {
+          "name": "EnumFromNameReturnsNulloptForUnknownName",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 534
+        }
+      ]
+    },
+    {
+      "name": "NameofValueNameAutoScanTests",
+      "tests": 9,
+      "testsuite": [
+        {
+          "name": "ValueNameShortExtractsFromCompilerForEnumValue",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 540
+        },
+        {
+          "name": "ValueNameDisplayFallsBackToAutoShortName",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 545
+        },
+        {
+          "name": "ValueNameKeyUsesAutoShortName",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 550
+        },
+        {
+          "name": "EnumToNameScansRangeWhenNoEnumEntries",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 555
+        },
+        {
+          "name": "EnumFromNameScansRangeWhenNoEnumEntries",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 560
+        },
+        {
+          "name": "EnumToNameReturnsUnknownForOutOfScanValue",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 567
+        },
+        {
+          "name": "EnumFromNameReturnsNulloptWhenNotFoundByScan",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 572
+        },
+        {
+          "name": "EnumToNameWorksWhenAliasCheckEnabled",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 578
+        },
+        {
+          "name": "EnumFromNameWorksWhenAliasCheckEnabled",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 583
+        }
+      ]
+    },
+    {
+      "name": "NameofEnumFlagsTests",
+      "tests": 14,
+      "testsuite": [
+        {
+          "name": "CombinesSingleBitNames",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 590
+        },
+        {
+          "name": "ReturnsUnknownForUnmappedFlagBits",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 596
+        },
+        {
+          "name": "ParsesCombinedFlagsFromText",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 602
+        },
+        {
+          "name": "ParsesCombinedFlagsWithWhitespace",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 610
+        },
+        {
+          "name": "ReturnsNulloptForUnknownFlagToken",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 618
+        },
+        {
+          "name": "FallsBackToExactLookupWhenFlagsDisabled",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 624
+        },
+        {
+          "name": "ReturnsExactNameForZeroWhenRegistered",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 634
+        },
+        {
+          "name": "ParsesExactZeroNameWhenRegistered",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 639
+        },
+        {
+          "name": "RejectsEmptyInput",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 646
+        },
+        {
+          "name": "RejectsMalformedTokenSequence",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 652
+        },
+        {
+          "name": "ReturnsUnknownForCombinedWhenFlagsDisabled",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 658
+        },
+        {
+          "name": "AutoScanFlagsToNameSupportsComposite",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 664
+        },
+        {
+          "name": "AutoScanFlagsFromNameSupportsComposite",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 670
+        },
+        {
+          "name": "AutoScanFlagsReturnsUnknownWhenBitNotMapped",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\NameofTests.cpp",
+          "line": 678
+        }
+      ]
+    },
+    {
+      "name": "VerifyTest",
+      "tests": 14,
+      "testsuite": [
+        {
+          "name": "VerifyPassesOnTrue",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\VerifyTests.cpp",
+          "line": 59
+        },
+        {
+          "name": "VerifyFailsWithoutAborting",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\VerifyTests.cpp",
+          "line": 66
+        },
+        {
+          "name": "VerifyMsgIncludesMessage",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\VerifyTests.cpp",
+          "line": 76
+        },
+        {
+          "name": "VerifyMsgPassesOnTrue",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\VerifyTests.cpp",
+          "line": 83
+        },
+        {
+          "name": "VerifyEqPassesOnEqual",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\VerifyTests.cpp",
+          "line": 93
+        },
+        {
+          "name": "VerifyEqFailsWithValues",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\VerifyTests.cpp",
+          "line": 99
+        },
+        {
+          "name": "VerifyNeFailsOnEqual",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\VerifyTests.cpp",
+          "line": 109
+        },
+        {
+          "name": "VerifyLtFailsWhenGreater",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\VerifyTests.cpp",
+          "line": 116
+        },
+        {
+          "name": "VerifyLePassesOnEqual",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\VerifyTests.cpp",
+          "line": 123
+        },
+        {
+          "name": "VerifyGtFailsWhenEqual",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\VerifyTests.cpp",
+          "line": 129
+        },
+        {
+          "name": "VerifyGePassesOnGreater",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\VerifyTests.cpp",
+          "line": 135
+        },
+        {
+          "name": "VerifyGeFailsWhenLess",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\VerifyTests.cpp",
+          "line": 141
+        },
+        {
+          "name": "MultipleFailuresContinueExecution",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\VerifyTests.cpp",
+          "line": 151
+        },
+        {
+          "name": "VerifyOpEvaluatesOnce",
+          "file": "D:\\Dev\\1Project\\Bee\\Tests\\Base\\VerifyTests.cpp",
+          "line": 167
+        }
+      ]
+    }
+  ]
+}

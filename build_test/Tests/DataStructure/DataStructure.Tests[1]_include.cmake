@@ -1,0 +1,5 @@
+if(EXISTS "D:/Dev/1Project/Bee/build_test/Tests/DataStructure/DataStructure.Tests[1]_tests.cmake")
+  include("D:/Dev/1Project/Bee/build_test/Tests/DataStructure/DataStructure.Tests[1]_tests.cmake")
+else()
+  add_test(DataStructure.Tests_NOT_BUILT DataStructure.Tests_NOT_BUILT)
+endif()

@@ -1,0 +1,5 @@
+if(EXISTS "D:/Dev/1Project/Bee/build_test/Tests/Base/Base.Tests[1]_tests.cmake")
+  include("D:/Dev/1Project/Bee/build_test/Tests/Base/Base.Tests[1]_tests.cmake")
+else()
+  add_test(Base.Tests_NOT_BUILT Base.Tests_NOT_BUILT)
+endif()

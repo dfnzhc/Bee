@@ -1,7 +1,9 @@
 #pragma once
 
 #include <cstdint>
+#include <initializer_list>
 #include <memory>
+#include <span>
 
 #include "Base/Diagnostics/Error.hpp"
 #include "Tensor/Core/Device.hpp"
@@ -15,7 +17,6 @@ namespace bee
 class Storage;
 
 // 用户面向的 Tensor 外壳：值语义，内部通过 shared_ptr<TensorImpl> 共享数据
-// 不包含算子、视图变换（属于后续任务）
 class Tensor
 {
 public:
@@ -42,12 +43,40 @@ public:
     [[nodiscard]] auto data_ptr() noexcept -> void*;
     [[nodiscard]] auto data_ptr() const noexcept -> const void*;
 
-    // 内部结构访问（后续视图/算子任务使用）
+    // 内部结构访问
     [[nodiscard]] auto storage() const noexcept -> const std::shared_ptr<Storage>&;
     [[nodiscard]] auto impl() const noexcept -> const std::shared_ptr<TensorImpl>&;
 
-    // 深拷贝；MVP 仅支持连续张量，非连续或 CUDA 路径返回 Err
+    // 深拷贝：始终返回 contiguous 的独立 storage（支持非连续张量）
     [[nodiscard]] auto clone() const -> Result<Tensor>;
+
+    // ── 视图与形状变换（零拷贝，除非另行说明）──────────────────────────────
+
+    // 返回新形状的视图；要求当前张量 contiguous；支持一个 -1 占位推断
+    [[nodiscard]] auto view(Shape new_shape) const -> Result<Tensor>;
+
+    // 重塑形状；非 contiguous 时先 clone 再 view（存储独立）
+    [[nodiscard]] auto reshape(Shape new_shape) const -> Result<Tensor>;
+
+    // 返回 contiguous 副本；若已连续则共享 storage，否则重新排列数据
+    [[nodiscard]] auto contiguous() const -> Result<Tensor>;
+
+    // 维度排列；dims 为 {0..ndim-1} 的一个排列
+    [[nodiscard]] auto permute(std::span<const int> dims) const -> Result<Tensor>;
+    [[nodiscard]] auto permute(std::initializer_list<int> dims) const -> Result<Tensor>;
+
+    // 交换两个维度；支持负数索引
+    [[nodiscard]] auto transpose(int dim0, int dim1) const -> Result<Tensor>;
+
+    // 移除大小为 1 的指定维度；若该维度 size != 1 则返回浅拷贝（不报错）
+    [[nodiscard]] auto squeeze(int dim) const -> Result<Tensor>;
+
+    // 在 dim 处插入大小为 1 的维度；dim 范围 [-ndim-1, ndim]
+    [[nodiscard]] auto unsqueeze(int dim) const -> Result<Tensor>;
+
+    // 在指定维度上切片（半开区间 [start, end)，步长 step >= 1）
+    [[nodiscard]] auto slice(int dim, int64_t start, int64_t end, int64_t step = 1) const
+        -> Result<Tensor>;
 
 private:
     explicit Tensor(std::shared_ptr<TensorImpl> impl);
