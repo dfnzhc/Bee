@@ -9,6 +9,66 @@
 namespace bee
 {
 
+// ── 内部辅助：按 DType 将 double 标量填充到原始缓冲区 ──────────────────────────
+
+namespace
+{
+
+// 模板：将 value 转换为类型 T 后填充 n 个元素
+template <DType D>
+auto fill_typed(void* data, std::size_t n, double value) -> void
+{
+    using T    = dtype_cpp_t<D>;
+    auto* ptr  = static_cast<T*>(data);
+    T     fill_val;
+    if constexpr (D == DType::Bool) {
+        // Bool：非零值视为 true
+        fill_val = static_cast<T>(value != 0.0);
+    } else {
+        fill_val = static_cast<T>(value);
+    }
+    std::fill_n(ptr, n, fill_val);
+}
+
+// 运行时分派：根据 DType 调用对应模板特化
+auto dispatch_fill(DType dt, void* data, std::size_t n, double value) -> void
+{
+    switch (dt) {
+    case DType::Bool: fill_typed<DType::Bool>(data, n, value); break;
+    case DType::U8:   fill_typed<DType::U8>(data, n, value);   break;
+    case DType::I32:  fill_typed<DType::I32>(data, n, value);  break;
+    case DType::I64:  fill_typed<DType::I64>(data, n, value);  break;
+    case DType::F32:  fill_typed<DType::F32>(data, n, value);  break;
+    case DType::F64:  fill_typed<DType::F64>(data, n, value);  break;
+    default: break;
+    }
+}
+
+// arange 填充：逐元素写入 start + i * step 后转换为目标类型
+template <DType D>
+auto arange_typed(void* data, std::size_t n, int64_t start, int64_t step) -> void
+{
+    using T   = dtype_cpp_t<D>;
+    auto* ptr = static_cast<T*>(data);
+    for (std::size_t i = 0; i < n; ++i) {
+        ptr[i] = static_cast<T>(start + static_cast<int64_t>(i) * step);
+    }
+}
+
+auto dispatch_arange(DType dt, void* data, std::size_t n, int64_t start, int64_t step) -> void
+{
+    switch (dt) {
+    case DType::U8:  arange_typed<DType::U8>(data, n, start, step);  break;
+    case DType::I32: arange_typed<DType::I32>(data, n, start, step); break;
+    case DType::I64: arange_typed<DType::I64>(data, n, start, step); break;
+    case DType::F32: arange_typed<DType::F32>(data, n, start, step); break;
+    case DType::F64: arange_typed<DType::F64>(data, n, start, step); break;
+    default: break;
+    }
+}
+
+} // namespace
+
 // ── 内部辅助：将含 -1 占位符的 new_shape 解析为确定 shape ──────────────────────
 
 static auto resolve_shape(const Shape& new_shape, int64_t total_numel) -> Result<Shape>
@@ -130,6 +190,89 @@ auto Tensor::empty(Shape shape, DType dtype, Device device) -> Result<Tensor>
     ti->offset   = 0;
 
     return Tensor(std::move(ti));
+}
+
+// ── zeros ────────────────────────────────────────────────────────────────────
+
+auto Tensor::zeros(Shape shape, DType dtype, Device device) -> Result<Tensor>
+{
+    // 直接复用 empty 分配内存，再 memset 全零
+    Tensor t;
+    BEE_TRY_ASSIGN(t, empty(shape, dtype, device));
+
+    const int64_t     n      = t.numel();
+    const std::size_t nbytes = static_cast<std::size_t>(n) * dtype_size(dtype);
+    if (nbytes > 0)
+        std::memset(t.data_ptr(), 0, nbytes);
+
+    return t;
+}
+
+// ── ones ─────────────────────────────────────────────────────────────────────
+
+auto Tensor::ones(Shape shape, DType dtype, Device device) -> Result<Tensor>
+{
+    // 复用 full，以 1.0 填充
+    return full(std::move(shape), dtype, 1.0, device);
+}
+
+// ── full ─────────────────────────────────────────────────────────────────────
+
+auto Tensor::full(Shape shape, DType dtype, double value, Device device) -> Result<Tensor>
+{
+    Tensor t;
+    BEE_TRY_ASSIGN(t, empty(shape, dtype, device));
+
+    const int64_t n = t.numel();
+    if (n > 0)
+        dispatch_fill(dtype, t.data_ptr(), static_cast<std::size_t>(n), value);
+
+    return t;
+}
+
+// ── arange ───────────────────────────────────────────────────────────────────
+
+auto Tensor::arange(int64_t start, int64_t end, int64_t step, DType dtype, Device device)
+    -> Result<Tensor>
+{
+    // Bool 类型不支持
+    if (dtype == DType::Bool)
+        return std::unexpected(
+            make_error("arange 不支持 Bool 类型", Severity::Recoverable));
+
+    // step 为 0 非法
+    if (step == 0)
+        return std::unexpected(
+            make_error("arange: step 不能为 0", Severity::Recoverable));
+
+    // 区间方向校验
+    if (step > 0 && start > end)
+        return std::unexpected(make_error(
+            std::format("arange: step>0 但 start({}) > end({})", start, end),
+            Severity::Recoverable));
+
+    if (step < 0 && start < end)
+        return std::unexpected(make_error(
+            std::format("arange: step<0 但 start({}) < end({})", start, end),
+            Severity::Recoverable));
+
+    // 计算元素数（PyTorch 语义：ceil 除法）
+    int64_t n = 0;
+    if (start != end) {
+        if (step > 0)
+            n = (end - start + step - 1) / step;
+        else
+            n = (end - start + step + 1) / step;
+    }
+
+    // 分配并填充
+    Tensor t;
+    BEE_TRY_ASSIGN(t, empty({n}, dtype, device));
+
+    if (n > 0)
+        dispatch_arange(dtype, t.data_ptr(), static_cast<std::size_t>(n), start, step);
+
+    return t;
 }
 
 // ── 查询访问器 ───────────────────────────────────────────────────────────────

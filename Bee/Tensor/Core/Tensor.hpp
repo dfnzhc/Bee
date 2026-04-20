@@ -27,6 +27,23 @@ public:
     [[nodiscard]] static auto empty(Shape shape, DType dtype, Device device = Device::CPU)
         -> Result<Tensor>;
 
+    // 工厂：所有元素置零
+    [[nodiscard]] static auto zeros(Shape shape, DType dtype, Device device = Device::CPU)
+        -> Result<Tensor>;
+
+    // 工厂：所有元素填充为 1（按 dtype 解释）
+    [[nodiscard]] static auto ones(Shape shape, DType dtype, Device device = Device::CPU)
+        -> Result<Tensor>;
+
+    // 工厂：所有元素填充为指定标量值（value 以 double 传入，按 dtype 转换）
+    [[nodiscard]] static auto full(Shape shape, DType dtype, double value,
+                                   Device device = Device::CPU) -> Result<Tensor>;
+
+    // 工厂：生成 1D 等差序列 [start, start+step, ..., < end)，dtype 默认 I64
+    [[nodiscard]] static auto arange(int64_t start, int64_t end, int64_t step = 1,
+                                     DType dtype = DType::I64, Device device = Device::CPU)
+        -> Result<Tensor>;
+
     // ── 查询访问器 ──────────────────────────────────────────────────────────
 
     [[nodiscard]] auto defined() const noexcept -> bool;

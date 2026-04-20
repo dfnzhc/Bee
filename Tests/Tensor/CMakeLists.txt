@@ -9,4 +9,5 @@ bee_add_component_test(
         TensorTests.cpp
         ViewTests.cpp
         SimdTests.cpp
+        CreationTests.cpp
 )
