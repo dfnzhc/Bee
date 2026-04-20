@@ -10,7 +10,9 @@
 #include "Tensor/Core/TensorImpl.hpp"
 #include "Tensor/Core/Tensor.hpp"
 #include "Tensor/Ops/Broadcast.hpp"
+#include "Tensor/Ops/Cast.hpp"
 #include "Tensor/Ops/ElementWise.hpp"
+#include "Tensor/Ops/Random.hpp"
 #include "Tensor/Ops/Reduce.hpp"
 
 #include <string_view>

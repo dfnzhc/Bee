@@ -13,4 +13,6 @@ bee_add_component_test(
         BroadcastTests.cpp
         ElementWiseTests.cpp
         ReduceTests.cpp
+        CastTests.cpp
+        RandomTests.cpp
 )
