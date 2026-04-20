@@ -9,6 +9,8 @@
 #include "Tensor/Core/Storage.hpp"
 #include "Tensor/Core/TensorImpl.hpp"
 #include "Tensor/Core/Tensor.hpp"
+#include "Tensor/Ops/Broadcast.hpp"
+#include "Tensor/Ops/ElementWise.hpp"
 
 #include <string_view>
 

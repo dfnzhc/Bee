@@ -10,4 +10,6 @@ bee_add_component_test(
         ViewTests.cpp
         SimdTests.cpp
         CreationTests.cpp
+        BroadcastTests.cpp
+        ElementWiseTests.cpp
 )
