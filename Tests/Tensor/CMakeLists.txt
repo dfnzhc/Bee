@@ -8,4 +8,5 @@ bee_add_component_test(
         StorageTests.cpp
         TensorTests.cpp
         ViewTests.cpp
+        SimdTests.cpp
 )
