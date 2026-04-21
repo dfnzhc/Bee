@@ -2,7 +2,7 @@
 
 // CPU matmul 内核：i-k-j 三重循环，F32/F64 内层使用 SIMD FMA 风格累加
 
-#include "Tensor/Cpu/Simd/Simd.hpp"
+#include "SIMD/SIMD.hpp"
 
 #include <cstdint>
 #include <cstring>
@@ -25,6 +25,18 @@ template <> inline constexpr bool kSimdMatmul<double, simd::IsaScalar> = true;
 // AVX2 仅为 float/double 提供 SIMD；整数类型走标量路径
 template <> inline constexpr bool kSimdMatmul<float,  simd::IsaAvx2> = true;
 template <> inline constexpr bool kSimdMatmul<double, simd::IsaAvx2> = true;
+#endif
+
+#ifdef BEE_TENSOR_SIMD_SSE2
+// SSE2 仅为 float/double 提供 SIMD matmul
+template <> inline constexpr bool kSimdMatmul<float,  simd::IsaSse2> = true;
+template <> inline constexpr bool kSimdMatmul<double, simd::IsaSse2> = true;
+#endif
+
+#ifdef BEE_TENSOR_SIMD_AVX512
+// AVX-512 为 float/double/int32 提供 SIMD matmul（int32 有 mullo）
+template <> inline constexpr bool kSimdMatmul<float,  simd::IsaAvx512> = true;
+template <> inline constexpr bool kSimdMatmul<double, simd::IsaAvx512> = true;
 #endif
 
 // ─────────────────────────────────────────────────────────────────────────────

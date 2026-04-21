@@ -6,7 +6,7 @@
 #include "Tensor/Core/DType.hpp"
 #include "Tensor/Core/Shape.hpp"
 #include "Tensor/Core/Tensor.hpp"
-#include "Tensor/Cpu/Simd/Simd.hpp"
+#include "SIMD/SIMD.hpp"
 
 #include <climits>
 #include <cstdint>
@@ -63,6 +63,52 @@ template <> inline constexpr bool kSimdReduceMin<int32_t,  simd::IsaAvx2> = true
 template <> inline constexpr bool kSimdReduceMax<float,    simd::IsaAvx2> = true;
 template <> inline constexpr bool kSimdReduceMax<double,   simd::IsaAvx2> = true;
 template <> inline constexpr bool kSimdReduceMax<int32_t,  simd::IsaAvx2> = true;
+#endif
+
+// ── IsaSse2 特化：SSE2 后端的 reduce 能力 ────────────────────────────────────
+// reduce_sum：5 种类型均有（u8 用 sad_epu8，i64 用标量提取）
+// reduce_min/max：float/double/int32/uint8 有；i64 无有符号 SSE2 比较指令，跳过
+
+#ifdef BEE_TENSOR_SIMD_SSE2
+template <> inline constexpr bool kSimdReduceSum<float,    simd::IsaSse2> = true;
+template <> inline constexpr bool kSimdReduceSum<double,   simd::IsaSse2> = true;
+template <> inline constexpr bool kSimdReduceSum<int32_t,  simd::IsaSse2> = true;
+template <> inline constexpr bool kSimdReduceSum<int64_t,  simd::IsaSse2> = true;
+template <> inline constexpr bool kSimdReduceSum<uint8_t,  simd::IsaSse2> = true;
+
+template <> inline constexpr bool kSimdReduceMin<float,    simd::IsaSse2> = true;
+template <> inline constexpr bool kSimdReduceMin<double,   simd::IsaSse2> = true;
+template <> inline constexpr bool kSimdReduceMin<int32_t,  simd::IsaSse2> = true;
+template <> inline constexpr bool kSimdReduceMin<uint8_t,  simd::IsaSse2> = true;
+
+template <> inline constexpr bool kSimdReduceMax<float,    simd::IsaSse2> = true;
+template <> inline constexpr bool kSimdReduceMax<double,   simd::IsaSse2> = true;
+template <> inline constexpr bool kSimdReduceMax<int32_t,  simd::IsaSse2> = true;
+template <> inline constexpr bool kSimdReduceMax<uint8_t,  simd::IsaSse2> = true;
+#endif
+
+// ── IsaAvx512 特化：AVX-512 后端的 reduce 能力 ──────────────────────────────
+// i64 min/max/abs 是 AVX-512F 原生（不同于 AVX2）
+// u8 依赖 AVX512BW，用 __AVX512BW__ 守卫
+
+#ifdef BEE_TENSOR_SIMD_AVX512
+template <> inline constexpr bool kSimdReduceSum<float,    simd::IsaAvx512> = true;
+template <> inline constexpr bool kSimdReduceSum<double,   simd::IsaAvx512> = true;
+template <> inline constexpr bool kSimdReduceSum<int32_t,  simd::IsaAvx512> = true;
+template <> inline constexpr bool kSimdReduceSum<int64_t,  simd::IsaAvx512> = true;
+#ifdef __AVX512BW__
+template <> inline constexpr bool kSimdReduceSum<uint8_t,  simd::IsaAvx512> = true;
+#endif
+
+template <> inline constexpr bool kSimdReduceMin<float,    simd::IsaAvx512> = true;
+template <> inline constexpr bool kSimdReduceMin<double,   simd::IsaAvx512> = true;
+template <> inline constexpr bool kSimdReduceMin<int32_t,  simd::IsaAvx512> = true;
+template <> inline constexpr bool kSimdReduceMin<int64_t,  simd::IsaAvx512> = true;
+
+template <> inline constexpr bool kSimdReduceMax<float,    simd::IsaAvx512> = true;
+template <> inline constexpr bool kSimdReduceMax<double,   simd::IsaAvx512> = true;
+template <> inline constexpr bool kSimdReduceMax<int32_t,  simd::IsaAvx512> = true;
+template <> inline constexpr bool kSimdReduceMax<int64_t,  simd::IsaAvx512> = true;
 #endif
 
 // ─────────────────────────────────────────────────────────────────────────────

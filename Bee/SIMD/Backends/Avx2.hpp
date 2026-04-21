@@ -1,6 +1,6 @@
 #pragma once
 
-#include "SimdTraits.hpp"
+#include "SIMD/Traits.hpp"
 
 #ifdef BEE_TENSOR_SIMD_AVX2
 

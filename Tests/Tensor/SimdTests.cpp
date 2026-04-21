@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "Tensor/Cpu/Simd/Simd.hpp"
+#include "SIMD/SIMD.hpp"
 
 #include <cmath>
 #include <cstdint>
@@ -404,18 +404,34 @@ TEST(SimdAvx2, U8_ReduceSum)
 
 TEST(SimdSelector, DefaultIsaName)
 {
-#ifdef BEE_TENSOR_SIMD_AVX2
+#if defined(BEE_TENSOR_SIMD_AVX512)
+    EXPECT_STREQ(bee::simd::default_isa_name(), "Avx512");
+#elif defined(BEE_TENSOR_SIMD_AVX2)
     EXPECT_STREQ(bee::simd::default_isa_name(), "Avx2");
+#elif defined(BEE_TENSOR_SIMD_SSE2)
+    EXPECT_STREQ(bee::simd::default_isa_name(), "Sse2");
 #else
     EXPECT_STREQ(bee::simd::default_isa_name(), "Scalar");
 #endif
 }
 
-#ifdef BEE_TENSOR_SIMD_AVX2
+#if defined(BEE_TENSOR_SIMD_AVX512)
+TEST(SimdSelector, DefaultIsaIsAvx512)
+{
+    // DefaultIsa 应为 IsaAvx512；验证其 float backend 宽度为 16
+    EXPECT_EQ((SimdBackend<float, bee::simd::DefaultIsa>::width), 16u);
+}
+#elif defined(BEE_TENSOR_SIMD_AVX2)
 TEST(SimdSelector, DefaultIsaIsAvx2)
 {
     // DefaultIsa 应为 IsaAvx2；验证其 float backend 宽度为 8
     EXPECT_EQ((SimdBackend<float, bee::simd::DefaultIsa>::width), 8u);
+}
+#elif defined(BEE_TENSOR_SIMD_SSE2)
+TEST(SimdSelector, DefaultIsaIsSse2)
+{
+    // DefaultIsa 应为 IsaSse2；验证其 float backend 宽度为 4
+    EXPECT_EQ((SimdBackend<float, bee::simd::DefaultIsa>::width), 4u);
 }
 #else
 TEST(SimdSelector, DefaultIsaIsScalar)

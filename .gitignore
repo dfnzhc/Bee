@@ -383,3 +383,5 @@ Source/BeeEditor/Dirty
 **/.idea
 docs
 .github
+
+.worktrees/

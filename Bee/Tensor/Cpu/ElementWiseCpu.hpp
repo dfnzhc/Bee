@@ -5,7 +5,7 @@
 #include "Tensor/Core/DType.hpp"
 #include "Tensor/Core/Shape.hpp"
 #include "Tensor/Core/Tensor.hpp"
-#include "Tensor/Cpu/Simd/Simd.hpp"
+#include "SIMD/SIMD.hpp"
 
 #include <cmath>
 #include <cstdint>
@@ -106,6 +106,87 @@ template <> inline constexpr bool kSimdExp<float,    simd::IsaAvx2> = true;
 template <> inline constexpr bool kSimdExp<double,   simd::IsaAvx2> = true;
 template <> inline constexpr bool kSimdLog<float,    simd::IsaAvx2> = true;
 template <> inline constexpr bool kSimdLog<double,   simd::IsaAvx2> = true;
+#endif
+
+// ── IsaSse2 特化 ─────────────────────────────────────────────────────────────
+#ifdef BEE_TENSOR_SIMD_SSE2
+template <> inline constexpr bool kSimdAdd<float,    simd::IsaSse2> = true;
+template <> inline constexpr bool kSimdAdd<double,   simd::IsaSse2> = true;
+template <> inline constexpr bool kSimdAdd<int32_t,  simd::IsaSse2> = true;
+template <> inline constexpr bool kSimdAdd<int64_t,  simd::IsaSse2> = true;
+template <> inline constexpr bool kSimdAdd<uint8_t,  simd::IsaSse2> = true;
+
+template <> inline constexpr bool kSimdSub<float,    simd::IsaSse2> = true;
+template <> inline constexpr bool kSimdSub<double,   simd::IsaSse2> = true;
+template <> inline constexpr bool kSimdSub<int32_t,  simd::IsaSse2> = true;
+template <> inline constexpr bool kSimdSub<int64_t,  simd::IsaSse2> = true;
+template <> inline constexpr bool kSimdSub<uint8_t,  simd::IsaSse2> = true;
+
+template <> inline constexpr bool kSimdMul<float,    simd::IsaSse2> = true;
+template <> inline constexpr bool kSimdMul<double,   simd::IsaSse2> = true;
+
+template <> inline constexpr bool kSimdDiv<float,    simd::IsaSse2> = true;
+template <> inline constexpr bool kSimdDiv<double,   simd::IsaSse2> = true;
+
+template <> inline constexpr bool kSimdNeg<float,    simd::IsaSse2> = true;
+template <> inline constexpr bool kSimdNeg<double,   simd::IsaSse2> = true;
+template <> inline constexpr bool kSimdNeg<int32_t,  simd::IsaSse2> = true;
+template <> inline constexpr bool kSimdNeg<int64_t,  simd::IsaSse2> = true;
+
+template <> inline constexpr bool kSimdAbs<float,    simd::IsaSse2> = true;
+template <> inline constexpr bool kSimdAbs<double,   simd::IsaSse2> = true;
+template <> inline constexpr bool kSimdAbs<int32_t,  simd::IsaSse2> = true;
+template <> inline constexpr bool kSimdAbs<int64_t,  simd::IsaSse2> = true;
+
+template <> inline constexpr bool kSimdSqrt<float,   simd::IsaSse2> = true;
+template <> inline constexpr bool kSimdSqrt<double,  simd::IsaSse2> = true;
+template <> inline constexpr bool kSimdExp<float,    simd::IsaSse2> = true;
+template <> inline constexpr bool kSimdExp<double,   simd::IsaSse2> = true;
+template <> inline constexpr bool kSimdLog<float,    simd::IsaSse2> = true;
+template <> inline constexpr bool kSimdLog<double,   simd::IsaSse2> = true;
+#endif
+
+// ── IsaAvx512 特化 ───────────────────────────────────────────────────────────
+#ifdef BEE_TENSOR_SIMD_AVX512
+template <> inline constexpr bool kSimdAdd<float,    simd::IsaAvx512> = true;
+template <> inline constexpr bool kSimdAdd<double,   simd::IsaAvx512> = true;
+template <> inline constexpr bool kSimdAdd<int32_t,  simd::IsaAvx512> = true;
+template <> inline constexpr bool kSimdAdd<int64_t,  simd::IsaAvx512> = true;
+#ifdef __AVX512BW__
+template <> inline constexpr bool kSimdAdd<uint8_t,  simd::IsaAvx512> = true;
+#endif
+
+template <> inline constexpr bool kSimdSub<float,    simd::IsaAvx512> = true;
+template <> inline constexpr bool kSimdSub<double,   simd::IsaAvx512> = true;
+template <> inline constexpr bool kSimdSub<int32_t,  simd::IsaAvx512> = true;
+template <> inline constexpr bool kSimdSub<int64_t,  simd::IsaAvx512> = true;
+#ifdef __AVX512BW__
+template <> inline constexpr bool kSimdSub<uint8_t,  simd::IsaAvx512> = true;
+#endif
+
+template <> inline constexpr bool kSimdMul<float,    simd::IsaAvx512> = true;
+template <> inline constexpr bool kSimdMul<double,   simd::IsaAvx512> = true;
+template <> inline constexpr bool kSimdMul<int32_t,  simd::IsaAvx512> = true;
+
+template <> inline constexpr bool kSimdDiv<float,    simd::IsaAvx512> = true;
+template <> inline constexpr bool kSimdDiv<double,   simd::IsaAvx512> = true;
+
+template <> inline constexpr bool kSimdNeg<float,    simd::IsaAvx512> = true;
+template <> inline constexpr bool kSimdNeg<double,   simd::IsaAvx512> = true;
+template <> inline constexpr bool kSimdNeg<int32_t,  simd::IsaAvx512> = true;
+template <> inline constexpr bool kSimdNeg<int64_t,  simd::IsaAvx512> = true;
+
+template <> inline constexpr bool kSimdAbs<float,    simd::IsaAvx512> = true;
+template <> inline constexpr bool kSimdAbs<double,   simd::IsaAvx512> = true;
+template <> inline constexpr bool kSimdAbs<int32_t,  simd::IsaAvx512> = true;
+template <> inline constexpr bool kSimdAbs<int64_t,  simd::IsaAvx512> = true;
+
+template <> inline constexpr bool kSimdSqrt<float,   simd::IsaAvx512> = true;
+template <> inline constexpr bool kSimdSqrt<double,  simd::IsaAvx512> = true;
+template <> inline constexpr bool kSimdExp<float,    simd::IsaAvx512> = true;
+template <> inline constexpr bool kSimdExp<double,   simd::IsaAvx512> = true;
+template <> inline constexpr bool kSimdLog<float,    simd::IsaAvx512> = true;
+template <> inline constexpr bool kSimdLog<double,   simd::IsaAvx512> = true;
 #endif
 
 // ─────────────────────────────────────────────────────────────────────────────

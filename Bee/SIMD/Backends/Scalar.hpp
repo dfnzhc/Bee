@@ -1,6 +1,6 @@
 #pragma once
 
-#include "SimdTraits.hpp"
+#include "SIMD/Traits.hpp"
 
 #include <algorithm>
 #include <cmath>
