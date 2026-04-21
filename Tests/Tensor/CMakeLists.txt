@@ -16,4 +16,5 @@ bee_add_component_test(
         CastTests.cpp
         RandomTests.cpp
         MatmulTests.cpp
+        CudaStubTests.cpp
 )

@@ -1,6 +1,11 @@
 set(tensor_library_type "STATIC")
 set(tensor_private_include_dir "${CMAKE_CURRENT_SOURCE_DIR}")
 
+# ---------------------------------------------------------------------------
+# CUDA 后端占位选项
+# ---------------------------------------------------------------------------
+option(BEE_TENSOR_WITH_CUDA "启用 Bee::Tensor CUDA 后端（当前为 stub 占位）" OFF)
+
 file(GLOB_RECURSE tensor_public_headers CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/*.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/*.h"
@@ -104,6 +109,12 @@ else()
 endif()
 
 message(STATUS "Bee::Tensor SIMD backend = ${BEE_TENSOR_SIMD_RESOLVED}")
+
+# 若启用 CUDA stub，打印状态信息
+if(BEE_TENSOR_WITH_CUDA)
+    message(STATUS "Bee::Tensor CUDA stub enabled: ON")
+    target_compile_definitions(Tensor PUBLIC BEE_TENSOR_WITH_CUDA)
+endif()
 
 # 设置编译期宏
 if(BEE_TENSOR_SIMD_RESOLVED STREQUAL "AVX512")
