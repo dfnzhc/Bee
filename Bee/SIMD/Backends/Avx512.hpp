@@ -2,7 +2,7 @@
 
 #include "SIMD/Traits.hpp"
 
-#ifdef BEE_TENSOR_SIMD_AVX512
+#ifdef BEE_SIMD_ENABLE_AVX512
 
 #include <immintrin.h>
 
@@ -347,4 +347,4 @@ struct SimdBackend<uint8_t, IsaAvx512>
 
 } // namespace bee::simd
 
-#endif // BEE_TENSOR_SIMD_AVX512
+#endif // BEE_SIMD_ENABLE_AVX512

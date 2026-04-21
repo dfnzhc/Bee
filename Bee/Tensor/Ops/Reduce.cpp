@@ -1,5 +1,6 @@
 #include "Tensor/Ops/Reduce.hpp"
 #include "Tensor/Cpu/ReduceCpu.hpp"
+#include "Tensor/Cpu/Dispatch/Dispatch.hpp"
 
 #include <format>
 
@@ -101,19 +102,18 @@ auto check_axis_precond(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 全局 reduce dispatch：根据 dtype 调用对应类型的 CPU 内核
+// 全局 reduce dispatch：运行期分派到 ISA 特化 namespace
 // ─────────────────────────────────────────────────────────────────────────────
 
-template <typename Op>
-auto dispatch_global_cpu(const Tensor& a, Tensor& out) -> void
+enum class RdOp { Sum, Min, Max, Prod };
+
+auto dispatch_global_cpu(RdOp op, const Tensor& a, Tensor& out) -> void
 {
-    switch (a.dtype()) {
-    case DType::F32: cpu::cpu_reduce_global_dispatch<float,   Op>(a, out); break;
-    case DType::F64: cpu::cpu_reduce_global_dispatch<double,  Op>(a, out); break;
-    case DType::I32: cpu::cpu_reduce_global_dispatch<int32_t, Op>(a, out); break;
-    case DType::I64: cpu::cpu_reduce_global_dispatch<int64_t, Op>(a, out); break;
-    case DType::U8:  cpu::cpu_reduce_global_dispatch<uint8_t, Op>(a, out); break;
-    default:         break;
+    switch (op) {
+    case RdOp::Sum:  BEE_RT_DISPATCH(rd_sum_global,  a, out);
+    case RdOp::Min:  BEE_RT_DISPATCH(rd_min_global,  a, out);
+    case RdOp::Max:  BEE_RT_DISPATCH(rd_max_global,  a, out);
+    case RdOp::Prod: BEE_RT_DISPATCH(rd_prod_global, a, out);
     }
 }
 
@@ -166,7 +166,7 @@ auto sum(const Tensor& a) -> Result<Tensor>
     // 输出为 0-rank 标量张量（shape={}，numel=1）
     auto out = Tensor::empty({}, a.dtype());
     if (!out) return std::unexpected(std::move(out.error()));
-    dispatch_global_cpu<cpu::OpReduceSum>(a, *out);
+    dispatch_global_cpu(RdOp::Sum, a, *out);
     return *out;
 }
 
@@ -182,12 +182,12 @@ auto mean(const Tensor& a) -> Result<Tensor>
 
     if (a.dtype() == DType::F32) {
         // F32 → F32：复用 sum 核心再除以 n
-        cpu::cpu_reduce_global_dispatch<float, cpu::OpReduceSum>(a, *out);
+        dispatch_global_cpu(RdOp::Sum, a, *out);
         auto* p = static_cast<float*>(out->data_ptr());
         p[0] /= static_cast<float>(a.numel());
     } else if (a.dtype() == DType::F64) {
         // F64 → F64
-        cpu::cpu_reduce_global_dispatch<double, cpu::OpReduceSum>(a, *out);
+        dispatch_global_cpu(RdOp::Sum, a, *out);
         auto* p = static_cast<double*>(out->data_ptr());
         p[0] /= static_cast<double>(a.numel());
     } else if (a.dtype() == DType::I32) {
@@ -214,7 +214,7 @@ auto min(const Tensor& a) -> Result<Tensor>
     }
     auto out = Tensor::empty({}, a.dtype());
     if (!out) return std::unexpected(std::move(out.error()));
-    dispatch_global_cpu<cpu::OpReduceMin>(a, *out);
+    dispatch_global_cpu(RdOp::Min, a, *out);
     return *out;
 }
 
@@ -232,7 +232,7 @@ auto max(const Tensor& a) -> Result<Tensor>
     }
     auto out = Tensor::empty({}, a.dtype());
     if (!out) return std::unexpected(std::move(out.error()));
-    dispatch_global_cpu<cpu::OpReduceMax>(a, *out);
+    dispatch_global_cpu(RdOp::Max, a, *out);
     return *out;
 }
 
@@ -244,7 +244,7 @@ auto prod(const Tensor& a) -> Result<Tensor>
     }
     auto out = Tensor::empty({}, a.dtype());
     if (!out) return std::unexpected(std::move(out.error()));
-    dispatch_global_cpu<cpu::OpReduceProd>(a, *out);
+    dispatch_global_cpu(RdOp::Prod, a, *out);
     return *out;
 }
 

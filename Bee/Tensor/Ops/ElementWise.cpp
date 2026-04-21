@@ -1,6 +1,6 @@
 #include "Tensor/Ops/ElementWise.hpp"
 #include "Tensor/Ops/Broadcast.hpp"
-#include "Tensor/Cpu/ElementWiseCpu.hpp"
+#include "Tensor/Cpu/Dispatch/Dispatch.hpp"
 
 #include <format>
 
@@ -74,42 +74,32 @@ auto check_dtype_float(DType dt, std::string_view op) -> Result<void>
     return {};
 }
 
-template <typename Op>
-auto dispatch_binary_cpu(const Tensor& a, const Tensor& b, Tensor& out) -> void
+// 运行期分派到 ISA 特化 namespace
+enum class BinOp { Add, Sub, Mul, Div };
+enum class UnOp  { Neg, Abs, Sqrt, Exp, Log };
+
+auto dispatch_binary_cpu(BinOp op, const Tensor& a, const Tensor& b, Tensor& out) -> void
 {
-    switch (out.dtype()) {
-    case DType::F32: cpu::cpu_elementwise_binary<float,    Op>(a, b, out); break;
-    case DType::F64: cpu::cpu_elementwise_binary<double,   Op>(a, b, out); break;
-    case DType::I32: cpu::cpu_elementwise_binary<int32_t,  Op>(a, b, out); break;
-    case DType::I64: cpu::cpu_elementwise_binary<int64_t,  Op>(a, b, out); break;
-    case DType::U8:  cpu::cpu_elementwise_binary<uint8_t,  Op>(a, b, out); break;
-    default: break;
+    switch (op) {
+    case BinOp::Add: BEE_RT_DISPATCH(ew_add, a, b, out);
+    case BinOp::Sub: BEE_RT_DISPATCH(ew_sub, a, b, out);
+    case BinOp::Mul: BEE_RT_DISPATCH(ew_mul, a, b, out);
+    case BinOp::Div: BEE_RT_DISPATCH(ew_div, a, b, out);
     }
 }
 
-template <typename Op>
-auto dispatch_unary_cpu_negabs(const Tensor& a, Tensor& out) -> void
+auto dispatch_unary_cpu(UnOp op, const Tensor& a, Tensor& out) -> void
 {
-    switch (out.dtype()) {
-    case DType::F32: cpu::cpu_elementwise_unary<float,   Op>(a, out); break;
-    case DType::F64: cpu::cpu_elementwise_unary<double,  Op>(a, out); break;
-    case DType::I32: cpu::cpu_elementwise_unary<int32_t, Op>(a, out); break;
-    case DType::I64: cpu::cpu_elementwise_unary<int64_t, Op>(a, out); break;
-    default: break;
+    switch (op) {
+    case UnOp::Neg:  BEE_RT_DISPATCH(ew_neg,  a, out);
+    case UnOp::Abs:  BEE_RT_DISPATCH(ew_abs,  a, out);
+    case UnOp::Sqrt: BEE_RT_DISPATCH(ew_sqrt, a, out);
+    case UnOp::Exp:  BEE_RT_DISPATCH(ew_exp,  a, out);
+    case UnOp::Log:  BEE_RT_DISPATCH(ew_log,  a, out);
     }
 }
 
-template <typename Op>
-auto dispatch_unary_cpu_float(const Tensor& a, Tensor& out) -> void
-{
-    switch (out.dtype()) {
-    case DType::F32: cpu::cpu_elementwise_unary<float,  Op>(a, out); break;
-    case DType::F64: cpu::cpu_elementwise_unary<double, Op>(a, out); break;
-    default: break;
-    }
-}
-
-template <typename Op, typename Fn>
+template <BinOp Op, typename Fn>
 auto binary_op_impl(const Tensor& a, const Tensor& b, std::string_view op_name,
                     Fn check_dtype_fn) -> Result<Tensor>
 {
@@ -131,11 +121,11 @@ auto binary_op_impl(const Tensor& a, const Tensor& b, std::string_view op_name,
     auto out = Tensor::empty(*bshape, a.dtype());
     if (!out) return std::unexpected(std::move(out.error()));
 
-    dispatch_binary_cpu<Op>(a, b, *out);
+    dispatch_binary_cpu(Op, a, b, *out);
     return *out;
 }
 
-template <typename Op, typename Fn>
+template <BinOp Op, typename Fn>
 auto inplace_binary_impl(Tensor& dst, const Tensor& src, std::string_view op_name,
                          Fn check_dtype_fn) -> Result<void>
 {
@@ -167,7 +157,7 @@ auto inplace_binary_impl(Tensor& dst, const Tensor& src, std::string_view op_nam
                         op_name),
             Severity::Recoverable));
 
-    dispatch_binary_cpu<Op>(dst, src, dst);
+    dispatch_binary_cpu(Op, dst, src, dst);
     return {};
 }
 
@@ -175,25 +165,25 @@ auto inplace_binary_impl(Tensor& dst, const Tensor& src, std::string_view op_nam
 
 auto add(const Tensor& a, const Tensor& b) -> Result<Tensor>
 {
-    return binary_op_impl<cpu::OpAdd>(a, b, "add",
+    return binary_op_impl<BinOp::Add>(a, b, "add",
         [](DType dt, std::string_view op) { return check_dtype_addsub(dt, op); });
 }
 
 auto sub(const Tensor& a, const Tensor& b) -> Result<Tensor>
 {
-    return binary_op_impl<cpu::OpSub>(a, b, "sub",
+    return binary_op_impl<BinOp::Sub>(a, b, "sub",
         [](DType dt, std::string_view op) { return check_dtype_addsub(dt, op); });
 }
 
 auto mul(const Tensor& a, const Tensor& b) -> Result<Tensor>
 {
-    return binary_op_impl<cpu::OpMul>(a, b, "mul",
+    return binary_op_impl<BinOp::Mul>(a, b, "mul",
         [](DType dt, std::string_view op) { return check_dtype_muldiv(dt, op); });
 }
 
 auto div(const Tensor& a, const Tensor& b) -> Result<Tensor>
 {
-    return binary_op_impl<cpu::OpDiv>(a, b, "div",
+    return binary_op_impl<BinOp::Div>(a, b, "div",
         [](DType dt, std::string_view op) { return check_dtype_muldiv(dt, op); });
 }
 
@@ -211,7 +201,7 @@ auto neg(const Tensor& a) -> Result<Tensor>
     auto out = Tensor::empty(a.shape(), a.dtype());
     if (!out) return std::unexpected(std::move(out.error()));
 
-    dispatch_unary_cpu_negabs<cpu::OpNeg>(a, *out);
+    dispatch_unary_cpu(UnOp::Neg, a, *out);
     return *out;
 }
 
@@ -229,7 +219,7 @@ auto abs(const Tensor& a) -> Result<Tensor>
     auto out = Tensor::empty(a.shape(), a.dtype());
     if (!out) return std::unexpected(std::move(out.error()));
 
-    dispatch_unary_cpu_negabs<cpu::OpAbs>(a, *out);
+    dispatch_unary_cpu(UnOp::Abs, a, *out);
     return *out;
 }
 
@@ -247,7 +237,7 @@ auto sqrt(const Tensor& a) -> Result<Tensor>
     auto out = Tensor::empty(a.shape(), a.dtype());
     if (!out) return std::unexpected(std::move(out.error()));
 
-    dispatch_unary_cpu_float<cpu::OpSqrt>(a, *out);
+    dispatch_unary_cpu(UnOp::Sqrt, a, *out);
     return *out;
 }
 
@@ -265,7 +255,7 @@ auto exp(const Tensor& a) -> Result<Tensor>
     auto out = Tensor::empty(a.shape(), a.dtype());
     if (!out) return std::unexpected(std::move(out.error()));
 
-    dispatch_unary_cpu_float<cpu::OpExp>(a, *out);
+    dispatch_unary_cpu(UnOp::Exp, a, *out);
     return *out;
 }
 
@@ -283,31 +273,31 @@ auto log(const Tensor& a) -> Result<Tensor>
     auto out = Tensor::empty(a.shape(), a.dtype());
     if (!out) return std::unexpected(std::move(out.error()));
 
-    dispatch_unary_cpu_float<cpu::OpLog>(a, *out);
+    dispatch_unary_cpu(UnOp::Log, a, *out);
     return *out;
 }
 
 auto add_inplace(Tensor& dst, const Tensor& src) -> Result<void>
 {
-    return inplace_binary_impl<cpu::OpAdd>(dst, src, "add_inplace",
+    return inplace_binary_impl<BinOp::Add>(dst, src, "add_inplace",
         [](DType dt, std::string_view op) { return check_dtype_addsub(dt, op); });
 }
 
 auto sub_inplace(Tensor& dst, const Tensor& src) -> Result<void>
 {
-    return inplace_binary_impl<cpu::OpSub>(dst, src, "sub_inplace",
+    return inplace_binary_impl<BinOp::Sub>(dst, src, "sub_inplace",
         [](DType dt, std::string_view op) { return check_dtype_addsub(dt, op); });
 }
 
 auto mul_inplace(Tensor& dst, const Tensor& src) -> Result<void>
 {
-    return inplace_binary_impl<cpu::OpMul>(dst, src, "mul_inplace",
+    return inplace_binary_impl<BinOp::Mul>(dst, src, "mul_inplace",
         [](DType dt, std::string_view op) { return check_dtype_muldiv(dt, op); });
 }
 
 auto div_inplace(Tensor& dst, const Tensor& src) -> Result<void>
 {
-    return inplace_binary_impl<cpu::OpDiv>(dst, src, "div_inplace",
+    return inplace_binary_impl<BinOp::Div>(dst, src, "div_inplace",
         [](DType dt, std::string_view op) { return check_dtype_muldiv(dt, op); });
 }
 
@@ -340,7 +330,7 @@ auto neg_inplace(Tensor& dst) -> Result<void>
 {
     auto r = inplace_unary_impl_negabs(dst, "neg_inplace");
     if (!r) return r;
-    dispatch_unary_cpu_negabs<cpu::OpNeg>(dst, dst);
+    dispatch_unary_cpu(UnOp::Neg, dst, dst);
     return {};
 }
 
@@ -348,7 +338,7 @@ auto abs_inplace(Tensor& dst) -> Result<void>
 {
     auto r = inplace_unary_impl_negabs(dst, "abs_inplace");
     if (!r) return r;
-    dispatch_unary_cpu_negabs<cpu::OpAbs>(dst, dst);
+    dispatch_unary_cpu(UnOp::Abs, dst, dst);
     return {};
 }
 
@@ -356,7 +346,7 @@ auto sqrt_inplace(Tensor& dst) -> Result<void>
 {
     auto r = inplace_unary_impl_float(dst, "sqrt_inplace");
     if (!r) return r;
-    dispatch_unary_cpu_float<cpu::OpSqrt>(dst, dst);
+    dispatch_unary_cpu(UnOp::Sqrt, dst, dst);
     return {};
 }
 
@@ -364,7 +354,7 @@ auto exp_inplace(Tensor& dst) -> Result<void>
 {
     auto r = inplace_unary_impl_float(dst, "exp_inplace");
     if (!r) return r;
-    dispatch_unary_cpu_float<cpu::OpExp>(dst, dst);
+    dispatch_unary_cpu(UnOp::Exp, dst, dst);
     return {};
 }
 
@@ -372,7 +362,7 @@ auto log_inplace(Tensor& dst) -> Result<void>
 {
     auto r = inplace_unary_impl_float(dst, "log_inplace");
     if (!r) return r;
-    dispatch_unary_cpu_float<cpu::OpLog>(dst, dst);
+    dispatch_unary_cpu(UnOp::Log, dst, dst);
     return {};
 }
 

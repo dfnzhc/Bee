@@ -133,9 +133,9 @@ TEST(SimdScalar, U8_AddSubMinMax)
 }
 
 // =====================================================================
-// AVX2 后端测试（需要 BEE_TENSOR_SIMD_AVX2）
+// AVX2 后端测试（需要 BEE_SIMD_ENABLE_AVX2）
 // =====================================================================
-#ifdef BEE_TENSOR_SIMD_AVX2
+#ifdef BEE_SIMD_ENABLE_AVX2
 
 TEST(SimdAvx2, Widths)
 {
@@ -396,47 +396,48 @@ TEST(SimdAvx2, U8_ReduceSum)
     EXPECT_EQ(B::reduce_sum(B::load(src)), uint8_t(32));
 }
 
-#endif // BEE_TENSOR_SIMD_AVX2
+#endif // BEE_SIMD_ENABLE_AVX2
 
 // =====================================================================
-// Selector 测试
+// 运行期 ISA 检测测试
 // =====================================================================
 
-TEST(SimdSelector, DefaultIsaName)
+TEST(SimdDetect, IsaEnumerates)
 {
-#if defined(BEE_TENSOR_SIMD_AVX512)
-    EXPECT_STREQ(bee::simd::default_isa_name(), "Avx512");
-#elif defined(BEE_TENSOR_SIMD_AVX2)
-    EXPECT_STREQ(bee::simd::default_isa_name(), "Avx2");
-#elif defined(BEE_TENSOR_SIMD_SSE2)
-    EXPECT_STREQ(bee::simd::default_isa_name(), "Sse2");
-#else
-    EXPECT_STREQ(bee::simd::default_isa_name(), "Scalar");
+    // detect_isa 返回值应在枚举范围内
+    const auto isa = bee::simd::detect_isa();
+    EXPECT_GE(static_cast<int>(isa), static_cast<int>(bee::simd::Isa::Scalar));
+    EXPECT_LE(static_cast<int>(isa), static_cast<int>(bee::simd::Isa::Avx512));
+}
+
+TEST(SimdDetect, CurrentIsaCached)
+{
+    // current_isa 多次调用结果应一致
+    const auto a = bee::simd::current_isa();
+    const auto b = bee::simd::current_isa();
+    EXPECT_EQ(a, b);
+}
+
+TEST(SimdDetect, IsaNameNonEmpty)
+{
+    EXPECT_STREQ(bee::simd::isa_name(bee::simd::Isa::Scalar), "Scalar");
+    EXPECT_STREQ(bee::simd::isa_name(bee::simd::Isa::Sse2),   "Sse2");
+    EXPECT_STREQ(bee::simd::isa_name(bee::simd::Isa::Avx2),   "Avx2");
+    EXPECT_STREQ(bee::simd::isa_name(bee::simd::Isa::Avx512), "Avx512");
+}
+
+TEST(SimdDetect, CompileCapabilityAtLeastRuntime)
+{
+    // 若本机编译时具备某 ISA，运行期检测结果不应超出该能力
+    const auto isa = bee::simd::current_isa();
+#if !defined(BEE_SIMD_ENABLE_AVX512)
+    EXPECT_LT(isa, bee::simd::Isa::Avx512);
+#endif
+#if !defined(BEE_SIMD_ENABLE_AVX2)
+    EXPECT_LT(isa, bee::simd::Isa::Avx2);
+#endif
+#if !defined(BEE_SIMD_ENABLE_SSE2)
+    EXPECT_LT(isa, bee::simd::Isa::Sse2);
 #endif
 }
 
-#if defined(BEE_TENSOR_SIMD_AVX512)
-TEST(SimdSelector, DefaultIsaIsAvx512)
-{
-    // DefaultIsa 应为 IsaAvx512；验证其 float backend 宽度为 16
-    EXPECT_EQ((SimdBackend<float, bee::simd::DefaultIsa>::width), 16u);
-}
-#elif defined(BEE_TENSOR_SIMD_AVX2)
-TEST(SimdSelector, DefaultIsaIsAvx2)
-{
-    // DefaultIsa 应为 IsaAvx2；验证其 float backend 宽度为 8
-    EXPECT_EQ((SimdBackend<float, bee::simd::DefaultIsa>::width), 8u);
-}
-#elif defined(BEE_TENSOR_SIMD_SSE2)
-TEST(SimdSelector, DefaultIsaIsSse2)
-{
-    // DefaultIsa 应为 IsaSse2；验证其 float backend 宽度为 4
-    EXPECT_EQ((SimdBackend<float, bee::simd::DefaultIsa>::width), 4u);
-}
-#else
-TEST(SimdSelector, DefaultIsaIsScalar)
-{
-    // DefaultIsa 应为 IsaScalar；验证其 float backend 宽度为 1
-    EXPECT_EQ((SimdBackend<float, bee::simd::DefaultIsa>::width), 1u);
-}
-#endif

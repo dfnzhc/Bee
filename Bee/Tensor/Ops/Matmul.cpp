@@ -1,5 +1,6 @@
 #include "Tensor/Ops/Matmul.hpp"
-#include "Tensor/Cpu/MatmulCpu.hpp"
+#include "Tensor/Cpu/Dispatch/Dispatch.hpp"
+#include "Tensor/Core/DType.hpp"
 
 #include <cstring>
 #include <format>
@@ -10,7 +11,7 @@ namespace bee
 namespace
 {
 
-// 分派到对应类型的 CPU 内核
+// 分派到对应类型的 CPU 内核（运行期 ISA 分派）
 auto dispatch_matmul_cpu(
     int64_t M, int64_t K, int64_t N,
     DType dtype,
@@ -24,33 +25,25 @@ auto dispatch_matmul_cpu(
 
     switch (dtype) {
     case DType::F32:
-        cpu::cpu_matmul_kernel<float>(
-            M, K, N,
+        BEE_RT_DISPATCH(mm_f32, M, K, N,
             static_cast<const float*>(A),
             static_cast<const float*>(B),
             static_cast<float*>(C));
-        break;
     case DType::F64:
-        cpu::cpu_matmul_kernel<double>(
-            M, K, N,
+        BEE_RT_DISPATCH(mm_f64, M, K, N,
             static_cast<const double*>(A),
             static_cast<const double*>(B),
             static_cast<double*>(C));
-        break;
     case DType::I32:
-        cpu::cpu_matmul_kernel<int32_t>(
-            M, K, N,
+        BEE_RT_DISPATCH(mm_i32, M, K, N,
             static_cast<const int32_t*>(A),
             static_cast<const int32_t*>(B),
             static_cast<int32_t*>(C));
-        break;
     case DType::I64:
-        cpu::cpu_matmul_kernel<int64_t>(
-            M, K, N,
+        BEE_RT_DISPATCH(mm_i64, M, K, N,
             static_cast<const int64_t*>(A),
             static_cast<const int64_t*>(B),
             static_cast<int64_t*>(C));
-        break;
     default:
         // 不应到达此处（调用方已校验 dtype）
         break;

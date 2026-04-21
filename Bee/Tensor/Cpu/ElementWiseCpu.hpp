@@ -71,7 +71,7 @@ template <> inline constexpr bool kSimdLog<float,    simd::IsaScalar> = true;
 template <> inline constexpr bool kSimdLog<double,   simd::IsaScalar> = true;
 
 // ── IsaAvx2 特化 ─────────────────────────────────────────────────────────────
-#ifdef BEE_TENSOR_SIMD_AVX2
+#ifdef BEE_SIMD_ENABLE_AVX2
 template <> inline constexpr bool kSimdAdd<float,    simd::IsaAvx2> = true;
 template <> inline constexpr bool kSimdAdd<double,   simd::IsaAvx2> = true;
 template <> inline constexpr bool kSimdAdd<int32_t,  simd::IsaAvx2> = true;
@@ -109,7 +109,7 @@ template <> inline constexpr bool kSimdLog<double,   simd::IsaAvx2> = true;
 #endif
 
 // ── IsaSse2 特化 ─────────────────────────────────────────────────────────────
-#ifdef BEE_TENSOR_SIMD_SSE2
+#ifdef BEE_SIMD_ENABLE_SSE2
 template <> inline constexpr bool kSimdAdd<float,    simd::IsaSse2> = true;
 template <> inline constexpr bool kSimdAdd<double,   simd::IsaSse2> = true;
 template <> inline constexpr bool kSimdAdd<int32_t,  simd::IsaSse2> = true;
@@ -147,7 +147,7 @@ template <> inline constexpr bool kSimdLog<double,   simd::IsaSse2> = true;
 #endif
 
 // ── IsaAvx512 特化 ───────────────────────────────────────────────────────────
-#ifdef BEE_TENSOR_SIMD_AVX512
+#ifdef BEE_SIMD_ENABLE_AVX512
 template <> inline constexpr bool kSimdAdd<float,    simd::IsaAvx512> = true;
 template <> inline constexpr bool kSimdAdd<double,   simd::IsaAvx512> = true;
 template <> inline constexpr bool kSimdAdd<int32_t,  simd::IsaAvx512> = true;
@@ -487,11 +487,9 @@ inline auto make_broadcast_strides(
     return bst;
 }
 
-template <typename T, typename Op>
+template <typename T, typename ISA, typename Op>
 auto cpu_elementwise_binary(const Tensor& a, const Tensor& b, Tensor& out) -> void
 {
-    using ISA = simd::DefaultIsa;
-
     const int64_t n    = out.numel();
     const int64_t ndim = out.ndim();
 
@@ -520,11 +518,9 @@ auto cpu_elementwise_binary(const Tensor& a, const Tensor& b, Tensor& out) -> vo
         a_ptr, b_ptr, out_ptr);
 }
 
-template <typename T, typename Op>
+template <typename T, typename ISA, typename Op>
 auto cpu_elementwise_unary(const Tensor& a, Tensor& out) -> void
 {
-    using ISA = simd::DefaultIsa;
-
     const int64_t n    = out.numel();
     const int64_t ndim = out.ndim();
 

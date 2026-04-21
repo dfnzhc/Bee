@@ -81,3 +81,19 @@ int main() {
 set(CMAKE_REQUIRED_FLAGS "${_bee_simd_saved_flags}")
 
 message(STATUS "Bee::SIMD 能力探测：SSE2+SSE4.1=${BEE_SIMD_HAS_SSE2}  AVX2=${BEE_SIMD_HAS_AVX2}  AVX512+BW=${BEE_SIMD_HAS_AVX512}")
+
+# ---------------------------------------------------------------------------
+# 对所有消费者暴露 BEE_SIMD_ENABLE_<ISA>：
+#   使得 SimdBackend<T, IsaXxx> 的特化头在 Tensor 运行期分派、Tests 中均可见。
+#   各 ISA 特化头中只含声明与 inline 函数定义，未被实例化时不会产生指令，
+#   因此安全暴露；对应 ISA 编译标志仍按需在各 TU 上应用。
+# ---------------------------------------------------------------------------
+if(BEE_SIMD_HAS_SSE2)
+    target_compile_definitions(SIMD PUBLIC BEE_SIMD_ENABLE_SSE2)
+endif()
+if(BEE_SIMD_HAS_AVX2)
+    target_compile_definitions(SIMD PUBLIC BEE_SIMD_ENABLE_AVX2)
+endif()
+if(BEE_SIMD_HAS_AVX512)
+    target_compile_definitions(SIMD PUBLIC BEE_SIMD_ENABLE_AVX512)
+endif()

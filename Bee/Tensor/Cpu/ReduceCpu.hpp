@@ -48,7 +48,7 @@ template <> inline constexpr bool kSimdReduceMax<uint8_t,  simd::IsaScalar> = tr
 // ── IsaAvx2 特化：AVX2 后端的 reduce 能力与类型对应关系 ─────────────────────
 // reduce_sum：float/double/i32/i64/u8 均有；reduce_min/max：仅 float/double/i32
 
-#ifdef BEE_TENSOR_SIMD_AVX2
+#ifdef BEE_SIMD_ENABLE_AVX2
 template <> inline constexpr bool kSimdReduceSum<float,    simd::IsaAvx2> = true;
 template <> inline constexpr bool kSimdReduceSum<double,   simd::IsaAvx2> = true;
 template <> inline constexpr bool kSimdReduceSum<int32_t,  simd::IsaAvx2> = true;
@@ -69,7 +69,7 @@ template <> inline constexpr bool kSimdReduceMax<int32_t,  simd::IsaAvx2> = true
 // reduce_sum：5 种类型均有（u8 用 sad_epu8，i64 用标量提取）
 // reduce_min/max：float/double/int32/uint8 有；i64 无有符号 SSE2 比较指令，跳过
 
-#ifdef BEE_TENSOR_SIMD_SSE2
+#ifdef BEE_SIMD_ENABLE_SSE2
 template <> inline constexpr bool kSimdReduceSum<float,    simd::IsaSse2> = true;
 template <> inline constexpr bool kSimdReduceSum<double,   simd::IsaSse2> = true;
 template <> inline constexpr bool kSimdReduceSum<int32_t,  simd::IsaSse2> = true;
@@ -91,7 +91,7 @@ template <> inline constexpr bool kSimdReduceMax<uint8_t,  simd::IsaSse2> = true
 // i64 min/max/abs 是 AVX-512F 原生（不同于 AVX2）
 // u8 依赖 AVX512BW，用 __AVX512BW__ 守卫
 
-#ifdef BEE_TENSOR_SIMD_AVX512
+#ifdef BEE_SIMD_ENABLE_AVX512
 template <> inline constexpr bool kSimdReduceSum<float,    simd::IsaAvx512> = true;
 template <> inline constexpr bool kSimdReduceSum<double,   simd::IsaAvx512> = true;
 template <> inline constexpr bool kSimdReduceSum<int32_t,  simd::IsaAvx512> = true;
@@ -290,10 +290,9 @@ auto cpu_global_reduce_strided(const Tensor& a) -> T
 // ─────────────────────────────────────────────────────────────────────────────
 
 // 将 reduce 结果写入 0-rank 输出张量
-template <typename T, typename Op>
+template <typename T, typename ISA, typename Op>
 auto cpu_reduce_global_dispatch(const Tensor& a, Tensor& out) -> void
 {
-    using ISA = simd::DefaultIsa;
     const auto* in_ptr  = static_cast<const T*>(a.data_ptr());
     auto*       out_ptr = static_cast<T*>(out.data_ptr());
 

@@ -2,7 +2,7 @@
 
 #include "SIMD/Traits.hpp"
 
-#ifdef BEE_TENSOR_SIMD_SSE2
+#ifdef BEE_SIMD_ENABLE_SSE2
 
 #include <immintrin.h>
 #include <smmintrin.h>
@@ -373,4 +373,4 @@ struct SimdBackend<uint8_t, IsaSse2>
 
 } // namespace bee::simd
 
-#endif // BEE_TENSOR_SIMD_SSE2
+#endif // BEE_SIMD_ENABLE_SSE2
