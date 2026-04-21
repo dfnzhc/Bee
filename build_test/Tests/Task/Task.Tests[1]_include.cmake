@@ -1,5 +1,0 @@
-if(EXISTS "D:/Dev/1Project/Bee/build_test/Tests/Task/Task.Tests[1]_tests.cmake")
-  include("D:/Dev/1Project/Bee/build_test/Tests/Task/Task.Tests[1]_tests.cmake")
-else()
-  add_test(Task.Tests_NOT_BUILT Task.Tests_NOT_BUILT)
-endif()

@@ -1,7 +1,0 @@
-add_test([=[MathComponentTests.ClampKeepsValueInRange]=]  D:/Dev/1Project/Bee/build_test/Tests/Math/Release/Math.Tests.exe [==[--gtest_filter=MathComponentTests.ClampKeepsValueInRange]==] --gtest_also_run_disabled_tests)
-set_tests_properties([=[MathComponentTests.ClampKeepsValueInRange]=]  PROPERTIES DEF_SOURCE_LINE [==[D:\Dev\1Project\Bee\Tests\Math\MathTests.cpp:6]==] WORKING_DIRECTORY D:/Dev/1Project/Bee/build_test/Tests/Math SKIP_REGULAR_EXPRESSION [==[\[  SKIPPED \]]==])
-add_test([=[MathComponentTests.LerpInterpolates]=]  D:/Dev/1Project/Bee/build_test/Tests/Math/Release/Math.Tests.exe [==[--gtest_filter=MathComponentTests.LerpInterpolates]==] --gtest_also_run_disabled_tests)
-set_tests_properties([=[MathComponentTests.LerpInterpolates]=]  PROPERTIES DEF_SOURCE_LINE [==[D:\Dev\1Project\Bee\Tests\Math\MathTests.cpp:13]==] WORKING_DIRECTORY D:/Dev/1Project/Bee/build_test/Tests/Math SKIP_REGULAR_EXPRESSION [==[\[  SKIPPED \]]==])
-add_test([=[MathComponentTests.DetectsPowerOfTwo]=]  D:/Dev/1Project/Bee/build_test/Tests/Math/Release/Math.Tests.exe [==[--gtest_filter=MathComponentTests.DetectsPowerOfTwo]==] --gtest_also_run_disabled_tests)
-set_tests_properties([=[MathComponentTests.DetectsPowerOfTwo]=]  PROPERTIES DEF_SOURCE_LINE [==[D:\Dev\1Project\Bee\Tests\Math\MathTests.cpp:19]==] WORKING_DIRECTORY D:/Dev/1Project/Bee/build_test/Tests/Math SKIP_REGULAR_EXPRESSION [==[\[  SKIPPED \]]==])
-set(  Math.Tests_TESTS MathComponentTests.ClampKeepsValueInRange MathComponentTests.LerpInterpolates MathComponentTests.DetectsPowerOfTwo)

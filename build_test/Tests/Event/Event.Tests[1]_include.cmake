@@ -1,5 +1,0 @@
-if(EXISTS "D:/Dev/1Project/Bee/build_test/Tests/Event/Event.Tests[1]_tests.cmake")
-  include("D:/Dev/1Project/Bee/build_test/Tests/Event/Event.Tests[1]_tests.cmake")
-else()
-  add_test(Event.Tests_NOT_BUILT Event.Tests_NOT_BUILT)
-endif()

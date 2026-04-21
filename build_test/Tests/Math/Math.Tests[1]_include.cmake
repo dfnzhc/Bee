@@ -1,5 +1,0 @@
-if(EXISTS "D:/Dev/1Project/Bee/build_test/Tests/Math/Math.Tests[1]_tests.cmake")
-  include("D:/Dev/1Project/Bee/build_test/Tests/Math/Math.Tests[1]_tests.cmake")
-else()
-  add_test(Math.Tests_NOT_BUILT Math.Tests_NOT_BUILT)
-endif()

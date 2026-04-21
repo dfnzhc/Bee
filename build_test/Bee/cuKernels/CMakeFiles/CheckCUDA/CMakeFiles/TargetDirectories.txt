@@ -1,2 +1,0 @@
-D:/Dev/1Project/Bee/build_test/Bee/cuKernels/CMakeFiles/CheckCUDA/CMakeFiles/ALL_BUILD.dir
-D:/Dev/1Project/Bee/build_test/Bee/cuKernels/CMakeFiles/CheckCUDA/CMakeFiles/ZERO_CHECK.dir
