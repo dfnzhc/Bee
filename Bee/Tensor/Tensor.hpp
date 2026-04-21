@@ -2,10 +2,10 @@
 
 // Tensor 组件门面头文件：聚合所有 Core 元数据类型
 
-#include "Tensor/Core/Device.hpp"
+#include "Base/Memory/Device.hpp"
 #include "Tensor/Core/DType.hpp"
 #include "Tensor/Core/Shape.hpp"
-#include "Tensor/Core/Allocator.hpp"
+#include "Base/Memory/Allocator.hpp"
 #include "Tensor/Core/Storage.hpp"
 #include "Tensor/Core/TensorImpl.hpp"
 #include "Tensor/Core/Tensor.hpp"

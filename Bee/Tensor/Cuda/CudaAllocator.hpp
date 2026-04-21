@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Tensor/Core/Allocator.hpp"
-#include "Tensor/Core/Device.hpp"
+#include "Base/Memory/Allocator.hpp"
+#include "Base/Memory/Device.hpp"
 #include "Tensor/Cuda/Backend.hpp"
 
 namespace bee

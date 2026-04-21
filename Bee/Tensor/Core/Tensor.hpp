@@ -6,7 +6,7 @@
 #include <span>
 
 #include "Base/Diagnostics/Error.hpp"
-#include "Tensor/Core/Device.hpp"
+#include "Base/Memory/Device.hpp"
 #include "Tensor/Core/DType.hpp"
 #include "Tensor/Core/Shape.hpp"
 #include "Tensor/Core/TensorImpl.hpp"

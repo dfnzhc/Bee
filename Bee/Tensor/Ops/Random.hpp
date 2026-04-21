@@ -4,7 +4,7 @@
 // 基于 std::mt19937_64；seed==0 时使用 std::random_device 生成随机种子
 
 #include "Base/Diagnostics/Error.hpp"
-#include "Tensor/Core/Device.hpp"
+#include "Base/Memory/Device.hpp"
 #include "Tensor/Core/DType.hpp"
 #include "Tensor/Core/Shape.hpp"
 #include "Tensor/Core/Tensor.hpp"

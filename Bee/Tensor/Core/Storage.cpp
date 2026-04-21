@@ -1,5 +1,5 @@
 #include "Tensor/Core/Storage.hpp"
-#include "Tensor/Core/Allocator.hpp"
+#include "Base/Memory/Allocator.hpp"
 
 namespace bee
 {

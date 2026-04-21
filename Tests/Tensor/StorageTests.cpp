@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "Tensor/Core/Allocator.hpp"
+#include "Base/Memory/Allocator.hpp"
 #include "Tensor/Core/Storage.hpp"
 
 using namespace bee;

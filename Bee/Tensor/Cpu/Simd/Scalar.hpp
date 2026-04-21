@@ -18,8 +18,9 @@ template <>
 struct SimdBackend<float, IsaScalar>
 {
     static constexpr std::size_t width = 1;
-    using reg = float;
+    using reg                          = float;
 
+    // clang-format off
     static auto load(const float* p) -> reg { return *p; }
     static auto loadu(const float* p) -> reg { return *p; }
     static auto store(float* p, reg v) -> void { *p = v; }
@@ -42,6 +43,7 @@ struct SimdBackend<float, IsaScalar>
     static auto reduce_sum(reg v) -> float { return v; }
     static auto reduce_min(reg v) -> float { return v; }
     static auto reduce_max(reg v) -> float { return v; }
+    // clang-format on
 };
 
 // -----------------------------------------------------------------------
@@ -51,8 +53,9 @@ template <>
 struct SimdBackend<double, IsaScalar>
 {
     static constexpr std::size_t width = 1;
-    using reg = double;
+    using reg                          = double;
 
+    // clang-format off
     static auto load(const double* p) -> reg { return *p; }
     static auto loadu(const double* p) -> reg { return *p; }
     static auto store(double* p, reg v) -> void { *p = v; }
@@ -75,6 +78,7 @@ struct SimdBackend<double, IsaScalar>
     static auto reduce_sum(reg v) -> double { return v; }
     static auto reduce_min(reg v) -> double { return v; }
     static auto reduce_max(reg v) -> double { return v; }
+    // clang-format on
 };
 
 // -----------------------------------------------------------------------
@@ -84,8 +88,9 @@ template <>
 struct SimdBackend<int32_t, IsaScalar>
 {
     static constexpr std::size_t width = 1;
-    using reg = int32_t;
+    using reg                          = int32_t;
 
+    // clang-format off
     static auto load(const int32_t* p) -> reg { return *p; }
     static auto loadu(const int32_t* p) -> reg { return *p; }
     static auto store(int32_t* p, reg v) -> void { *p = v; }
@@ -105,6 +110,7 @@ struct SimdBackend<int32_t, IsaScalar>
     static auto reduce_sum(reg v) -> int32_t { return v; }
     static auto reduce_min(reg v) -> int32_t { return v; }
     static auto reduce_max(reg v) -> int32_t { return v; }
+    // clang-format on
 };
 
 // -----------------------------------------------------------------------
@@ -114,8 +120,9 @@ template <>
 struct SimdBackend<int64_t, IsaScalar>
 {
     static constexpr std::size_t width = 1;
-    using reg = int64_t;
+    using reg                          = int64_t;
 
+    // clang-format off
     static auto load(const int64_t* p) -> reg { return *p; }
     static auto loadu(const int64_t* p) -> reg { return *p; }
     static auto store(int64_t* p, reg v) -> void { *p = v; }
@@ -135,6 +142,7 @@ struct SimdBackend<int64_t, IsaScalar>
     static auto reduce_sum(reg v) -> int64_t { return v; }
     static auto reduce_min(reg v) -> int64_t { return v; }
     static auto reduce_max(reg v) -> int64_t { return v; }
+    // clang-format on
 };
 
 // -----------------------------------------------------------------------
@@ -145,13 +153,14 @@ template <>
 struct SimdBackend<uint8_t, IsaScalar>
 {
     static constexpr std::size_t width = 1;
-    using reg = uint8_t;
+    using reg                          = uint8_t;
 
-    static auto load(const uint8_t* p) -> reg { return *p; }
-    static auto loadu(const uint8_t* p) -> reg { return *p; }
-    static auto store(uint8_t* p, reg v) -> void { *p = v; }
+    // clang-format off
+    static auto load(const uint8_t* p)    -> reg  { return *p; }
+    static auto loadu(const uint8_t* p)   -> reg  { return *p; }
+    static auto store(uint8_t* p, reg v)  -> void { *p = v; }
     static auto storeu(uint8_t* p, reg v) -> void { *p = v; }
-    static auto set1(uint8_t x) -> reg { return x; }
+    static auto set1(uint8_t x)           -> reg  { return x; }
 
     static auto add(reg a, reg b) -> reg { return static_cast<uint8_t>(a + b); }
     static auto sub(reg a, reg b) -> reg { return static_cast<uint8_t>(a - b); }
@@ -162,6 +171,7 @@ struct SimdBackend<uint8_t, IsaScalar>
     static auto reduce_sum(reg v) -> uint8_t { return v; }
     static auto reduce_min(reg v) -> uint8_t { return v; }
     static auto reduce_max(reg v) -> uint8_t { return v; }
+    // clang-format on
 };
 
 } // namespace bee::simd

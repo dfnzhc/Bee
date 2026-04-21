@@ -4,7 +4,7 @@
 #include <memory>
 
 #include "Base/Diagnostics/Error.hpp"
-#include "Tensor/Core/Device.hpp"
+#include "Base/Memory/Device.hpp"
 
 namespace bee
 {

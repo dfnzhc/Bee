@@ -22,6 +22,7 @@ struct SimdBackend<float, IsaAvx2>
     static constexpr std::size_t width = 8;
     using reg = __m256;
 
+    // clang-format off
     static auto load(const float* p) -> reg { return _mm256_load_ps(p); }
     static auto loadu(const float* p) -> reg { return _mm256_loadu_ps(p); }
     static auto store(float* p, reg v) -> void { _mm256_store_ps(p, v); }
@@ -35,6 +36,7 @@ struct SimdBackend<float, IsaAvx2>
 
     static auto min(reg a, reg b) -> reg { return _mm256_min_ps(a, b); }
     static auto max(reg a, reg b) -> reg { return _mm256_max_ps(a, b); }
+    // clang-format on
 
     // 翻转符号位
     static auto neg(reg a) -> reg
@@ -112,6 +114,7 @@ struct SimdBackend<double, IsaAvx2>
     static constexpr std::size_t width = 4;
     using reg = __m256d;
 
+    // clang-format off
     static auto load(const double* p) -> reg { return _mm256_load_pd(p); }
     static auto loadu(const double* p) -> reg { return _mm256_loadu_pd(p); }
     static auto store(double* p, reg v) -> void { _mm256_store_pd(p, v); }
@@ -125,6 +128,7 @@ struct SimdBackend<double, IsaAvx2>
 
     static auto min(reg a, reg b) -> reg { return _mm256_min_pd(a, b); }
     static auto max(reg a, reg b) -> reg { return _mm256_max_pd(a, b); }
+    // clang-format on
 
     static auto neg(reg a) -> reg
     {
