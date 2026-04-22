@@ -193,6 +193,30 @@ auto cast(ScalarType src_dt, const void* src, ScalarType dst_dt, void* dst, std:
     return wrap(err, "cuda::ops::cast");
 }
 
+auto reduce_global(ReduceOp op, ScalarType dt, const void* src, void* dst, std::size_t n) -> Result<void>
+{
+    if (n == 0)
+        return std::unexpected(make_error("cuda::ops::reduce_global: n == 0", Severity::Recoverable));
+    const int err = detail::ops_reduce_global(static_cast<int>(op), static_cast<int>(dt), src, dst, n);
+    return wrap(err, "cuda::ops::reduce_global");
+}
+
+auto reduce_axis(ReduceOp op, ScalarType dt, const void* src, void* dst,
+                 std::size_t outer, std::size_t axis, std::size_t inner) -> Result<void>
+{
+    if (outer == 0 || inner == 0 || axis == 0)
+        return std::unexpected(make_error("cuda::ops::reduce_axis: 维度含 0", Severity::Recoverable));
+    const int err = detail::ops_reduce_axis(static_cast<int>(op), static_cast<int>(dt), src, dst, outer, axis, inner);
+    return wrap(err, "cuda::ops::reduce_axis");
+}
+
+auto scale_fp(ScalarType dt, void* buf, double factor, std::size_t n) -> Result<void>
+{
+    if (n == 0) return {};
+    const int err = detail::ops_scale_fp(static_cast<int>(dt), buf, factor, n);
+    return wrap(err, "cuda::ops::scale_fp");
+}
+
 } // namespace ops
 
 } // namespace bee::cuda

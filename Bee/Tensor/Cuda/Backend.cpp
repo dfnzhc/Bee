@@ -65,6 +65,29 @@ auto ew_cast(int src_dt, const void* src, int dst_dt, void* dst, std::size_t n) 
         static_cast<::bee::cuda::ScalarType>(dst_dt), dst, n);
 }
 
+auto reduce_global(int op, int dt, const void* src, void* dst, std::size_t n) -> Result<void>
+{
+    return ::bee::cuda::ops::reduce_global(
+        static_cast<::bee::cuda::ReduceOp>(op),
+        static_cast<::bee::cuda::ScalarType>(dt),
+        src, dst, n);
+}
+
+auto reduce_axis(int op, int dt, const void* src, void* dst,
+                 std::size_t outer, std::size_t axis, std::size_t inner) -> Result<void>
+{
+    return ::bee::cuda::ops::reduce_axis(
+        static_cast<::bee::cuda::ReduceOp>(op),
+        static_cast<::bee::cuda::ScalarType>(dt),
+        src, dst, outer, axis, inner);
+}
+
+auto scale_fp(int dt, void* buf, double factor, std::size_t n) -> Result<void>
+{
+    return ::bee::cuda::ops::scale_fp(
+        static_cast<::bee::cuda::ScalarType>(dt), buf, factor, n);
+}
+
 auto synchronize() -> Result<void>
 {
     return ::bee::cuda::device_synchronize();
@@ -118,6 +141,21 @@ auto ew_unary(int /*op*/, int /*dt*/, const void*, void*, std::size_t) -> Result
 auto ew_cast(int /*src_dt*/, const void*, int /*dst_dt*/, void*, std::size_t) -> Result<void>
 {
     return std::unexpected(make_error("CUDA 后端不可用：ew_cast", Severity::Recoverable));
+}
+
+auto reduce_global(int, int, const void*, void*, std::size_t) -> Result<void>
+{
+    return std::unexpected(make_error("CUDA 后端不可用：reduce_global", Severity::Recoverable));
+}
+
+auto reduce_axis(int, int, const void*, void*, std::size_t, std::size_t, std::size_t) -> Result<void>
+{
+    return std::unexpected(make_error("CUDA 后端不可用：reduce_axis", Severity::Recoverable));
+}
+
+auto scale_fp(int, void*, double, std::size_t) -> Result<void>
+{
+    return std::unexpected(make_error("CUDA 后端不可用：scale_fp", Severity::Recoverable));
 }
 
 auto synchronize() -> Result<void>

@@ -22,4 +22,11 @@ int ops_binary(int op, int dt, const void* a, const void* b, void* out, std::siz
 int ops_unary (int op, int dt, const void* a, void* out, std::size_t n) noexcept;
 int ops_cast  (int src_dt, const void* src, int dst_dt, void* dst, std::size_t n) noexcept;
 
+int ops_reduce_global(int op, int dt, const void* src, void* dst, std::size_t n) noexcept;
+int ops_reduce_axis  (int op, int dt, const void* src, void* dst,
+                      std::size_t outer, std::size_t axis, std::size_t inner) noexcept;
+
+// dt ∈ {F32, F64}；buf[i] *= factor（原地缩放，供 mean 使用）。
+int ops_scale_fp(int dt, void* buf, double factor, std::size_t n) noexcept;
+
 } // namespace bee::cuda::detail

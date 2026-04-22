@@ -91,6 +91,14 @@ enum class UnaryOp : std::uint8_t
     Log,
 };
 
+enum class ReduceOp : std::uint8_t
+{
+    Sum,
+    Min,
+    Max,
+    Prod,
+};
+
 namespace ops
 {
 
@@ -102,6 +110,17 @@ namespace ops
 
 // dtype 转换；src/dst 均连续且元素数相同。
 [[nodiscard]] auto cast(ScalarType src_dt, const void* src, ScalarType dst_dt, void* dst, std::size_t n) -> Result<void>;
+
+// 全局 reduce：src 为连续 n 元素缓冲，dst 指向 1 个同 dtype 标量。
+[[nodiscard]] auto reduce_global(ReduceOp op, ScalarType dt, const void* src, void* dst, std::size_t n) -> Result<void>;
+
+// 按轴 reduce：输入视为 [outer, axis, inner] 三维连续布局；输出 [outer, inner]。
+// src/dst 同 dtype、均连续；axis 必须 >=1。
+[[nodiscard]] auto reduce_axis(ReduceOp op, ScalarType dt, const void* src, void* dst,
+                               std::size_t outer, std::size_t axis, std::size_t inner) -> Result<void>;
+
+// 原地缩放（dt ∈ {F32, F64}）：供 mean 实现。
+[[nodiscard]] auto scale_fp(ScalarType dt, void* buf, double factor, std::size_t n) -> Result<void>;
 
 } // namespace ops
 

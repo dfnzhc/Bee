@@ -55,6 +55,16 @@ auto deallocate(void* p, std::size_t nbytes, std::size_t alignment) -> void;
 // dtype 转换（src/dst 连续，元素数相同）。
 [[nodiscard]] auto ew_cast(int src_dt, const void* src, int dst_dt, void* dst, std::size_t n) -> Result<void>;
 
+// 全局 reduce：src 为连续 n 元素缓冲，dst 指向 1 个同 dtype 标量。
+[[nodiscard]] auto reduce_global(int op, int dt, const void* src, void* dst, std::size_t n) -> Result<void>;
+
+// 按轴 reduce：[outer, axis, inner] -> [outer, inner]，同 dtype、均连续。
+[[nodiscard]] auto reduce_axis(int op, int dt, const void* src, void* dst,
+                               std::size_t outer, std::size_t axis, std::size_t inner) -> Result<void>;
+
+// F32/F64 原地缩放（mean 使用）。
+[[nodiscard]] auto scale_fp(int dt, void* buf, double factor, std::size_t n) -> Result<void>;
+
 // 同步 CUDA 设备，等待所有待处理操作完成。
 // @return 成功时返回 void；失败时返回 NotImplemented 错误
 [[nodiscard]] auto synchronize() -> Result<void>;
