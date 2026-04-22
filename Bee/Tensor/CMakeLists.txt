@@ -45,7 +45,7 @@ bee_add_component(
 function(_bee_tensor_add_dispatch_isa isa_upper flags_var)
     set(_obj "TensorDispatch_${isa_upper}")
     add_library(${_obj} OBJECT "${tensor_dispatch_source}")
-    set_target_properties(${_obj} PROPERTIES FOLDER "Bee")
+    set_target_properties(${_obj} PROPERTIES FOLDER "Bee/Dispatch")
     target_compile_features(${_obj} PRIVATE cxx_std_23)
     target_link_libraries(${_obj} PRIVATE Bee::Base Bee::SIMD)
     target_include_directories(${_obj} PRIVATE "${tensor_private_include_dir}")
@@ -65,7 +65,7 @@ endfunction()
 
 # Scalar 始终构建
 add_library(TensorDispatch_SCALAR OBJECT "${tensor_dispatch_source}")
-set_target_properties(TensorDispatch_SCALAR PROPERTIES FOLDER "Bee")
+set_target_properties(TensorDispatch_SCALAR PROPERTIES FOLDER "Bee/Dispatch")
 target_compile_features(TensorDispatch_SCALAR PRIVATE cxx_std_23)
 target_link_libraries(TensorDispatch_SCALAR PRIVATE Bee::Base Bee::SIMD)
 target_include_directories(TensorDispatch_SCALAR PRIVATE "${tensor_private_include_dir}")

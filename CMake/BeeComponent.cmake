@@ -56,6 +56,19 @@ function(bee_add_component)
             target_link_libraries(${BEE_COMP_NAME} INTERFACE ${BEE_COMP_DEPENDS})
         endif()
         target_compile_features(${BEE_COMP_NAME} INTERFACE cxx_std_23)
+
+        # 让 IDE（CLion / VS）能看到 header-only 组件：额外创建一个带 SOURCES 的
+        # 伴随自定义目标，名字是 <Name>.Headers，FOLDER 归到 Bee/HeaderOnly。
+        if(BEE_COMP_PUBLIC_HEADERS)
+            add_custom_target(${BEE_COMP_NAME}.Headers SOURCES ${BEE_COMP_PUBLIC_HEADERS})
+            set_target_properties(${BEE_COMP_NAME}.Headers PROPERTIES FOLDER "Bee/HeaderOnly")
+            bee_group_sources(
+                TARGET ${BEE_COMP_NAME}.Headers
+                BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}"
+                SOURCES ${BEE_COMP_PUBLIC_HEADERS}
+            )
+        endif()
+        set(_bee_folder "Bee/HeaderOnly")
     else()
         add_library(${BEE_COMP_NAME} ${BEE_COMP_TYPE}
             ${BEE_COMP_SOURCES}
@@ -72,8 +85,9 @@ function(bee_add_component)
             target_link_libraries(${BEE_COMP_NAME} PUBLIC ${BEE_COMP_DEPENDS})
         endif()
         target_compile_features(${BEE_COMP_NAME} PUBLIC cxx_std_23)
+        set(_bee_folder "Bee/Libraries")
     endif()
-    set_target_properties(${BEE_COMP_NAME} PROPERTIES FOLDER "Bee")
+    set_target_properties(${BEE_COMP_NAME} PROPERTIES FOLDER "${_bee_folder}")
 
     set(bee_comp_all_sources ${BEE_COMP_SOURCES} ${BEE_COMP_PUBLIC_HEADERS})
     bee_group_sources(

@@ -382,7 +382,11 @@ Source/BeeEditor/Dirty
 [Rr]ef/
 **/[Bb]uild/*
 **/.idea
-docs
+docs/*
+!docs/perf/
 .github
 
 .worktrees/
+
+# Benchmark baseline JSON snapshots (not versioned)
+Benchmarks/baseline/

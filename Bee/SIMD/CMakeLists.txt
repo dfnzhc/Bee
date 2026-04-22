@@ -35,7 +35,11 @@ include(CheckCXXSourceRuns)
 if(MSVC)
     set(BEE_SIMD_AVX512_FLAGS "/arch:AVX512" CACHE STRING "AVX-512 编译标志" FORCE)
     set(BEE_SIMD_AVX2_FLAGS   "/arch:AVX2"   CACHE STRING "AVX2 编译标志" FORCE)
-    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+        # clang-cl：MSVC 驱动但 Clang 前端；x64 默认 target 不带 SSE4.1 feature，
+        # 需显式 -msse4.1（SSE2 后端使用 _mm_min_epi32 等 SSE4.1 指令）。
+        set(BEE_SIMD_SSE2_FLAGS "-msse4.1" CACHE STRING "SSE2+SSE4.1 编译标志（clang-cl）" FORCE)
+    elseif(CMAKE_SIZEOF_VOID_P EQUAL 8)
         set(BEE_SIMD_SSE2_FLAGS "" CACHE STRING "SSE2 编译标志（MSVC x64 默认开启）" FORCE)
     else()
         set(BEE_SIMD_SSE2_FLAGS "/arch:SSE2" CACHE STRING "SSE2 编译标志（MSVC x86 需显式开启）" FORCE)

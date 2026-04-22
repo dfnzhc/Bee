@@ -131,7 +131,7 @@ target_compile_definitions(CUDA
 set_target_properties(CUDA PROPERTIES
         CUDA_ARCHITECTURES "${CMAKE_CUDA_ARCHITECTURES}"
         CUDA_SEPARABLE_COMPILATION OFF
-        FOLDER "Bee"
+        FOLDER "Bee/Libraries"
 )
 
 set(cuda_all_sources ${cuda_sources} ${cuda_public_headers})
