@@ -9,8 +9,8 @@ endif ()
 enable_language(CUDA)
 
 # 单一目标架构：sm_120（Blackwell, RTX 50 系列）。plan-cuda §4 规定。
-set(CMAKE_CUDA_ARCHITECTURES "120")
-set(CMAKE_CUDA_ARCHITECTURES "${CMAKE_CUDA_ARCHITECTURES}" PARENT_SCOPE)
+# 以 CACHE 方式发布，使 Tests/CUDA/ 等同级目录同样可见。
+set(CMAKE_CUDA_ARCHITECTURES "120" CACHE STRING "Bee::CUDA target architectures" FORCE)
 
 find_package(CUDAToolkit QUIET)
 if (NOT CUDAToolkit_FOUND)

@@ -7,6 +7,7 @@ if(TARGET Bee::CUDA)
         TARGET CUDA.Tests
         SOURCES
             ApiTests.cpp
+            InfraTests.cpp
     )
 
     if(NOT CMAKE_CUDA_COMPILER_LOADED)
