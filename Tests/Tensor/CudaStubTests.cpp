@@ -148,4 +148,149 @@ TEST(CudaBackend, ToSameDeviceReturnsShallowCopy)
     EXPECT_EQ(same->data_ptr(), t->data_ptr());
 }
 
+// ── M3：ElementWise / Cast CUDA 数值对拍 ─────────────────────────────────────
+
+namespace
+{
+
+auto to_cpu_floats(const Tensor& t) -> std::vector<float>
+{
+    auto cpu = t.to(Device::CPU).value();
+    const auto* p = static_cast<const float*>(cpu.data_ptr());
+    return std::vector<float>(p, p + cpu.numel());
+}
+
+} // namespace
+
+TEST(CudaOps, BinaryAddF32MatchesCpu)
+{
+    if (!cuda_available()) GTEST_SKIP() << "No CUDA device";
+    constexpr std::int64_t N = 257;
+    auto a_cpu = Tensor::arange(0, N, 1, DType::F32, Device::CPU).value();
+    auto b_cpu = Tensor::arange(N, 2 * N, 1, DType::F32, Device::CPU).value();
+    auto c_cpu = add(a_cpu, b_cpu).value();
+
+    auto a_cu = a_cpu.to(Device::CUDA).value();
+    auto b_cu = b_cpu.to(Device::CUDA).value();
+    auto c_cu = add(a_cu, b_cu).value();
+    EXPECT_EQ(c_cu.device(), Device::CUDA);
+
+    auto lhs = to_cpu_floats(c_cu);
+    const auto* r = static_cast<const float*>(c_cpu.data_ptr());
+    for (std::int64_t i = 0; i < N; ++i) EXPECT_FLOAT_EQ(lhs[i], r[i]);
+}
+
+TEST(CudaOps, BinarySubMulDivF32MatchesCpu)
+{
+    if (!cuda_available()) GTEST_SKIP() << "No CUDA device";
+    constexpr std::int64_t N = 131;
+    auto a_cpu = Tensor::arange(1, N + 1, 1, DType::F32, Device::CPU).value();
+    auto b_cpu = Tensor::full({N}, DType::F32, 2.0, Device::CPU).value();
+    auto a_cu = a_cpu.to(Device::CUDA).value();
+    auto b_cu = b_cpu.to(Device::CUDA).value();
+
+    auto sub_cpu = sub(a_cpu, b_cpu).value();
+    auto sub_cu  = sub(a_cu,  b_cu).value();
+    auto mul_cpu = mul(a_cpu, b_cpu).value();
+    auto mul_cu  = mul(a_cu,  b_cu).value();
+    auto div_cpu = div(a_cpu, b_cpu).value();
+    auto div_cu  = div(a_cu,  b_cu).value();
+
+    auto check = [&](const Tensor& cpu, const Tensor& cu) {
+        auto gpu = to_cpu_floats(cu);
+        const auto* r = static_cast<const float*>(cpu.data_ptr());
+        for (std::int64_t i = 0; i < N; ++i) EXPECT_FLOAT_EQ(gpu[i], r[i]) << "i=" << i;
+    };
+    check(sub_cpu, sub_cu);
+    check(mul_cpu, mul_cu);
+    check(div_cpu, div_cu);
+}
+
+TEST(CudaOps, UnaryNegAbsSqrtExpLogF32MatchesCpu)
+{
+    if (!cuda_available()) GTEST_SKIP() << "No CUDA device";
+    constexpr std::int64_t N = 64;
+    auto src_cpu = Tensor::arange(1, N + 1, 1, DType::F32, Device::CPU).value();
+    auto src_cu  = src_cpu.to(Device::CUDA).value();
+
+    auto cmp = [&](const Tensor& cpu, const Tensor& cu, float tol) {
+        auto gpu = to_cpu_floats(cu);
+        const auto* r = static_cast<const float*>(cpu.data_ptr());
+        for (std::int64_t i = 0; i < N; ++i) EXPECT_NEAR(gpu[i], r[i], tol) << "i=" << i;
+    };
+
+    cmp(neg(src_cpu).value(),  neg(src_cu).value(),  0.0f);
+    cmp(abs(src_cpu).value(),  abs(src_cu).value(),  0.0f);
+    cmp(sqrt(src_cpu).value(), sqrt(src_cu).value(), 1e-5f);
+    // exp over 1..64 溢出；只对前 8 个元素对拍。
+    {
+        auto small_cpu = Tensor::arange(0, 8, 1, DType::F32, Device::CPU).value();
+        auto small_cu  = small_cpu.to(Device::CUDA).value();
+        auto e_cpu = exp(small_cpu).value();
+        auto e_cu  = exp(small_cu ).value();
+        auto gpu = to_cpu_floats(e_cu);
+        const auto* r = static_cast<const float*>(e_cpu.data_ptr());
+        for (int i = 0; i < 8; ++i) EXPECT_NEAR(gpu[i], r[i], std::abs(r[i]) * 1e-4f);
+    }
+    cmp(log(src_cpu).value(), log(src_cu).value(), 1e-5f);
+}
+
+TEST(CudaOps, InplaceAddF32MatchesCpu)
+{
+    if (!cuda_available()) GTEST_SKIP() << "No CUDA device";
+    constexpr std::int64_t N = 100;
+    auto a_cpu = Tensor::arange(0, N, 1, DType::F32, Device::CPU).value();
+    auto b_cpu = Tensor::full({N}, DType::F32, 3.0, Device::CPU).value();
+    auto a_cu = a_cpu.to(Device::CUDA).value();
+    auto b_cu = b_cpu.to(Device::CUDA).value();
+
+    ASSERT_TRUE(add_inplace(a_cpu, b_cpu).has_value());
+    ASSERT_TRUE(add_inplace(a_cu,  b_cu ).has_value());
+
+    auto gpu = to_cpu_floats(a_cu);
+    const auto* r = static_cast<const float*>(a_cpu.data_ptr());
+    for (std::int64_t i = 0; i < N; ++i) EXPECT_FLOAT_EQ(gpu[i], r[i]);
+}
+
+TEST(CudaOps, CastF32ToI32MatchesCpu)
+{
+    if (!cuda_available()) GTEST_SKIP() << "No CUDA device";
+    constexpr std::int64_t N = 32;
+    auto src_cpu = Tensor::arange(0, N, 1, DType::F32, Device::CPU).value();
+    auto src_cu  = src_cpu.to(Device::CUDA).value();
+
+    auto dst_cpu = cast(src_cpu, DType::I32).value();
+    auto dst_cu  = cast(src_cu,  DType::I32).value();
+
+    auto back = dst_cu.to(Device::CPU).value();
+    const auto* g = static_cast<const std::int32_t*>(back.data_ptr());
+    const auto* r = static_cast<const std::int32_t*>(dst_cpu.data_ptr());
+    for (std::int64_t i = 0; i < N; ++i) EXPECT_EQ(g[i], r[i]);
+}
+
+TEST(CudaOps, CastI32ToF64MatchesCpu)
+{
+    if (!cuda_available()) GTEST_SKIP() << "No CUDA device";
+    constexpr std::int64_t N = 48;
+    auto src_cpu = Tensor::arange(-16, N - 16, 1, DType::I32, Device::CPU).value();
+    auto src_cu  = src_cpu.to(Device::CUDA).value();
+
+    auto dst_cpu = cast(src_cpu, DType::F64).value();
+    auto dst_cu  = cast(src_cu,  DType::F64).value();
+
+    auto back = dst_cu.to(Device::CPU).value();
+    const auto* g = static_cast<const double*>(back.data_ptr());
+    const auto* r = static_cast<const double*>(dst_cpu.data_ptr());
+    for (std::int64_t i = 0; i < N; ++i) EXPECT_DOUBLE_EQ(g[i], r[i]);
+}
+
+TEST(CudaOps, BinaryShapeMismatchReturnsError)
+{
+    if (!cuda_available()) GTEST_SKIP() << "No CUDA device";
+    auto a = Tensor::zeros({4, 3}, DType::F32, Device::CUDA).value();
+    auto b = Tensor::zeros({3},    DType::F32, Device::CUDA).value();
+    auto r = add(a, b);
+    EXPECT_FALSE(r.has_value());
+}
+
 #endif // BEE_TENSOR_WITH_CUDA

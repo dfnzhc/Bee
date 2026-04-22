@@ -1,4 +1,5 @@
 #include "Tensor/Ops/Cast.hpp"
+#include "Tensor/Cuda/Backend.hpp"
 
 #include <format>
 #include <cstdint>
@@ -65,8 +66,6 @@ auto cast(const Tensor& src, DType dst_dtype) -> Result<Tensor>
     // 前置校验
     if (!src.defined())
         return std::unexpected(make_error("cast: 输入 Tensor 未定义", Severity::Recoverable));
-    if (src.device() == Device::CUDA)
-        return std::unexpected(make_error("cast: CUDA 后端未实现", Severity::Recoverable));
 
     // 相同 dtype：返回独立 clone
     if (src.dtype() == dst_dtype)
@@ -88,6 +87,17 @@ auto cast(const Tensor& src, DType dst_dtype) -> Result<Tensor>
     if (!out_r)
         return std::unexpected(std::move(out_r.error()));
     Tensor out = std::move(*out_r);
+
+    if (cont.device() == Device::CUDA) {
+        auto r = tensor::cuda::ew_cast(
+            static_cast<int>(cont.dtype()), cont.data_ptr(),
+            static_cast<int>(dst_dtype), out.data_ptr(),
+            static_cast<std::size_t>(cont.numel())
+        );
+        if (!r)
+            return std::unexpected(std::move(r.error()));
+        return out;
+    }
 
     // 执行类型转换
     dispatch_cast(cont.dtype(), dst_dtype, cont.data_ptr(), out.data_ptr(), cont.numel());

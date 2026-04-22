@@ -42,6 +42,29 @@ auto memset(void* ptr, int value, std::size_t nbytes) -> Result<void>
     return ::bee::cuda::memset(ptr, value, nbytes);
 }
 
+auto ew_binary(int op, int dt, const void* a, const void* b, void* out, std::size_t n) -> Result<void>
+{
+    return ::bee::cuda::ops::binary(
+        static_cast<::bee::cuda::BinaryOp>(op),
+        static_cast<::bee::cuda::ScalarType>(dt),
+        a, b, out, n);
+}
+
+auto ew_unary(int op, int dt, const void* src, void* dst, std::size_t n) -> Result<void>
+{
+    return ::bee::cuda::ops::unary(
+        static_cast<::bee::cuda::UnaryOp>(op),
+        static_cast<::bee::cuda::ScalarType>(dt),
+        src, dst, n);
+}
+
+auto ew_cast(int src_dt, const void* src, int dst_dt, void* dst, std::size_t n) -> Result<void>
+{
+    return ::bee::cuda::ops::cast(
+        static_cast<::bee::cuda::ScalarType>(src_dt), src,
+        static_cast<::bee::cuda::ScalarType>(dst_dt), dst, n);
+}
+
 auto synchronize() -> Result<void>
 {
     return ::bee::cuda::device_synchronize();
@@ -80,6 +103,21 @@ auto memcpy_d2d(void* /*dst*/, const void* /*src*/, std::size_t /*nbytes*/) -> R
 auto memset(void* /*ptr*/, int /*value*/, std::size_t /*nbytes*/) -> Result<void>
 {
     return std::unexpected(make_error("CUDA 后端不可用：memset", Severity::Recoverable));
+}
+
+auto ew_binary(int /*op*/, int /*dt*/, const void*, const void*, void*, std::size_t) -> Result<void>
+{
+    return std::unexpected(make_error("CUDA 后端不可用：ew_binary", Severity::Recoverable));
+}
+
+auto ew_unary(int /*op*/, int /*dt*/, const void*, void*, std::size_t) -> Result<void>
+{
+    return std::unexpected(make_error("CUDA 后端不可用：ew_unary", Severity::Recoverable));
+}
+
+auto ew_cast(int /*src_dt*/, const void*, int /*dst_dt*/, void*, std::size_t) -> Result<void>
+{
+    return std::unexpected(make_error("CUDA 后端不可用：ew_cast", Severity::Recoverable));
 }
 
 auto synchronize() -> Result<void>

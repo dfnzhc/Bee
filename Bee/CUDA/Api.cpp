@@ -12,6 +12,7 @@
 #include "CUDA/Core/Check.hpp"
 #include "CUDA/Core/Stream.hpp"
 #include "CUDA/Mem/MemoryPool.hpp"
+#include "CUDA/Ops/OpsBridge.hpp"
 
 #include <cuda_runtime.h>
 
@@ -154,5 +155,44 @@ auto memset(void* ptr, int value, std::size_t nbytes) -> Result<void>
     BEE_CUDA_CHECK(cudaStreamSynchronize(stream.native_handle()));
     return {};
 }
+
+// ── 元素级算子（M3 实装） ──────────────────────────────────────────────────
+
+namespace ops
+{
+
+namespace
+{
+
+[[nodiscard]] auto wrap(int err, std::string_view op) -> Result<void>
+{
+    if (err == 0) return {};
+    return std::unexpected(cuda_err_to_error(err, op));
+}
+
+} // namespace
+
+auto binary(BinaryOp op, ScalarType dt, const void* a, const void* b, void* out, std::size_t n) -> Result<void>
+{
+    if (n == 0) return {};
+    const int err = detail::ops_binary(static_cast<int>(op), static_cast<int>(dt), a, b, out, n);
+    return wrap(err, "cuda::ops::binary");
+}
+
+auto unary(UnaryOp op, ScalarType dt, const void* src, void* dst, std::size_t n) -> Result<void>
+{
+    if (n == 0) return {};
+    const int err = detail::ops_unary(static_cast<int>(op), static_cast<int>(dt), src, dst, n);
+    return wrap(err, "cuda::ops::unary");
+}
+
+auto cast(ScalarType src_dt, const void* src, ScalarType dst_dt, void* dst, std::size_t n) -> Result<void>
+{
+    if (n == 0) return {};
+    const int err = detail::ops_cast(static_cast<int>(src_dt), src, static_cast<int>(dst_dt), dst, n);
+    return wrap(err, "cuda::ops::cast");
+}
+
+} // namespace ops
 
 } // namespace bee::cuda

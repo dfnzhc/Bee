@@ -44,6 +44,17 @@ auto deallocate(void* p, std::size_t nbytes, std::size_t alignment) -> void;
 // 把设备内存 ptr 的前 nbytes 个字节置为 value 的低 8 位。
 [[nodiscard]] auto memset(void* ptr, int value, std::size_t nbytes) -> Result<void>;
 
+// 元素级二元算子（a、b、out 均为同 dtype、同长度、连续的设备内存）。
+// op/dt 取值对齐 bee::cuda::BinaryOp / bee::cuda::ScalarType 的整型编码，
+// 亦即 bee::DType 的整型编码（见 Tensor/Core/DType.hpp）。
+[[nodiscard]] auto ew_binary(int op, int dt, const void* a, const void* b, void* out, std::size_t n) -> Result<void>;
+
+// 元素级一元算子（src/dst 同 dtype、同长度、连续）。
+[[nodiscard]] auto ew_unary(int op, int dt, const void* src, void* dst, std::size_t n) -> Result<void>;
+
+// dtype 转换（src/dst 连续，元素数相同）。
+[[nodiscard]] auto ew_cast(int src_dt, const void* src, int dst_dt, void* dst, std::size_t n) -> Result<void>;
+
 // 同步 CUDA 设备，等待所有待处理操作完成。
 // @return 成功时返回 void；失败时返回 NotImplemented 错误
 [[nodiscard]] auto synchronize() -> Result<void>;

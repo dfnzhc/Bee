@@ -1,6 +1,7 @@
 #include "Tensor/Ops/ElementWise.hpp"
 #include "Tensor/Ops/Broadcast.hpp"
 #include "Tensor/Cpu/Dispatch/Dispatch.hpp"
+#include "Tensor/Cuda/Backend.hpp"
 
 #include <format>
 
@@ -21,8 +22,6 @@ namespace
                 ),
                 Severity::Recoverable
             ));
-        if (a.device() == Device::CUDA)
-            return std::unexpected(make_error(std::format("{}: CUDA 后端未实现", op), Severity::Recoverable));
         return {};
     }
 
@@ -105,6 +104,42 @@ namespace
         }
     }
 
+    // CUDA 端二元算子：要求 a、b、out 形状一致且均连续（无广播）。
+    auto run_binary_cuda(BinOp op, const Tensor& a, const Tensor& b, Tensor& out, std::string_view op_name) -> Result<void>
+    {
+        if (a.shape() != b.shape())
+            return std::unexpected(make_error(
+                std::format("{}: CUDA 后端暂不支持广播，两操作数 shape 必须一致", op_name),
+                Severity::Recoverable
+            ));
+        if (!a.is_contiguous() || !b.is_contiguous() || !out.is_contiguous())
+            return std::unexpected(make_error(
+                std::format("{}: CUDA 后端要求所有张量均 contiguous", op_name),
+                Severity::Recoverable
+            ));
+        return tensor::cuda::ew_binary(
+            static_cast<int>(op),
+            static_cast<int>(a.dtype()),
+            a.data_ptr(), b.data_ptr(), out.data_ptr(),
+            static_cast<std::size_t>(a.numel())
+        );
+    }
+
+    auto run_unary_cuda(UnOp op, const Tensor& a, Tensor& out, std::string_view op_name) -> Result<void>
+    {
+        if (!a.is_contiguous() || !out.is_contiguous())
+            return std::unexpected(make_error(
+                std::format("{}: CUDA 后端要求所有张量均 contiguous", op_name),
+                Severity::Recoverable
+            ));
+        return tensor::cuda::ew_unary(
+            static_cast<int>(op),
+            static_cast<int>(a.dtype()),
+            a.data_ptr(), out.data_ptr(),
+            static_cast<std::size_t>(a.numel())
+        );
+    }
+
     template <BinOp Op, typename Fn>
     auto binary_op_impl(const Tensor& a, const Tensor& b, std::string_view op_name, Fn check_dtype_fn) -> Result<Tensor>
     {
@@ -127,9 +162,16 @@ namespace
         if (!bshape)
             return std::unexpected(std::move(bshape.error()));
 
-        auto out = Tensor::empty(*bshape, a.dtype());
+        auto out = Tensor::empty(*bshape, a.dtype(), a.device());
         if (!out)
             return std::unexpected(std::move(out.error()));
+
+        if (a.device() == Device::CUDA) {
+            auto r = run_binary_cuda(Op, a, b, *out, op_name);
+            if (!r)
+                return std::unexpected(std::move(r.error()));
+            return *out;
+        }
 
         dispatch_binary_cpu(Op, a, b, *out);
         return *out;
@@ -142,8 +184,6 @@ namespace
             return std::unexpected(make_error(std::format("{}: Tensor 未定义", op_name), Severity::Recoverable));
         if (dst.device() != src.device())
             return std::unexpected(make_error(std::format("{}: device 不一致", op_name), Severity::Recoverable));
-        if (dst.device() == Device::CUDA)
-            return std::unexpected(make_error(std::format("{}: CUDA 后端未实现", op_name), Severity::Recoverable));
 
         {
             auto r = check_same_dtype(dst, src, op_name);
@@ -168,6 +208,10 @@ namespace
                 ),
                 Severity::Recoverable
             ));
+
+        if (dst.device() == Device::CUDA) {
+            return run_binary_cuda(Op, dst, src, dst, op_name);
+        }
 
         dispatch_binary_cpu(Op, dst, src, dst);
         return {};
@@ -195,104 +239,58 @@ auto div(const Tensor& a, const Tensor& b) -> Result<Tensor>
     return binary_op_impl<BinOp::Div>(a, b, "div", [](DType dt, std::string_view op) { return check_dtype_muldiv(dt, op); });
 }
 
+namespace
+{
+    template <UnOp Op, typename Fn>
+    auto unary_op_impl(const Tensor& a, std::string_view op_name, Fn check_dtype_fn) -> Result<Tensor>
+    {
+        if (!a.defined())
+            return std::unexpected(make_error(std::format("{}: Tensor 未定义", op_name), Severity::Recoverable));
+        {
+            auto r = check_dtype_fn(a.dtype(), op_name);
+            if (!r)
+                return std::unexpected(std::move(r.error()));
+        }
+
+        auto out = Tensor::empty(a.shape(), a.dtype(), a.device());
+        if (!out)
+            return std::unexpected(std::move(out.error()));
+
+        if (a.device() == Device::CUDA) {
+            auto r = run_unary_cuda(Op, a, *out, op_name);
+            if (!r)
+                return std::unexpected(std::move(r.error()));
+            return *out;
+        }
+
+        dispatch_unary_cpu(Op, a, *out);
+        return *out;
+    }
+} // namespace
+
 auto neg(const Tensor& a) -> Result<Tensor>
 {
-    if (!a.defined())
-        return std::unexpected(make_error("neg: Tensor 未定义", Severity::Recoverable));
-    if (a.device() == Device::CUDA)
-        return std::unexpected(make_error("neg: CUDA 后端未实现", Severity::Recoverable));
-    {
-        auto r = check_dtype_negabs(a.dtype(), "neg");
-        if (!r)
-            return std::unexpected(std::move(r.error()));
-    }
-
-    auto out = Tensor::empty(a.shape(), a.dtype());
-    if (!out)
-        return std::unexpected(std::move(out.error()));
-
-    dispatch_unary_cpu(UnOp::Neg, a, *out);
-    return *out;
+    return unary_op_impl<UnOp::Neg>(a, "neg", [](DType dt, std::string_view op) { return check_dtype_negabs(dt, op); });
 }
 
 auto abs(const Tensor& a) -> Result<Tensor>
 {
-    if (!a.defined())
-        return std::unexpected(make_error("abs: Tensor 未定义", Severity::Recoverable));
-    if (a.device() == Device::CUDA)
-        return std::unexpected(make_error("abs: CUDA 后端未实现", Severity::Recoverable));
-    {
-        auto r = check_dtype_negabs(a.dtype(), "abs");
-        if (!r)
-            return std::unexpected(std::move(r.error()));
-    }
-
-    auto out = Tensor::empty(a.shape(), a.dtype());
-    if (!out)
-        return std::unexpected(std::move(out.error()));
-
-    dispatch_unary_cpu(UnOp::Abs, a, *out);
-    return *out;
+    return unary_op_impl<UnOp::Abs>(a, "abs", [](DType dt, std::string_view op) { return check_dtype_negabs(dt, op); });
 }
 
 auto sqrt(const Tensor& a) -> Result<Tensor>
 {
-    if (!a.defined())
-        return std::unexpected(make_error("sqrt: Tensor 未定义", Severity::Recoverable));
-    if (a.device() == Device::CUDA)
-        return std::unexpected(make_error("sqrt: CUDA 后端未实现", Severity::Recoverable));
-    {
-        auto r = check_dtype_float(a.dtype(), "sqrt");
-        if (!r)
-            return std::unexpected(std::move(r.error()));
-    }
-
-    auto out = Tensor::empty(a.shape(), a.dtype());
-    if (!out)
-        return std::unexpected(std::move(out.error()));
-
-    dispatch_unary_cpu(UnOp::Sqrt, a, *out);
-    return *out;
+    return unary_op_impl<UnOp::Sqrt>(a, "sqrt", [](DType dt, std::string_view op) { return check_dtype_float(dt, op); });
 }
 
 auto exp(const Tensor& a) -> Result<Tensor>
 {
-    if (!a.defined())
-        return std::unexpected(make_error("exp: Tensor 未定义", Severity::Recoverable));
-    if (a.device() == Device::CUDA)
-        return std::unexpected(make_error("exp: CUDA 后端未实现", Severity::Recoverable));
-    {
-        auto r = check_dtype_float(a.dtype(), "exp");
-        if (!r)
-            return std::unexpected(std::move(r.error()));
-    }
-
-    auto out = Tensor::empty(a.shape(), a.dtype());
-    if (!out)
-        return std::unexpected(std::move(out.error()));
-
-    dispatch_unary_cpu(UnOp::Exp, a, *out);
-    return *out;
+    return unary_op_impl<UnOp::Exp>(a, "exp", [](DType dt, std::string_view op) { return check_dtype_float(dt, op); });
 }
 
 auto log(const Tensor& a) -> Result<Tensor>
 {
-    if (!a.defined())
-        return std::unexpected(make_error("log: Tensor 未定义", Severity::Recoverable));
-    if (a.device() == Device::CUDA)
-        return std::unexpected(make_error("log: CUDA 后端未实现", Severity::Recoverable));
-    {
-        auto r = check_dtype_float(a.dtype(), "log");
-        if (!r)
-            return std::unexpected(std::move(r.error()));
-    }
-
-    auto out = Tensor::empty(a.shape(), a.dtype());
-    if (!out)
-        return std::unexpected(std::move(out.error()));
-
-    dispatch_unary_cpu(UnOp::Log, a, *out);
-    return *out;
+    return unary_op_impl<UnOp::Log>(a, "log", [](DType dt, std::string_view op) { return check_dtype_float(dt, op); });
 }
 
 auto add_inplace(Tensor& dst, const Tensor& src) -> Result<void>
@@ -321,8 +319,6 @@ namespace
     {
         if (!dst.defined())
             return std::unexpected(make_error(std::format("{}: Tensor 未定义", op_name), Severity::Recoverable));
-        if (dst.device() == Device::CUDA)
-            return std::unexpected(make_error(std::format("{}: CUDA 后端未实现", op_name), Severity::Recoverable));
         return check_dtype_negabs(dst.dtype(), op_name);
     }
 
@@ -330,9 +326,15 @@ namespace
     {
         if (!dst.defined())
             return std::unexpected(make_error(std::format("{}: Tensor 未定义", op_name), Severity::Recoverable));
-        if (dst.device() == Device::CUDA)
-            return std::unexpected(make_error(std::format("{}: CUDA 后端未实现", op_name), Severity::Recoverable));
         return check_dtype_float(dst.dtype(), op_name);
+    }
+
+    auto run_inplace_unary(UnOp op, Tensor& dst, std::string_view op_name) -> Result<void>
+    {
+        if (dst.device() == Device::CUDA)
+            return run_unary_cuda(op, dst, dst, op_name);
+        dispatch_unary_cpu(op, dst, dst);
+        return {};
     }
 } // namespace
 
@@ -341,8 +343,7 @@ auto neg_inplace(Tensor& dst) -> Result<void>
     auto r = inplace_unary_impl_negabs(dst, "neg_inplace");
     if (!r)
         return r;
-    dispatch_unary_cpu(UnOp::Neg, dst, dst);
-    return {};
+    return run_inplace_unary(UnOp::Neg, dst, "neg_inplace");
 }
 
 auto abs_inplace(Tensor& dst) -> Result<void>
@@ -350,8 +351,7 @@ auto abs_inplace(Tensor& dst) -> Result<void>
     auto r = inplace_unary_impl_negabs(dst, "abs_inplace");
     if (!r)
         return r;
-    dispatch_unary_cpu(UnOp::Abs, dst, dst);
-    return {};
+    return run_inplace_unary(UnOp::Abs, dst, "abs_inplace");
 }
 
 auto sqrt_inplace(Tensor& dst) -> Result<void>
@@ -359,8 +359,7 @@ auto sqrt_inplace(Tensor& dst) -> Result<void>
     auto r = inplace_unary_impl_float(dst, "sqrt_inplace");
     if (!r)
         return r;
-    dispatch_unary_cpu(UnOp::Sqrt, dst, dst);
-    return {};
+    return run_inplace_unary(UnOp::Sqrt, dst, "sqrt_inplace");
 }
 
 auto exp_inplace(Tensor& dst) -> Result<void>
@@ -368,8 +367,7 @@ auto exp_inplace(Tensor& dst) -> Result<void>
     auto r = inplace_unary_impl_float(dst, "exp_inplace");
     if (!r)
         return r;
-    dispatch_unary_cpu(UnOp::Exp, dst, dst);
-    return {};
+    return run_inplace_unary(UnOp::Exp, dst, "exp_inplace");
 }
 
 auto log_inplace(Tensor& dst) -> Result<void>
@@ -377,8 +375,7 @@ auto log_inplace(Tensor& dst) -> Result<void>
     auto r = inplace_unary_impl_float(dst, "log_inplace");
     if (!r)
         return r;
-    dispatch_unary_cpu(UnOp::Log, dst, dst);
-    return {};
+    return run_inplace_unary(UnOp::Log, dst, "log_inplace");
 }
 
 } // namespace bee

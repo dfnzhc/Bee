@@ -58,4 +58,51 @@ void deallocate(void* ptr, std::size_t nbytes, std::size_t alignment) noexcept;
 // 把设备内存 ptr 的前 nbytes 个字节置为 value 的低 8 位。
 [[nodiscard]] auto memset(void* ptr, int value, std::size_t nbytes) -> Result<void>;
 
+// ── 元素级算子（M3） ────────────────────────────────────────────────────────
+//
+// 计算模型：输入/输出均为连续设备内存；CUDA 端暂不处理广播与非连续 stride，
+// 由 Tensor 层在必要时先 contiguous() 再进入。ScalarType 与 bee::DType
+// 共享同一整型编码（见 Tensor/Core/DType.hpp），便于直接转换。
+
+enum class ScalarType : std::uint8_t
+{
+    Bool = 0,
+    U8   = 1,
+    I32  = 2,
+    I64  = 3,
+    F32  = 4,
+    F64  = 5,
+};
+
+enum class BinaryOp : std::uint8_t
+{
+    Add,
+    Sub,
+    Mul,
+    Div,
+};
+
+enum class UnaryOp : std::uint8_t
+{
+    Neg,
+    Abs,
+    Sqrt,
+    Exp,
+    Log,
+};
+
+namespace ops
+{
+
+// n 以元素为单位；a/b/out 指向同一 dtype 的连续缓冲。
+[[nodiscard]] auto binary(BinaryOp op, ScalarType dt, const void* a, const void* b, void* out, std::size_t n) -> Result<void>;
+
+// 一元算子；src/dst 同 dtype、同 shape、均连续。
+[[nodiscard]] auto unary(UnaryOp op, ScalarType dt, const void* src, void* dst, std::size_t n) -> Result<void>;
+
+// dtype 转换；src/dst 均连续且元素数相同。
+[[nodiscard]] auto cast(ScalarType src_dt, const void* src, ScalarType dst_dt, void* dst, std::size_t n) -> Result<void>;
+
+} // namespace ops
+
 } // namespace bee::cuda
