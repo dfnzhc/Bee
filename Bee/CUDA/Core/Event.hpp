@@ -25,12 +25,13 @@ class Event
 public:
     Event() noexcept = default;
 
-    Event(const Event&) = delete;
+    Event(const Event&)            = delete;
     Event& operator=(const Event&) = delete;
 
     Event(Event&& other) noexcept
         : event_(std::exchange(other.event_, nullptr))
-    {}
+    {
+    }
 
     Event& operator=(Event&& other) noexcept
     {
@@ -41,7 +42,10 @@ public:
         return *this;
     }
 
-    ~Event() { reset(); }
+    ~Event()
+    {
+        reset();
+    }
 
     // 默认 flags 适合轻量同步（不启用 timing）；要测时请传 cudaEventDefault。
     [[nodiscard]] static auto create(unsigned flags = cudaEventDisableTiming | cudaEventBlockingSync) -> Result<Event>
@@ -69,8 +73,10 @@ public:
     [[nodiscard]] auto query() const -> Result<bool>
     {
         const cudaError_t err = cudaEventQuery(event_);
-        if (err == cudaSuccess) return true;
-        if (err == cudaErrorNotReady) return false;
+        if (err == cudaSuccess)
+            return true;
+        if (err == cudaErrorNotReady)
+            return false;
         (void)cudaGetLastError();
         return std::unexpected(detail::to_error(err, "cudaEventQuery"));
     }
@@ -84,9 +90,15 @@ public:
         return ms;
     }
 
-    [[nodiscard]] cudaEvent_t native_handle() const noexcept { return event_; }
+    [[nodiscard]] cudaEvent_t native_handle() const noexcept
+    {
+        return event_;
+    }
 
-    [[nodiscard]] explicit operator bool() const noexcept { return event_ != nullptr; }
+    [[nodiscard]] explicit operator bool() const noexcept
+    {
+        return event_ != nullptr;
+    }
 
     void reset() noexcept
     {

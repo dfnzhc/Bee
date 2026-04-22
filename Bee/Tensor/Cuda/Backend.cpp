@@ -1,7 +1,7 @@
 #include "Tensor/Cuda/Backend.hpp"
 
 #if defined(BEE_TENSOR_WITH_CUDA)
-#include "CUDA/Api.hpp"
+    #include "CUDA/Api.hpp"
 #endif
 
 namespace bee::tensor::cuda
@@ -44,62 +44,44 @@ auto memset(void* ptr, int value, std::size_t nbytes) -> Result<void>
 
 auto ew_binary(int op, int dt, const void* a, const void* b, void* out, std::size_t n) -> Result<void>
 {
-    return ::bee::cuda::ops::binary(
-        static_cast<::bee::cuda::BinaryOp>(op),
-        static_cast<::bee::cuda::ScalarType>(dt),
-        a, b, out, n);
+    return ::bee::cuda::ops::binary(static_cast<::bee::cuda::BinaryOp>(op), static_cast<::bee::cuda::ScalarType>(dt), a, b, out, n);
 }
 
 auto ew_unary(int op, int dt, const void* src, void* dst, std::size_t n) -> Result<void>
 {
-    return ::bee::cuda::ops::unary(
-        static_cast<::bee::cuda::UnaryOp>(op),
-        static_cast<::bee::cuda::ScalarType>(dt),
-        src, dst, n);
+    return ::bee::cuda::ops::unary(static_cast<::bee::cuda::UnaryOp>(op), static_cast<::bee::cuda::ScalarType>(dt), src, dst, n);
 }
 
 auto ew_cast(int src_dt, const void* src, int dst_dt, void* dst, std::size_t n) -> Result<void>
 {
-    return ::bee::cuda::ops::cast(
-        static_cast<::bee::cuda::ScalarType>(src_dt), src,
-        static_cast<::bee::cuda::ScalarType>(dst_dt), dst, n);
+    return ::bee::cuda::ops::cast(static_cast<::bee::cuda::ScalarType>(src_dt), src, static_cast<::bee::cuda::ScalarType>(dst_dt), dst, n);
 }
 
 auto reduce_global(int op, int dt, const void* src, void* dst, std::size_t n) -> Result<void>
 {
-    return ::bee::cuda::ops::reduce_global(
-        static_cast<::bee::cuda::ReduceOp>(op),
-        static_cast<::bee::cuda::ScalarType>(dt),
-        src, dst, n);
+    return ::bee::cuda::ops::reduce_global(static_cast<::bee::cuda::ReduceOp>(op), static_cast<::bee::cuda::ScalarType>(dt), src, dst, n);
 }
 
-auto reduce_axis(int op, int dt, const void* src, void* dst,
-                 std::size_t outer, std::size_t axis, std::size_t inner) -> Result<void>
+auto reduce_axis(int op, int dt, const void* src, void* dst, std::size_t outer, std::size_t axis, std::size_t inner) -> Result<void>
 {
     return ::bee::cuda::ops::reduce_axis(
-        static_cast<::bee::cuda::ReduceOp>(op),
-        static_cast<::bee::cuda::ScalarType>(dt),
-        src, dst, outer, axis, inner);
+        static_cast<::bee::cuda::ReduceOp>(op), static_cast<::bee::cuda::ScalarType>(dt), src, dst, outer, axis, inner
+    );
 }
 
 auto scale_fp(int dt, void* buf, double factor, std::size_t n) -> Result<void>
 {
-    return ::bee::cuda::ops::scale_fp(
-        static_cast<::bee::cuda::ScalarType>(dt), buf, factor, n);
+    return ::bee::cuda::ops::scale_fp(static_cast<::bee::cuda::ScalarType>(dt), buf, factor, n);
 }
 
-auto matmul(int dt, const void* A, const void* B, void* C,
-            std::size_t M, std::size_t K, std::size_t N) -> Result<void>
+auto matmul(int dt, const void* A, const void* B, void* C, std::size_t M, std::size_t K, std::size_t N) -> Result<void>
 {
-    return ::bee::cuda::ops::matmul(
-        static_cast<::bee::cuda::ScalarType>(dt), A, B, C, M, K, N);
+    return ::bee::cuda::ops::matmul(static_cast<::bee::cuda::ScalarType>(dt), A, B, C, M, K, N);
 }
 
-auto transpose_2d(int dt, const void* src, void* dst,
-                  std::size_t rows, std::size_t cols) -> Result<void>
+auto transpose_2d(int dt, const void* src, void* dst, std::size_t rows, std::size_t cols) -> Result<void>
 {
-    return ::bee::cuda::ops::transpose_2d(
-        static_cast<::bee::cuda::ScalarType>(dt), src, dst, rows, cols);
+    return ::bee::cuda::ops::transpose_2d(static_cast<::bee::cuda::ScalarType>(dt), src, dst, rows, cols);
 }
 
 auto synchronize() -> Result<void>

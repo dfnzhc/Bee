@@ -102,61 +102,59 @@ enum class ReduceOp : std::uint8_t
 namespace ops
 {
 
-// n 以元素为单位；a/b/out 指向同一 dtype 的连续缓冲。
-[[nodiscard]] auto binary(BinaryOp op, ScalarType dt, const void* a, const void* b, void* out, std::size_t n) -> Result<void>;
+    // n 以元素为单位；a/b/out 指向同一 dtype 的连续缓冲。
+    [[nodiscard]] auto binary(BinaryOp op, ScalarType dt, const void* a, const void* b, void* out, std::size_t n) -> Result<void>;
 
-// 一元算子；src/dst 同 dtype、同 shape、均连续。
-[[nodiscard]] auto unary(UnaryOp op, ScalarType dt, const void* src, void* dst, std::size_t n) -> Result<void>;
+    // 一元算子；src/dst 同 dtype、同 shape、均连续。
+    [[nodiscard]] auto unary(UnaryOp op, ScalarType dt, const void* src, void* dst, std::size_t n) -> Result<void>;
 
-// dtype 转换；src/dst 均连续且元素数相同。
-[[nodiscard]] auto cast(ScalarType src_dt, const void* src, ScalarType dst_dt, void* dst, std::size_t n) -> Result<void>;
+    // dtype 转换；src/dst 均连续且元素数相同。
+    [[nodiscard]] auto cast(ScalarType src_dt, const void* src, ScalarType dst_dt, void* dst, std::size_t n) -> Result<void>;
 
-// 全局 reduce：src 为连续 n 元素缓冲，dst 指向 1 个同 dtype 标量。
-[[nodiscard]] auto reduce_global(ReduceOp op, ScalarType dt, const void* src, void* dst, std::size_t n) -> Result<void>;
+    // 全局 reduce：src 为连续 n 元素缓冲，dst 指向 1 个同 dtype 标量。
+    [[nodiscard]] auto reduce_global(ReduceOp op, ScalarType dt, const void* src, void* dst, std::size_t n) -> Result<void>;
 
-// 按轴 reduce：输入视为 [outer, axis, inner] 三维连续布局；输出 [outer, inner]。
-// src/dst 同 dtype、均连续；axis 必须 >=1。
-[[nodiscard]] auto reduce_axis(ReduceOp op, ScalarType dt, const void* src, void* dst,
-                               std::size_t outer, std::size_t axis, std::size_t inner) -> Result<void>;
+    // 按轴 reduce：输入视为 [outer, axis, inner] 三维连续布局；输出 [outer, inner]。
+    // src/dst 同 dtype、均连续；axis 必须 >=1。
+    [[nodiscard]] auto reduce_axis(ReduceOp op, ScalarType dt, const void* src, void* dst, std::size_t outer, std::size_t axis, std::size_t inner)
+        -> Result<void>;
 
-// 原地缩放（dt ∈ {F32, F64}）：供 mean 实现。
-[[nodiscard]] auto scale_fp(ScalarType dt, void* buf, double factor, std::size_t n) -> Result<void>;
+    // 原地缩放（dt ∈ {F32, F64}）：供 mean 实现。
+    [[nodiscard]] auto scale_fp(ScalarType dt, void* buf, double factor, std::size_t n) -> Result<void>;
 
-// 2D tiled-shared matmul：C[M,N] = A[M,K] * B[K,N]；A/B/C 同 dtype、均连续。
-[[nodiscard]] auto matmul(ScalarType dt, const void* A, const void* B, void* C,
-                          std::size_t M, std::size_t K, std::size_t N) -> Result<void>;
+    // 2D tiled-shared matmul：C[M,N] = A[M,K] * B[K,N]；A/B/C 同 dtype、均连续。
+    [[nodiscard]] auto matmul(ScalarType dt, const void* A, const void* B, void* C, std::size_t M, std::size_t K, std::size_t N) -> Result<void>;
 
-// 2D tiled-shared transpose：dst[i,j] = src[j,i]，src 为 [rows, cols] 连续。
-[[nodiscard]] auto transpose_2d(ScalarType dt, const void* src, void* dst,
-                                std::size_t rows, std::size_t cols) -> Result<void>;
+    // 2D tiled-shared transpose：dst[i,j] = src[j,i]，src 为 [rows, cols] 连续。
+    [[nodiscard]] auto transpose_2d(ScalarType dt, const void* src, void* dst, std::size_t rows, std::size_t cols) -> Result<void>;
 
-// ── Matmul 后端切换（M6/M7 脚手架） ─────────────────────────────────────────
-//
-// L1 = Wmma（当前实装的 tile-shared baseline；覆盖 F32/F64/I32/I64）
-// L2 = Cutlass（CUTLASS 3.8+ Blackwell collective；FP16/BF16/FP8/FP4 优化路径）
-// L3 = Native（手写 TMA + tcgen05.mma；F16/BF16/FP8 主路径）
-//
-// Auto：运行期根据设备算力与 dtype 自动选择；当前由于 L2/L3 未实装，
-// Auto 等同 L1（Wmma）。
-//
-// L2/L3 当前 scaffolding 状态：set_matmul_backend(Cutlass/Native) 允许设置，
-// 但 matmul() 调用对应后端时返回 NotImplemented；Auto 分支保持可用。
-enum class MatmulBackend : uint8_t
-{
-    Auto    = 0,
-    Wmma    = 1,
-    Cutlass = 2,
-    Native  = 3,
-};
+    // ── Matmul 后端切换（M6/M7 脚手架） ─────────────────────────────────────────
+    //
+    // L1 = Wmma（当前实装的 tile-shared baseline；覆盖 F32/F64/I32/I64）
+    // L2 = Cutlass（CUTLASS 3.8+ Blackwell collective；FP16/BF16/FP8/FP4 优化路径）
+    // L3 = Native（手写 TMA + tcgen05.mma；F16/BF16/FP8 主路径）
+    //
+    // Auto：运行期根据设备算力与 dtype 自动选择；当前由于 L2/L3 未实装，
+    // Auto 等同 L1（Wmma）。
+    //
+    // L2/L3 当前 scaffolding 状态：set_matmul_backend(Cutlass/Native) 允许设置，
+    // 但 matmul() 调用对应后端时返回 NotImplemented；Auto 分支保持可用。
+    enum class MatmulBackend : uint8_t
+    {
+        Auto    = 0,
+        Wmma    = 1,
+        Cutlass = 2,
+        Native  = 3,
+    };
 
-// 设置全局默认 matmul 后端；返回旧值。线程安全（std::atomic）。
-auto set_matmul_backend(MatmulBackend backend) noexcept -> MatmulBackend;
+    // 设置全局默认 matmul 后端；返回旧值。线程安全（std::atomic）。
+    auto set_matmul_backend(MatmulBackend backend) noexcept -> MatmulBackend;
 
-// 查询当前全局默认 matmul 后端。
-[[nodiscard]] auto get_matmul_backend() noexcept -> MatmulBackend;
+    // 查询当前全局默认 matmul 后端。
+    [[nodiscard]] auto get_matmul_backend() noexcept -> MatmulBackend;
 
-// 查询后端是否在当前构建中可用（L2/L3 目前始终返回 false）。
-[[nodiscard]] auto matmul_backend_available(MatmulBackend backend) noexcept -> bool;
+    // 查询后端是否在当前构建中可用（L2/L3 目前始终返回 false）。
+    [[nodiscard]] auto matmul_backend_available(MatmulBackend backend) noexcept -> bool;
 
 } // namespace ops
 

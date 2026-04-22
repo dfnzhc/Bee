@@ -25,7 +25,8 @@ bool has_device()
 
 TEST(CudaM1Stream, PerThreadViewSynchronize)
 {
-    if (!has_device()) GTEST_SKIP() << "No CUDA device";
+    if (!has_device())
+        GTEST_SKIP() << "No CUDA device";
     ASSERT_TRUE(cuda::set_device(0).has_value());
 
     auto s = cuda::StreamView::per_thread();
@@ -35,7 +36,8 @@ TEST(CudaM1Stream, PerThreadViewSynchronize)
 
 TEST(CudaM1Stream, OwnedStreamCreateQuerySynchronize)
 {
-    if (!has_device()) GTEST_SKIP() << "No CUDA device";
+    if (!has_device())
+        GTEST_SKIP() << "No CUDA device";
     ASSERT_TRUE(cuda::set_device(0).has_value());
 
     auto s = cuda::OwnedStream::create();
@@ -52,7 +54,8 @@ TEST(CudaM1Stream, OwnedStreamCreateQuerySynchronize)
 
 TEST(CudaM1Event, RecordAndSynchronize)
 {
-    if (!has_device()) GTEST_SKIP() << "No CUDA device";
+    if (!has_device())
+        GTEST_SKIP() << "No CUDA device";
     ASSERT_TRUE(cuda::set_device(0).has_value());
 
     auto ev = cuda::Event::create();
@@ -68,7 +71,8 @@ TEST(CudaM1Event, RecordAndSynchronize)
 
 TEST(CudaM1MemoryPool, DefaultPoolAllocateFreeAsync)
 {
-    if (!has_device()) GTEST_SKIP() << "No CUDA device";
+    if (!has_device())
+        GTEST_SKIP() << "No CUDA device";
     ASSERT_TRUE(cuda::set_device(0).has_value());
 
     auto pool_r = cuda::MemoryPool::get_default(0);
@@ -87,7 +91,8 @@ TEST(CudaM1MemoryPool, DefaultPoolAllocateFreeAsync)
 
 TEST(CudaM1MemoryPool, ZeroSizeAllocateReturnsNull)
 {
-    if (!has_device()) GTEST_SKIP() << "No CUDA device";
+    if (!has_device())
+        GTEST_SKIP() << "No CUDA device";
     ASSERT_TRUE(cuda::set_device(0).has_value());
 
     auto pool_r = cuda::MemoryPool::get_default(0);

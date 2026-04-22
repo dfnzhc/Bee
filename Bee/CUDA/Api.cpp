@@ -56,14 +56,12 @@ auto device_count() noexcept -> int
 namespace
 {
 
-[[nodiscard]] auto cuda_err_to_error(int err, std::string_view op) -> Error
-{
-    return make_error(
-        std::format("{} 失败: {} ({})", op, detail::runtime_error_name(err), detail::runtime_error_string(err)),
-        Severity::Recoverable,
-        err
-    );
-}
+    [[nodiscard]] auto cuda_err_to_error(int err, std::string_view op) -> Error
+    {
+        return make_error(
+            std::format("{} 失败: {} ({})", op, detail::runtime_error_name(err), detail::runtime_error_string(err)), Severity::Recoverable, err
+        );
+    }
 
 } // namespace
 
@@ -87,7 +85,8 @@ auto device_synchronize() -> Result<void>
 
 auto allocate(std::size_t nbytes, std::size_t /*alignment*/) -> Result<void*>
 {
-    if (nbytes == 0) return static_cast<void*>(nullptr);
+    if (nbytes == 0)
+        return static_cast<void*>(nullptr);
 
     int dev = 0;
     BEE_CUDA_CHECK(cudaGetDevice(&dev));
@@ -96,7 +95,7 @@ auto allocate(std::size_t nbytes, std::size_t /*alignment*/) -> Result<void*>
     BEE_TRY_ASSIGN(pool, MemoryPool::get_default(dev));
 
     const auto stream = StreamView::per_thread();
-    void* ptr = nullptr;
+    void*      ptr    = nullptr;
     BEE_TRY_ASSIGN(ptr, pool->allocate_async(nbytes, stream));
     // 分配后同步：返回的指针立即可用（plan-cuda §5 同步 API 语义）。
     BEE_CUDA_CHECK(cudaStreamSynchronize(stream.native_handle()));
@@ -105,14 +104,16 @@ auto allocate(std::size_t nbytes, std::size_t /*alignment*/) -> Result<void*>
 
 void deallocate(void* ptr, std::size_t /*nbytes*/, std::size_t /*alignment*/) noexcept
 {
-    if (!ptr) return;
+    if (!ptr)
+        return;
     int dev = 0;
     if (cudaGetDevice(&dev) != cudaSuccess) {
         (void)cudaGetLastError();
         return;
     }
     auto pool_r = MemoryPool::get_default(dev);
-    if (!pool_r) return;
+    if (!pool_r)
+        return;
     const auto stream = StreamView::per_thread();
     pool_r.value()->deallocate_async(ptr, stream);
     // 同步，确保 free 生效后再继续（与 allocate 的同步语义对称）。
@@ -122,14 +123,15 @@ void deallocate(void* ptr, std::size_t /*nbytes*/, std::size_t /*alignment*/) no
 namespace
 {
 
-[[nodiscard]] auto sync_memcpy(void* dst, const void* src, std::size_t nbytes, cudaMemcpyKind kind) -> Result<void>
-{
-    if (nbytes == 0) return {};
-    const auto stream = StreamView::per_thread();
-    BEE_CUDA_CHECK(cudaMemcpyAsync(dst, src, nbytes, kind, stream.native_handle()));
-    BEE_CUDA_CHECK(cudaStreamSynchronize(stream.native_handle()));
-    return {};
-}
+    [[nodiscard]] auto sync_memcpy(void* dst, const void* src, std::size_t nbytes, cudaMemcpyKind kind) -> Result<void>
+    {
+        if (nbytes == 0)
+            return {};
+        const auto stream = StreamView::per_thread();
+        BEE_CUDA_CHECK(cudaMemcpyAsync(dst, src, nbytes, kind, stream.native_handle()));
+        BEE_CUDA_CHECK(cudaStreamSynchronize(stream.native_handle()));
+        return {};
+    }
 
 } // namespace
 
@@ -150,7 +152,8 @@ auto memcpy_d2d(void* dst, const void* src, std::size_t nbytes) -> Result<void>
 
 auto memset(void* ptr, int value, std::size_t nbytes) -> Result<void>
 {
-    if (nbytes == 0) return {};
+    if (nbytes == 0)
+        return {};
     const auto stream = StreamView::per_thread();
     BEE_CUDA_CHECK(cudaMemsetAsync(ptr, value, nbytes, stream.native_handle()));
     BEE_CUDA_CHECK(cudaStreamSynchronize(stream.native_handle()));
@@ -162,130 +165,130 @@ auto memset(void* ptr, int value, std::size_t nbytes) -> Result<void>
 namespace ops
 {
 
-namespace
-{
+    namespace
+    {
 
-[[nodiscard]] auto wrap(int err, std::string_view op) -> Result<void>
-{
-    if (err == 0) return {};
-    return std::unexpected(cuda_err_to_error(err, op));
-}
+        [[nodiscard]] auto wrap(int err, std::string_view op) -> Result<void>
+        {
+            if (err == 0)
+                return {};
+            return std::unexpected(cuda_err_to_error(err, op));
+        }
 
-} // namespace
+    } // namespace
 
-auto binary(BinaryOp op, ScalarType dt, const void* a, const void* b, void* out, std::size_t n) -> Result<void>
-{
-    if (n == 0) return {};
-    const int err = detail::ops_binary(static_cast<int>(op), static_cast<int>(dt), a, b, out, n);
-    return wrap(err, "cuda::ops::binary");
-}
-
-auto unary(UnaryOp op, ScalarType dt, const void* src, void* dst, std::size_t n) -> Result<void>
-{
-    if (n == 0) return {};
-    const int err = detail::ops_unary(static_cast<int>(op), static_cast<int>(dt), src, dst, n);
-    return wrap(err, "cuda::ops::unary");
-}
-
-auto cast(ScalarType src_dt, const void* src, ScalarType dst_dt, void* dst, std::size_t n) -> Result<void>
-{
-    if (n == 0) return {};
-    const int err = detail::ops_cast(static_cast<int>(src_dt), src, static_cast<int>(dst_dt), dst, n);
-    return wrap(err, "cuda::ops::cast");
-}
-
-auto reduce_global(ReduceOp op, ScalarType dt, const void* src, void* dst, std::size_t n) -> Result<void>
-{
-    if (n == 0)
-        return std::unexpected(make_error("cuda::ops::reduce_global: n == 0", Severity::Recoverable));
-    const int err = detail::ops_reduce_global(static_cast<int>(op), static_cast<int>(dt), src, dst, n);
-    return wrap(err, "cuda::ops::reduce_global");
-}
-
-auto reduce_axis(ReduceOp op, ScalarType dt, const void* src, void* dst,
-                 std::size_t outer, std::size_t axis, std::size_t inner) -> Result<void>
-{
-    if (outer == 0 || inner == 0 || axis == 0)
-        return std::unexpected(make_error("cuda::ops::reduce_axis: 维度含 0", Severity::Recoverable));
-    const int err = detail::ops_reduce_axis(static_cast<int>(op), static_cast<int>(dt), src, dst, outer, axis, inner);
-    return wrap(err, "cuda::ops::reduce_axis");
-}
-
-auto scale_fp(ScalarType dt, void* buf, double factor, std::size_t n) -> Result<void>
-{
-    if (n == 0) return {};
-    const int err = detail::ops_scale_fp(static_cast<int>(dt), buf, factor, n);
-    return wrap(err, "cuda::ops::scale_fp");
-}
-
-auto matmul(ScalarType dt, const void* A, const void* B, void* C,
-            std::size_t M, std::size_t K, std::size_t N) -> Result<void>
-{
-    if (M == 0 || N == 0) return {};
-
-    // 按当前全局后端设置分派：L2/L3 未实装时直接返回 NotImplemented；
-    // Auto/Wmma 走现有 tile-shared baseline。
-    const auto backend = get_matmul_backend();
-    switch (backend) {
-    case MatmulBackend::Cutlass:
-        return std::unexpected(make_error(
-            "cuda::ops::matmul: Cutlass 后端尚未实装（M6）", Severity::Recoverable));
-    case MatmulBackend::Native:
-        return std::unexpected(make_error(
-            "cuda::ops::matmul: Native(TMA+tcgen05) 后端尚未实装（M7）", Severity::Recoverable));
-    case MatmulBackend::Auto:
-    case MatmulBackend::Wmma:
-    default:
-        break;
+    auto binary(BinaryOp op, ScalarType dt, const void* a, const void* b, void* out, std::size_t n) -> Result<void>
+    {
+        if (n == 0)
+            return {};
+        const int err = detail::ops_binary(static_cast<int>(op), static_cast<int>(dt), a, b, out, n);
+        return wrap(err, "cuda::ops::binary");
     }
 
-    const int err = detail::ops_matmul(static_cast<int>(dt), A, B, C, M, K, N);
-    return wrap(err, "cuda::ops::matmul");
-}
-
-auto transpose_2d(ScalarType dt, const void* src, void* dst,
-                  std::size_t rows, std::size_t cols) -> Result<void>
-{
-    if (rows == 0 || cols == 0) return {};
-    const int err = detail::ops_transpose_2d(static_cast<int>(dt), src, dst, rows, cols);
-    return wrap(err, "cuda::ops::transpose_2d");
-}
-
-// ── Matmul 后端切换（M6/M7 脚手架） ─────────────────────────────────────────
-
-namespace
-{
-
-// std::atomic<uint8_t>：线程安全的全局后端设置。
-std::atomic<std::uint8_t>& matmul_backend_storage() noexcept
-{
-    static std::atomic<std::uint8_t> g_backend{static_cast<std::uint8_t>(MatmulBackend::Auto)};
-    return g_backend;
-}
-
-} // namespace
-
-auto set_matmul_backend(MatmulBackend backend) noexcept -> MatmulBackend
-{
-    const auto old = matmul_backend_storage().exchange(static_cast<std::uint8_t>(backend), std::memory_order_acq_rel);
-    return static_cast<MatmulBackend>(old);
-}
-
-auto get_matmul_backend() noexcept -> MatmulBackend
-{
-    return static_cast<MatmulBackend>(matmul_backend_storage().load(std::memory_order_acquire));
-}
-
-auto matmul_backend_available(MatmulBackend backend) noexcept -> bool
-{
-    switch (backend) {
-    case MatmulBackend::Auto: return true;  // 退化到 Wmma
-    case MatmulBackend::Wmma: return true;
-    case MatmulBackend::Cutlass: return false;  // L2 未实装
-    case MatmulBackend::Native:  return false;  // L3 未实装
+    auto unary(UnaryOp op, ScalarType dt, const void* src, void* dst, std::size_t n) -> Result<void>
+    {
+        if (n == 0)
+            return {};
+        const int err = detail::ops_unary(static_cast<int>(op), static_cast<int>(dt), src, dst, n);
+        return wrap(err, "cuda::ops::unary");
     }
-    return false;
-}
+
+    auto cast(ScalarType src_dt, const void* src, ScalarType dst_dt, void* dst, std::size_t n) -> Result<void>
+    {
+        if (n == 0)
+            return {};
+        const int err = detail::ops_cast(static_cast<int>(src_dt), src, static_cast<int>(dst_dt), dst, n);
+        return wrap(err, "cuda::ops::cast");
+    }
+
+    auto reduce_global(ReduceOp op, ScalarType dt, const void* src, void* dst, std::size_t n) -> Result<void>
+    {
+        if (n == 0)
+            return std::unexpected(make_error("cuda::ops::reduce_global: n == 0", Severity::Recoverable));
+        const int err = detail::ops_reduce_global(static_cast<int>(op), static_cast<int>(dt), src, dst, n);
+        return wrap(err, "cuda::ops::reduce_global");
+    }
+
+    auto reduce_axis(ReduceOp op, ScalarType dt, const void* src, void* dst, std::size_t outer, std::size_t axis, std::size_t inner) -> Result<void>
+    {
+        if (outer == 0 || inner == 0 || axis == 0)
+            return std::unexpected(make_error("cuda::ops::reduce_axis: 维度含 0", Severity::Recoverable));
+        const int err = detail::ops_reduce_axis(static_cast<int>(op), static_cast<int>(dt), src, dst, outer, axis, inner);
+        return wrap(err, "cuda::ops::reduce_axis");
+    }
+
+    auto scale_fp(ScalarType dt, void* buf, double factor, std::size_t n) -> Result<void>
+    {
+        if (n == 0)
+            return {};
+        const int err = detail::ops_scale_fp(static_cast<int>(dt), buf, factor, n);
+        return wrap(err, "cuda::ops::scale_fp");
+    }
+
+    auto matmul(ScalarType dt, const void* A, const void* B, void* C, std::size_t M, std::size_t K, std::size_t N) -> Result<void>
+    {
+        if (M == 0 || N == 0)
+            return {};
+
+        // 按当前全局后端设置分派：L2/L3 未实装时直接返回 NotImplemented；
+        // Auto/Wmma 走现有 tile-shared baseline。
+        const auto backend = get_matmul_backend();
+        switch (backend) {
+        case MatmulBackend::Cutlass: return std::unexpected(make_error("cuda::ops::matmul: Cutlass 后端尚未实装（M6）", Severity::Recoverable));
+        case MatmulBackend::Native:
+            return std::unexpected(make_error("cuda::ops::matmul: Native(TMA+tcgen05) 后端尚未实装（M7）", Severity::Recoverable));
+        case MatmulBackend::Auto:
+        case MatmulBackend::Wmma:
+        default: break;
+        }
+
+        const int err = detail::ops_matmul(static_cast<int>(dt), A, B, C, M, K, N);
+        return wrap(err, "cuda::ops::matmul");
+    }
+
+    auto transpose_2d(ScalarType dt, const void* src, void* dst, std::size_t rows, std::size_t cols) -> Result<void>
+    {
+        if (rows == 0 || cols == 0)
+            return {};
+        const int err = detail::ops_transpose_2d(static_cast<int>(dt), src, dst, rows, cols);
+        return wrap(err, "cuda::ops::transpose_2d");
+    }
+
+    // ── Matmul 后端切换（M6/M7 脚手架） ─────────────────────────────────────────
+
+    namespace
+    {
+
+        // std::atomic<uint8_t>：线程安全的全局后端设置。
+        std::atomic<std::uint8_t>& matmul_backend_storage() noexcept
+        {
+            static std::atomic<std::uint8_t> g_backend{static_cast<std::uint8_t>(MatmulBackend::Auto)};
+            return g_backend;
+        }
+
+    } // namespace
+
+    auto set_matmul_backend(MatmulBackend backend) noexcept -> MatmulBackend
+    {
+        const auto old = matmul_backend_storage().exchange(static_cast<std::uint8_t>(backend), std::memory_order_acq_rel);
+        return static_cast<MatmulBackend>(old);
+    }
+
+    auto get_matmul_backend() noexcept -> MatmulBackend
+    {
+        return static_cast<MatmulBackend>(matmul_backend_storage().load(std::memory_order_acquire));
+    }
+
+    auto matmul_backend_available(MatmulBackend backend) noexcept -> bool
+    {
+        switch (backend) {
+        case MatmulBackend::Auto: return true; // 退化到 Wmma
+        case MatmulBackend::Wmma: return true;
+        case MatmulBackend::Cutlass: return false; // L2 未实装
+        case MatmulBackend::Native: return false;  // L3 未实装
+        }
+        return false;
+    }
 
 } // namespace ops
 

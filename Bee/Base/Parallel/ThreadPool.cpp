@@ -9,7 +9,8 @@
 #include <algorithm>
 #include <utility>
 
-namespace bee::parallel {
+namespace bee::parallel
+{
 
 ThreadPool::ThreadPool(std::size_t thread_count)
 {
@@ -47,9 +48,7 @@ void ThreadPool::worker_loop() noexcept
         std::function<void()> task;
         {
             std::unique_lock lk(mu_);
-            cv_.wait(lk, [this] {
-                return stop_.load(std::memory_order_acquire) || !queue_.empty();
-            });
+            cv_.wait(lk, [this] { return stop_.load(std::memory_order_acquire) || !queue_.empty(); });
             if (queue_.empty() && stop_.load(std::memory_order_acquire))
                 return;
             task = std::move(queue_.front());

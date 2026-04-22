@@ -25,17 +25,19 @@
 
 #include "Base/Parallel/ThreadPool.hpp"
 
-namespace bee::parallel {
-
-namespace detail {
-
-inline std::size_t compute_chunks(std::size_t n, std::size_t grain, std::size_t max_workers) noexcept
+namespace bee::parallel
 {
-    if (grain == 0)
-        grain = 1;
-    const std::size_t by_grain = (n + grain - 1) / grain;
-    return std::min<std::size_t>(std::max<std::size_t>(by_grain, 1), std::max<std::size_t>(max_workers, 1));
-}
+
+namespace detail
+{
+
+    inline std::size_t compute_chunks(std::size_t n, std::size_t grain, std::size_t max_workers) noexcept
+    {
+        if (grain == 0)
+            grain = 1;
+        const std::size_t by_grain = (n + grain - 1) / grain;
+        return std::min<std::size_t>(std::max<std::size_t>(by_grain, 1), std::max<std::size_t>(max_workers, 1));
+    }
 
 } // namespace detail
 

@@ -50,14 +50,13 @@ auto matmul(const Tensor& a, const Tensor& b) -> Result<Tensor>
     if (a.device() == Device::CUDA) {
         // CUDA 路径：dtype 检查后直接走 tiled-shared kernel。
         if (a.dtype() != b.dtype())
-            return std::unexpected(make_error(
-                std::format("matmul: dtype 不匹配（{} vs {}）", dtype_name(a.dtype()), dtype_name(b.dtype())),
-                Severity::Recoverable));
+            return std::unexpected(
+                make_error(std::format("matmul: dtype 不匹配（{} vs {}）", dtype_name(a.dtype()), dtype_name(b.dtype())), Severity::Recoverable)
+            );
 
         const DType dt_cu = a.dtype();
         if (dt_cu == DType::Bool || dt_cu == DType::U8)
-            return std::unexpected(make_error(
-                std::format("matmul: CUDA 不支持 DType::{}", dtype_name(dt_cu)), Severity::Recoverable));
+            return std::unexpected(make_error(std::format("matmul: CUDA 不支持 DType::{}", dtype_name(dt_cu)), Severity::Recoverable));
 
         if (a.ndim() != 2 || b.ndim() != 2)
             return std::unexpected(make_error("matmul: 仅支持 2D × 2D", Severity::Recoverable));
@@ -67,31 +66,40 @@ auto matmul(const Tensor& a, const Tensor& b) -> Result<Tensor>
         const int64_t Kb = b.shape()[0];
         const int64_t N  = b.shape()[1];
         if (Ka != Kb)
-            return std::unexpected(make_error(
-                std::format("matmul: 内维不匹配（a 列={}, b 行={}）", Ka, Kb), Severity::Recoverable));
+            return std::unexpected(make_error(std::format("matmul: 内维不匹配（a 列={}, b 行={}）", Ka, Kb), Severity::Recoverable));
 
         auto out_r = Tensor::zeros({M, N}, dt_cu, Device::CUDA);
-        if (!out_r) return std::unexpected(std::move(out_r.error()));
-        if (M == 0 || N == 0 || Ka == 0) return *out_r;
+        if (!out_r)
+            return std::unexpected(std::move(out_r.error()));
+        if (M == 0 || N == 0 || Ka == 0)
+            return *out_r;
 
         Tensor ca = a;
         if (!a.is_contiguous()) {
             auto r = a.contiguous();
-            if (!r) return std::unexpected(std::move(r.error()));
+            if (!r)
+                return std::unexpected(std::move(r.error()));
             ca = *r;
         }
         Tensor cb = b;
         if (!b.is_contiguous()) {
             auto r = b.contiguous();
-            if (!r) return std::unexpected(std::move(r.error()));
+            if (!r)
+                return std::unexpected(std::move(r.error()));
             cb = *r;
         }
 
         auto rc = tensor::cuda::matmul(
             static_cast<int>(dt_cu),
-            ca.data_ptr(), cb.data_ptr(), out_r->data_ptr(),
-            static_cast<std::size_t>(M), static_cast<std::size_t>(Ka), static_cast<std::size_t>(N));
-        if (!rc) return std::unexpected(std::move(rc.error()));
+            ca.data_ptr(),
+            cb.data_ptr(),
+            out_r->data_ptr(),
+            static_cast<std::size_t>(M),
+            static_cast<std::size_t>(Ka),
+            static_cast<std::size_t>(N)
+        );
+        if (!rc)
+            return std::unexpected(std::move(rc.error()));
         return *out_r;
     }
 

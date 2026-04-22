@@ -79,10 +79,8 @@ enum class DType : uint8_t
     case DType::I32:
     case DType::I64:
     case DType::F32:
-    case DType::F64:
-        return true;
-    default:
-        return false;
+    case DType::F64: return true;
+    default: return false;
     }
 }
 

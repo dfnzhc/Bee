@@ -28,9 +28,15 @@ class StreamView
 public:
     StreamView() noexcept = default;
 
-    explicit StreamView(cudaStream_t s) noexcept : stream_(s) {}
+    explicit StreamView(cudaStream_t s) noexcept
+        : stream_(s)
+    {
+    }
 
-    [[nodiscard]] cudaStream_t native_handle() const noexcept { return stream_; }
+    [[nodiscard]] cudaStream_t native_handle() const noexcept
+    {
+        return stream_;
+    }
 
     [[nodiscard]] auto synchronize() const -> Result<void>
     {
@@ -42,8 +48,10 @@ public:
     [[nodiscard]] auto query() const -> Result<bool>
     {
         const cudaError_t err = cudaStreamQuery(stream_);
-        if (err == cudaSuccess) return true;
-        if (err == cudaErrorNotReady) return false;
+        if (err == cudaSuccess)
+            return true;
+        if (err == cudaErrorNotReady)
+            return false;
         (void)cudaGetLastError();
         return std::unexpected(detail::to_error(err, "cudaStreamQuery"));
     }
@@ -68,12 +76,13 @@ class OwnedStream
 public:
     OwnedStream() noexcept = default;
 
-    OwnedStream(const OwnedStream&) = delete;
+    OwnedStream(const OwnedStream&)            = delete;
     OwnedStream& operator=(const OwnedStream&) = delete;
 
     OwnedStream(OwnedStream&& other) noexcept
         : stream_(std::exchange(other.stream_, nullptr))
-    {}
+    {
+    }
 
     OwnedStream& operator=(OwnedStream&& other) noexcept
     {
@@ -84,7 +93,10 @@ public:
         return *this;
     }
 
-    ~OwnedStream() { reset(); }
+    ~OwnedStream()
+    {
+        reset();
+    }
 
     // flags: cudaStreamDefault / cudaStreamNonBlocking
     // priority: 0 或由 cudaDeviceGetStreamPriorityRange 获得
@@ -97,9 +109,15 @@ public:
         return o;
     }
 
-    [[nodiscard]] cudaStream_t native_handle() const noexcept { return stream_; }
+    [[nodiscard]] cudaStream_t native_handle() const noexcept
+    {
+        return stream_;
+    }
 
-    [[nodiscard]] StreamView view() const noexcept { return StreamView{stream_}; }
+    [[nodiscard]] StreamView view() const noexcept
+    {
+        return StreamView{stream_};
+    }
 
     [[nodiscard]] auto synchronize() const -> Result<void>
     {
@@ -107,7 +125,10 @@ public:
         return {};
     }
 
-    [[nodiscard]] explicit operator bool() const noexcept { return stream_ != nullptr; }
+    [[nodiscard]] explicit operator bool() const noexcept
+    {
+        return stream_ != nullptr;
+    }
 
     void reset() noexcept
     {

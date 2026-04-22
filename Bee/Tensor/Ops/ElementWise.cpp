@@ -108,35 +108,20 @@ namespace
     auto run_binary_cuda(BinOp op, const Tensor& a, const Tensor& b, Tensor& out, std::string_view op_name) -> Result<void>
     {
         if (a.shape() != b.shape())
-            return std::unexpected(make_error(
-                std::format("{}: CUDA 后端暂不支持广播，两操作数 shape 必须一致", op_name),
-                Severity::Recoverable
-            ));
+            return std::unexpected(make_error(std::format("{}: CUDA 后端暂不支持广播，两操作数 shape 必须一致", op_name), Severity::Recoverable));
         if (!a.is_contiguous() || !b.is_contiguous() || !out.is_contiguous())
-            return std::unexpected(make_error(
-                std::format("{}: CUDA 后端要求所有张量均 contiguous", op_name),
-                Severity::Recoverable
-            ));
+            return std::unexpected(make_error(std::format("{}: CUDA 后端要求所有张量均 contiguous", op_name), Severity::Recoverable));
         return tensor::cuda::ew_binary(
-            static_cast<int>(op),
-            static_cast<int>(a.dtype()),
-            a.data_ptr(), b.data_ptr(), out.data_ptr(),
-            static_cast<std::size_t>(a.numel())
+            static_cast<int>(op), static_cast<int>(a.dtype()), a.data_ptr(), b.data_ptr(), out.data_ptr(), static_cast<std::size_t>(a.numel())
         );
     }
 
     auto run_unary_cuda(UnOp op, const Tensor& a, Tensor& out, std::string_view op_name) -> Result<void>
     {
         if (!a.is_contiguous() || !out.is_contiguous())
-            return std::unexpected(make_error(
-                std::format("{}: CUDA 后端要求所有张量均 contiguous", op_name),
-                Severity::Recoverable
-            ));
+            return std::unexpected(make_error(std::format("{}: CUDA 后端要求所有张量均 contiguous", op_name), Severity::Recoverable));
         return tensor::cuda::ew_unary(
-            static_cast<int>(op),
-            static_cast<int>(a.dtype()),
-            a.data_ptr(), out.data_ptr(),
-            static_cast<std::size_t>(a.numel())
+            static_cast<int>(op), static_cast<int>(a.dtype()), a.data_ptr(), out.data_ptr(), static_cast<std::size_t>(a.numel())
         );
     }
 

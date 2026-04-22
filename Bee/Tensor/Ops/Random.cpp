@@ -40,8 +40,8 @@ auto rand(Shape shape, DType dtype, uint64_t seed, Device device) -> Result<Tens
         return std::unexpected(std::move(out_r.error()));
     Tensor out = std::move(*out_r);
 
-    auto eng = make_engine(seed);
-    const int64_t n = out.numel();
+    auto          eng = make_engine(seed);
+    const int64_t n   = out.numel();
 
     if (dtype == DType::F32) {
         std::uniform_real_distribution<float> dist(0.0f, 1.0f);
@@ -68,8 +68,8 @@ auto randn(Shape shape, DType dtype, uint64_t seed, Device device) -> Result<Ten
         return std::unexpected(std::move(out_r.error()));
     Tensor out = std::move(*out_r);
 
-    auto eng = make_engine(seed);
-    const int64_t n = out.numel();
+    auto          eng = make_engine(seed);
+    const int64_t n   = out.numel();
 
     if (dtype == DType::F32) {
         std::normal_distribution<float> dist(0.0f, 1.0f);
@@ -101,10 +101,9 @@ auto randint(int64_t low, int64_t high, Shape shape, DType dtype, uint64_t seed,
         constexpr int64_t kI32Min = static_cast<int64_t>(std::numeric_limits<int32_t>::min());
         constexpr int64_t kI32Max = static_cast<int64_t>(std::numeric_limits<int32_t>::max());
         if (low < kI32Min || high > (kI32Max + 1)) {
-            return std::unexpected(make_error(
-                std::format("randint: I32 范围要求 [{} , {}]（high 为开区间上界）", kI32Min, kI32Max + 1),
-                Severity::Recoverable
-            ));
+            return std::unexpected(
+                make_error(std::format("randint: I32 范围要求 [{} , {}]（high 为开区间上界）", kI32Min, kI32Max + 1), Severity::Recoverable)
+            );
         }
     }
 
@@ -119,8 +118,8 @@ auto randint(int64_t low, int64_t high, Shape shape, DType dtype, uint64_t seed,
         return std::unexpected(std::move(out_r.error()));
     Tensor out = std::move(*out_r);
 
-    auto eng = make_engine(seed);
-    const int64_t n = out.numel();
+    auto          eng = make_engine(seed);
+    const int64_t n   = out.numel();
 
     if (dtype == DType::I32) {
         std::uniform_int_distribution<int32_t> dist(static_cast<int32_t>(low), static_cast<int32_t>(high) - 1);

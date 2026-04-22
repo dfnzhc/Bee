@@ -125,8 +125,7 @@ namespace
     auto check_cuda_contig(const Tensor& a, std::string_view op) -> Result<void>
     {
         if (!a.is_contiguous())
-            return std::unexpected(make_error(
-                std::format("{}: CUDA 后端要求输入 contiguous", op), Severity::Recoverable));
+            return std::unexpected(make_error(std::format("{}: CUDA 后端要求输入 contiguous", op), Severity::Recoverable));
         return {};
     }
 
@@ -135,10 +134,8 @@ namespace
         if (auto r = check_cuda_contig(a, op_name); !r)
             return std::unexpected(std::move(r.error()));
         return tensor::cuda::reduce_global(
-            static_cast<int>(op),
-            static_cast<int>(a.dtype()),
-            a.data_ptr(), out.data_ptr(),
-            static_cast<std::size_t>(a.numel()));
+            static_cast<int>(op), static_cast<int>(a.dtype()), a.data_ptr(), out.data_ptr(), static_cast<std::size_t>(a.numel())
+        );
     }
 
     auto run_axis_cuda(RdOp op, const Tensor& a, int64_t dim, Tensor& out, std::string_view op_name) -> Result<void>
@@ -152,19 +149,13 @@ namespace
         for (int64_t i = dim + 1; i < static_cast<int64_t>(s.size()); ++i)
             inner *= static_cast<std::size_t>(s[static_cast<std::size_t>(i)]);
         const std::size_t axis_n = static_cast<std::size_t>(s[static_cast<std::size_t>(dim)]);
-        return tensor::cuda::reduce_axis(
-            static_cast<int>(op),
-            static_cast<int>(a.dtype()),
-            a.data_ptr(), out.data_ptr(),
-            outer, axis_n, inner);
+        return tensor::cuda::reduce_axis(static_cast<int>(op), static_cast<int>(a.dtype()), a.data_ptr(), out.data_ptr(), outer, axis_n, inner);
     }
 
     auto mean_not_impl_on_cuda_for_int(DType dt, std::string_view op) -> Result<void>
     {
         if (dt == DType::I32 || dt == DType::I64)
-            return std::unexpected(make_error(
-                std::format("{}: CUDA 后端暂未实现整数输入（I32/I64 → F64）", op),
-                Severity::Recoverable));
+            return std::unexpected(make_error(std::format("{}: CUDA 后端暂未实现整数输入（I32/I64 → F64）", op), Severity::Recoverable));
         return {};
     }
 
@@ -210,8 +201,7 @@ auto mean(const Tensor& a) -> Result<Tensor>
         if (auto r = run_global_cuda(RdOp::Sum, a, *out, "mean"); !r)
             return std::unexpected(std::move(r.error()));
         const double inv = 1.0 / static_cast<double>(a.numel());
-        return tensor::cuda::scale_fp(static_cast<int>(a.dtype()), out->data_ptr(), inv, 1)
-            .transform([&] { return *out; });
+        return tensor::cuda::scale_fp(static_cast<int>(a.dtype()), out->data_ptr(), inv, 1).transform([&] { return *out; });
     }
 
     if (a.dtype() == DType::F32) {
@@ -292,7 +282,7 @@ namespace
     {
         return Tensor::empty(make_reduce_axis_shape(a.shape(), d, keepdim), out_dt, a.device());
     }
-}
+} // namespace
 
 auto sum(const Tensor& a, int dim, bool keepdim) -> Result<Tensor>
 {
@@ -335,21 +325,19 @@ auto mean(const Tensor& a, int dim, bool keepdim) -> Result<Tensor>
         if (auto r = run_axis_cuda(RdOp::Sum, a, d, *out, "mean"); !r)
             return std::unexpected(std::move(r.error()));
         const double inv = 1.0 / static_cast<double>(K);
-        if (auto r = tensor::cuda::scale_fp(
-                static_cast<int>(a.dtype()), out->data_ptr(), inv,
-                static_cast<std::size_t>(out->numel())); !r)
+        if (auto r = tensor::cuda::scale_fp(static_cast<int>(a.dtype()), out->data_ptr(), inv, static_cast<std::size_t>(out->numel())); !r)
             return std::unexpected(std::move(r.error()));
         return *out;
     }
 
     if (a.dtype() == DType::F32) {
         cpu::cpu_reduce_axis_dispatch<float, cpu::OpReduceSum>(a, d, keepdim, *out);
-        auto*         p = static_cast<float*>(out->data_ptr());
+        auto* p = static_cast<float*>(out->data_ptr());
         for (int64_t i = 0; i < out->numel(); ++i)
             p[i] /= static_cast<float>(K);
     } else if (a.dtype() == DType::F64) {
         cpu::cpu_reduce_axis_dispatch<double, cpu::OpReduceSum>(a, d, keepdim, *out);
-        auto*         p = static_cast<double*>(out->data_ptr());
+        auto* p = static_cast<double*>(out->data_ptr());
         for (int64_t i = 0; i < out->numel(); ++i)
             p[i] /= static_cast<double>(K);
     } else if (a.dtype() == DType::I32) {

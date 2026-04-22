@@ -40,9 +40,10 @@ TEST(ParallelFor, SmallRangeRunsSerialOnce)
 
 TEST(ParallelFor, CoversExactlyOnceAndDisjoint)
 {
-    constexpr std::size_t N = 100'003;
+    constexpr std::size_t         N = 100'003;
     std::vector<std::atomic<int>> hit(N);
-    for (auto& x : hit) x.store(0);
+    for (auto& x : hit)
+        x.store(0);
 
     parallel_for(0, N, 1024, [&](std::size_t lo, std::size_t hi) {
         for (std::size_t i = lo; i < hi; ++i)
@@ -56,13 +57,14 @@ TEST(ParallelFor, CoversExactlyOnceAndDisjoint)
 TEST(ParallelFor, ParallelSumMatchesSerial)
 {
     constexpr std::size_t N = 1'000'000;
-    std::vector<int> data(N);
+    std::vector<int>      data(N);
     std::iota(data.begin(), data.end(), 1);
 
     std::atomic<long long> sum{0};
     parallel_for(0, N, 2048, [&](std::size_t lo, std::size_t hi) {
         long long local = 0;
-        for (std::size_t i = lo; i < hi; ++i) local += data[i];
+        for (std::size_t i = lo; i < hi; ++i)
+            local += data[i];
         sum.fetch_add(local, std::memory_order_relaxed);
     });
 
@@ -72,13 +74,12 @@ TEST(ParallelFor, ParallelSumMatchesSerial)
 
 TEST(ParallelForEach, PerIndexCoversAll)
 {
-    constexpr std::size_t N = 50'000;
+    constexpr std::size_t         N = 50'000;
     std::vector<std::atomic<int>> hit(N);
-    for (auto& x : hit) x.store(0);
+    for (auto& x : hit)
+        x.store(0);
 
-    parallel_for_each(0, N, 512, [&](std::size_t i) {
-        hit[i].fetch_add(1, std::memory_order_relaxed);
-    });
+    parallel_for_each(0, N, 512, [&](std::size_t i) { hit[i].fetch_add(1, std::memory_order_relaxed); });
 
     for (std::size_t i = 0; i < N; ++i)
         ASSERT_EQ(hit[i].load(), 1);
@@ -91,8 +92,8 @@ TEST(ParallelFor, UsesMultipleThreadsWhenLargeEnough)
         GTEST_SKIP() << "单核环境跳过并发线程观测";
     }
 
-    constexpr std::size_t N = 200'000;
-    std::mutex mu;
+    constexpr std::size_t               N = 200'000;
+    std::mutex                          mu;
     std::unordered_set<std::thread::id> tids;
 
     parallel_for(0, N, 1024, [&](std::size_t, std::size_t) {
@@ -106,9 +107,5 @@ TEST(ParallelFor, UsesMultipleThreadsWhenLargeEnough)
 TEST(ParallelFor, ExceptionPropagates)
 {
     constexpr std::size_t N = 10'000;
-    EXPECT_THROW(
-        parallel_for(0, N, 256, [](std::size_t, std::size_t) {
-            throw std::runtime_error("boom");
-        }),
-        std::runtime_error);
+    EXPECT_THROW(parallel_for(0, N, 256, [](std::size_t, std::size_t) { throw std::runtime_error("boom"); }), std::runtime_error);
 }

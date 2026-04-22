@@ -16,7 +16,8 @@
 #include <thread>
 #include <vector>
 
-namespace bee::parallel {
+namespace bee::parallel
+{
 
 /// 轻量级固定大小线程池：持久工作线程 + 共享 FIFO 队列。
 /// 仅用于 parallel_for 等 fork-join 原语，不承担任务依赖/续延等复杂调度。
@@ -33,7 +34,10 @@ public:
     ThreadPool(const ThreadPool&)            = delete;
     ThreadPool& operator=(const ThreadPool&) = delete;
 
-    [[nodiscard]] std::size_t size() const noexcept { return workers_.size(); }
+    [[nodiscard]] std::size_t size() const noexcept
+    {
+        return workers_.size();
+    }
 
     /// 提交一个可执行任务。线程安全。任务内不应再次阻塞等待同池任务，
     /// 否则在 worker 数耗尽时可能死锁。

@@ -90,9 +90,7 @@ auto cast(const Tensor& src, DType dst_dtype) -> Result<Tensor>
 
     if (cont.device() == Device::CUDA) {
         auto r = tensor::cuda::ew_cast(
-            static_cast<int>(cont.dtype()), cont.data_ptr(),
-            static_cast<int>(dst_dtype), out.data_ptr(),
-            static_cast<std::size_t>(cont.numel())
+            static_cast<int>(cont.dtype()), cont.data_ptr(), static_cast<int>(dst_dtype), out.data_ptr(), static_cast<std::size_t>(cont.numel())
         );
         if (!r)
             return std::unexpected(std::move(r.error()));

@@ -172,8 +172,8 @@ auto Tensor::empty(Shape shape, DType dtype, Device device) -> Result<Tensor>
     const int64_t     n      = ::bee::numel(shape);
     const std::size_t nbytes = static_cast<std::size_t>(n) * dtype_size(dtype);
 
-    IAllocator& alloc = (device == Device::CUDA) ? static_cast<IAllocator&>(CudaAllocator::instance())
-                                                 : static_cast<IAllocator&>(CpuAllocator::instance());
+    IAllocator& alloc =
+        (device == Device::CUDA) ? static_cast<IAllocator&>(CudaAllocator::instance()) : static_cast<IAllocator&>(CpuAllocator::instance());
     auto storage_result = Storage::allocate(nbytes, alloc);
     if (!storage_result)
         return std::unexpected(std::move(storage_result.error()));
@@ -222,9 +222,9 @@ auto Tensor::ones(Shape shape, DType dtype, Device device) -> Result<Tensor>
 auto Tensor::full(Shape shape, DType dtype, double value, Device device) -> Result<Tensor>
 {
     if (!dtype_is_cpu_computable(dtype))
-        return std::unexpected(make_error(
-            std::format("Tensor::full: 扩展 dtype::{} 暂不支持 CPU 端填充（NotImplemented）", dtype_name(dtype)),
-            Severity::Recoverable));
+        return std::unexpected(
+            make_error(std::format("Tensor::full: 扩展 dtype::{} 暂不支持 CPU 端填充（NotImplemented）", dtype_name(dtype)), Severity::Recoverable)
+        );
 
     // CUDA 设备暂不支持直接 fill；先在 CPU 构造再搬运到目标设备
     if (device == Device::CUDA) {
@@ -475,22 +475,18 @@ auto Tensor::contiguous() const -> Result<Tensor>
         const std::size_t elem_sz = dtype_size(impl_->dtype);
         const std::size_t nbytes  = static_cast<std::size_t>(n) * elem_sz;
 
-        if (impl_->shape.size() == 2
-            && impl_->strides.size() == 2
-            && impl_->offset == 0
-            && impl_->strides[0] == 1
-            && impl_->strides[1] == impl_->shape[0]) {
-            const std::size_t rows_src = static_cast<std::size_t>(impl_->shape[1]);
-            const std::size_t cols_src = static_cast<std::size_t>(impl_->shape[0]);
-            auto storage_result = Storage::allocate(nbytes, impl_->storage->allocator());
+        if (impl_->shape.size() == 2 && impl_->strides.size() == 2 && impl_->offset == 0 && impl_->strides[0] == 1 &&
+            impl_->strides[1] == impl_->shape[0]) {
+            const std::size_t rows_src       = static_cast<std::size_t>(impl_->shape[1]);
+            const std::size_t cols_src       = static_cast<std::size_t>(impl_->shape[0]);
+            auto              storage_result = Storage::allocate(nbytes, impl_->storage->allocator());
             if (!storage_result)
                 return std::unexpected(std::move(storage_result.error()));
 
-            auto rc = tensor::cuda::transpose_2d(
-                static_cast<int>(impl_->dtype),
-                impl_->storage->data(), (*storage_result)->data(),
-                rows_src, cols_src);
-            if (!rc) return std::unexpected(std::move(rc.error()));
+            auto rc =
+                tensor::cuda::transpose_2d(static_cast<int>(impl_->dtype), impl_->storage->data(), (*storage_result)->data(), rows_src, cols_src);
+            if (!rc)
+                return std::unexpected(std::move(rc.error()));
 
             auto ti     = std::make_shared<TensorImpl>();
             ti->storage = std::move(*storage_result);
@@ -503,9 +499,11 @@ auto Tensor::contiguous() const -> Result<Tensor>
 
         // 通用回退：D2H → CPU 重排 → H2D。功能正确但非最优。
         auto host_r = to(Device::CPU);
-        if (!host_r) return std::unexpected(std::move(host_r.error()));
+        if (!host_r)
+            return std::unexpected(std::move(host_r.error()));
         auto host_contig = host_r->contiguous();
-        if (!host_contig) return std::unexpected(std::move(host_contig.error()));
+        if (!host_contig)
+            return std::unexpected(std::move(host_contig.error()));
         return host_contig->to(Device::CUDA);
     }
 

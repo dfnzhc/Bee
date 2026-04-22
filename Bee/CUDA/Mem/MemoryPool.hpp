@@ -32,7 +32,7 @@ public:
     // 取指定设备的默认内存池（首次调用会设置 release_threshold=UINT64_MAX 以减少归还）。
     [[nodiscard]] static auto get_default(int device_index) -> Result<MemoryPool*>
     {
-        auto& inst = instance();
+        auto&           inst = instance();
         std::lock_guard lk(inst.mutex_);
 
         auto it = inst.pools_.find(device_index);
@@ -54,7 +54,8 @@ public:
     // Stream-ordered 分配。调用前确保 stream 有效；返回 device 指针。
     [[nodiscard]] auto allocate_async(std::size_t nbytes, StreamView stream) -> Result<void*>
     {
-        if (nbytes == 0) return static_cast<void*>(nullptr);
+        if (nbytes == 0)
+            return static_cast<void*>(nullptr);
         void* ptr = nullptr;
         BEE_CUDA_CHECK(cudaMallocFromPoolAsync(&ptr, nbytes, pool_, stream.native_handle()));
         return ptr;
@@ -63,7 +64,8 @@ public:
     // Stream-ordered 释放。释放在 stream 上的后续工作可能仍需该地址；需调用方保证时序。
     void deallocate_async(void* ptr, StreamView stream) noexcept
     {
-        if (!ptr) return;
+        if (!ptr)
+            return;
         (void)cudaFreeAsync(ptr, stream.native_handle());
     }
 
@@ -74,12 +76,22 @@ public:
         return {};
     }
 
-    [[nodiscard]] cudaMemPool_t native_handle() const noexcept { return pool_; }
-    [[nodiscard]] int           device_index() const noexcept  { return device_; }
+    [[nodiscard]] cudaMemPool_t native_handle() const noexcept
+    {
+        return pool_;
+    }
+    [[nodiscard]] int device_index() const noexcept
+    {
+        return device_;
+    }
 
 private:
     MemoryPool() = default;
-    MemoryPool(cudaMemPool_t p, int dev) noexcept : pool_(p), device_(dev) {}
+    MemoryPool(cudaMemPool_t p, int dev) noexcept
+        : pool_(p)
+        , device_(dev)
+    {
+    }
 
     struct Registry
     {
