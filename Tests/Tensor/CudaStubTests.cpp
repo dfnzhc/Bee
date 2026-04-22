@@ -409,4 +409,106 @@ TEST(CudaOps, RandIntOnCudaSameSeedMatchesCpu)
     for (int i = 0; i < 64; ++i) EXPECT_EQ(g[i], r[i]);
 }
 
+// ── M5 Matmul ───────────────────────────────────────────────────────────────
+
+TEST(CudaOps, MatmulF32MatchesCpu)
+{
+    if (!cuda_available()) GTEST_SKIP() << "No CUDA device";
+    const int M = 17, K = 33, N = 21;
+    auto a = randn({M, K}, DType::F32, 1, Device::CPU).value();
+    auto b = randn({K, N}, DType::F32, 2, Device::CPU).value();
+    auto cpu_res = matmul(a, b).value();
+
+    auto ac = a.to(Device::CUDA).value();
+    auto bc = b.to(Device::CUDA).value();
+    auto cu_res = matmul(ac, bc).value();
+    auto back = cu_res.to(Device::CPU).value();
+
+    const auto* p = static_cast<const float*>(back.data_ptr());
+    const auto* r = static_cast<const float*>(cpu_res.data_ptr());
+    for (int i = 0; i < M * N; ++i) EXPECT_NEAR(p[i], r[i], 1e-3f);
+}
+
+TEST(CudaOps, MatmulF64MatchesCpu)
+{
+    if (!cuda_available()) GTEST_SKIP() << "No CUDA device";
+    const int M = 8, K = 16, N = 12;
+    auto a = randn({M, K}, DType::F64, 5, Device::CPU).value();
+    auto b = randn({K, N}, DType::F64, 6, Device::CPU).value();
+    auto cpu_res = matmul(a, b).value();
+
+    auto cu_res = matmul(a.to(Device::CUDA).value(), b.to(Device::CUDA).value()).value();
+    auto back = cu_res.to(Device::CPU).value();
+
+    const auto* p = static_cast<const double*>(back.data_ptr());
+    const auto* r = static_cast<const double*>(cpu_res.data_ptr());
+    for (int i = 0; i < M * N; ++i) EXPECT_NEAR(p[i], r[i], 1e-9);
+}
+
+TEST(CudaOps, MatmulI32MatchesCpu)
+{
+    if (!cuda_available()) GTEST_SKIP() << "No CUDA device";
+    const int M = 5, K = 7, N = 6;
+    auto a = randint(-3, 3, {M, K}, DType::I32, 11, Device::CPU).value();
+    auto b = randint(-3, 3, {K, N}, DType::I32, 12, Device::CPU).value();
+    auto cpu_res = matmul(a, b).value();
+    auto cu_res  = matmul(a.to(Device::CUDA).value(), b.to(Device::CUDA).value()).value();
+    auto back    = cu_res.to(Device::CPU).value();
+
+    const auto* p = static_cast<const std::int32_t*>(back.data_ptr());
+    const auto* r = static_cast<const std::int32_t*>(cpu_res.data_ptr());
+    for (int i = 0; i < M * N; ++i) EXPECT_EQ(p[i], r[i]);
+}
+
+TEST(CudaOps, MatmulSmallOnTileBoundary)
+{
+    if (!cuda_available()) GTEST_SKIP() << "No CUDA device";
+    // Exercise shapes that are exact multiples of TILE and larger than 1 tile.
+    const int M = 32, K = 48, N = 32;
+    auto a = randn({M, K}, DType::F32, 7, Device::CPU).value();
+    auto b = randn({K, N}, DType::F32, 8, Device::CPU).value();
+    auto cpu_res = matmul(a, b).value();
+    auto cu_res  = matmul(a.to(Device::CUDA).value(), b.to(Device::CUDA).value()).value();
+    auto back    = cu_res.to(Device::CPU).value();
+    const auto* p = static_cast<const float*>(back.data_ptr());
+    const auto* r = static_cast<const float*>(cpu_res.data_ptr());
+    for (int i = 0; i < M * N; ++i) EXPECT_NEAR(p[i], r[i], 1e-3f);
+}
+
+// ── M8 Transpose（通过 contiguous() 路径触发） ───────────────────────────────
+
+TEST(CudaOps, Transpose2DViaContiguousF32)
+{
+    if (!cuda_available()) GTEST_SKIP() << "No CUDA device";
+    auto host = randn({7, 13}, DType::F32, 42, Device::CPU).value();
+    auto host_t = host.transpose(0, 1).value();
+    auto host_c = host_t.contiguous().value();
+
+    auto cu   = host.to(Device::CUDA).value();
+    auto cu_t = cu.transpose(0, 1).value();
+    ASSERT_FALSE(cu_t.is_contiguous());
+    auto cu_c = cu_t.contiguous().value();
+    ASSERT_TRUE(cu_c.is_contiguous());
+    auto back = cu_c.to(Device::CPU).value();
+
+    const auto* p = static_cast<const float*>(back.data_ptr());
+    const auto* r = static_cast<const float*>(host_c.data_ptr());
+    for (int i = 0; i < host_c.numel(); ++i) EXPECT_FLOAT_EQ(p[i], r[i]);
+}
+
+TEST(CudaOps, Transpose2DViaContiguousI64)
+{
+    if (!cuda_available()) GTEST_SKIP() << "No CUDA device";
+    auto host = randint(-100, 100, {11, 5}, DType::I64, 77, Device::CPU).value();
+    auto host_c = host.transpose(0, 1).value().contiguous().value();
+
+    auto cu = host.to(Device::CUDA).value();
+    auto cu_c = cu.transpose(0, 1).value().contiguous().value();
+    auto back = cu_c.to(Device::CPU).value();
+
+    const auto* p = static_cast<const std::int64_t*>(back.data_ptr());
+    const auto* r = static_cast<const std::int64_t*>(host_c.data_ptr());
+    for (int i = 0; i < host_c.numel(); ++i) EXPECT_EQ(p[i], r[i]);
+}
+
 #endif // BEE_TENSOR_WITH_CUDA

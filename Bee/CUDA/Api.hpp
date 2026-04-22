@@ -122,6 +122,14 @@ namespace ops
 // 原地缩放（dt ∈ {F32, F64}）：供 mean 实现。
 [[nodiscard]] auto scale_fp(ScalarType dt, void* buf, double factor, std::size_t n) -> Result<void>;
 
+// 2D tiled-shared matmul：C[M,N] = A[M,K] * B[K,N]；A/B/C 同 dtype、均连续。
+[[nodiscard]] auto matmul(ScalarType dt, const void* A, const void* B, void* C,
+                          std::size_t M, std::size_t K, std::size_t N) -> Result<void>;
+
+// 2D tiled-shared transpose：dst[i,j] = src[j,i]，src 为 [rows, cols] 连续。
+[[nodiscard]] auto transpose_2d(ScalarType dt, const void* src, void* dst,
+                                std::size_t rows, std::size_t cols) -> Result<void>;
+
 } // namespace ops
 
 } // namespace bee::cuda

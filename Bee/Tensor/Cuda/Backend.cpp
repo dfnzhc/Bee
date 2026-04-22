@@ -88,6 +88,20 @@ auto scale_fp(int dt, void* buf, double factor, std::size_t n) -> Result<void>
         static_cast<::bee::cuda::ScalarType>(dt), buf, factor, n);
 }
 
+auto matmul(int dt, const void* A, const void* B, void* C,
+            std::size_t M, std::size_t K, std::size_t N) -> Result<void>
+{
+    return ::bee::cuda::ops::matmul(
+        static_cast<::bee::cuda::ScalarType>(dt), A, B, C, M, K, N);
+}
+
+auto transpose_2d(int dt, const void* src, void* dst,
+                  std::size_t rows, std::size_t cols) -> Result<void>
+{
+    return ::bee::cuda::ops::transpose_2d(
+        static_cast<::bee::cuda::ScalarType>(dt), src, dst, rows, cols);
+}
+
 auto synchronize() -> Result<void>
 {
     return ::bee::cuda::device_synchronize();
@@ -156,6 +170,16 @@ auto reduce_axis(int, int, const void*, void*, std::size_t, std::size_t, std::si
 auto scale_fp(int, void*, double, std::size_t) -> Result<void>
 {
     return std::unexpected(make_error("CUDA 后端不可用：scale_fp", Severity::Recoverable));
+}
+
+auto matmul(int, const void*, const void*, void*, std::size_t, std::size_t, std::size_t) -> Result<void>
+{
+    return std::unexpected(make_error("CUDA 后端不可用：matmul", Severity::Recoverable));
+}
+
+auto transpose_2d(int, const void*, void*, std::size_t, std::size_t) -> Result<void>
+{
+    return std::unexpected(make_error("CUDA 后端不可用：transpose_2d", Severity::Recoverable));
 }
 
 auto synchronize() -> Result<void>

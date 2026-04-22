@@ -217,6 +217,22 @@ auto scale_fp(ScalarType dt, void* buf, double factor, std::size_t n) -> Result<
     return wrap(err, "cuda::ops::scale_fp");
 }
 
+auto matmul(ScalarType dt, const void* A, const void* B, void* C,
+            std::size_t M, std::size_t K, std::size_t N) -> Result<void>
+{
+    if (M == 0 || N == 0) return {};
+    const int err = detail::ops_matmul(static_cast<int>(dt), A, B, C, M, K, N);
+    return wrap(err, "cuda::ops::matmul");
+}
+
+auto transpose_2d(ScalarType dt, const void* src, void* dst,
+                  std::size_t rows, std::size_t cols) -> Result<void>
+{
+    if (rows == 0 || cols == 0) return {};
+    const int err = detail::ops_transpose_2d(static_cast<int>(dt), src, dst, rows, cols);
+    return wrap(err, "cuda::ops::transpose_2d");
+}
+
 } // namespace ops
 
 } // namespace bee::cuda

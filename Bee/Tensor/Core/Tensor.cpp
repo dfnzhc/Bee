@@ -464,8 +464,45 @@ auto Tensor::contiguous() const -> Result<Tensor>
     if (is_contiguous())
         return *this; // 共享 storage，引用计数递增
 
-    if (device() == Device::CUDA)
-        return std::unexpected(make_error("CUDA contiguous 尚未实现", Severity::Recoverable));
+    if (device() == Device::CUDA) {
+        // 2D transpose 快速路径：shape=[R,C]，strides=[1,R]（=src 原 [C,R] 行主序的 T）。
+        const int64_t     n       = numel();
+        const std::size_t elem_sz = dtype_size(impl_->dtype);
+        const std::size_t nbytes  = static_cast<std::size_t>(n) * elem_sz;
+
+        if (impl_->shape.size() == 2
+            && impl_->strides.size() == 2
+            && impl_->offset == 0
+            && impl_->strides[0] == 1
+            && impl_->strides[1] == impl_->shape[0]) {
+            const std::size_t rows_src = static_cast<std::size_t>(impl_->shape[1]);
+            const std::size_t cols_src = static_cast<std::size_t>(impl_->shape[0]);
+            auto storage_result = Storage::allocate(nbytes, impl_->storage->allocator());
+            if (!storage_result)
+                return std::unexpected(std::move(storage_result.error()));
+
+            auto rc = tensor::cuda::transpose_2d(
+                static_cast<int>(impl_->dtype),
+                impl_->storage->data(), (*storage_result)->data(),
+                rows_src, cols_src);
+            if (!rc) return std::unexpected(std::move(rc.error()));
+
+            auto ti     = std::make_shared<TensorImpl>();
+            ti->storage = std::move(*storage_result);
+            ti->dtype   = impl_->dtype;
+            ti->shape   = impl_->shape;
+            ti->strides = compute_contiguous_strides(impl_->shape);
+            ti->offset  = 0;
+            return Tensor(std::move(ti));
+        }
+
+        // 通用回退：D2H → CPU 重排 → H2D。功能正确但非最优。
+        auto host_r = to(Device::CPU);
+        if (!host_r) return std::unexpected(std::move(host_r.error()));
+        auto host_contig = host_r->contiguous();
+        if (!host_contig) return std::unexpected(std::move(host_contig.error()));
+        return host_contig->to(Device::CUDA);
+    }
 
     const int64_t     n       = numel();
     const std::size_t elem_sz = dtype_size(impl_->dtype);

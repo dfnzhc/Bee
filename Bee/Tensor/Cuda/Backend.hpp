@@ -65,6 +65,14 @@ auto deallocate(void* p, std::size_t nbytes, std::size_t alignment) -> void;
 // F32/F64 原地缩放（mean 使用）。
 [[nodiscard]] auto scale_fp(int dt, void* buf, double factor, std::size_t n) -> Result<void>;
 
+// 2D tiled-shared matmul：C[M,N] = A[M,K] * B[K,N]；同 dtype、连续。
+[[nodiscard]] auto matmul(int dt, const void* A, const void* B, void* C,
+                          std::size_t M, std::size_t K, std::size_t N) -> Result<void>;
+
+// 2D tiled-shared transpose：dst[i,j] = src[j,i]。
+[[nodiscard]] auto transpose_2d(int dt, const void* src, void* dst,
+                                std::size_t rows, std::size_t cols) -> Result<void>;
+
 // 同步 CUDA 设备，等待所有待处理操作完成。
 // @return 成功时返回 void；失败时返回 NotImplemented 错误
 [[nodiscard]] auto synchronize() -> Result<void>;
