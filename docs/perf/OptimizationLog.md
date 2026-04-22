@@ -48,13 +48,15 @@ GEMM 方阵：{128, 256, 512, 1024, 2048} —— 2048 是 CPU 朴素版本的舒
 
 ### B0 — Benchmark 基础设施
 
-- **状态**：已完成（本次）。
+- **状态**：已完成。
 - **内容**：
   - `bee_add_component_benchmark` 已具备（`CMake/BeeComponent.cmake:135`）；
   - 新增 `Benchmarks/Tensor/`（EWise / Reduce / Matmul，F32，tiny→large + 方阵 128→1024）；
   - 新增 `Benchmarks/CUDA/`（EWise / Matmul / Memcpy，small→large + 方阵 256→2048）；
   - 仓库 `.gitignore` 加入 `Benchmarks/baseline/`；
-  - 本文档建立。
+  - `Bee/Base/Parallel/`：引入独立的轻量级 `ThreadPool` + `parallel_for(lo, hi, grain, fn)` / `parallel_for_each(begin, end, grain, fn)`，
+    不依赖 `Task/Scheduler`，供 CPU 算子后续多线程改造直接使用；
+  - `Tests/Base/ParallelForTests.cpp`：覆盖空区间、粒度退化、区间不漏不重、并行累加与串行等价、多线程命中、异常传播共 7 条用例。
 - **执行方式**：
   ```pwsh
   cmake -S . -B build-bench -DBEE_BUILD_BENCHMARKS=ON -DCMAKE_BUILD_TYPE=Release

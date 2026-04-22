@@ -14,5 +14,6 @@ bee_add_component_test(
         MoveOnlyFunctionTests.cpp
         NameofTests.cpp
         NumericTests.cpp
+        ParallelForTests.cpp
         VerifyTests.cpp
 )

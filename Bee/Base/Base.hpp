@@ -5,6 +5,7 @@
 #include "Reflection.hpp"
 #include "Numeric.hpp"
 #include "Diagnostics.hpp"
+#include "Parallel.hpp"
 
 #include <string_view>
 
