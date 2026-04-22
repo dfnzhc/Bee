@@ -40,10 +40,12 @@ namespace bee::cuda
 // 阻塞直到当前设备上所有已提交工作完成
 [[nodiscard]] auto device_synchronize() -> Result<void>;
 
-// ── 内存（M2 实现） ──────────────────────────────────────────────────────────
+// ── 内存 ────────────────────────────────────────────────────────────────────
 //
-// 以下接口将在 M2 里程碑中实装；目前为占位声明，当 CUDA 组件链接进 Tensor
-// 时由 Bee::Tensor 的 Cuda/Backend.cpp 转发调用。
+// 默认使用当前 device 的 cudaMemPool_t（cudaMallocFromPoolAsync）与
+// cudaStreamPerThread；每个入口在返回前都 cudaStreamSynchronize，对调用方
+// 表现为同步 API（plan-cuda §5）。alignment 参数当前被忽略（cudaMallocAsync
+// 保证的对齐 >= 256B 通常足够；M6/M7 若需特殊对齐再扩展）。
 
 [[nodiscard]] auto allocate(std::size_t nbytes, std::size_t alignment) -> Result<void*>;
 
@@ -52,5 +54,8 @@ void deallocate(void* ptr, std::size_t nbytes, std::size_t alignment) noexcept;
 [[nodiscard]] auto memcpy_h2d(void* dst, const void* src, std::size_t nbytes) -> Result<void>;
 [[nodiscard]] auto memcpy_d2h(void* dst, const void* src, std::size_t nbytes) -> Result<void>;
 [[nodiscard]] auto memcpy_d2d(void* dst, const void* src, std::size_t nbytes) -> Result<void>;
+
+// 把设备内存 ptr 的前 nbytes 个字节置为 value 的低 8 位。
+[[nodiscard]] auto memset(void* ptr, int value, std::size_t nbytes) -> Result<void>;
 
 } // namespace bee::cuda

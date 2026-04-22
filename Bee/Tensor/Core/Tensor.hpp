@@ -62,6 +62,10 @@ public:
     // 深拷贝：始终返回 contiguous 的独立 storage（支持非连续张量）
     [[nodiscard]] auto clone() const -> Result<Tensor>;
 
+    // 设备迁移：在目标设备上分配等形状张量并搬运数据。
+    // 若已在目标设备上则直接返回浅拷贝；非连续张量会先 contiguous() 再搬运。
+    [[nodiscard]] auto to(Device target) const -> Result<Tensor>;
+
     // ── 视图与形状变换（零拷贝，除非另行说明）──────────────────────────────
 
     // 返回新形状的视图；要求当前张量 contiguous；支持一个 -1 占位推断

@@ -2,9 +2,13 @@ set(tensor_library_type "STATIC")
 set(tensor_private_include_dir "${CMAKE_CURRENT_SOURCE_DIR}")
 
 # ---------------------------------------------------------------------------
-# CUDA 后端占位选项
+# CUDA 后端自动探测：若 Bee::CUDA target 已定义，则默认启用
 # ---------------------------------------------------------------------------
-option(BEE_TENSOR_WITH_CUDA "启用 Bee::Tensor CUDA 后端（当前为 stub 占位）" OFF)
+if(TARGET Bee::CUDA)
+    option(BEE_TENSOR_WITH_CUDA "启用 Bee::Tensor CUDA 后端" ON)
+else()
+    option(BEE_TENSOR_WITH_CUDA "启用 Bee::Tensor CUDA 后端" OFF)
+endif()
 
 file(GLOB_RECURSE tensor_public_headers CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/*.hpp"
@@ -92,8 +96,14 @@ endif()
 list(JOIN _bee_tensor_isa_list " " _bee_tensor_isa_str)
 message(STATUS "Bee::Tensor 运行期 ISA 分派: ${_bee_tensor_isa_str}")
 
-# 若启用 CUDA stub
+# 若启用 CUDA 后端：链接 Bee::CUDA 并定义 BEE_TENSOR_WITH_CUDA
 if(BEE_TENSOR_WITH_CUDA)
-    message(STATUS "Bee::Tensor CUDA stub enabled: ON")
+    if(NOT TARGET Bee::CUDA)
+        message(FATAL_ERROR "BEE_TENSOR_WITH_CUDA=ON 但 Bee::CUDA target 不存在")
+    endif()
+    message(STATUS "Bee::Tensor CUDA 后端: ON (link Bee::CUDA)")
+    target_link_libraries(Tensor PRIVATE Bee::CUDA)
     target_compile_definitions(Tensor PUBLIC BEE_TENSOR_WITH_CUDA)
+else()
+    message(STATUS "Bee::Tensor CUDA 后端: OFF")
 endif()

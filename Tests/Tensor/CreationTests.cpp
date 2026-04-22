@@ -221,8 +221,10 @@ TEST(CreationTests, Arange_BoolDtype_ReturnsError)
 
 // ── CUDA 路径 ─────────────────────────────────────────────────────────────────
 
+#if !defined(BEE_TENSOR_WITH_CUDA)
 TEST(CreationTests, Zeros_CUDA_ReturnsError)
 {
     auto result = Tensor::zeros({1}, DType::F32, Device::CUDA);
     EXPECT_FALSE(result.has_value());
 }
+#endif

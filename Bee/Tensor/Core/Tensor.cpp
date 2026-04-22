@@ -2,6 +2,8 @@
 #include "Base/Memory/Allocator.hpp"
 #include "Base/Diagnostics/Check.hpp"
 #include "Tensor/Core/Storage.hpp"
+#include "Tensor/Cuda/CudaAllocator.hpp"
+#include "Tensor/Cuda/Backend.hpp"
 
 #include <algorithm>
 #include <cstring>
@@ -160,9 +162,6 @@ Tensor::Tensor(std::shared_ptr<TensorImpl> impl)
 
 auto Tensor::empty(Shape shape, DType dtype, Device device) -> Result<Tensor>
 {
-    if (device == Device::CUDA)
-        return std::unexpected(make_error("CUDA backend not available", Severity::Recoverable));
-
     // 校验 shape：负维度非法
     for (auto d : shape) {
         if (d < 0) {
@@ -173,7 +172,9 @@ auto Tensor::empty(Shape shape, DType dtype, Device device) -> Result<Tensor>
     const int64_t     n      = ::bee::numel(shape);
     const std::size_t nbytes = static_cast<std::size_t>(n) * dtype_size(dtype);
 
-    auto storage_result = Storage::allocate(nbytes, CpuAllocator::instance());
+    IAllocator& alloc = (device == Device::CUDA) ? static_cast<IAllocator&>(CudaAllocator::instance())
+                                                 : static_cast<IAllocator&>(CpuAllocator::instance());
+    auto storage_result = Storage::allocate(nbytes, alloc);
     if (!storage_result)
         return std::unexpected(std::move(storage_result.error()));
 
@@ -191,14 +192,19 @@ auto Tensor::empty(Shape shape, DType dtype, Device device) -> Result<Tensor>
 
 auto Tensor::zeros(Shape shape, DType dtype, Device device) -> Result<Tensor>
 {
-    // 直接复用 empty 分配内存，再 memset 全零
+    // 直接复用 empty 分配内存，再按设备 memset 全零
     Tensor t;
     BEE_TRY_ASSIGN(t, empty(shape, dtype, device));
 
     const int64_t     n      = t.numel();
     const std::size_t nbytes = static_cast<std::size_t>(n) * dtype_size(dtype);
-    if (nbytes > 0)
-        std::memset(t.data_ptr(), 0, nbytes);
+    if (nbytes > 0) {
+        if (device == Device::CUDA) {
+            BEE_TRY(tensor::cuda::memset(t.data_ptr(), 0, nbytes));
+        } else {
+            std::memset(t.data_ptr(), 0, nbytes);
+        }
+    }
 
     return t;
 }
@@ -215,6 +221,13 @@ auto Tensor::ones(Shape shape, DType dtype, Device device) -> Result<Tensor>
 
 auto Tensor::full(Shape shape, DType dtype, double value, Device device) -> Result<Tensor>
 {
+    // CUDA 设备暂不支持直接 fill；先在 CPU 构造再搬运到目标设备
+    if (device == Device::CUDA) {
+        Tensor cpu_t;
+        BEE_TRY_ASSIGN(cpu_t, full(std::move(shape), dtype, value, Device::CPU));
+        return cpu_t.to(Device::CUDA);
+    }
+
     Tensor t;
     BEE_TRY_ASSIGN(t, empty(shape, dtype, device));
 
@@ -251,6 +264,13 @@ auto Tensor::arange(int64_t start, int64_t end, int64_t step, DType dtype, Devic
             n = (end - start + step - 1) / step;
         else
             n = (end - start + step + 1) / step;
+    }
+
+    // CUDA 设备暂不支持直接 fill；先在 CPU 构造再搬运到目标设备
+    if (device == Device::CUDA) {
+        Tensor cpu_t;
+        BEE_TRY_ASSIGN(cpu_t, arange(start, end, step, dtype, Device::CPU));
+        return cpu_t.to(Device::CUDA);
     }
 
     // 分配并填充
@@ -351,12 +371,30 @@ auto Tensor::clone() const -> Result<Tensor>
     if (!defined())
         return std::unexpected(make_error("不能克隆未定义的 Tensor", Severity::Recoverable));
 
-    if (device() == Device::CUDA)
-        return std::unexpected(make_error("CUDA clone 尚未实现", Severity::Recoverable));
-
     // 只分配一次新 storage，按需选择拷贝路径
     const std::size_t elem_sz = dtype_size(impl_->dtype);
     const std::size_t nbytes  = static_cast<std::size_t>(numel()) * elem_sz;
+
+    if (device() == Device::CUDA) {
+        // CUDA：非连续 clone 尚未实现（M3+ 会补 transpose/slice kernel）
+        if (!is_contiguous())
+            return std::unexpected(make_error("CUDA 非连续 clone 尚未实现", Severity::Recoverable));
+
+        auto storage_result = Storage::allocate(nbytes, impl_->storage->allocator());
+        if (!storage_result)
+            return std::unexpected(std::move(storage_result.error()));
+
+        if (nbytes > 0)
+            BEE_TRY(tensor::cuda::memcpy_d2d((*storage_result)->data(), data_ptr(), nbytes));
+
+        auto ti     = std::make_shared<TensorImpl>();
+        ti->storage = std::move(*storage_result);
+        ti->dtype   = impl_->dtype;
+        ti->shape   = impl_->shape;
+        ti->strides = compute_contiguous_strides(impl_->shape);
+        ti->offset  = 0;
+        return Tensor(std::move(ti));
+    }
 
     auto storage_result = Storage::allocate(nbytes, impl_->storage->allocator());
     if (!storage_result)
@@ -378,6 +416,45 @@ auto Tensor::clone() const -> Result<Tensor>
     ti->offset  = 0;
 
     return Tensor(std::move(ti));
+}
+
+// ── to ───────────────────────────────────────────────────────────────────────
+
+auto Tensor::to(Device target) const -> Result<Tensor>
+{
+    if (!defined())
+        return std::unexpected(make_error("不能在未定义 Tensor 上调用 to()", Severity::Recoverable));
+
+    // 同设备：返回浅拷贝（共享 storage，零拷贝）
+    if (device() == target)
+        return *this;
+
+    // 非连续源先 contiguous 化
+    Tensor src = *this;
+    if (!is_contiguous()) {
+        BEE_TRY_ASSIGN(src, contiguous());
+    }
+
+    Tensor dst;
+    BEE_TRY_ASSIGN(dst, empty(src.shape(), src.dtype(), target));
+
+    const std::size_t nbytes = static_cast<std::size_t>(src.numel()) * dtype_size(src.dtype());
+    if (nbytes > 0) {
+        const Device from = src.device();
+        const Device to   = target;
+        if (from == Device::CPU && to == Device::CUDA) {
+            BEE_TRY(tensor::cuda::memcpy_h2d(dst.data_ptr(), src.data_ptr(), nbytes));
+        } else if (from == Device::CUDA && to == Device::CPU) {
+            BEE_TRY(tensor::cuda::memcpy_d2h(dst.data_ptr(), src.data_ptr(), nbytes));
+        } else if (from == Device::CUDA && to == Device::CUDA) {
+            BEE_TRY(tensor::cuda::memcpy_d2d(dst.data_ptr(), src.data_ptr(), nbytes));
+        } else {
+            // CPU→CPU 在 device == target 时已处理；此处不可达
+            return std::unexpected(make_error("Tensor::to 遇到未支持的设备组合", Severity::Recoverable));
+        }
+    }
+
+    return dst;
 }
 
 // ── contiguous ───────────────────────────────────────────────────────────────

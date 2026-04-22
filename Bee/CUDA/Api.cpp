@@ -9,6 +9,11 @@
 
 #include "CUDA/Api.hpp"
 #include "CUDA/Runtime.hpp"
+#include "CUDA/Core/Check.hpp"
+#include "CUDA/Core/Stream.hpp"
+#include "CUDA/Mem/MemoryPool.hpp"
+
+#include <cuda_runtime.h>
 
 #include <format>
 
@@ -76,31 +81,78 @@ auto device_synchronize() -> Result<void>
     return {};
 }
 
-// ── 内存（M2 实装） ─────────────────────────────────────────────────────────
+// ── 内存通路（M2 实装） ─────────────────────────────────────────────────────
 
-auto allocate(std::size_t /*nbytes*/, std::size_t /*alignment*/) -> Result<void*>
+auto allocate(std::size_t nbytes, std::size_t /*alignment*/) -> Result<void*>
 {
-    return std::unexpected(make_error("bee::cuda::allocate 尚未实装（计划于 M2）", Severity::Recoverable));
+    if (nbytes == 0) return static_cast<void*>(nullptr);
+
+    int dev = 0;
+    BEE_CUDA_CHECK(cudaGetDevice(&dev));
+
+    MemoryPool* pool = nullptr;
+    BEE_TRY_ASSIGN(pool, MemoryPool::get_default(dev));
+
+    const auto stream = StreamView::per_thread();
+    void* ptr = nullptr;
+    BEE_TRY_ASSIGN(ptr, pool->allocate_async(nbytes, stream));
+    // 分配后同步：返回的指针立即可用（plan-cuda §5 同步 API 语义）。
+    BEE_CUDA_CHECK(cudaStreamSynchronize(stream.native_handle()));
+    return ptr;
 }
 
-void deallocate(void* /*ptr*/, std::size_t /*nbytes*/, std::size_t /*alignment*/) noexcept
+void deallocate(void* ptr, std::size_t /*nbytes*/, std::size_t /*alignment*/) noexcept
 {
-    // 尚未实装（M2）
+    if (!ptr) return;
+    int dev = 0;
+    if (cudaGetDevice(&dev) != cudaSuccess) {
+        (void)cudaGetLastError();
+        return;
+    }
+    auto pool_r = MemoryPool::get_default(dev);
+    if (!pool_r) return;
+    const auto stream = StreamView::per_thread();
+    pool_r.value()->deallocate_async(ptr, stream);
+    // 同步，确保 free 生效后再继续（与 allocate 的同步语义对称）。
+    (void)cudaStreamSynchronize(stream.native_handle());
 }
 
-auto memcpy_h2d(void* /*dst*/, const void* /*src*/, std::size_t /*nbytes*/) -> Result<void>
+namespace
 {
-    return std::unexpected(make_error("bee::cuda::memcpy_h2d 尚未实装（计划于 M2）", Severity::Recoverable));
+
+[[nodiscard]] auto sync_memcpy(void* dst, const void* src, std::size_t nbytes, cudaMemcpyKind kind) -> Result<void>
+{
+    if (nbytes == 0) return {};
+    const auto stream = StreamView::per_thread();
+    BEE_CUDA_CHECK(cudaMemcpyAsync(dst, src, nbytes, kind, stream.native_handle()));
+    BEE_CUDA_CHECK(cudaStreamSynchronize(stream.native_handle()));
+    return {};
 }
 
-auto memcpy_d2h(void* /*dst*/, const void* /*src*/, std::size_t /*nbytes*/) -> Result<void>
+} // namespace
+
+auto memcpy_h2d(void* dst, const void* src, std::size_t nbytes) -> Result<void>
 {
-    return std::unexpected(make_error("bee::cuda::memcpy_d2h 尚未实装（计划于 M2）", Severity::Recoverable));
+    return sync_memcpy(dst, src, nbytes, cudaMemcpyHostToDevice);
 }
 
-auto memcpy_d2d(void* /*dst*/, const void* /*src*/, std::size_t /*nbytes*/) -> Result<void>
+auto memcpy_d2h(void* dst, const void* src, std::size_t nbytes) -> Result<void>
 {
-    return std::unexpected(make_error("bee::cuda::memcpy_d2d 尚未实装（计划于 M2）", Severity::Recoverable));
+    return sync_memcpy(dst, src, nbytes, cudaMemcpyDeviceToHost);
+}
+
+auto memcpy_d2d(void* dst, const void* src, std::size_t nbytes) -> Result<void>
+{
+    return sync_memcpy(dst, src, nbytes, cudaMemcpyDeviceToDevice);
+}
+
+auto memset(void* ptr, int value, std::size_t nbytes) -> Result<void>
+{
+    if (nbytes == 0) return {};
+    const auto stream = StreamView::per_thread();
+    BEE_CUDA_CHECK(cudaMemsetAsync(ptr, value, nbytes, stream.native_handle()));
+    BEE_CUDA_CHECK(cudaStreamSynchronize(stream.native_handle()));
+    return {};
 }
 
 } // namespace bee::cuda

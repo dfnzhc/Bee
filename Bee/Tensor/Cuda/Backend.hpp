@@ -39,11 +39,10 @@ auto deallocate(void* p, std::size_t nbytes, std::size_t alignment) -> void;
 [[nodiscard]] auto memcpy_d2h(void* dst, const void* src, std::size_t nbytes) -> Result<void>;
 
 // 在设备内存中复制数据（设备到设备）。
-// @param dst: 设备目标指针
-// @param src: 设备源指针
-// @param nbytes: 要复制的字节数
-// @return 成功时返回 void；失败时返回 NotImplemented 错误
 [[nodiscard]] auto memcpy_d2d(void* dst, const void* src, std::size_t nbytes) -> Result<void>;
+
+// 把设备内存 ptr 的前 nbytes 个字节置为 value 的低 8 位。
+[[nodiscard]] auto memset(void* ptr, int value, std::size_t nbytes) -> Result<void>;
 
 // 同步 CUDA 设备，等待所有待处理操作完成。
 // @return 成功时返回 void；失败时返回 NotImplemented 错误

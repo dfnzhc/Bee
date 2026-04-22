@@ -57,13 +57,15 @@ TEST(TensorTests, Empty1D)
     EXPECT_EQ(t.strides(), expected_strides);
 }
 
-// ── CUDA 路径返回错误 ────────────────────────────────────────────────────────
+// ── CUDA 路径返回错误（仅在 CUDA 后端关闭时有效）──────────────────────────────
 
+#if !defined(BEE_TENSOR_WITH_CUDA)
 TEST(TensorTests, EmptyCudaReturnsError)
 {
     auto result = Tensor::empty({4}, DType::I64, Device::CUDA);
     EXPECT_FALSE(result.has_value());
 }
+#endif
 
 // ── 拷贝共享 impl ─────────────────────────────────────────────────────────────
 
