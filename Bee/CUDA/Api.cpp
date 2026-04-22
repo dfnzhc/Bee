@@ -16,6 +16,7 @@
 
 #include <cuda_runtime.h>
 
+#include <atomic>
 #include <format>
 
 namespace bee::cuda
@@ -221,6 +222,23 @@ auto matmul(ScalarType dt, const void* A, const void* B, void* C,
             std::size_t M, std::size_t K, std::size_t N) -> Result<void>
 {
     if (M == 0 || N == 0) return {};
+
+    // 按当前全局后端设置分派：L2/L3 未实装时直接返回 NotImplemented；
+    // Auto/Wmma 走现有 tile-shared baseline。
+    const auto backend = get_matmul_backend();
+    switch (backend) {
+    case MatmulBackend::Cutlass:
+        return std::unexpected(make_error(
+            "cuda::ops::matmul: Cutlass 后端尚未实装（M6）", Severity::Recoverable));
+    case MatmulBackend::Native:
+        return std::unexpected(make_error(
+            "cuda::ops::matmul: Native(TMA+tcgen05) 后端尚未实装（M7）", Severity::Recoverable));
+    case MatmulBackend::Auto:
+    case MatmulBackend::Wmma:
+    default:
+        break;
+    }
+
     const int err = detail::ops_matmul(static_cast<int>(dt), A, B, C, M, K, N);
     return wrap(err, "cuda::ops::matmul");
 }
@@ -231,6 +249,42 @@ auto transpose_2d(ScalarType dt, const void* src, void* dst,
     if (rows == 0 || cols == 0) return {};
     const int err = detail::ops_transpose_2d(static_cast<int>(dt), src, dst, rows, cols);
     return wrap(err, "cuda::ops::transpose_2d");
+}
+
+// ── Matmul 后端切换（M6/M7 脚手架） ─────────────────────────────────────────
+
+namespace
+{
+
+// std::atomic<uint8_t>：线程安全的全局后端设置。
+std::atomic<std::uint8_t>& matmul_backend_storage() noexcept
+{
+    static std::atomic<std::uint8_t> g_backend{static_cast<std::uint8_t>(MatmulBackend::Auto)};
+    return g_backend;
+}
+
+} // namespace
+
+auto set_matmul_backend(MatmulBackend backend) noexcept -> MatmulBackend
+{
+    const auto old = matmul_backend_storage().exchange(static_cast<std::uint8_t>(backend), std::memory_order_acq_rel);
+    return static_cast<MatmulBackend>(old);
+}
+
+auto get_matmul_backend() noexcept -> MatmulBackend
+{
+    return static_cast<MatmulBackend>(matmul_backend_storage().load(std::memory_order_acquire));
+}
+
+auto matmul_backend_available(MatmulBackend backend) noexcept -> bool
+{
+    switch (backend) {
+    case MatmulBackend::Auto: return true;  // 退化到 Wmma
+    case MatmulBackend::Wmma: return true;
+    case MatmulBackend::Cutlass: return false;  // L2 未实装
+    case MatmulBackend::Native:  return false;  // L3 未实装
+    }
+    return false;
 }
 
 } // namespace ops

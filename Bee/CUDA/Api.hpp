@@ -130,6 +130,34 @@ namespace ops
 [[nodiscard]] auto transpose_2d(ScalarType dt, const void* src, void* dst,
                                 std::size_t rows, std::size_t cols) -> Result<void>;
 
+// ── Matmul 后端切换（M6/M7 脚手架） ─────────────────────────────────────────
+//
+// L1 = Wmma（当前实装的 tile-shared baseline；覆盖 F32/F64/I32/I64）
+// L2 = Cutlass（CUTLASS 3.8+ Blackwell collective；FP16/BF16/FP8/FP4 优化路径）
+// L3 = Native（手写 TMA + tcgen05.mma；F16/BF16/FP8 主路径）
+//
+// Auto：运行期根据设备算力与 dtype 自动选择；当前由于 L2/L3 未实装，
+// Auto 等同 L1（Wmma）。
+//
+// L2/L3 当前 scaffolding 状态：set_matmul_backend(Cutlass/Native) 允许设置，
+// 但 matmul() 调用对应后端时返回 NotImplemented；Auto 分支保持可用。
+enum class MatmulBackend : uint8_t
+{
+    Auto    = 0,
+    Wmma    = 1,
+    Cutlass = 2,
+    Native  = 3,
+};
+
+// 设置全局默认 matmul 后端；返回旧值。线程安全（std::atomic）。
+auto set_matmul_backend(MatmulBackend backend) noexcept -> MatmulBackend;
+
+// 查询当前全局默认 matmul 后端。
+[[nodiscard]] auto get_matmul_backend() noexcept -> MatmulBackend;
+
+// 查询后端是否在当前构建中可用（L2/L3 目前始终返回 false）。
+[[nodiscard]] auto matmul_backend_available(MatmulBackend backend) noexcept -> bool;
+
 } // namespace ops
 
 } // namespace bee::cuda

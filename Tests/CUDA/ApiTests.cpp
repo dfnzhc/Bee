@@ -118,3 +118,70 @@ TEST(CUDAComponent, MemcpyD2DWorks)
     cuda::deallocate(*a, N * sizeof(float), 16);
     cuda::deallocate(*b, N * sizeof(float), 16);
 }
+
+// ── M6/M7 Matmul 后端切换脚手架 ─────────────────────────────────────────────
+
+TEST(CUDAMatmulBackend, DefaultIsAuto)
+{
+    // 初始/默认值应为 Auto。为避免依赖其它测试顺序，这里先保存再还原。
+    const auto prev = cuda::ops::get_matmul_backend();
+    cuda::ops::set_matmul_backend(cuda::ops::MatmulBackend::Auto);
+    EXPECT_EQ(cuda::ops::get_matmul_backend(), cuda::ops::MatmulBackend::Auto);
+    cuda::ops::set_matmul_backend(prev);
+}
+
+TEST(CUDAMatmulBackend, AvailabilityReflectsBuildStatus)
+{
+    EXPECT_TRUE (cuda::ops::matmul_backend_available(cuda::ops::MatmulBackend::Auto));
+    EXPECT_TRUE (cuda::ops::matmul_backend_available(cuda::ops::MatmulBackend::Wmma));
+    EXPECT_FALSE(cuda::ops::matmul_backend_available(cuda::ops::MatmulBackend::Cutlass));
+    EXPECT_FALSE(cuda::ops::matmul_backend_available(cuda::ops::MatmulBackend::Native));
+}
+
+TEST(CUDAMatmulBackend, SetReturnsPrevious)
+{
+    const auto prev = cuda::ops::set_matmul_backend(cuda::ops::MatmulBackend::Wmma);
+    (void)prev; // 不假定具体值
+    EXPECT_EQ(cuda::ops::get_matmul_backend(), cuda::ops::MatmulBackend::Wmma);
+
+    const auto was_wmma = cuda::ops::set_matmul_backend(cuda::ops::MatmulBackend::Auto);
+    EXPECT_EQ(was_wmma, cuda::ops::MatmulBackend::Wmma);
+    EXPECT_EQ(cuda::ops::get_matmul_backend(), cuda::ops::MatmulBackend::Auto);
+}
+
+TEST(CUDAMatmulBackend, CutlassReturnsNotImplemented)
+{
+    if (cuda::device_count() == 0) GTEST_SKIP() << "No CUDA device";
+    // 分配两小块设备内存，调用 matmul，预期在 Cutlass 后端下返回错误。
+    auto A = cuda::allocate(4 * 4 * sizeof(float), 16).value();
+    auto B = cuda::allocate(4 * 4 * sizeof(float), 16).value();
+    auto C = cuda::allocate(4 * 4 * sizeof(float), 16).value();
+
+    const auto prev = cuda::ops::set_matmul_backend(cuda::ops::MatmulBackend::Cutlass);
+    auto r = cuda::ops::matmul(cuda::ScalarType::F32, A, B, C, 4, 4, 4);
+    EXPECT_FALSE(r);
+    if (!r) EXPECT_NE(r.error().message.view().find("Cutlass"), std::string_view::npos);
+    cuda::ops::set_matmul_backend(prev);
+
+    cuda::deallocate(A, 4 * 4 * sizeof(float), 16);
+    cuda::deallocate(B, 4 * 4 * sizeof(float), 16);
+    cuda::deallocate(C, 4 * 4 * sizeof(float), 16);
+}
+
+TEST(CUDAMatmulBackend, NativeReturnsNotImplemented)
+{
+    if (cuda::device_count() == 0) GTEST_SKIP() << "No CUDA device";
+    auto A = cuda::allocate(4 * 4 * sizeof(float), 16).value();
+    auto B = cuda::allocate(4 * 4 * sizeof(float), 16).value();
+    auto C = cuda::allocate(4 * 4 * sizeof(float), 16).value();
+
+    const auto prev = cuda::ops::set_matmul_backend(cuda::ops::MatmulBackend::Native);
+    auto r = cuda::ops::matmul(cuda::ScalarType::F32, A, B, C, 4, 4, 4);
+    EXPECT_FALSE(r);
+    if (!r) EXPECT_NE(r.error().message.view().find("Native"), std::string_view::npos);
+    cuda::ops::set_matmul_backend(prev);
+
+    cuda::deallocate(A, 4 * 4 * sizeof(float), 16);
+    cuda::deallocate(B, 4 * 4 * sizeof(float), 16);
+    cuda::deallocate(C, 4 * 4 * sizeof(float), 16);
+}
