@@ -221,6 +221,11 @@ auto Tensor::ones(Shape shape, DType dtype, Device device) -> Result<Tensor>
 
 auto Tensor::full(Shape shape, DType dtype, double value, Device device) -> Result<Tensor>
 {
+    if (!dtype_is_cpu_computable(dtype))
+        return std::unexpected(make_error(
+            std::format("Tensor::full: 扩展 dtype::{} 暂不支持 CPU 端填充（NotImplemented）", dtype_name(dtype)),
+            Severity::Recoverable));
+
     // CUDA 设备暂不支持直接 fill；先在 CPU 构造再搬运到目标设备
     if (device == Device::CUDA) {
         Tensor cpu_t;
