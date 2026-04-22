@@ -58,4 +58,32 @@ static void BM_MaxF32(benchmark::State& state)
 }
 BENCHMARK(BM_MaxF32)->Apply(set_shape_args_1d);
 
+static void BM_SumF64(benchmark::State& state)
+{
+    const int64_t n = state.range(0);
+    auto a = make_filled_1d(n, DType::F64, 1.0);
+    for (auto _ : state) {
+        auto r = bee::sum(a);
+        benchmark::DoNotOptimize(r);
+        benchmark::ClobberMemory();
+    }
+    state.SetItemsProcessed(state.iterations() * n);
+    state.SetBytesProcessed(state.iterations() * n * sizeof(double));
+}
+BENCHMARK(BM_SumF64)->Apply(set_shape_args_1d);
+
+static void BM_SumI32(benchmark::State& state)
+{
+    const int64_t n = state.range(0);
+    auto a = make_filled_1d(n, DType::I32, 1.0);
+    for (auto _ : state) {
+        auto r = bee::sum(a);
+        benchmark::DoNotOptimize(r);
+        benchmark::ClobberMemory();
+    }
+    state.SetItemsProcessed(state.iterations() * n);
+    state.SetBytesProcessed(state.iterations() * n * sizeof(int32_t));
+}
+BENCHMARK(BM_SumI32)->Apply(set_shape_args_1d);
+
 } // namespace

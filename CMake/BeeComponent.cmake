@@ -115,7 +115,7 @@ function(bee_add_component_test)
     endif()
 
     add_executable(${BEE_TEST_TARGET} ${BEE_TEST_SOURCES})
-    set_target_properties(${BEE_TEST_TARGET} PROPERTIES FOLDER "tests")
+    set_target_properties(${BEE_TEST_TARGET} PROPERTIES FOLDER "Bee/Tests")
     bee_group_sources(
         TARGET ${BEE_TEST_TARGET}
         BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -168,7 +168,7 @@ function(bee_add_component_benchmark)
     endif()
 
     add_executable(${BEE_BENCH_TARGET} ${BEE_BENCH_SOURCES})
-    set_target_properties(${BEE_BENCH_TARGET} PROPERTIES FOLDER "benchmarks")
+    set_target_properties(${BEE_BENCH_TARGET} PROPERTIES FOLDER "Bee/Benchmarks")
     bee_group_sources(
         TARGET ${BEE_BENCH_TARGET}
         BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}"

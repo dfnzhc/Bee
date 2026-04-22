@@ -6,4 +6,7 @@ bee_add_component_benchmark(
         EWiseBench.cpp
         ReduceBench.cpp
         MatmulBench.cpp
+        CastBench.cpp
+        RandomBench.cpp
+        TransposeBench.cpp
 )

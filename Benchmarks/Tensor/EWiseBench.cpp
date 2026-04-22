@@ -61,4 +61,34 @@ static void BM_SqrtF32(benchmark::State& state)
 }
 BENCHMARK(BM_SqrtF32)->Apply(set_shape_args_1d);
 
+static void BM_AddF64(benchmark::State& state)
+{
+    const int64_t n = state.range(0);
+    auto a = make_filled_1d(n, DType::F64, 1.0);
+    auto b = make_filled_1d(n, DType::F64, 2.0);
+    for (auto _ : state) {
+        auto c = bee::add(a, b);
+        benchmark::DoNotOptimize(c);
+        benchmark::ClobberMemory();
+    }
+    state.SetItemsProcessed(state.iterations() * n);
+    state.SetBytesProcessed(state.iterations() * n * 3 * sizeof(double));
+}
+BENCHMARK(BM_AddF64)->Apply(set_shape_args_1d);
+
+static void BM_AddI32(benchmark::State& state)
+{
+    const int64_t n = state.range(0);
+    auto a = make_filled_1d(n, DType::I32, 1.0);
+    auto b = make_filled_1d(n, DType::I32, 2.0);
+    for (auto _ : state) {
+        auto c = bee::add(a, b);
+        benchmark::DoNotOptimize(c);
+        benchmark::ClobberMemory();
+    }
+    state.SetItemsProcessed(state.iterations() * n);
+    state.SetBytesProcessed(state.iterations() * n * 3 * sizeof(int32_t));
+}
+BENCHMARK(BM_AddI32)->Apply(set_shape_args_1d);
+
 } // namespace
