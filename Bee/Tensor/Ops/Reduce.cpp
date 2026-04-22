@@ -169,6 +169,9 @@ auto mean(const Tensor& a) -> Result<Tensor>
         if (!r)
             return std::unexpected(std::move(r.error()));
     }
+    if (a.numel() == 0) {
+        return std::unexpected(make_error("mean: 不支持空张量（numel == 0）", Severity::Recoverable));
+    }
     const DType out_dt = mean_out_dtype(a.dtype());
     auto        out    = Tensor::empty({}, out_dt);
     if (!out)
@@ -266,6 +269,10 @@ auto mean(const Tensor& a, int dim, bool keepdim) -> Result<Tensor>
     if (!dim_r)
         return std::unexpected(std::move(dim_r.error()));
     const int64_t d = *dim_r;
+    const int64_t K = a.shape()[static_cast<std::size_t>(d)];
+    if (K == 0) {
+        return std::unexpected(make_error("mean: 被 reduce 的维度大小为 0", Severity::Recoverable));
+    }
 
     const DType out_dt = mean_out_dtype(a.dtype());
     auto        out    = Tensor::empty(make_reduce_axis_shape(a.shape(), d, keepdim), out_dt);
@@ -275,13 +282,11 @@ auto mean(const Tensor& a, int dim, bool keepdim) -> Result<Tensor>
     if (a.dtype() == DType::F32) {
         // F32 → F32：累加后除以轴长
         cpu::cpu_reduce_axis_dispatch<float, cpu::OpReduceSum>(a, d, keepdim, *out);
-        const int64_t K = a.shape()[static_cast<std::size_t>(d)];
         auto*         p = static_cast<float*>(out->data_ptr());
         for (int64_t i = 0; i < out->numel(); ++i)
             p[i] /= static_cast<float>(K);
     } else if (a.dtype() == DType::F64) {
         cpu::cpu_reduce_axis_dispatch<double, cpu::OpReduceSum>(a, d, keepdim, *out);
-        const int64_t K = a.shape()[static_cast<std::size_t>(d)];
         auto*         p = static_cast<double*>(out->data_ptr());
         for (int64_t i = 0; i < out->numel(); ++i)
             p[i] /= static_cast<double>(K);

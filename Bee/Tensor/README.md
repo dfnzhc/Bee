@@ -39,7 +39,7 @@ cmake --build . --config Debug
 | `BEE_TENSOR_SIMD`           | `AUTO`   | SIMD 后端：`AUTO`（自动探测）/ `SCALAR` / `SSE2` / `AVX2` / `AVX512` |
 | `BEE_TENSOR_WITH_CUDA`      | `OFF`    | 打开后链接 CUDA 后端（当前为 stub，所有调用返回 `NotImplemented`） |
 
-> **注意**：当前 SIMD 实现仅包含 **Scalar** 与 **AVX2** 后端；指定 `SSE2` 或 `AVX512` 时会自动降级为 Scalar。
+> **注意**：当前 Tensor CPU 内核支持按已启用 ISA 进行运行期分派（`Scalar/SSE2/AVX2/AVX512`）。具体可用集合取决于构建期探测与本机 CPU 能力。
 
 ### 运行测试
 

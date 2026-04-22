@@ -1,5 +1,6 @@
 #include "Tensor/Core/Tensor.hpp"
 #include "Base/Memory/Allocator.hpp"
+#include "Base/Diagnostics/Check.hpp"
 #include "Tensor/Core/Storage.hpp"
 
 #include <algorithm>
@@ -271,63 +272,75 @@ auto Tensor::defined() const noexcept -> bool
 
 auto Tensor::ndim() const noexcept -> int64_t
 {
+    BEE_CHECK(impl_ != nullptr);
     return static_cast<int64_t>(impl_->shape.size());
 }
 
 auto Tensor::numel() const noexcept -> int64_t
 {
+    BEE_CHECK(impl_ != nullptr);
     return impl_->numel();
 }
 
 auto Tensor::shape() const noexcept -> const Shape&
 {
+    BEE_CHECK(impl_ != nullptr);
     return impl_->shape;
 }
 
 auto Tensor::strides() const noexcept -> const Strides&
 {
+    BEE_CHECK(impl_ != nullptr);
     return impl_->strides;
 }
 
 auto Tensor::dtype() const noexcept -> DType
 {
+    BEE_CHECK(impl_ != nullptr);
     return impl_->dtype;
 }
 
 auto Tensor::device() const noexcept -> Device
 {
+    BEE_CHECK(impl_ != nullptr);
     return impl_->storage->device();
 }
 
 auto Tensor::is_contiguous() const noexcept -> bool
 {
+    BEE_CHECK(impl_ != nullptr);
     return ::bee::is_contiguous(impl_->shape, impl_->strides);
 }
 
 auto Tensor::storage_offset() const noexcept -> int64_t
 {
+    BEE_CHECK(impl_ != nullptr);
     return impl_->offset;
 }
 
 auto Tensor::data_ptr() noexcept -> void*
 {
+    BEE_CHECK(impl_ != nullptr);
     auto* base = static_cast<uint8_t*>(impl_->storage->data());
     return base + impl_->offset * static_cast<int64_t>(dtype_size(impl_->dtype));
 }
 
 auto Tensor::data_ptr() const noexcept -> const void*
 {
+    BEE_CHECK(impl_ != nullptr);
     const auto* base = static_cast<const uint8_t*>(impl_->storage->data());
     return base + impl_->offset * static_cast<int64_t>(dtype_size(impl_->dtype));
 }
 
 auto Tensor::storage() const noexcept -> const std::shared_ptr<Storage>&
 {
+    BEE_CHECK(impl_ != nullptr);
     return impl_->storage;
 }
 
 auto Tensor::impl() const noexcept -> const std::shared_ptr<TensorImpl>&
 {
+    BEE_CHECK(impl_ != nullptr);
     return impl_;
 }
 

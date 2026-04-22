@@ -503,3 +503,17 @@ TEST(ReduceTests, AxisMinMaxEmptyDimErr)
     ASSERT_ERR(min(*a, 1));
     ASSERT_ERR(max(*a, 1));
 }
+
+TEST(ReduceTests, GlobalMeanEmptyErr)
+{
+    auto a = Tensor::empty({0}, DType::F32);
+    ASSERT_OK(a);
+    ASSERT_ERR(mean(*a));
+}
+
+TEST(ReduceTests, AxisMeanEmptyDimErr)
+{
+    auto a = Tensor::empty({2, 0, 3}, DType::F32);
+    ASSERT_OK(a);
+    ASSERT_ERR(mean(*a, 1));
+}

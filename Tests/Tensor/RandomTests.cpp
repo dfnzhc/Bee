@@ -3,6 +3,7 @@
 #include "Tensor/Tensor.hpp"
 
 #include <cmath>
+#include <limits>
 #include <numeric>
 
 using namespace bee;
@@ -116,5 +117,19 @@ TEST(RandomTests, Randint_U8_NegativeLow)
 TEST(RandomTests, Randint_InvalidDtype)
 {
     auto r = randint(0, 10, {5}, DType::F32);
+    EXPECT_FALSE(r.has_value());
+}
+
+TEST(RandomTests, Randint_I32_OutOfRange)
+{
+    auto r1 = randint(static_cast<int64_t>(std::numeric_limits<int32_t>::min()) - 1, 10, {4}, DType::I32, 1);
+    auto r2 = randint(0, static_cast<int64_t>(std::numeric_limits<int32_t>::max()) + 2, {4}, DType::I32, 1);
+    EXPECT_FALSE(r1.has_value());
+    EXPECT_FALSE(r2.has_value());
+}
+
+TEST(RandomTests, Randint_U8_HighTooLarge)
+{
+    auto r = randint(0, 300, {8}, DType::U8, 1);
     EXPECT_FALSE(r.has_value());
 }

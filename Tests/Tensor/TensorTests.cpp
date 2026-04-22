@@ -123,3 +123,15 @@ TEST(TensorTests, EmptyAllowsZeroDimension)
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result->numel(), 0);
 }
+
+TEST(TensorDeathTest, UndefinedTensorNdimCheckFails)
+{
+    Tensor t;
+    ASSERT_DEATH(static_cast<void>(t.ndim()), "impl_ != nullptr");
+}
+
+TEST(TensorDeathTest, UndefinedTensorDataPtrCheckFails)
+{
+    Tensor t;
+    ASSERT_DEATH(static_cast<void>(t.data_ptr()), "impl_ != nullptr");
+}

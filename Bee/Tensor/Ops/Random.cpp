@@ -3,6 +3,7 @@
 #include <format>
 #include <random>
 #include <cstdint>
+#include <limits>
 
 namespace bee
 {
@@ -96,6 +97,23 @@ auto randint(int64_t low, int64_t high, Shape shape, DType dtype, uint64_t seed,
     // U8 时要求 low >= 0
     if (dtype == DType::U8 && low < 0)
         return std::unexpected(make_error(std::format("randint: dtype=U8 时要求 low >= 0，但 low={}", low), Severity::Recoverable));
+
+    if (dtype == DType::I32) {
+        constexpr int64_t kI32Min = static_cast<int64_t>(std::numeric_limits<int32_t>::min());
+        constexpr int64_t kI32Max = static_cast<int64_t>(std::numeric_limits<int32_t>::max());
+        if (low < kI32Min || high > (kI32Max + 1)) {
+            return std::unexpected(make_error(
+                std::format("randint: I32 范围要求 [{} , {}]（high 为开区间上界）", kI32Min, kI32Max + 1),
+                Severity::Recoverable
+            ));
+        }
+    }
+
+    if (dtype == DType::U8) {
+        if (high > 256) {
+            return std::unexpected(make_error("randint: U8 范围要求 high <= 256（开区间上界）", Severity::Recoverable));
+        }
+    }
 
     auto out_r = Tensor::empty(shape, dtype, device);
     if (!out_r)
