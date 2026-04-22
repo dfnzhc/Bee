@@ -35,7 +35,11 @@ include(CheckCXXSourceRuns)
 if(MSVC)
     set(BEE_SIMD_AVX512_FLAGS "/arch:AVX512" CACHE STRING "AVX-512 编译标志" FORCE)
     set(BEE_SIMD_AVX2_FLAGS   "/arch:AVX2"   CACHE STRING "AVX2 编译标志" FORCE)
-    set(BEE_SIMD_SSE2_FLAGS   ""             CACHE STRING "SSE2 编译标志（MSVC x64 默认开启）" FORCE)
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+        set(BEE_SIMD_SSE2_FLAGS "" CACHE STRING "SSE2 编译标志（MSVC x64 默认开启）" FORCE)
+    else()
+        set(BEE_SIMD_SSE2_FLAGS "/arch:SSE2" CACHE STRING "SSE2 编译标志（MSVC x86 需显式开启）" FORCE)
+    endif()
 else()
     set(BEE_SIMD_AVX512_FLAGS "-mavx512f -mavx512bw" CACHE STRING "AVX-512F+BW 编译标志" FORCE)
     set(BEE_SIMD_AVX2_FLAGS   "-mavx2"               CACHE STRING "AVX2 编译标志" FORCE)
@@ -66,17 +70,37 @@ int main() { __m256 a = _mm256_set1_ps(1.0f); (void)a; return 0; }"
 )
 
 # 探测 SSE2+SSE4.1（SSE2 后端依赖 SSE4.1 的部分指令；运行时验证）
+# 说明：
+#   - GCC/Clang: 直接使用 SSE4.1 intrinsic，编译+运行双重校验。
+#   - MSVC: 某些环境对 smmintrin intrinsic 的可用性判定不稳定，因此改为：
+#       1) 通过 SSE2 intrinsic 验证可编译（x64 默认或 x86 /arch:SSE2）
+#       2) 运行期用 CPUID 检查 SSE4.1 位（ECX bit 19）
 set(CMAKE_REQUIRED_FLAGS "${_bee_simd_saved_flags} ${BEE_SIMD_SSE2_FLAGS}")
-check_cxx_source_runs(
-    "#include <smmintrin.h>
+if(MSVC)
+    check_cxx_source_runs(
+        "#include <intrin.h>
+#include <emmintrin.h>
+int main() {
+    __m128i a = _mm_set1_epi32(1);
+    (void)a;
+    int info[4] = {0, 0, 0, 0};
+    __cpuid(info, 1);
+    return (info[2] & (1 << 19)) ? 0 : 1;
+}"
+        BEE_SIMD_HAS_SSE2
+    )
+else()
+    check_cxx_source_runs(
+        "#include <smmintrin.h>
 int main() {
     __m128i a = _mm_set1_epi32(1);
     __m128i b = _mm_min_epi32(a, a);
     (void)b;
     return 0;
 }"
-    BEE_SIMD_HAS_SSE2
-)
+        BEE_SIMD_HAS_SSE2
+    )
+endif()
 
 set(CMAKE_REQUIRED_FLAGS "${_bee_simd_saved_flags}")
 
