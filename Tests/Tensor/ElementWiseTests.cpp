@@ -6,7 +6,7 @@
 
 using namespace bee;
 
-#define ASSERT_OK(expr) ASSERT_TRUE((expr).has_value())
+#define ASSERT_OK(expr)  ASSERT_TRUE((expr).has_value())
 #define ASSERT_ERR(expr) ASSERT_FALSE((expr).has_value())
 
 TEST(ElementWiseTests, AddF32Contiguous)
@@ -91,15 +91,21 @@ TEST(ElementWiseTests, BroadcastAdd2x3Plus3)
     ASSERT_OK(a);
     {
         auto* p = static_cast<int32_t*>(a->data_ptr());
-        p[0] = 1; p[1] = 2; p[2] = 3;
-        p[3] = 4; p[4] = 5; p[5] = 6;
+        p[0]    = 1;
+        p[1]    = 2;
+        p[2]    = 3;
+        p[3]    = 4;
+        p[4]    = 5;
+        p[5]    = 6;
     }
 
     auto b = Tensor::empty({3}, DType::I32);
     ASSERT_OK(b);
     {
         auto* p = static_cast<int32_t*>(b->data_ptr());
-        p[0] = 10; p[1] = 20; p[2] = 30;
+        p[0]    = 10;
+        p[1]    = 20;
+        p[2]    = 30;
     }
 
     auto c = add(*a, *b);
@@ -107,8 +113,12 @@ TEST(ElementWiseTests, BroadcastAdd2x3Plus3)
     EXPECT_EQ(c->shape(), (Shape{2, 3}));
 
     const auto* p = static_cast<const int32_t*>(c->data_ptr());
-    EXPECT_EQ(p[0], 11); EXPECT_EQ(p[1], 22); EXPECT_EQ(p[2], 33);
-    EXPECT_EQ(p[3], 14); EXPECT_EQ(p[4], 25); EXPECT_EQ(p[5], 36);
+    EXPECT_EQ(p[0], 11);
+    EXPECT_EQ(p[1], 22);
+    EXPECT_EQ(p[2], 33);
+    EXPECT_EQ(p[3], 14);
+    EXPECT_EQ(p[4], 25);
+    EXPECT_EQ(p[5], 36);
 }
 
 TEST(ElementWiseTests, BroadcastMul2x1Times1x3)
@@ -117,14 +127,17 @@ TEST(ElementWiseTests, BroadcastMul2x1Times1x3)
     ASSERT_OK(a);
     {
         auto* p = static_cast<int32_t*>(a->data_ptr());
-        p[0] = 2; p[1] = 3;
+        p[0]    = 2;
+        p[1]    = 3;
     }
 
     auto b = Tensor::empty({1, 3}, DType::I32);
     ASSERT_OK(b);
     {
         auto* p = static_cast<int32_t*>(b->data_ptr());
-        p[0] = 10; p[1] = 20; p[2] = 30;
+        p[0]    = 10;
+        p[1]    = 20;
+        p[2]    = 30;
     }
 
     auto c = mul(*a, *b);
@@ -132,8 +145,12 @@ TEST(ElementWiseTests, BroadcastMul2x1Times1x3)
     EXPECT_EQ(c->shape(), (Shape{2, 3}));
 
     const auto* p = static_cast<const int32_t*>(c->data_ptr());
-    EXPECT_EQ(p[0], 20); EXPECT_EQ(p[1], 40); EXPECT_EQ(p[2], 60);
-    EXPECT_EQ(p[3], 30); EXPECT_EQ(p[4], 60); EXPECT_EQ(p[5], 90);
+    EXPECT_EQ(p[0], 20);
+    EXPECT_EQ(p[1], 40);
+    EXPECT_EQ(p[2], 60);
+    EXPECT_EQ(p[3], 30);
+    EXPECT_EQ(p[4], 60);
+    EXPECT_EQ(p[5], 90);
 }
 
 TEST(ElementWiseTests, BroadcastIncompatible)
@@ -289,7 +306,7 @@ TEST(ElementWiseTests, ExpF32)
 TEST(ElementWiseTests, LogF32)
 {
     const float e_val = static_cast<float>(std::exp(1.0));
-    auto a = Tensor::full({100}, DType::F32, static_cast<double>(e_val));
+    auto        a     = Tensor::full({100}, DType::F32, static_cast<double>(e_val));
     ASSERT_OK(a);
 
     auto b = log(*a);
@@ -347,22 +364,33 @@ TEST(ElementWiseTests, AddInplaceBroadcast)
     ASSERT_OK(dst);
     {
         auto* p = static_cast<int32_t*>(dst->data_ptr());
-        p[0]=1; p[1]=2; p[2]=3; p[3]=4; p[4]=5; p[5]=6;
+        p[0]    = 1;
+        p[1]    = 2;
+        p[2]    = 3;
+        p[3]    = 4;
+        p[4]    = 5;
+        p[5]    = 6;
     }
 
     auto src = Tensor::empty({3}, DType::I32);
     ASSERT_OK(src);
     {
         auto* p = static_cast<int32_t*>(src->data_ptr());
-        p[0]=10; p[1]=20; p[2]=30;
+        p[0]    = 10;
+        p[1]    = 20;
+        p[2]    = 30;
     }
 
     auto r = add_inplace(*dst, *src);
     ASSERT_OK(r);
 
     const auto* p = static_cast<const int32_t*>(dst->data_ptr());
-    EXPECT_EQ(p[0], 11); EXPECT_EQ(p[1], 22); EXPECT_EQ(p[2], 33);
-    EXPECT_EQ(p[3], 14); EXPECT_EQ(p[4], 25); EXPECT_EQ(p[5], 36);
+    EXPECT_EQ(p[0], 11);
+    EXPECT_EQ(p[1], 22);
+    EXPECT_EQ(p[2], 33);
+    EXPECT_EQ(p[3], 14);
+    EXPECT_EQ(p[4], 25);
+    EXPECT_EQ(p[5], 36);
 }
 
 TEST(ElementWiseTests, AddInplaceNonContiguous)

@@ -19,7 +19,9 @@ using namespace bee;
 
 TEST(ThenTests, InlineThenIntToString)
 {
-    auto t = []() -> Task<int> { co_return 42; }();
+    auto t = []() -> Task<int> {
+        co_return 42;
+    }();
 
     auto t2 = t.then([](int v) { return std::to_string(v); });
 
@@ -30,8 +32,10 @@ TEST(ThenTests, InlineThenIntToString)
 
 TEST(ThenTests, InlineThenIntToVoid)
 {
-    int captured = 0;
-    auto t = []() -> Task<int> { co_return 7; }();
+    int  captured = 0;
+    auto t        = []() -> Task<int> {
+        co_return 7;
+    }();
 
     auto t2 = t.then([&captured](int v) { captured = v; });
     t2.get();
@@ -43,7 +47,9 @@ TEST(ThenTests, InlineThenIntToVoid)
 
 TEST(ThenTests, InlineThenVoidToInt)
 {
-    auto t = []() -> Task<void> { co_return; }();
+    auto t = []() -> Task<void> {
+        co_return;
+    }();
 
     auto t2 = t.then([] { return 99; });
 
@@ -55,7 +61,9 @@ TEST(ThenTests, InlineThenVoidToInt)
 TEST(ThenTests, InlineThenVoidToVoid)
 {
     bool called = false;
-    auto t = []() -> Task<void> { co_return; }();
+    auto t      = []() -> Task<void> {
+        co_return;
+    }();
 
     auto t2 = t.then([&called] { called = true; });
     t2.get();
@@ -67,11 +75,11 @@ TEST(ThenTests, InlineThenVoidToVoid)
 
 TEST(ThenTests, ChainedThen)
 {
-    auto t = []() -> Task<int> { co_return 1; }();
+    auto t = []() -> Task<int> {
+        co_return 1;
+    }();
 
-    auto t2 = t.then([](int v) { return v + 10; })
-                .then([](int v) { return v * 2; })
-                .then([](int v) { return std::to_string(v); });
+    auto t2 = t.then([](int v) { return v + 10; }).then([](int v) { return v * 2; }).then([](int v) { return std::to_string(v); });
 
     EXPECT_EQ(t2.get(), "22"); // (1 + 10) * 2 = 22
 }
@@ -92,7 +100,9 @@ TEST(ThenTests, ThenPropagatesExceptionFromPredecessor)
 
 TEST(ThenTests, ThenPropagatesExceptionFromContinuation)
 {
-    auto t = []() -> Task<int> { co_return 5; }();
+    auto t = []() -> Task<int> {
+        co_return 5;
+    }();
 
     auto t2 = t.then([](int) -> int { throw std::logic_error("cont fail"); });
 
@@ -104,13 +114,13 @@ TEST(ThenTests, ThenPropagatesExceptionFromContinuation)
 TEST(ThenTests, SchedulerThenRunsOnWorkerThread)
 {
     WorkPool pool(2);
-    auto main_tid = std::this_thread::get_id();
+    auto     main_tid = std::this_thread::get_id();
 
-    auto t = []() -> Task<int> { co_return 10; }();
+    auto t = []() -> Task<int> {
+        co_return 10;
+    }();
 
-    auto t2 = t.then(pool, [main_tid](int v) -> std::pair<int, bool> {
-        return {v * 3, std::this_thread::get_id() != main_tid};
-    });
+    auto t2 = t.then(pool, [main_tid](int v) -> std::pair<int, bool> { return {v * 3, std::this_thread::get_id() != main_tid}; });
 
     auto [result, on_worker] = t2.get();
     EXPECT_EQ(result, 30);
@@ -123,10 +133,12 @@ TEST(ThenTests, SchedulerThenRunsOnWorkerThread)
 
 TEST(ThenTests, SchedulerThenVoidToVoid)
 {
-    WorkPool pool(2);
+    WorkPool          pool(2);
     std::atomic<bool> ran{false};
 
-    auto t = []() -> Task<void> { co_return; }();
+    auto t = []() -> Task<void> {
+        co_return;
+    }();
 
     auto t2 = t.then(pool, [&ran] { ran.store(true, std::memory_order_release); });
     t2.get();
@@ -141,10 +153,11 @@ TEST(ThenTests, SchedulerChainedThen)
 {
     WorkPool pool(2);
 
-    auto t = []() -> Task<int> { co_return 5; }();
+    auto t = []() -> Task<int> {
+        co_return 5;
+    }();
 
-    auto t2 = t.then(pool, [](int v) { return v * 10; })
-                .then([](int v) { return v + 1; });
+    auto t2 = t.then(pool, [](int v) { return v * 10; }).then([](int v) { return v + 1; });
 
     EXPECT_EQ(t2.get(), 51); // 5 * 10 + 1
     pool.shutdown();

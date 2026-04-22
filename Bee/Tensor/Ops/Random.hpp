@@ -13,16 +13,14 @@ namespace bee
 {
 
 // 均匀分布 [0, 1)；dtype 仅支持 F32/F64，其他返回 Err
-[[nodiscard]] auto rand(Shape shape, DType dtype = DType::F32, uint64_t seed = 0,
-                        Device device = Device::CPU) -> Result<Tensor>;
+[[nodiscard]] auto rand(Shape shape, DType dtype = DType::F32, uint64_t seed = 0, Device device = Device::CPU) -> Result<Tensor>;
 
 // 标准正态分布 N(0, 1)；dtype 仅支持 F32/F64，其他返回 Err
-[[nodiscard]] auto randn(Shape shape, DType dtype = DType::F32, uint64_t seed = 0,
-                         Device device = Device::CPU) -> Result<Tensor>;
+[[nodiscard]] auto randn(Shape shape, DType dtype = DType::F32, uint64_t seed = 0, Device device = Device::CPU) -> Result<Tensor>;
 
 // 离散均匀分布 [low, high)；dtype 支持 I32/I64/U8（U8 要求 low >= 0）；
 // low >= high 或 dtype 不合法时返回 Err
-[[nodiscard]] auto randint(int64_t low, int64_t high, Shape shape, DType dtype = DType::I64,
-                           uint64_t seed = 0, Device device = Device::CPU) -> Result<Tensor>;
+[[nodiscard]] auto randint(int64_t low, int64_t high, Shape shape, DType dtype = DType::I64, uint64_t seed = 0, Device device = Device::CPU)
+    -> Result<Tensor>;
 
 } // namespace bee

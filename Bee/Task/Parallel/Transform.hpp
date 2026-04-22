@@ -71,7 +71,8 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
                 *out = fn(*in);
             }
         },
-        token);
+        token
+    );
 
     return std::next(d_first, static_cast<std::ptrdiff_t>(n));
 }

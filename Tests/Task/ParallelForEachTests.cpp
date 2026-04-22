@@ -23,14 +23,12 @@ using namespace bee;
 
 TEST(ParallelForEachTests, BasicIterator)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> data(10000);
     std::iota(data.begin(), data.end(), 0);
 
     std::atomic<int> sum{0};
-    parallel_for_each(pool, data.begin(), data.end(), [&sum](int v) {
-        sum.fetch_add(v, std::memory_order_relaxed);
-    });
+    parallel_for_each(pool, data.begin(), data.end(), [&sum](int v) { sum.fetch_add(v, std::memory_order_relaxed); });
 
     // sum(0..9999) = 9999 * 10000 / 2
     EXPECT_EQ(sum.load(), 9999 * 10000 / 2);
@@ -39,7 +37,7 @@ TEST(ParallelForEachTests, BasicIterator)
 TEST(ParallelForEachTests, SerialFallback)
 {
     // 低于阈值时退化为串行
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> data(100, 1);
 
     int sum = 0;
@@ -52,26 +50,29 @@ TEST(ParallelForEachTests, SerialFallback)
 
 TEST(ParallelForEachTests, EmptyRange)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> data;
-    bool called = false;
-    parallel_for_each(pool, data.begin(), data.end(), [&called](int) {
-        called = true;
-    });
+    bool             called = false;
+    parallel_for_each(pool, data.begin(), data.end(), [&called](int) { called = true; });
     EXPECT_FALSE(called);
 }
 
 TEST(ParallelForEachTests, ExceptionPropagation)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> data(10000, 0);
 
     EXPECT_THROW(
-        parallel_for_each(pool, data.begin(), data.end(), [](int& v) {
-            if (&v - &*(&v) == 0) { // 总是执行
-                throw std::runtime_error("test");
+        parallel_for_each(
+            pool,
+            data.begin(),
+            data.end(),
+            [](int& v) {
+                if (&v - &*(&v) == 0) { // 总是执行
+                    throw std::runtime_error("test");
+                }
             }
-        }),
+        ),
         std::runtime_error
     );
 }
@@ -82,15 +83,12 @@ TEST(ParallelForEachTests, ExceptionPropagation)
 
 TEST(ParallelForEachTests, CancellationStopsWork)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> data(10000, 0);
     std::stop_source ss;
     ss.request_stop();
 
-    EXPECT_THROW(
-        parallel_for_each(pool, data.begin(), data.end(), [](int&) {}, ss.get_token()),
-        std::runtime_error
-    );
+    EXPECT_THROW(parallel_for_each(pool, data.begin(), data.end(), [](int&) {}, ss.get_token()), std::runtime_error);
 }
 
 // =========================================================================
@@ -99,38 +97,31 @@ TEST(ParallelForEachTests, CancellationStopsWork)
 
 TEST(ParallelForEachTests, RangesBasic)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> data(10000);
     std::iota(data.begin(), data.end(), 0);
 
     std::atomic<int> sum{0};
-    parallel_for_each(pool, data, [&sum](int v) {
-        sum.fetch_add(v, std::memory_order_relaxed);
-    });
+    parallel_for_each(pool, data, [&sum](int v) { sum.fetch_add(v, std::memory_order_relaxed); });
 
     EXPECT_EQ(sum.load(), 9999 * 10000 / 2);
 }
 
 TEST(ParallelForEachTests, RangesEmpty)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> data;
-    bool called = false;
-    parallel_for_each(pool, data, [&called](int) {
-        called = true;
-    });
+    bool             called = false;
+    parallel_for_each(pool, data, [&called](int) { called = true; });
     EXPECT_FALSE(called);
 }
 
 TEST(ParallelForEachTests, RangesCancellation)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> data(10000, 0);
     std::stop_source ss;
     ss.request_stop();
 
-    EXPECT_THROW(
-        parallel_for_each(pool, data, [](int&) {}, ss.get_token()),
-        std::runtime_error
-    );
+    EXPECT_THROW(parallel_for_each(pool, data, [](int&) {}, ss.get_token()), std::runtime_error);
 }

@@ -111,8 +111,7 @@ private:
         try {
             co_await scheduler.schedule();
             co_await std::move(task);
-        }
-        catch (...) {
+        } catch (...) {
             std::lock_guard lock(ex_mutex_);
             if (!first_ex_) {
                 first_ex_ = std::current_exception();
@@ -132,7 +131,7 @@ private:
     auto check_exception() -> void
     {
         if (first_ex_) {
-            auto ex  = first_ex_;
+            auto ex   = first_ex_;
             first_ex_ = nullptr;
             std::rethrow_exception(ex);
         }

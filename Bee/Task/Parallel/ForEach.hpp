@@ -66,7 +66,8 @@ auto parallel_for_each(S& scheduler, It first, It last, Fn fn, std::stop_token t
                 fn(*it);
             }
         },
-        token);
+        token
+    );
 }
 
 // =========================================================================

@@ -52,16 +52,14 @@ namespace detail
         std::optional<WhenAnyResult<T>> winner;
         std::exception_ptr              winner_ex;
 
-        explicit WhenAnyControl(std::size_t n) : remaining(n + 1)
+        explicit WhenAnyControl(std::size_t n)
+            : remaining(n + 1)
         {
         }
     };
 
     template <typename T>
-    auto when_any_wrapper(
-        std::shared_ptr<WhenAnyControl<T>> ctrl,
-        std::size_t index,
-        Task<T> task) -> DetachedTask
+    auto when_any_wrapper(std::shared_ptr<WhenAnyControl<T>> ctrl, std::size_t index, Task<T> task) -> DetachedTask
     {
         static_assert(!std::is_void_v<T>, "when_any 暂不支持 void 类型");
 
@@ -70,8 +68,7 @@ namespace detail
 
         try {
             result_val.emplace(co_await std::move(task));
-        }
-        catch (...) {
+        } catch (...) {
             ex = std::current_exception();
         }
 
@@ -80,8 +77,7 @@ namespace detail
         if (ctrl->claimed.compare_exchange_strong(expected, true, std::memory_order_acq_rel)) {
             if (ex) {
                 ctrl->winner_ex = ex;
-            }
-            else {
+            } else {
                 ctrl->winner.emplace(WhenAnyResult<T>{index, std::move(*result_val)});
             }
         }

@@ -127,14 +127,22 @@ public:
     {
         WorkPool* pool;
 
-        [[nodiscard]] auto await_ready() const noexcept -> bool { return false; }
+        [[nodiscard]] auto await_ready() const noexcept -> bool
+        {
+            return false;
+        }
         auto await_suspend(std::coroutine_handle<> h) -> void;
-        auto await_resume() const noexcept -> void {}
+        auto await_resume() const noexcept -> void
+        {
+        }
     };
 
     /// 返回一个 awaiter，co_await 后将执行转移到工作线程。
     /// 这是 P2300 schedule(scheduler) 的协程等价物。
-    auto schedule() -> ScheduleAwaiter { return ScheduleAwaiter{this}; }
+    auto schedule() -> ScheduleAwaiter
+    {
+        return ScheduleAwaiter{this};
+    }
 
     // ── 查询 ──
 

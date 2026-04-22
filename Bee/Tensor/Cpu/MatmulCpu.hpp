@@ -15,28 +15,37 @@ namespace bee::cpu
 // SIMD 可用性 trait：标记哪些 (类型, ISA) 组合支持 matmul SIMD 内层
 // ─────────────────────────────────────────────────────────────────────────────
 
-template <typename T, typename ISA> inline constexpr bool kSimdMatmul = false;
+template <typename T, typename ISA>
+inline constexpr bool kSimdMatmul = false;
 
 // IsaScalar 对 float/double 均可用（退化为标量宽度 1，与下方统一路径兼容）
-template <> inline constexpr bool kSimdMatmul<float,  simd::IsaScalar> = true;
-template <> inline constexpr bool kSimdMatmul<double, simd::IsaScalar> = true;
+template <>
+inline constexpr bool kSimdMatmul<float, simd::IsaScalar> = true;
+template <>
+inline constexpr bool kSimdMatmul<double, simd::IsaScalar> = true;
 
 #ifdef BEE_SIMD_ENABLE_AVX2
 // AVX2 仅为 float/double 提供 SIMD；整数类型走标量路径
-template <> inline constexpr bool kSimdMatmul<float,  simd::IsaAvx2> = true;
-template <> inline constexpr bool kSimdMatmul<double, simd::IsaAvx2> = true;
+template <>
+inline constexpr bool kSimdMatmul<float, simd::IsaAvx2> = true;
+template <>
+inline constexpr bool kSimdMatmul<double, simd::IsaAvx2> = true;
 #endif
 
 #ifdef BEE_SIMD_ENABLE_SSE2
 // SSE2 仅为 float/double 提供 SIMD matmul
-template <> inline constexpr bool kSimdMatmul<float,  simd::IsaSse2> = true;
-template <> inline constexpr bool kSimdMatmul<double, simd::IsaSse2> = true;
+template <>
+inline constexpr bool kSimdMatmul<float, simd::IsaSse2> = true;
+template <>
+inline constexpr bool kSimdMatmul<double, simd::IsaSse2> = true;
 #endif
 
 #ifdef BEE_SIMD_ENABLE_AVX512
 // AVX-512 为 float/double/int32 提供 SIMD matmul（int32 有 mullo）
-template <> inline constexpr bool kSimdMatmul<float,  simd::IsaAvx512> = true;
-template <> inline constexpr bool kSimdMatmul<double, simd::IsaAvx512> = true;
+template <>
+inline constexpr bool kSimdMatmul<float, simd::IsaAvx512> = true;
+template <>
+inline constexpr bool kSimdMatmul<double, simd::IsaAvx512> = true;
 #endif
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -45,22 +54,18 @@ template <> inline constexpr bool kSimdMatmul<double, simd::IsaAvx512> = true;
 // ─────────────────────────────────────────────────────────────────────────────
 
 template <typename T, typename ISA>
-auto cpu_matmul_kernel(
-    int64_t M, int64_t K, int64_t N,
-    const T* A,
-    const T* B,
-    T*       C) -> void
+auto cpu_matmul_kernel(int64_t M, int64_t K, int64_t N, const T* A, const T* B, T* C) -> void
 {
     // F32/F64 走 SIMD 内层（宽度 >= 1，自动涵盖 Scalar 降级）
     if constexpr (kSimdMatmul<T, ISA>) {
-        using SB = simd::SimdBackend<T, ISA>;
+        using SB         = simd::SimdBackend<T, ISA>;
         constexpr auto W = static_cast<int64_t>(SB::width);
 
         for (int64_t i = 0; i < M; ++i) {
             for (int64_t k = 0; k < K; ++k) {
                 // 广播 a[i,k] 到 SIMD 寄存器
-                auto va = SB::set1(A[i * K + k]);
-                int64_t j = 0;
+                auto    va = SB::set1(A[i * K + k]);
+                int64_t j  = 0;
                 // 向量化处理宽度对齐的部分
                 for (; j + W <= N; j += W) {
                     auto vb = SB::loadu(B + k * N + j);
@@ -74,8 +79,7 @@ auto cpu_matmul_kernel(
                     C[i * N + j] += A[i * K + k] * B[k * N + j];
             }
         }
-    }
-    else {
+    } else {
         // I32/I64：纯标量三重循环
         for (int64_t i = 0; i < M; ++i) {
             for (int64_t k = 0; k < K; ++k) {

@@ -26,12 +26,12 @@ using namespace bee;
 
 TEST(ParallelVerificationTests, ForEachUsesMultipleThreads)
 {
-    WorkPool pool(4);
+    WorkPool              pool(4);
     constexpr std::size_t N = 40000;
-    std::vector<int> data(N, 1);
+    std::vector<int>      data(N, 1);
 
     std::set<std::thread::id> ids;
-    std::mutex mtx;
+    std::mutex                mtx;
 
     parallel_for_each(pool, data.begin(), data.end(), [&](int&) {
         std::lock_guard lk(mtx);
@@ -43,13 +43,13 @@ TEST(ParallelVerificationTests, ForEachUsesMultipleThreads)
 
 TEST(ParallelVerificationTests, TransformUsesMultipleThreads)
 {
-    WorkPool pool(4);
+    WorkPool              pool(4);
     constexpr std::size_t N = 40000;
-    std::vector<int> input(N, 1);
-    std::vector<int> output(N);
+    std::vector<int>      input(N, 1);
+    std::vector<int>      output(N);
 
     std::set<std::thread::id> ids;
-    std::mutex mtx;
+    std::mutex                mtx;
 
     (void)parallel_transform(pool, input.begin(), input.end(), output.begin(), [&](int v) {
         std::lock_guard lk(mtx);
@@ -62,22 +62,21 @@ TEST(ParallelVerificationTests, TransformUsesMultipleThreads)
 
 TEST(ParallelVerificationTests, ReduceUsesMultipleThreads)
 {
-    WorkPool pool(4);
+    WorkPool              pool(4);
     constexpr std::size_t N = 40000;
-    std::vector<int> data(N, 1);
+    std::vector<int>      data(N, 1);
 
-    std::atomic<int> thread_count{0};
+    std::atomic<int>          thread_count{0};
     std::set<std::thread::id> ids;
-    std::mutex mtx;
+    std::mutex                mtx;
 
-    auto result = parallel_reduce(pool, data.begin(), data.end(), 0,
-        [&](int a, int b) {
-            {
-                std::lock_guard lk(mtx);
-                ids.insert(std::this_thread::get_id());
-            }
-            return a + b;
-        });
+    auto result = parallel_reduce(pool, data.begin(), data.end(), 0, [&](int a, int b) {
+        {
+            std::lock_guard lk(mtx);
+            ids.insert(std::this_thread::get_id());
+        }
+        return a + b;
+    });
 
     EXPECT_EQ(result, static_cast<int>(N));
     EXPECT_GE(ids.size(), 2u) << "parallel_reduce should use at least 2 threads for large input";
@@ -85,9 +84,9 @@ TEST(ParallelVerificationTests, ReduceUsesMultipleThreads)
 
 TEST(ParallelVerificationTests, SortUsesMultipleThreads)
 {
-    WorkPool pool(4);
+    WorkPool              pool(4);
     constexpr std::size_t N = 40000;
-    std::vector<int> data(N);
+    std::vector<int>      data(N);
     // 逆序数据以确保有足够排序工作
     std::iota(data.rbegin(), data.rend(), 0);
 
@@ -103,21 +102,25 @@ TEST(ParallelVerificationTests, SortUsesMultipleThreads)
 
 TEST(ParallelVerificationTests, ForEachInFlightCancellation)
 {
-    WorkPool pool(4);
-    constexpr std::size_t N = 100000;
-    std::vector<int> data(N, 0);
-    std::stop_source ss;
+    WorkPool                 pool(4);
+    constexpr std::size_t    N = 100000;
+    std::vector<int>         data(N, 0);
+    std::stop_source         ss;
     std::atomic<std::size_t> processed{0};
 
     // 在处理过程中触发取消
     EXPECT_THROW(
-        parallel_for_each(pool, data.begin(), data.end(),
+        parallel_for_each(
+            pool,
+            data.begin(),
+            data.end(),
             [&](int&) {
                 auto count = processed.fetch_add(1, std::memory_order_relaxed);
                 if (count == N / 4)
                     ss.request_stop();
             },
-            ss.get_token()),
+            ss.get_token()
+        ),
         std::runtime_error
     );
 
@@ -127,22 +130,27 @@ TEST(ParallelVerificationTests, ForEachInFlightCancellation)
 
 TEST(ParallelVerificationTests, TransformInFlightCancellation)
 {
-    WorkPool pool(4);
-    constexpr std::size_t N = 100000;
-    std::vector<int> input(N, 1);
-    std::vector<int> output(N, 0);
-    std::stop_source ss;
+    WorkPool                 pool(4);
+    constexpr std::size_t    N = 100000;
+    std::vector<int>         input(N, 1);
+    std::vector<int>         output(N, 0);
+    std::stop_source         ss;
     std::atomic<std::size_t> processed{0};
 
     EXPECT_THROW(
-        (void)parallel_transform(pool, input.begin(), input.end(), output.begin(),
+        (void)parallel_transform(
+            pool,
+            input.begin(),
+            input.end(),
+            output.begin(),
             [&](int v) {
                 auto count = processed.fetch_add(1, std::memory_order_relaxed);
                 if (count == N / 4)
                     ss.request_stop();
                 return v;
             },
-            ss.get_token()),
+            ss.get_token()
+        ),
         std::runtime_error
     );
 
@@ -151,21 +159,26 @@ TEST(ParallelVerificationTests, TransformInFlightCancellation)
 
 TEST(ParallelVerificationTests, ReduceInFlightCancellation)
 {
-    WorkPool pool(4);
-    constexpr std::size_t N = 100000;
-    std::vector<int> data(N, 1);
-    std::stop_source ss;
+    WorkPool                 pool(4);
+    constexpr std::size_t    N = 100000;
+    std::vector<int>         data(N, 1);
+    std::stop_source         ss;
     std::atomic<std::size_t> processed{0};
 
     EXPECT_THROW(
-        (void)parallel_reduce(pool, data.begin(), data.end(), 0,
+        (void)parallel_reduce(
+            pool,
+            data.begin(),
+            data.end(),
+            0,
             [&](int a, int b) {
                 auto count = processed.fetch_add(1, std::memory_order_relaxed);
                 if (count == N / 4)
                     ss.request_stop();
                 return a + b;
             },
-            ss.get_token()),
+            ss.get_token()
+        ),
         std::runtime_error
     );
 
@@ -174,44 +187,53 @@ TEST(ParallelVerificationTests, ReduceInFlightCancellation)
 
 TEST(ParallelVerificationTests, SortInFlightCancellation)
 {
-    WorkPool pool(4);
+    WorkPool              pool(4);
     constexpr std::size_t N = 100000;
-    std::vector<int> data(N);
+    std::vector<int>      data(N);
     std::iota(data.rbegin(), data.rend(), 0);
-    std::stop_source ss;
+    std::stop_source         ss;
     std::atomic<std::size_t> compared{0};
 
     EXPECT_THROW(
-        parallel_sort(pool, data.begin(), data.end(),
+        parallel_sort(
+            pool,
+            data.begin(),
+            data.end(),
             [&](int a, int b) {
                 auto count = compared.fetch_add(1, std::memory_order_relaxed);
                 if (count == N)
                     ss.request_stop();
                 return a < b;
             },
-            ss.get_token()),
+            ss.get_token()
+        ),
         std::runtime_error
     );
 }
 
 TEST(ParallelVerificationTests, ScanInFlightCancellation)
 {
-    WorkPool pool(4);
-    constexpr std::size_t N = 100000;
-    std::vector<int> input(N, 1);
-    std::vector<int> output(N, 0);
-    std::stop_source ss;
+    WorkPool                 pool(4);
+    constexpr std::size_t    N = 100000;
+    std::vector<int>         input(N, 1);
+    std::vector<int>         output(N, 0);
+    std::stop_source         ss;
     std::atomic<std::size_t> processed{0};
 
     EXPECT_THROW(
-        (void)parallel_inclusive_scan(pool, input.begin(), input.end(), output.begin(),
+        (void)parallel_inclusive_scan(
+            pool,
+            input.begin(),
+            input.end(),
+            output.begin(),
             [&](int a, int b) {
                 auto count = processed.fetch_add(1, std::memory_order_relaxed);
                 if (count == N / 4)
                     ss.request_stop();
                 return a + b;
             },
-            ss.get_token()),
+            ss.get_token()
+        ),
         std::runtime_error
     );
 }

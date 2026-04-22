@@ -16,10 +16,8 @@ public:
     // 线程安全单例（Meyer 模式）
     [[nodiscard]] static auto instance() noexcept -> CudaAllocator&;
 
-    [[nodiscard]] auto allocate(std::size_t nbytes, std::size_t alignment)
-        -> Result<void*> override;
-    auto deallocate(void* p, std::size_t nbytes, std::size_t alignment) noexcept
-        -> void override;
+    [[nodiscard]] auto allocate(std::size_t nbytes, std::size_t alignment) -> Result<void*> override;
+    auto               deallocate(void* p, std::size_t nbytes, std::size_t alignment) noexcept -> void override;
 
     [[nodiscard]] auto device() const noexcept -> Device override;
 
@@ -35,15 +33,13 @@ inline auto CudaAllocator::instance() noexcept -> CudaAllocator&
     return inst;
 }
 
-inline auto CudaAllocator::allocate(std::size_t nbytes, std::size_t alignment)
-    -> Result<void*>
+inline auto CudaAllocator::allocate(std::size_t nbytes, std::size_t alignment) -> Result<void*>
 {
     // 转发至 CUDA 后端接口（当前返回 NotImplemented）
     return tensor::cuda::allocate(nbytes, alignment);
 }
 
-inline auto CudaAllocator::deallocate(void* p, std::size_t nbytes, std::size_t alignment) noexcept
-    -> void
+inline auto CudaAllocator::deallocate(void* p, std::size_t nbytes, std::size_t alignment) noexcept -> void
 {
     // 转发至 CUDA 后端接口（当前为 noop）
     tensor::cuda::deallocate(p, nbytes, alignment);

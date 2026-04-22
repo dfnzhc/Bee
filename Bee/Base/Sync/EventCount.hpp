@@ -64,7 +64,10 @@ public:
 
     private:
         friend class EventCount;
-        explicit Key(std::uint64_t epoch) noexcept : epoch_(epoch) {}
+        explicit Key(std::uint64_t epoch) noexcept
+            : epoch_(epoch)
+        {
+        }
         std::uint64_t epoch_{0};
     };
 

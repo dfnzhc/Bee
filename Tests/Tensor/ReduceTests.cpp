@@ -130,7 +130,10 @@ TEST(ReduceTests, GlobalMinI32)
     auto a = Tensor::empty({4}, DType::I32);
     ASSERT_OK(a);
     auto* p = static_cast<int32_t*>(a->data_ptr());
-    p[0] = 1; p[1] = 2; p[2] = 3; p[3] = 4;
+    p[0]    = 1;
+    p[1]    = 2;
+    p[2]    = 3;
+    p[3]    = 4;
 
     auto r = min(*a);
     ASSERT_OK(r);
@@ -143,7 +146,10 @@ TEST(ReduceTests, GlobalMaxI32)
     auto a = Tensor::empty({4}, DType::I32);
     ASSERT_OK(a);
     auto* p = static_cast<int32_t*>(a->data_ptr());
-    p[0] = 1; p[1] = 2; p[2] = 3; p[3] = 4;
+    p[0]    = 1;
+    p[1]    = 2;
+    p[2]    = 3;
+    p[3]    = 4;
 
     auto r = max(*a);
     ASSERT_OK(r);
@@ -155,7 +161,7 @@ TEST(ReduceTests, GlobalMinF32)
     auto a = Tensor::full({8}, DType::F32, -3.0);
     ASSERT_OK(a);
     auto* p = static_cast<float*>(a->data_ptr());
-    p[4] = -10.0f; // 插入最小值
+    p[4]    = -10.0f; // 插入最小值
 
     auto r = min(*a);
     ASSERT_OK(r);
@@ -167,7 +173,7 @@ TEST(ReduceTests, GlobalMaxF32)
     auto a = Tensor::full({8}, DType::F32, 1.0);
     ASSERT_OK(a);
     auto* p = static_cast<float*>(a->data_ptr());
-    p[7] = 99.0f;
+    p[7]    = 99.0f;
 
     auto r = max(*a);
     ASSERT_OK(r);
@@ -180,7 +186,10 @@ TEST(ReduceTests, GlobalMinU8)
     auto a = Tensor::empty({4}, DType::U8);
     ASSERT_OK(a);
     auto* p = static_cast<uint8_t*>(a->data_ptr());
-    p[0] = 10; p[1] = 3; p[2] = 7; p[3] = 200;
+    p[0]    = 10;
+    p[1]    = 3;
+    p[2]    = 7;
+    p[3]    = 200;
 
     auto rmin = min(*a);
     ASSERT_OK(rmin);
@@ -457,7 +466,12 @@ TEST(ReduceTests, AxisSumNonContiguous)
     ASSERT_OK(a);
     auto* p = static_cast<float*>(a->data_ptr());
     // 行0: [1,2,3], 行1: [4,5,6]
-    p[0]=1; p[1]=2; p[2]=3; p[3]=4; p[4]=5; p[5]=6;
+    p[0] = 1;
+    p[1] = 2;
+    p[2] = 3;
+    p[3] = 4;
+    p[4] = 5;
+    p[5] = 6;
 
     // 转置后 shape {3,2}，非连续
     auto t = a->transpose(0, 1);

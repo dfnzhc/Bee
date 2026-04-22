@@ -76,8 +76,7 @@ TEST(WhenAnyTests, WinnerExceptionPropagated)
         auto result = combined.get();
         // 如果正常任务先完成，结果应该有效
         EXPECT_EQ(result.value, 1);
-    }
-    catch (const std::runtime_error& e) {
+    } catch (const std::runtime_error& e) {
         // 如果异常任务先完成
         EXPECT_STREQ(e.what(), "any fail");
     }
@@ -104,7 +103,7 @@ TEST(WhenAnyTests, AllTasksFail)
 
 TEST(WhenAnyTests, LargeRace)
 {
-    WorkPool pool(8);
+    WorkPool      pool(8);
     constexpr int N = 100;
 
     std::vector<Task<int>> tasks;
@@ -128,7 +127,9 @@ TEST(WhenAnyTests, SynchronousTasksRace)
     // 纯同步协程——不需要 WorkPool
     std::vector<Task<int>> tasks;
     for (int i = 0; i < 5; ++i) {
-        auto t = [](int v) -> Task<int> { co_return v; }(i * 10);
+        auto t = [](int v) -> Task<int> {
+            co_return v;
+        }(i * 10);
         tasks.push_back(std::move(t));
     }
 

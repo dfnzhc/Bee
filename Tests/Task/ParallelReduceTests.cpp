@@ -24,7 +24,7 @@ using namespace bee;
 
 TEST(ParallelReduceTests, SumIterator)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> data(10000);
     std::iota(data.begin(), data.end(), 1);
 
@@ -36,7 +36,7 @@ TEST(ParallelReduceTests, SumIterator)
 
 TEST(ParallelReduceTests, ProductSmall)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> data = {1, 2, 3, 4, 5};
 
     auto result = parallel_reduce(pool, data.begin(), data.end(), 1, std::multiplies<>{});
@@ -46,7 +46,7 @@ TEST(ParallelReduceTests, ProductSmall)
 
 TEST(ParallelReduceTests, EmptyRange)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> data;
 
     auto result = parallel_reduce(pool, data.begin(), data.end(), 42, std::plus<>{});
@@ -56,7 +56,7 @@ TEST(ParallelReduceTests, EmptyRange)
 
 TEST(ParallelReduceTests, SerialFallback)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> data(100);
     std::iota(data.begin(), data.end(), 1);
 
@@ -67,27 +67,22 @@ TEST(ParallelReduceTests, SerialFallback)
 
 TEST(ParallelReduceTests, ExceptionPropagation)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> data(10000, 0);
 
     EXPECT_THROW(
-        (void)parallel_reduce(pool, data.begin(), data.end(), 0,
-            [](int, int) -> int { throw std::runtime_error("test"); }),
-        std::runtime_error
+        (void)parallel_reduce(pool, data.begin(), data.end(), 0, [](int, int) -> int { throw std::runtime_error("test"); }), std::runtime_error
     );
 }
 
 TEST(ParallelReduceTests, Cancellation)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> data(10000, 1);
     std::stop_source ss;
     ss.request_stop();
 
-    EXPECT_THROW(
-        (void)parallel_reduce(pool, data.begin(), data.end(), 0, std::plus<>{}, ss.get_token()),
-        std::runtime_error
-    );
+    EXPECT_THROW((void)parallel_reduce(pool, data.begin(), data.end(), 0, std::plus<>{}, ss.get_token()), std::runtime_error);
 }
 
 // =========================================================================
@@ -96,7 +91,7 @@ TEST(ParallelReduceTests, Cancellation)
 
 TEST(ParallelReduceTests, SumRanges)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> data(10000);
     std::iota(data.begin(), data.end(), 1);
 
@@ -111,16 +106,14 @@ TEST(ParallelReduceTests, SumRanges)
 
 TEST(ParallelReduceTests, TransformReduceBasic)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> data(10000);
     std::iota(data.begin(), data.end(), 1);
 
     // sum of squares
-    auto result = parallel_transform_reduce(
-        pool, data.begin(), data.end(),
-        static_cast<long long>(0),
-        std::plus<>{},
-        [](int v) { return static_cast<long long>(v) * v; });
+    auto result = parallel_transform_reduce(pool, data.begin(), data.end(), static_cast<long long>(0), std::plus<>{}, [](int v) {
+        return static_cast<long long>(v) * v;
+    });
 
     // sum(i^2, i=1..n) = n*(n+1)*(2n+1)/6
     long long expected = 10000LL * 10001LL * 20001LL / 6;
@@ -129,27 +122,22 @@ TEST(ParallelReduceTests, TransformReduceBasic)
 
 TEST(ParallelReduceTests, TransformReduceEmpty)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> data;
 
-    auto result = parallel_transform_reduce(
-        pool, data.begin(), data.end(), 100, std::plus<>{},
-        [](int v) { return v * v; });
+    auto result = parallel_transform_reduce(pool, data.begin(), data.end(), 100, std::plus<>{}, [](int v) { return v * v; });
 
     EXPECT_EQ(result, 100);
 }
 
 TEST(ParallelReduceTests, TransformReduceRanges)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> data(10000);
     std::iota(data.begin(), data.end(), 1);
 
-    auto result = parallel_transform_reduce(
-        pool, data,
-        static_cast<long long>(0),
-        std::plus<>{},
-        [](int v) { return static_cast<long long>(v) * v; });
+    auto result =
+        parallel_transform_reduce(pool, data, static_cast<long long>(0), std::plus<>{}, [](int v) { return static_cast<long long>(v) * v; });
 
     long long expected = 10000LL * 10001LL * 20001LL / 6;
     EXPECT_EQ(result, expected);
@@ -157,15 +145,12 @@ TEST(ParallelReduceTests, TransformReduceRanges)
 
 TEST(ParallelReduceTests, TransformReduceCancellation)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> data(10000, 1);
     std::stop_source ss;
     ss.request_stop();
 
     EXPECT_THROW(
-        (void)parallel_transform_reduce(
-            pool, data.begin(), data.end(), 0, std::plus<>{},
-            [](int v) { return v; }, ss.get_token()),
-        std::runtime_error
+        (void)parallel_transform_reduce(pool, data.begin(), data.end(), 0, std::plus<>{}, [](int v) { return v; }, ss.get_token()), std::runtime_error
     );
 }

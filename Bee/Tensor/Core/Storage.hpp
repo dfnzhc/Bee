@@ -24,8 +24,7 @@ public:
     ~Storage();
 
     // 静态工厂：委托 allocator 分配内存，返回 shared_ptr<Storage>
-    [[nodiscard]] static auto allocate(std::size_t nbytes, IAllocator& allocator)
-        -> Result<std::shared_ptr<Storage>>;
+    [[nodiscard]] static auto allocate(std::size_t nbytes, IAllocator& allocator) -> Result<std::shared_ptr<Storage>>;
 
     [[nodiscard]] auto data() noexcept -> void*;
     [[nodiscard]] auto data() const noexcept -> const void*;
@@ -34,12 +33,11 @@ public:
     [[nodiscard]] auto allocator() const noexcept -> IAllocator&;
 
 private:
-    explicit Storage(void* data, std::size_t nbytes, std::size_t alignment, Device device,
-                     IAllocator* allocator) noexcept;
+    explicit Storage(void* data, std::size_t nbytes, std::size_t alignment, Device device, IAllocator* allocator) noexcept;
 
     void*       data_      = nullptr;
     std::size_t nbytes_    = 0;
-    std::size_t alignment_ = 64;   // 分配时实际使用的对齐值，析构时传回 deallocate
+    std::size_t alignment_ = 64; // 分配时实际使用的对齐值，析构时传回 deallocate
     Device      device_    = Device::CPU;
     IAllocator* allocator_ = nullptr;
 };

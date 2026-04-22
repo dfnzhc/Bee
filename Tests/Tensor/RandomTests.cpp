@@ -55,14 +55,14 @@ TEST(RandomTests, Randn_Statistics)
     // 计算标准差
     double var = 0.0;
     for (int i = 0; i < n; ++i) {
-        double d = static_cast<double>(p[i]) - mean_val;
-        var += d * d;
+        double d  = static_cast<double>(p[i]) - mean_val;
+        var      += d * d;
     }
     double std_val = std::sqrt(var / n);
 
     EXPECT_LT(std::abs(mean_val), 0.2) << "均值=" << mean_val;
-    EXPECT_GT(std_val, 0.7)            << "标准差=" << std_val;
-    EXPECT_LT(std_val, 1.3)            << "标准差=" << std_val;
+    EXPECT_GT(std_val, 0.7) << "标准差=" << std_val;
+    EXPECT_LT(std_val, 1.3) << "标准差=" << std_val;
 }
 
 // ── randint 元素均在 [low, high) ─────────────────────────────────────────────
@@ -74,7 +74,7 @@ TEST(RandomTests, Randint_RangeCheck)
 
     const auto* p = static_cast<const int32_t*>(r->data_ptr());
     for (int i = 0; i < 200; ++i) {
-        EXPECT_GE(p[i], 0)  << "index=" << i;
+        EXPECT_GE(p[i], 0) << "index=" << i;
         EXPECT_LT(p[i], 10) << "index=" << i;
     }
 }

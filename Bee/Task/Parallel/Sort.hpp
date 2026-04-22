@@ -36,8 +36,7 @@ namespace detail
     /// 递归并行归并排序。
     /// 左半区提交到 Scheduler，右半区在当前线程递归处理。
     template <Scheduler S, typename It, typename Comp>
-    auto parallel_merge_sort(S& scheduler, It first, It last, Comp comp, std::size_t depth, std::size_t max_depth)
-        -> void
+    auto parallel_merge_sort(S& scheduler, It first, It last, Comp comp, std::size_t depth, std::size_t max_depth) -> void
     {
         const auto n = std::distance(first, last);
         if (n < static_cast<std::ptrdiff_t>(kParallelThreshold) || depth >= max_depth) {
@@ -57,8 +56,7 @@ namespace detail
         std::exception_ptr right_ex;
         try {
             parallel_merge_sort(scheduler, mid, last, comp, depth + 1, max_depth);
-        }
-        catch (...) {
+        } catch (...) {
             right_ex = std::current_exception();
         }
 
@@ -66,8 +64,7 @@ namespace detail
         std::exception_ptr left_ex;
         try {
             left_task.get();
-        }
-        catch (...) {
+        } catch (...) {
             left_ex = std::current_exception();
         }
 
@@ -81,8 +78,7 @@ namespace detail
 
     /// 带取消支持的递归并行归并排序。
     template <Scheduler S, typename It, typename Comp>
-    auto parallel_merge_sort(S& scheduler, It first, It last, Comp comp,
-        std::size_t depth, std::size_t max_depth, std::stop_token token) -> void
+    auto parallel_merge_sort(S& scheduler, It first, It last, Comp comp, std::size_t depth, std::size_t max_depth, std::stop_token token) -> void
     {
         if (token.stop_requested())
             return;
@@ -102,16 +98,14 @@ namespace detail
         std::exception_ptr right_ex;
         try {
             parallel_merge_sort(scheduler, mid, last, comp, depth + 1, max_depth, token);
-        }
-        catch (...) {
+        } catch (...) {
             right_ex = std::current_exception();
         }
 
         std::exception_ptr left_ex;
         try {
             left_task.get();
-        }
-        catch (...) {
+        } catch (...) {
             left_ex = std::current_exception();
         }
 

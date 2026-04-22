@@ -22,7 +22,7 @@ using namespace bee;
 
 TEST(ParallelScanTests, InclusiveScanBasic)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> input(10000);
     std::iota(input.begin(), input.end(), 1);
     std::vector<int> output(10000);
@@ -39,7 +39,7 @@ TEST(ParallelScanTests, InclusiveScanBasic)
 
 TEST(ParallelScanTests, InclusiveScanSmall)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> input = {1, 2, 3, 4, 5};
     std::vector<int> output(5);
 
@@ -50,7 +50,7 @@ TEST(ParallelScanTests, InclusiveScanSmall)
 
 TEST(ParallelScanTests, InclusiveScanEmpty)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> input;
     std::vector<int> output;
 
@@ -60,7 +60,7 @@ TEST(ParallelScanTests, InclusiveScanEmpty)
 
 TEST(ParallelScanTests, InclusiveScanSingle)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> input = {42};
     std::vector<int> output(1);
 
@@ -70,21 +70,18 @@ TEST(ParallelScanTests, InclusiveScanSingle)
 
 TEST(ParallelScanTests, InclusiveScanCancellation)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> input(10000, 1);
     std::vector<int> output(10000);
     std::stop_source ss;
     ss.request_stop();
 
-    EXPECT_THROW(
-        (void)parallel_inclusive_scan(pool, input.begin(), input.end(), output.begin(), std::plus<>{}, ss.get_token()),
-        std::runtime_error
-    );
+    EXPECT_THROW((void)parallel_inclusive_scan(pool, input.begin(), input.end(), output.begin(), std::plus<>{}, ss.get_token()), std::runtime_error);
 }
 
 TEST(ParallelScanTests, InclusiveScanRanges)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> input(10000);
     std::iota(input.begin(), input.end(), 1);
     std::vector<int> output(10000);
@@ -102,7 +99,7 @@ TEST(ParallelScanTests, InclusiveScanRanges)
 
 TEST(ParallelScanTests, ExclusiveScanBasic)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> input(10000);
     std::iota(input.begin(), input.end(), 1);
     std::vector<int> output(10000);
@@ -118,7 +115,7 @@ TEST(ParallelScanTests, ExclusiveScanBasic)
 
 TEST(ParallelScanTests, ExclusiveScanSmall)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> input = {1, 2, 3, 4, 5};
     std::vector<int> output(5);
 
@@ -129,7 +126,7 @@ TEST(ParallelScanTests, ExclusiveScanSmall)
 
 TEST(ParallelScanTests, ExclusiveScanEmpty)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> input;
     std::vector<int> output;
 
@@ -139,7 +136,7 @@ TEST(ParallelScanTests, ExclusiveScanEmpty)
 
 TEST(ParallelScanTests, ExclusiveScanWithInit)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> input = {1, 2, 3};
     std::vector<int> output(3);
 
@@ -151,21 +148,20 @@ TEST(ParallelScanTests, ExclusiveScanWithInit)
 
 TEST(ParallelScanTests, ExclusiveScanCancellation)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> input(10000, 1);
     std::vector<int> output(10000);
     std::stop_source ss;
     ss.request_stop();
 
     EXPECT_THROW(
-        (void)parallel_exclusive_scan(pool, input.begin(), input.end(), output.begin(), 0, std::plus<>{}, ss.get_token()),
-        std::runtime_error
+        (void)parallel_exclusive_scan(pool, input.begin(), input.end(), output.begin(), 0, std::plus<>{}, ss.get_token()), std::runtime_error
     );
 }
 
 TEST(ParallelScanTests, ExclusiveScanRanges)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> input(10000);
     std::iota(input.begin(), input.end(), 1);
     std::vector<int> output(10000);

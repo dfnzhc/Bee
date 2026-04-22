@@ -50,7 +50,7 @@ TEST(SchedulerTests, SpawnTaskReturnsValue)
 
 TEST(SchedulerTests, SpawnTaskVoid)
 {
-    WorkPool pool(2);
+    WorkPool          pool(2);
     std::atomic<bool> executed{false};
 
     auto t = spawn_task(pool, [&] { executed.store(true, std::memory_order_release); });
@@ -73,7 +73,7 @@ TEST(SchedulerTests, SpawnTaskPropagatesException)
 TEST(SchedulerTests, SpawnTaskRunsOnWorkerThread)
 {
     WorkPool pool(2);
-    auto main_tid = std::this_thread::get_id();
+    auto     main_tid = std::this_thread::get_id();
 
     auto t = spawn_task(pool, [main_tid] { return std::this_thread::get_id() != main_tid; });
     EXPECT_TRUE(t.get());
@@ -130,16 +130,14 @@ TEST(SchedulerTests, NestedCoAwait)
 
 TEST(SchedulerTests, MultipleConcurrentSpawnTasks)
 {
-    WorkPool pool(4);
-    constexpr int N = 100;
+    WorkPool         pool(4);
+    constexpr int    N = 100;
     std::atomic<int> sum{0};
 
     std::vector<Task<void>> tasks;
     tasks.reserve(N);
     for (int i = 0; i < N; ++i) {
-        tasks.push_back(spawn_task(pool, [&sum, i] {
-            sum.fetch_add(i, std::memory_order_relaxed);
-        }));
+        tasks.push_back(spawn_task(pool, [&sum, i] { sum.fetch_add(i, std::memory_order_relaxed); }));
     }
 
     for (auto& t : tasks) {

@@ -21,48 +21,77 @@ namespace bee::cpu
 // SIMD reduce 可用性 trait：默认 false，对已知 (T, ISA) 组合显式设为 true
 // ─────────────────────────────────────────────────────────────────────────────
 
-template <typename T, typename ISA> inline constexpr bool kSimdReduceSum = false;
-template <typename T, typename ISA> inline constexpr bool kSimdReduceMin = false;
-template <typename T, typename ISA> inline constexpr bool kSimdReduceMax = false;
+template <typename T, typename ISA>
+inline constexpr bool kSimdReduceSum = false;
+template <typename T, typename ISA>
+inline constexpr bool kSimdReduceMin = false;
+template <typename T, typename ISA>
+inline constexpr bool kSimdReduceMax = false;
 
 // ── IsaScalar 特化：标量后端对所有支持类型均有 reduce 原语 ───────────────────
 
-template <> inline constexpr bool kSimdReduceSum<float,    simd::IsaScalar> = true;
-template <> inline constexpr bool kSimdReduceSum<double,   simd::IsaScalar> = true;
-template <> inline constexpr bool kSimdReduceSum<int32_t,  simd::IsaScalar> = true;
-template <> inline constexpr bool kSimdReduceSum<int64_t,  simd::IsaScalar> = true;
-template <> inline constexpr bool kSimdReduceSum<uint8_t,  simd::IsaScalar> = true;
+template <>
+inline constexpr bool kSimdReduceSum<float, simd::IsaScalar> = true;
+template <>
+inline constexpr bool kSimdReduceSum<double, simd::IsaScalar> = true;
+template <>
+inline constexpr bool kSimdReduceSum<int32_t, simd::IsaScalar> = true;
+template <>
+inline constexpr bool kSimdReduceSum<int64_t, simd::IsaScalar> = true;
+template <>
+inline constexpr bool kSimdReduceSum<uint8_t, simd::IsaScalar> = true;
 
-template <> inline constexpr bool kSimdReduceMin<float,    simd::IsaScalar> = true;
-template <> inline constexpr bool kSimdReduceMin<double,   simd::IsaScalar> = true;
-template <> inline constexpr bool kSimdReduceMin<int32_t,  simd::IsaScalar> = true;
-template <> inline constexpr bool kSimdReduceMin<int64_t,  simd::IsaScalar> = true;
-template <> inline constexpr bool kSimdReduceMin<uint8_t,  simd::IsaScalar> = true;
+template <>
+inline constexpr bool kSimdReduceMin<float, simd::IsaScalar> = true;
+template <>
+inline constexpr bool kSimdReduceMin<double, simd::IsaScalar> = true;
+template <>
+inline constexpr bool kSimdReduceMin<int32_t, simd::IsaScalar> = true;
+template <>
+inline constexpr bool kSimdReduceMin<int64_t, simd::IsaScalar> = true;
+template <>
+inline constexpr bool kSimdReduceMin<uint8_t, simd::IsaScalar> = true;
 
-template <> inline constexpr bool kSimdReduceMax<float,    simd::IsaScalar> = true;
-template <> inline constexpr bool kSimdReduceMax<double,   simd::IsaScalar> = true;
-template <> inline constexpr bool kSimdReduceMax<int32_t,  simd::IsaScalar> = true;
-template <> inline constexpr bool kSimdReduceMax<int64_t,  simd::IsaScalar> = true;
-template <> inline constexpr bool kSimdReduceMax<uint8_t,  simd::IsaScalar> = true;
+template <>
+inline constexpr bool kSimdReduceMax<float, simd::IsaScalar> = true;
+template <>
+inline constexpr bool kSimdReduceMax<double, simd::IsaScalar> = true;
+template <>
+inline constexpr bool kSimdReduceMax<int32_t, simd::IsaScalar> = true;
+template <>
+inline constexpr bool kSimdReduceMax<int64_t, simd::IsaScalar> = true;
+template <>
+inline constexpr bool kSimdReduceMax<uint8_t, simd::IsaScalar> = true;
 
 // ── IsaAvx2 特化：AVX2 后端的 reduce 能力与类型对应关系 ─────────────────────
 // reduce_sum：float/double/i32/i64/u8 均有；reduce_min/max：仅 float/double/i32
 
 #ifdef BEE_SIMD_ENABLE_AVX2
-template <> inline constexpr bool kSimdReduceSum<float,    simd::IsaAvx2> = true;
-template <> inline constexpr bool kSimdReduceSum<double,   simd::IsaAvx2> = true;
-template <> inline constexpr bool kSimdReduceSum<int32_t,  simd::IsaAvx2> = true;
-template <> inline constexpr bool kSimdReduceSum<int64_t,  simd::IsaAvx2> = true;
-template <> inline constexpr bool kSimdReduceSum<uint8_t,  simd::IsaAvx2> = true;
+template <>
+inline constexpr bool kSimdReduceSum<float, simd::IsaAvx2> = true;
+template <>
+inline constexpr bool kSimdReduceSum<double, simd::IsaAvx2> = true;
+template <>
+inline constexpr bool kSimdReduceSum<int32_t, simd::IsaAvx2> = true;
+template <>
+inline constexpr bool kSimdReduceSum<int64_t, simd::IsaAvx2> = true;
+template <>
+inline constexpr bool kSimdReduceSum<uint8_t, simd::IsaAvx2> = true;
 
 // AVX2 的 i64 缺少有符号比较原语，u8 缺少 reduce_min/reduce_max：均不启用
-template <> inline constexpr bool kSimdReduceMin<float,    simd::IsaAvx2> = true;
-template <> inline constexpr bool kSimdReduceMin<double,   simd::IsaAvx2> = true;
-template <> inline constexpr bool kSimdReduceMin<int32_t,  simd::IsaAvx2> = true;
+template <>
+inline constexpr bool kSimdReduceMin<float, simd::IsaAvx2> = true;
+template <>
+inline constexpr bool kSimdReduceMin<double, simd::IsaAvx2> = true;
+template <>
+inline constexpr bool kSimdReduceMin<int32_t, simd::IsaAvx2> = true;
 
-template <> inline constexpr bool kSimdReduceMax<float,    simd::IsaAvx2> = true;
-template <> inline constexpr bool kSimdReduceMax<double,   simd::IsaAvx2> = true;
-template <> inline constexpr bool kSimdReduceMax<int32_t,  simd::IsaAvx2> = true;
+template <>
+inline constexpr bool kSimdReduceMax<float, simd::IsaAvx2> = true;
+template <>
+inline constexpr bool kSimdReduceMax<double, simd::IsaAvx2> = true;
+template <>
+inline constexpr bool kSimdReduceMax<int32_t, simd::IsaAvx2> = true;
 #endif
 
 // ── IsaSse2 特化：SSE2 后端的 reduce 能力 ────────────────────────────────────
@@ -70,21 +99,34 @@ template <> inline constexpr bool kSimdReduceMax<int32_t,  simd::IsaAvx2> = true
 // reduce_min/max：float/double/int32/uint8 有；i64 无有符号 SSE2 比较指令，跳过
 
 #ifdef BEE_SIMD_ENABLE_SSE2
-template <> inline constexpr bool kSimdReduceSum<float,    simd::IsaSse2> = true;
-template <> inline constexpr bool kSimdReduceSum<double,   simd::IsaSse2> = true;
-template <> inline constexpr bool kSimdReduceSum<int32_t,  simd::IsaSse2> = true;
-template <> inline constexpr bool kSimdReduceSum<int64_t,  simd::IsaSse2> = true;
-template <> inline constexpr bool kSimdReduceSum<uint8_t,  simd::IsaSse2> = true;
+template <>
+inline constexpr bool kSimdReduceSum<float, simd::IsaSse2> = true;
+template <>
+inline constexpr bool kSimdReduceSum<double, simd::IsaSse2> = true;
+template <>
+inline constexpr bool kSimdReduceSum<int32_t, simd::IsaSse2> = true;
+template <>
+inline constexpr bool kSimdReduceSum<int64_t, simd::IsaSse2> = true;
+template <>
+inline constexpr bool kSimdReduceSum<uint8_t, simd::IsaSse2> = true;
 
-template <> inline constexpr bool kSimdReduceMin<float,    simd::IsaSse2> = true;
-template <> inline constexpr bool kSimdReduceMin<double,   simd::IsaSse2> = true;
-template <> inline constexpr bool kSimdReduceMin<int32_t,  simd::IsaSse2> = true;
-template <> inline constexpr bool kSimdReduceMin<uint8_t,  simd::IsaSse2> = true;
+template <>
+inline constexpr bool kSimdReduceMin<float, simd::IsaSse2> = true;
+template <>
+inline constexpr bool kSimdReduceMin<double, simd::IsaSse2> = true;
+template <>
+inline constexpr bool kSimdReduceMin<int32_t, simd::IsaSse2> = true;
+template <>
+inline constexpr bool kSimdReduceMin<uint8_t, simd::IsaSse2> = true;
 
-template <> inline constexpr bool kSimdReduceMax<float,    simd::IsaSse2> = true;
-template <> inline constexpr bool kSimdReduceMax<double,   simd::IsaSse2> = true;
-template <> inline constexpr bool kSimdReduceMax<int32_t,  simd::IsaSse2> = true;
-template <> inline constexpr bool kSimdReduceMax<uint8_t,  simd::IsaSse2> = true;
+template <>
+inline constexpr bool kSimdReduceMax<float, simd::IsaSse2> = true;
+template <>
+inline constexpr bool kSimdReduceMax<double, simd::IsaSse2> = true;
+template <>
+inline constexpr bool kSimdReduceMax<int32_t, simd::IsaSse2> = true;
+template <>
+inline constexpr bool kSimdReduceMax<uint8_t, simd::IsaSse2> = true;
 #endif
 
 // ── IsaAvx512 特化：AVX-512 后端的 reduce 能力 ──────────────────────────────
@@ -92,23 +134,36 @@ template <> inline constexpr bool kSimdReduceMax<uint8_t,  simd::IsaSse2> = true
 // u8 依赖 AVX512BW，用 __AVX512BW__ 守卫
 
 #ifdef BEE_SIMD_ENABLE_AVX512
-template <> inline constexpr bool kSimdReduceSum<float,    simd::IsaAvx512> = true;
-template <> inline constexpr bool kSimdReduceSum<double,   simd::IsaAvx512> = true;
-template <> inline constexpr bool kSimdReduceSum<int32_t,  simd::IsaAvx512> = true;
-template <> inline constexpr bool kSimdReduceSum<int64_t,  simd::IsaAvx512> = true;
-#ifdef __AVX512BW__
-template <> inline constexpr bool kSimdReduceSum<uint8_t,  simd::IsaAvx512> = true;
-#endif
+template <>
+inline constexpr bool kSimdReduceSum<float, simd::IsaAvx512> = true;
+template <>
+inline constexpr bool kSimdReduceSum<double, simd::IsaAvx512> = true;
+template <>
+inline constexpr bool kSimdReduceSum<int32_t, simd::IsaAvx512> = true;
+template <>
+inline constexpr bool kSimdReduceSum<int64_t, simd::IsaAvx512> = true;
+    #ifdef __AVX512BW__
+template <>
+inline constexpr bool kSimdReduceSum<uint8_t, simd::IsaAvx512> = true;
+    #endif
 
-template <> inline constexpr bool kSimdReduceMin<float,    simd::IsaAvx512> = true;
-template <> inline constexpr bool kSimdReduceMin<double,   simd::IsaAvx512> = true;
-template <> inline constexpr bool kSimdReduceMin<int32_t,  simd::IsaAvx512> = true;
-template <> inline constexpr bool kSimdReduceMin<int64_t,  simd::IsaAvx512> = true;
+template <>
+inline constexpr bool kSimdReduceMin<float, simd::IsaAvx512> = true;
+template <>
+inline constexpr bool kSimdReduceMin<double, simd::IsaAvx512> = true;
+template <>
+inline constexpr bool kSimdReduceMin<int32_t, simd::IsaAvx512> = true;
+template <>
+inline constexpr bool kSimdReduceMin<int64_t, simd::IsaAvx512> = true;
 
-template <> inline constexpr bool kSimdReduceMax<float,    simd::IsaAvx512> = true;
-template <> inline constexpr bool kSimdReduceMax<double,   simd::IsaAvx512> = true;
-template <> inline constexpr bool kSimdReduceMax<int32_t,  simd::IsaAvx512> = true;
-template <> inline constexpr bool kSimdReduceMax<int64_t,  simd::IsaAvx512> = true;
+template <>
+inline constexpr bool kSimdReduceMax<float, simd::IsaAvx512> = true;
+template <>
+inline constexpr bool kSimdReduceMax<double, simd::IsaAvx512> = true;
+template <>
+inline constexpr bool kSimdReduceMax<int32_t, simd::IsaAvx512> = true;
+template <>
+inline constexpr bool kSimdReduceMax<int64_t, simd::IsaAvx512> = true;
 #endif
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -122,16 +177,20 @@ struct OpReduceSum
 
     // 加法恒等元为 0
     template <typename T>
-    static auto identity() -> T { return T{0}; }
+    static auto identity() -> T
+    {
+        return T{0};
+    }
 
     template <typename T>
-    static auto scalar(T a, T b) -> T { return static_cast<T>(a + b); }
+    static auto scalar(T a, T b) -> T
+    {
+        return static_cast<T>(a + b);
+    }
 
     template <typename T, typename ISA>
-    static auto simd_acc(
-        typename simd::SimdBackend<T, ISA>::reg a,
-        typename simd::SimdBackend<T, ISA>::reg b)
-        -> typename simd::SimdBackend<T, ISA>::reg
+    static auto simd_acc(typename simd::SimdBackend<T, ISA>::reg a, typename simd::SimdBackend<T, ISA>::reg b) ->
+        typename simd::SimdBackend<T, ISA>::reg
     {
         return simd::SimdBackend<T, ISA>::add(a, b);
     }
@@ -150,16 +209,20 @@ struct OpReduceMin
 
     // min 恒等元为类型最大值
     template <typename T>
-    static auto identity() -> T { return std::numeric_limits<T>::max(); }
+    static auto identity() -> T
+    {
+        return std::numeric_limits<T>::max();
+    }
 
     template <typename T>
-    static auto scalar(T a, T b) -> T { return a < b ? a : b; }
+    static auto scalar(T a, T b) -> T
+    {
+        return a < b ? a : b;
+    }
 
     template <typename T, typename ISA>
-    static auto simd_acc(
-        typename simd::SimdBackend<T, ISA>::reg a,
-        typename simd::SimdBackend<T, ISA>::reg b)
-        -> typename simd::SimdBackend<T, ISA>::reg
+    static auto simd_acc(typename simd::SimdBackend<T, ISA>::reg a, typename simd::SimdBackend<T, ISA>::reg b) ->
+        typename simd::SimdBackend<T, ISA>::reg
     {
         return simd::SimdBackend<T, ISA>::min(a, b);
     }
@@ -178,16 +241,20 @@ struct OpReduceMax
 
     // max 恒等元为类型最小值
     template <typename T>
-    static auto identity() -> T { return std::numeric_limits<T>::lowest(); }
+    static auto identity() -> T
+    {
+        return std::numeric_limits<T>::lowest();
+    }
 
     template <typename T>
-    static auto scalar(T a, T b) -> T { return a > b ? a : b; }
+    static auto scalar(T a, T b) -> T
+    {
+        return a > b ? a : b;
+    }
 
     template <typename T, typename ISA>
-    static auto simd_acc(
-        typename simd::SimdBackend<T, ISA>::reg a,
-        typename simd::SimdBackend<T, ISA>::reg b)
-        -> typename simd::SimdBackend<T, ISA>::reg
+    static auto simd_acc(typename simd::SimdBackend<T, ISA>::reg a, typename simd::SimdBackend<T, ISA>::reg b) ->
+        typename simd::SimdBackend<T, ISA>::reg
     {
         return simd::SimdBackend<T, ISA>::max(a, b);
     }
@@ -207,10 +274,16 @@ struct OpReduceProd
 
     // 乘法恒等元为 1
     template <typename T>
-    static auto identity() -> T { return T{1}; }
+    static auto identity() -> T
+    {
+        return T{1};
+    }
 
     template <typename T>
-    static auto scalar(T a, T b) -> T { return static_cast<T>(a * b); }
+    static auto scalar(T a, T b) -> T
+    {
+        return static_cast<T>(a * b);
+    }
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -227,8 +300,8 @@ auto cpu_global_reduce_linear(int64_t n, const T* ptr) -> T
         constexpr auto W = static_cast<int64_t>(B::width);
         if (n >= W) {
             // 以恒等元初始化 SIMD 累加器
-            auto acc = B::set1(Op::template identity<T>());
-            int64_t i = 0;
+            auto    acc = B::set1(Op::template identity<T>());
+            int64_t i   = 0;
             for (; i + W <= n; i += W)
                 acc = Op::template simd_acc<T, ISA>(acc, B::loadu(ptr + i));
             // 水平折叠得到标量
@@ -254,11 +327,11 @@ auto cpu_global_reduce_linear(int64_t n, const T* ptr) -> T
 template <typename T, typename Op>
 auto cpu_global_reduce_strided(const Tensor& a) -> T
 {
-    const int64_t  ndim    = a.ndim();
-    const auto&    shape   = a.shape();
-    const auto&    strides = a.strides();
-    const auto*    ptr     = static_cast<const T*>(a.data_ptr());
-    const int64_t  n       = a.numel();
+    const int64_t ndim    = a.ndim();
+    const auto&   shape   = a.shape();
+    const auto&   strides = a.strides();
+    const auto*   ptr     = static_cast<const T*>(a.data_ptr());
+    const int64_t n       = a.numel();
 
     T result = Op::template identity<T>();
 
@@ -313,9 +386,9 @@ auto cpu_reduce_global_dispatch(const Tensor& a, Tensor& out) -> void
 template <typename Tin, typename Tout>
 auto cpu_reduce_mean_global_dispatch(const Tensor& a, Tensor& out) -> void
 {
-    const auto* in_ptr  = static_cast<const Tin*>(a.data_ptr());
-    auto*       out_ptr = static_cast<Tout*>(out.data_ptr());
-    const int64_t n     = a.numel();
+    const auto*   in_ptr  = static_cast<const Tin*>(a.data_ptr());
+    auto*         out_ptr = static_cast<Tout*>(out.data_ptr());
+    const int64_t n       = a.numel();
 
     double acc = 0.0;
     if (a.is_contiguous()) {
@@ -352,14 +425,13 @@ auto cpu_reduce_mean_global_dispatch(const Tensor& a, Tensor& out) -> void
 // ─────────────────────────────────────────────────────────────────────────────
 
 template <typename T, typename Op>
-auto cpu_reduce_axis_dispatch(
-    const Tensor& a, int64_t dim, bool keepdim, Tensor& out) -> void
+auto cpu_reduce_axis_dispatch(const Tensor& a, int64_t dim, bool keepdim, Tensor& out) -> void
 {
-    const int64_t  ndim      = a.ndim();
-    const auto&    shape     = a.shape();
-    const auto&    strides_a = a.strides();
-    const auto*    in_ptr    = static_cast<const T*>(a.data_ptr());
-    auto*          out_ptr   = static_cast<T*>(out.data_ptr());
+    const int64_t ndim      = a.ndim();
+    const auto&   shape     = a.shape();
+    const auto&   strides_a = a.strides();
+    const auto*   in_ptr    = static_cast<const T*>(a.data_ptr());
+    auto*         out_ptr   = static_cast<T*>(out.data_ptr());
 
     const int64_t K = shape[static_cast<std::size_t>(dim)];
 
@@ -378,8 +450,7 @@ auto cpu_reduce_axis_dispatch(
             for (int64_t i = 0; i < inner; ++i) {
                 T acc = Op::template identity<T>();
                 for (int64_t k = 0; k < K; ++k)
-                    acc = Op::template scalar<T>(
-                        acc, in_ptr[o * K * inner + k * inner + i]);
+                    acc = Op::template scalar<T>(acc, in_ptr[o * K * inner + k * inner + i]);
                 out_ptr[o * inner + i] = acc;
             }
         }
@@ -395,29 +466,25 @@ auto cpu_reduce_axis_dispatch(
             // 计算当前 outer 多维索引对应的输入偏移
             int64_t outer_off = 0;
             for (int64_t d = 0; d < outer_ndim; ++d)
-                outer_off += outer_idx[static_cast<std::size_t>(d)]
-                           * strides_a[static_cast<std::size_t>(d)];
+                outer_off += outer_idx[static_cast<std::size_t>(d)] * strides_a[static_cast<std::size_t>(d)];
 
             for (int64_t i = 0; i < inner; ++i) {
                 // 计算当前 inner 多维索引对应的输入偏移
                 int64_t inner_off = 0;
                 for (int64_t d = 0; d < inner_ndim; ++d)
-                    inner_off += inner_idx[static_cast<std::size_t>(d)]
-                               * strides_a[static_cast<std::size_t>(dim + 1 + d)];
+                    inner_off += inner_idx[static_cast<std::size_t>(d)] * strides_a[static_cast<std::size_t>(dim + 1 + d)];
 
                 const int64_t in_base = outer_off + inner_off;
 
                 T acc = Op::template identity<T>();
                 for (int64_t k = 0; k < K; ++k)
-                    acc = Op::template scalar<T>(
-                        acc, in_ptr[in_base + k * strides_a[static_cast<std::size_t>(dim)]]);
+                    acc = Op::template scalar<T>(acc, in_ptr[in_base + k * strides_a[static_cast<std::size_t>(dim)]]);
                 out_ptr[o * inner + i] = acc;
 
                 // 推进 inner 多维索引
                 for (int64_t d = inner_ndim - 1; d >= 0; --d) {
                     ++inner_idx[static_cast<std::size_t>(d)];
-                    if (inner_idx[static_cast<std::size_t>(d)] <
-                        shape[static_cast<std::size_t>(dim + 1 + d)])
+                    if (inner_idx[static_cast<std::size_t>(d)] < shape[static_cast<std::size_t>(dim + 1 + d)])
                         break;
                     inner_idx[static_cast<std::size_t>(d)] = 0;
                 }
@@ -439,14 +506,13 @@ auto cpu_reduce_axis_dispatch(
 // ─────────────────────────────────────────────────────────────────────────────
 
 template <typename Tin, typename Tout>
-auto cpu_reduce_mean_axis_dispatch(
-    const Tensor& a, int64_t dim, bool keepdim, Tensor& out) -> void
+auto cpu_reduce_mean_axis_dispatch(const Tensor& a, int64_t dim, bool keepdim, Tensor& out) -> void
 {
-    const int64_t  ndim      = a.ndim();
-    const auto&    shape     = a.shape();
-    const auto&    strides_a = a.strides();
-    const auto*    in_ptr    = static_cast<const Tin*>(a.data_ptr());
-    auto*          out_ptr   = static_cast<Tout*>(out.data_ptr());
+    const int64_t ndim      = a.ndim();
+    const auto&   shape     = a.shape();
+    const auto&   strides_a = a.strides();
+    const auto*   in_ptr    = static_cast<const Tin*>(a.data_ptr());
+    auto*         out_ptr   = static_cast<Tout*>(out.data_ptr());
 
     const int64_t K = shape[static_cast<std::size_t>(dim)];
 
@@ -478,27 +544,23 @@ auto cpu_reduce_mean_axis_dispatch(
         for (int64_t o = 0; o < outer; ++o) {
             int64_t outer_off = 0;
             for (int64_t d = 0; d < outer_ndim; ++d)
-                outer_off += outer_idx[static_cast<std::size_t>(d)]
-                           * strides_a[static_cast<std::size_t>(d)];
+                outer_off += outer_idx[static_cast<std::size_t>(d)] * strides_a[static_cast<std::size_t>(d)];
 
             for (int64_t i = 0; i < inner; ++i) {
                 int64_t inner_off = 0;
                 for (int64_t d = 0; d < inner_ndim; ++d)
-                    inner_off += inner_idx[static_cast<std::size_t>(d)]
-                               * strides_a[static_cast<std::size_t>(dim + 1 + d)];
+                    inner_off += inner_idx[static_cast<std::size_t>(d)] * strides_a[static_cast<std::size_t>(dim + 1 + d)];
 
                 const int64_t in_base = outer_off + inner_off;
 
                 double acc = 0.0;
                 for (int64_t k = 0; k < K; ++k)
-                    acc += static_cast<double>(
-                        in_ptr[in_base + k * strides_a[static_cast<std::size_t>(dim)]]);
+                    acc += static_cast<double>(in_ptr[in_base + k * strides_a[static_cast<std::size_t>(dim)]]);
                 out_ptr[o * inner + i] = static_cast<Tout>(acc / static_cast<double>(K));
 
                 for (int64_t d = inner_ndim - 1; d >= 0; --d) {
                     ++inner_idx[static_cast<std::size_t>(d)];
-                    if (inner_idx[static_cast<std::size_t>(d)] <
-                        shape[static_cast<std::size_t>(dim + 1 + d)])
+                    if (inner_idx[static_cast<std::size_t>(d)] < shape[static_cast<std::size_t>(dim + 1 + d)])
                         break;
                     inner_idx[static_cast<std::size_t>(d)] = 0;
                 }

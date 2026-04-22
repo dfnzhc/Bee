@@ -54,8 +54,8 @@ TEST(WhenAllTests, VariadicWithVoid)
     WorkPool pool(2);
 
     std::atomic<int> counter{0};
-    auto t1 = spawn_task(pool, [&] { counter.fetch_add(1); });
-    auto t2 = spawn_task(pool, [&] { counter.fetch_add(1); });
+    auto             t1 = spawn_task(pool, [&] { counter.fetch_add(1); });
+    auto             t2 = spawn_task(pool, [&] { counter.fetch_add(1); });
 
     auto combined = when_all(std::move(t1), std::move(t2));
     combined.get();
@@ -66,7 +66,9 @@ TEST(WhenAllTests, VariadicWithVoid)
 
 TEST(WhenAllTests, VariadicSingleTask)
 {
-    auto t = []() -> Task<int> { co_return 7; }();
+    auto t = []() -> Task<int> {
+        co_return 7;
+    }();
 
     auto combined = when_all(std::move(t));
     auto [v]      = combined.get();
@@ -111,15 +113,17 @@ TEST(WhenAllTests, VectorBasic)
 TEST(WhenAllTests, VectorEmpty)
 {
     std::vector<Task<int>> tasks;
-    auto combined = when_all(std::move(tasks));
-    auto results  = combined.get();
+    auto                   combined = when_all(std::move(tasks));
+    auto                   results  = combined.get();
 
     EXPECT_TRUE(results.empty());
 }
 
 TEST(WhenAllTests, VectorSingleElement)
 {
-    auto t = []() -> Task<int> { co_return 42; }();
+    auto t = []() -> Task<int> {
+        co_return 42;
+    }();
 
     std::vector<Task<int>> tasks;
     tasks.push_back(std::move(t));
@@ -150,7 +154,7 @@ TEST(WhenAllTests, VectorExceptionPropagation)
 
 TEST(WhenAllTests, VectorLargeConcurrency)
 {
-    WorkPool pool(8);
+    WorkPool      pool(8);
     constexpr int N = 1000;
 
     std::vector<Task<int>> tasks;
@@ -176,8 +180,8 @@ TEST(WhenAllTests, VariadicMixedValueAndVoid)
     WorkPool pool(2);
 
     std::atomic<int> side{0};
-    auto t1 = spawn_task(pool, [] { return 100; });
-    auto t2 = spawn_task(pool, [&side] { side.store(1); });
+    auto             t1 = spawn_task(pool, [] { return 100; });
+    auto             t2 = spawn_task(pool, [&side] { side.store(1); });
 
     auto combined = when_all(std::move(t1), std::move(t2));
     auto [val, _] = combined.get();

@@ -24,7 +24,7 @@ using namespace bee;
 
 TEST(ParallelSortTests, BasicDefaultComp)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> data(10000);
     std::iota(data.begin(), data.end(), 0);
 
@@ -39,7 +39,7 @@ TEST(ParallelSortTests, BasicDefaultComp)
 
 TEST(ParallelSortTests, CustomComparator)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> data(10000);
     std::iota(data.begin(), data.end(), 0);
 
@@ -53,7 +53,7 @@ TEST(ParallelSortTests, CustomComparator)
 
 TEST(ParallelSortTests, AlreadySorted)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> data(10000);
     std::iota(data.begin(), data.end(), 0);
 
@@ -64,7 +64,7 @@ TEST(ParallelSortTests, AlreadySorted)
 
 TEST(ParallelSortTests, ReverseSorted)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> data(10000);
     std::iota(data.begin(), data.end(), 0);
     std::reverse(data.begin(), data.end());
@@ -76,7 +76,7 @@ TEST(ParallelSortTests, ReverseSorted)
 
 TEST(ParallelSortTests, SerialFallback)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> data = {5, 3, 1, 4, 2};
 
     parallel_sort(pool, data.begin(), data.end());
@@ -86,7 +86,7 @@ TEST(ParallelSortTests, SerialFallback)
 
 TEST(ParallelSortTests, EmptyRange)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> data;
 
     parallel_sort(pool, data.begin(), data.end());
@@ -96,7 +96,7 @@ TEST(ParallelSortTests, EmptyRange)
 
 TEST(ParallelSortTests, SingleElement)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> data = {42};
 
     parallel_sort(pool, data.begin(), data.end());
@@ -106,7 +106,7 @@ TEST(ParallelSortTests, SingleElement)
 
 TEST(ParallelSortTests, AllEqual)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> data(10000, 7);
 
     parallel_sort(pool, data.begin(), data.end());
@@ -120,7 +120,7 @@ TEST(ParallelSortTests, AllEqual)
 
 TEST(ParallelSortTests, Cancellation)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> data(10000);
     std::iota(data.begin(), data.end(), 0);
     std::mt19937 rng(42);
@@ -129,10 +129,7 @@ TEST(ParallelSortTests, Cancellation)
     std::stop_source ss;
     ss.request_stop();
 
-    EXPECT_THROW(
-        parallel_sort(pool, data.begin(), data.end(), std::less<>{}, ss.get_token()),
-        std::runtime_error
-    );
+    EXPECT_THROW(parallel_sort(pool, data.begin(), data.end(), std::less<>{}, ss.get_token()), std::runtime_error);
 }
 
 // =========================================================================
@@ -141,7 +138,7 @@ TEST(ParallelSortTests, Cancellation)
 
 TEST(ParallelSortTests, RangesBasic)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> data(10000);
     std::iota(data.begin(), data.end(), 0);
     std::mt19937 rng(42);
@@ -154,7 +151,7 @@ TEST(ParallelSortTests, RangesBasic)
 
 TEST(ParallelSortTests, RangesCustomComp)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> data(10000);
     std::iota(data.begin(), data.end(), 0);
     std::mt19937 rng(42);
@@ -168,9 +165,9 @@ TEST(ParallelSortTests, RangesCustomComp)
 TEST(ParallelSortTests, LargeDataCorrectnessCheck)
 {
     // 排序后数据与 std::sort 结果完全一致
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> data(50000);
-    std::mt19937 rng(999);
+    std::mt19937     rng(999);
     std::generate(data.begin(), data.end(), [&rng]() { return rng() % 10000; });
 
     auto expected = data;

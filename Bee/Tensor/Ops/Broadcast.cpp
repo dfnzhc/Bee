@@ -28,9 +28,7 @@ auto compute_broadcast_shape(const Shape& a, const Shape& b) -> Result<Shape>
         } else if (db == 1) {
             result[static_cast<std::size_t>(i)] = da;
         } else {
-            return std::unexpected(make_error(
-                std::format("shape 不兼容，无法广播：对齐后第 {} 维大小 {} vs {}", i, da, db),
-                Severity::Recoverable));
+            return std::unexpected(make_error(std::format("shape 不兼容，无法广播：对齐后第 {} 维大小 {} vs {}", i, da, db), Severity::Recoverable));
         }
     }
 

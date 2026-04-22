@@ -21,8 +21,8 @@ namespace
 
 using bee::NodeHandle;
 using bee::TaskGraph;
-using bee::WorkPool;
 using bee::TaskState;
+using bee::WorkPool;
 
 // =========================================================================
 // 构建器 + 查询测试
@@ -39,7 +39,7 @@ TEST(TaskGraphTests, EmptyGraph)
 TEST(TaskGraphTests, SingleRootNode)
 {
     TaskGraph graph;
-    auto a = graph.node([] { return 42; });
+    auto      a = graph.node([] { return 42; });
     EXPECT_FALSE(graph.empty());
     EXPECT_EQ(graph.node_count(), 1u);
     EXPECT_FALSE(graph.has_cycle());
@@ -49,10 +49,10 @@ TEST(TaskGraphTests, SingleRootNode)
 TEST(TaskGraphTests, DiamondNoCycle)
 {
     TaskGraph graph;
-    auto a = graph.node([] { return 1; });
-    auto b = graph.node([](int x) { return x + 1; }, a);
-    auto c = graph.node([](int x) { return x * 2; }, a);
-    auto d = graph.node([](int x, int y) { return x + y; }, b, c);
+    auto      a = graph.node([] { return 1; });
+    auto      b = graph.node([](int x) { return x + 1; }, a);
+    auto      c = graph.node([](int x) { return x * 2; }, a);
+    auto      d = graph.node([](int x, int y) { return x + y; }, b, c);
     EXPECT_EQ(graph.node_count(), 4u);
     EXPECT_FALSE(graph.has_cycle());
     (void)d;
@@ -74,11 +74,11 @@ TEST(TaskGraphTests, NodeCountIncremental)
 TEST(TaskGraphTests, HasCycleReturnsFalseForDAG)
 {
     TaskGraph graph;
-    auto a = graph.node([] { return 1; });
-    auto b = graph.node([](int x) { return x; }, a);
-    auto c = graph.node([](int x) { return x; }, a);
-    auto d = graph.node([](int x, int y) { return x + y; }, b, c);
-    auto e = graph.node([](int x) { return x; }, d);
+    auto      a = graph.node([] { return 1; });
+    auto      b = graph.node([](int x) { return x; }, a);
+    auto      c = graph.node([](int x) { return x; }, a);
+    auto      d = graph.node([](int x, int y) { return x + y; }, b, c);
+    auto      e = graph.node([](int x) { return x; }, d);
     EXPECT_FALSE(graph.has_cycle());
     (void)e;
 }
@@ -99,9 +99,9 @@ TEST(TaskGraphTests, ToDotEmptyGraph)
 TEST(TaskGraphTests, ToDotWithLabels)
 {
     TaskGraph graph;
-    auto a = graph.node("load", [] { return 42; });
-    auto b = graph.node([](int x) { return x * 2; }, a);  // 无标签
-    auto c = graph.node("save", [](int x) { return std::to_string(x); }, b);
+    auto      a = graph.node("load", [] { return 42; });
+    auto      b = graph.node([](int x) { return x * 2; }, a); // 无标签
+    auto      c = graph.node("save", [](int x) { return std::to_string(x); }, b);
     (void)c;
 
     auto dot = graph.to_dot();
@@ -116,7 +116,7 @@ TEST(TaskGraphTests, ToDotWithLabels)
 TEST(TaskGraphTests, ToDotAutoLabel)
 {
     TaskGraph graph;
-    auto a = graph.node([] { return 42; });  // 无标签，应自动生成含 "int" 的标签
+    auto      a = graph.node([] { return 42; }); // 无标签，应自动生成含 "int" 的标签
     (void)a;
 
     auto dot = graph.to_dot();
@@ -150,9 +150,9 @@ TEST(TaskGraphTests, SimpleChain)
 {
     WorkPool  pool(2);
     TaskGraph graph;
-    auto      a = graph.node([] { return 10; });
-    auto      b = graph.node([](int x) { return x * 2; }, a);
-    auto      c = graph.node([](int x) { return x + 5; }, b);
+    auto      a    = graph.node([] { return 10; });
+    auto      b    = graph.node([](int x) { return x * 2; }, a);
+    auto      c    = graph.node([](int x) { return x + 5; }, b);
     auto      task = graph.execute(pool);
     task.wait();
     EXPECT_EQ(graph.result(a), 10);
@@ -164,10 +164,10 @@ TEST(TaskGraphTests, DiamondDependency)
 {
     WorkPool  pool(4);
     TaskGraph graph;
-    auto      a = graph.node([] { return 1; });
-    auto      b = graph.node([](int x) { return x + 10; }, a);
-    auto      c = graph.node([](int x) { return x * 100; }, a);
-    auto      d = graph.node([](int x, int y) { return x + y; }, b, c);
+    auto      a    = graph.node([] { return 1; });
+    auto      b    = graph.node([](int x) { return x + 10; }, a);
+    auto      c    = graph.node([](int x) { return x * 100; }, a);
+    auto      d    = graph.node([](int x, int y) { return x + y; }, b, c);
     auto      task = graph.execute(pool);
     task.wait();
     EXPECT_EQ(graph.result(a), 1);
@@ -197,9 +197,9 @@ TEST(TaskGraphTests, TypedDataFlow)
 {
     WorkPool  pool(2);
     TaskGraph graph;
-    auto      a = graph.node([] { return 42; });
-    auto      b = graph.node([](int x) { return std::to_string(x); }, a);
-    auto      c = graph.node([](const std::string& s) { return static_cast<double>(s.size()); }, b);
+    auto      a    = graph.node([] { return 42; });
+    auto      b    = graph.node([](int x) { return std::to_string(x); }, a);
+    auto      c    = graph.node([](const std::string& s) { return static_cast<double>(s.size()); }, b);
     auto      task = graph.execute(pool);
     task.wait();
     EXPECT_EQ(graph.result(a), 42);
@@ -247,8 +247,8 @@ TEST(TaskGraphTests, VoidNodesWithNodeAfter)
     WorkPool         pool(2);
     TaskGraph        graph;
     std::atomic<int> counter{0};
-    auto             a = graph.node([&] { counter.fetch_add(1, std::memory_order_relaxed); });
-    auto             b = graph.node_after([&] { counter.fetch_add(10, std::memory_order_relaxed); }, a);
+    auto             a    = graph.node([&] { counter.fetch_add(1, std::memory_order_relaxed); });
+    auto             b    = graph.node_after([&] { counter.fetch_add(10, std::memory_order_relaxed); }, a);
     auto             task = graph.execute(pool);
     task.wait();
     EXPECT_EQ(counter.load(), 11);
@@ -279,15 +279,9 @@ TEST(TaskGraphTests, VoidNodeChain)
     std::atomic<int> order_tracker{0};
     int              step1_val = 0, step2_val = 0, step3_val = 0;
 
-    auto a = graph.node([&] {
-        step1_val = order_tracker.fetch_add(1, std::memory_order_relaxed);
-    });
-    auto b = graph.node_after([&] {
-        step2_val = order_tracker.fetch_add(1, std::memory_order_relaxed);
-    }, a);
-    auto c = graph.node_after([&] {
-        step3_val = order_tracker.fetch_add(1, std::memory_order_relaxed);
-    }, b);
+    auto a = graph.node([&] { step1_val = order_tracker.fetch_add(1, std::memory_order_relaxed); });
+    auto b = graph.node_after([&] { step2_val = order_tracker.fetch_add(1, std::memory_order_relaxed); }, a);
+    auto c = graph.node_after([&] { step3_val = order_tracker.fetch_add(1, std::memory_order_relaxed); }, b);
 
     auto task = graph.execute(pool);
     task.wait();
@@ -320,10 +314,13 @@ TEST(TaskGraphTests, CascadeFailure)
     std::atomic<bool> downstream_ran{false};
 
     auto a = graph.node([]() -> int { throw std::runtime_error("fail"); });
-    auto b = graph.node([&](int x) -> int {
-        downstream_ran.store(true, std::memory_order_relaxed);
-        return x;
-    }, a);
+    auto b = graph.node(
+        [&](int x) -> int {
+            downstream_ran.store(true, std::memory_order_relaxed);
+            return x;
+        },
+        a
+    );
     (void)b;
 
     auto task = graph.execute(pool);
@@ -367,22 +364,26 @@ TEST(TaskGraphTests, WideFanOutParallelism)
     WorkPool  pool(4);
     TaskGraph graph;
 
-    auto root = graph.node([] { return 0; });
-    constexpr int    N = 100;
+    auto             root = graph.node([] { return 0; });
+    constexpr int    N    = 100;
     std::atomic<int> parallel_count{0};
     std::atomic<int> max_parallel{0};
 
     std::vector<NodeHandle<void>> leaves;
     for (int i = 0; i < N; ++i) {
-        leaves.push_back(graph.node([&](int) {
-            auto cur  = parallel_count.fetch_add(1, std::memory_order_relaxed) + 1;
-            // 更新最大并行度
-            auto prev = max_parallel.load(std::memory_order_relaxed);
-            while (cur > prev && !max_parallel.compare_exchange_weak(prev, cur, std::memory_order_relaxed)) {}
+        leaves.push_back(graph.node(
+            [&](int) {
+                auto cur = parallel_count.fetch_add(1, std::memory_order_relaxed) + 1;
+                // 更新最大并行度
+                auto prev = max_parallel.load(std::memory_order_relaxed);
+                while (cur > prev && !max_parallel.compare_exchange_weak(prev, cur, std::memory_order_relaxed)) {
+                }
 
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-            parallel_count.fetch_sub(1, std::memory_order_relaxed);
-        }, root));
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                parallel_count.fetch_sub(1, std::memory_order_relaxed);
+            },
+            root
+        ));
     }
 
     auto task = graph.execute(pool);
@@ -409,11 +410,11 @@ TEST(TaskGraphTests, LargeGraphStress)
 
 TEST(TaskGraphTests, DoubleExecuteAllowedAndResultReadable)
 {
-    WorkPool  pool(2);
-    TaskGraph graph;
+    WorkPool         pool(2);
+    TaskGraph        graph;
     std::atomic<int> counter{0};
-    auto a = graph.node([&] { return ++counter; });
-    auto b = graph.node([](int x) { return x * 10; }, a);
+    auto             a = graph.node([&] { return ++counter; });
+    auto             b = graph.node([](int x) { return x * 10; }, a);
 
     // 第一次执行
     auto task1 = graph.execute(pool);
@@ -440,8 +441,8 @@ TEST(TaskGraphTests, DoubleExecuteAllowedAndResultReadable)
 TEST(TaskGraphTests, DotLabelEscaping)
 {
     TaskGraph graph;
-    auto a = graph.node("node with \"quotes\"", [] { return 1; });
-    auto b = graph.node("back\\slash", [](int x) { return x; }, a);
+    auto      a = graph.node("node with \"quotes\"", [] { return 1; });
+    auto      b = graph.node("back\\slash", [](int x) { return x; }, a);
     (void)b;
 
     auto dot = graph.to_dot();
@@ -457,19 +458,18 @@ TEST(TaskGraphTests, DotLabelEscaping)
 
 TEST(TaskGraphTests, ResultTypeMismatchDiagnostic)
 {
-    TaskGraph graph;
-    auto a = graph.node([] { return 42; });              // 节点 #0，返回 int
+    TaskGraph          graph;
+    auto               a = graph.node([] { return 42; }); // 节点 #0，返回 int
     NodeHandle<double> forged{a.index};                   // 人为伪造错位类型
 
     WorkPool pool(2);
-    auto t = graph.execute(pool);
+    auto     t = graph.execute(pool);
     t.wait();
 
     try {
         (void)graph.result(forged);
         FAIL() << "expected std::logic_error";
-    }
-    catch (const std::logic_error& e) {
+    } catch (const std::logic_error& e) {
         std::string msg = e.what();
         EXPECT_NE(msg.find("TaskGraph::result"), std::string::npos);
         EXPECT_NE(msg.find("#0"), std::string::npos);

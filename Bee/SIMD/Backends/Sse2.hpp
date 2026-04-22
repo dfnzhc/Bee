@@ -4,12 +4,12 @@
 
 #ifdef BEE_SIMD_ENABLE_SSE2
 
-#include <immintrin.h>
-#include <smmintrin.h>
+    #include <immintrin.h>
+    #include <smmintrin.h>
 
-#include <cmath>
-#include <cstddef>
-#include <cstdint>
+    #include <cmath>
+    #include <cstddef>
+    #include <cstdint>
 
 namespace bee::simd
 {
@@ -21,7 +21,7 @@ template <>
 struct SimdBackend<float, IsaSse2>
 {
     static constexpr std::size_t width = 4;
-    using reg = __m128;
+    using reg                          = __m128;
 
     // clang-format off
     static auto load(const float* p)  -> reg  { return _mm_load_ps(p); }
@@ -51,7 +51,10 @@ struct SimdBackend<float, IsaSse2>
         return _mm_andnot_ps(_mm_set1_ps(-0.0f), a);
     }
 
-    static auto sqrt(reg a) -> reg { return _mm_sqrt_ps(a); }
+    static auto sqrt(reg a) -> reg
+    {
+        return _mm_sqrt_ps(a);
+    }
 
     // exp 回退标量逐元素计算
     static auto exp(reg v) -> reg
@@ -78,7 +81,7 @@ struct SimdBackend<float, IsaSse2>
     static auto reduce_sum(reg v) -> float
     {
         __m128 t = _mm_add_ps(v, _mm_movehl_ps(v, v));
-        t = _mm_add_ss(t, _mm_shuffle_ps(t, t, 1));
+        t        = _mm_add_ss(t, _mm_shuffle_ps(t, t, 1));
         return _mm_cvtss_f32(t);
     }
 
@@ -86,7 +89,7 @@ struct SimdBackend<float, IsaSse2>
     static auto reduce_min(reg v) -> float
     {
         __m128 t = _mm_min_ps(v, _mm_movehl_ps(v, v));
-        t = _mm_min_ss(t, _mm_shuffle_ps(t, t, 1));
+        t        = _mm_min_ss(t, _mm_shuffle_ps(t, t, 1));
         return _mm_cvtss_f32(t);
     }
 
@@ -94,7 +97,7 @@ struct SimdBackend<float, IsaSse2>
     static auto reduce_max(reg v) -> float
     {
         __m128 t = _mm_max_ps(v, _mm_movehl_ps(v, v));
-        t = _mm_max_ss(t, _mm_shuffle_ps(t, t, 1));
+        t        = _mm_max_ss(t, _mm_shuffle_ps(t, t, 1));
         return _mm_cvtss_f32(t);
     }
 };
@@ -106,7 +109,7 @@ template <>
 struct SimdBackend<double, IsaSse2>
 {
     static constexpr std::size_t width = 2;
-    using reg = __m128d;
+    using reg                          = __m128d;
 
     // clang-format off
     static auto load(const double* p)  -> reg  { return _mm_load_pd(p); }
@@ -134,7 +137,10 @@ struct SimdBackend<double, IsaSse2>
         return _mm_andnot_pd(_mm_set1_pd(-0.0), a);
     }
 
-    static auto sqrt(reg a) -> reg { return _mm_sqrt_pd(a); }
+    static auto sqrt(reg a) -> reg
+    {
+        return _mm_sqrt_pd(a);
+    }
 
     static auto exp(reg v) -> reg
     {
@@ -184,7 +190,7 @@ template <>
 struct SimdBackend<int32_t, IsaSse2>
 {
     static constexpr std::size_t width = 4;
-    using reg = __m128i;
+    using reg                          = __m128i;
 
     static auto load(const int32_t* p) -> reg
     {
@@ -202,17 +208,35 @@ struct SimdBackend<int32_t, IsaSse2>
     {
         _mm_storeu_si128(reinterpret_cast<__m128i*>(p), v);
     }
-    static auto set1(int32_t x) -> reg { return _mm_set1_epi32(x); }
+    static auto set1(int32_t x) -> reg
+    {
+        return _mm_set1_epi32(x);
+    }
 
-    static auto add(reg a, reg b) -> reg { return _mm_add_epi32(a, b); }
-    static auto sub(reg a, reg b) -> reg { return _mm_sub_epi32(a, b); }
+    static auto add(reg a, reg b) -> reg
+    {
+        return _mm_add_epi32(a, b);
+    }
+    static auto sub(reg a, reg b) -> reg
+    {
+        return _mm_sub_epi32(a, b);
+    }
 
     // SSE4.1 有符号 32-bit 比较
-    static auto min(reg a, reg b) -> reg { return _mm_min_epi32(a, b); }
-    static auto max(reg a, reg b) -> reg { return _mm_max_epi32(a, b); }
+    static auto min(reg a, reg b) -> reg
+    {
+        return _mm_min_epi32(a, b);
+    }
+    static auto max(reg a, reg b) -> reg
+    {
+        return _mm_max_epi32(a, b);
+    }
 
     // 取反：0 - v
-    static auto neg(reg a) -> reg { return _mm_sub_epi32(_mm_setzero_si128(), a); }
+    static auto neg(reg a) -> reg
+    {
+        return _mm_sub_epi32(_mm_setzero_si128(), a);
+    }
 
     // 绝对值：SSE2 算术右移模拟（符号掩码法）
     // mask = 算术右移 31 位：负数得 0xFFFFFFFF，非负得 0
@@ -227,7 +251,7 @@ struct SimdBackend<int32_t, IsaSse2>
     static auto reduce_sum(reg v) -> int32_t
     {
         __m128i t = _mm_add_epi32(v, _mm_srli_si128(v, 8));
-        t = _mm_add_epi32(t, _mm_srli_si128(t, 4));
+        t         = _mm_add_epi32(t, _mm_srli_si128(t, 4));
         return _mm_cvtsi128_si32(t);
     }
 
@@ -235,7 +259,7 @@ struct SimdBackend<int32_t, IsaSse2>
     static auto reduce_min(reg v) -> int32_t
     {
         __m128i t = _mm_min_epi32(v, _mm_srli_si128(v, 8));
-        t = _mm_min_epi32(t, _mm_srli_si128(t, 4));
+        t         = _mm_min_epi32(t, _mm_srli_si128(t, 4));
         return _mm_cvtsi128_si32(t);
     }
 
@@ -243,7 +267,7 @@ struct SimdBackend<int32_t, IsaSse2>
     static auto reduce_max(reg v) -> int32_t
     {
         __m128i t = _mm_max_epi32(v, _mm_srli_si128(v, 8));
-        t = _mm_max_epi32(t, _mm_srli_si128(t, 4));
+        t         = _mm_max_epi32(t, _mm_srli_si128(t, 4));
         return _mm_cvtsi128_si32(t);
     }
 };
@@ -256,7 +280,7 @@ template <>
 struct SimdBackend<int64_t, IsaSse2>
 {
     static constexpr std::size_t width = 2;
-    using reg = __m128i;
+    using reg                          = __m128i;
 
     static auto load(const int64_t* p) -> reg
     {
@@ -274,13 +298,25 @@ struct SimdBackend<int64_t, IsaSse2>
     {
         _mm_storeu_si128(reinterpret_cast<__m128i*>(p), v);
     }
-    static auto set1(int64_t x) -> reg { return _mm_set1_epi64x(x); }
+    static auto set1(int64_t x) -> reg
+    {
+        return _mm_set1_epi64x(x);
+    }
 
-    static auto add(reg a, reg b) -> reg { return _mm_add_epi64(a, b); }
-    static auto sub(reg a, reg b) -> reg { return _mm_sub_epi64(a, b); }
+    static auto add(reg a, reg b) -> reg
+    {
+        return _mm_add_epi64(a, b);
+    }
+    static auto sub(reg a, reg b) -> reg
+    {
+        return _mm_sub_epi64(a, b);
+    }
 
     // 取反：0 - v
-    static auto neg(reg a) -> reg { return _mm_sub_epi64(_mm_setzero_si128(), a); }
+    static auto neg(reg a) -> reg
+    {
+        return _mm_sub_epi64(_mm_setzero_si128(), a);
+    }
 
     // 绝对值：利用高 32-bit lane 算术右移模拟 64-bit 符号掩码
     // 将每个 64-bit lane 的高 32 位算术右移 31 位，广播到整个 64 位 lane
@@ -310,7 +346,7 @@ template <>
 struct SimdBackend<uint8_t, IsaSse2>
 {
     static constexpr std::size_t width = 16;
-    using reg = __m128i;
+    using reg                          = __m128i;
 
     static auto load(const uint8_t* p) -> reg
     {
@@ -328,15 +364,30 @@ struct SimdBackend<uint8_t, IsaSse2>
     {
         _mm_storeu_si128(reinterpret_cast<__m128i*>(p), v);
     }
-    static auto set1(uint8_t x) -> reg { return _mm_set1_epi8(static_cast<char>(x)); }
+    static auto set1(uint8_t x) -> reg
+    {
+        return _mm_set1_epi8(static_cast<char>(x));
+    }
 
     // 字节加法（环绕，与标量行为一致）
-    static auto add(reg a, reg b) -> reg { return _mm_add_epi8(a, b); }
-    static auto sub(reg a, reg b) -> reg { return _mm_sub_epi8(a, b); }
+    static auto add(reg a, reg b) -> reg
+    {
+        return _mm_add_epi8(a, b);
+    }
+    static auto sub(reg a, reg b) -> reg
+    {
+        return _mm_sub_epi8(a, b);
+    }
 
     // SSE2 原生无符号字节比较
-    static auto min(reg a, reg b) -> reg { return _mm_min_epu8(a, b); }
-    static auto max(reg a, reg b) -> reg { return _mm_max_epu8(a, b); }
+    static auto min(reg a, reg b) -> reg
+    {
+        return _mm_min_epu8(a, b);
+    }
+    static auto max(reg a, reg b) -> reg
+    {
+        return _mm_max_epu8(a, b);
+    }
 
     // 水平求和：用 _mm_sad_epu8 将 16 个 uint8 分为两组 SAD 求和
     static auto reduce_sum(reg v) -> uint8_t
@@ -344,9 +395,8 @@ struct SimdBackend<uint8_t, IsaSse2>
         __m128i zero = _mm_setzero_si128();
         __m128i sad  = _mm_sad_epu8(v, zero);
         // sad[63:0] = 低 8 字节之和，sad[127:64] = 高 8 字节之和
-        __m128i hi   = _mm_srli_si128(sad, 8);
-        uint32_t total = static_cast<uint32_t>(_mm_cvtsi128_si32(sad))
-                       + static_cast<uint32_t>(_mm_cvtsi128_si32(hi));
+        __m128i  hi    = _mm_srli_si128(sad, 8);
+        uint32_t total = static_cast<uint32_t>(_mm_cvtsi128_si32(sad)) + static_cast<uint32_t>(_mm_cvtsi128_si32(hi));
         return static_cast<uint8_t>(total);
     }
 
@@ -354,9 +404,9 @@ struct SimdBackend<uint8_t, IsaSse2>
     static auto reduce_min(reg v) -> uint8_t
     {
         __m128i t = _mm_min_epu8(v, _mm_srli_si128(v, 8));
-        t = _mm_min_epu8(t, _mm_srli_si128(t, 4));
-        t = _mm_min_epu8(t, _mm_srli_si128(t, 2));
-        t = _mm_min_epu8(t, _mm_srli_si128(t, 1));
+        t         = _mm_min_epu8(t, _mm_srli_si128(t, 4));
+        t         = _mm_min_epu8(t, _mm_srli_si128(t, 2));
+        t         = _mm_min_epu8(t, _mm_srli_si128(t, 1));
         return static_cast<uint8_t>(_mm_cvtsi128_si32(t) & 0xFF);
     }
 
@@ -364,9 +414,9 @@ struct SimdBackend<uint8_t, IsaSse2>
     static auto reduce_max(reg v) -> uint8_t
     {
         __m128i t = _mm_max_epu8(v, _mm_srli_si128(v, 8));
-        t = _mm_max_epu8(t, _mm_srli_si128(t, 4));
-        t = _mm_max_epu8(t, _mm_srli_si128(t, 2));
-        t = _mm_max_epu8(t, _mm_srli_si128(t, 1));
+        t         = _mm_max_epu8(t, _mm_srli_si128(t, 4));
+        t         = _mm_max_epu8(t, _mm_srli_si128(t, 2));
+        t         = _mm_max_epu8(t, _mm_srli_si128(t, 1));
         return static_cast<uint8_t>(_mm_cvtsi128_si32(t) & 0xFF);
     }
 };

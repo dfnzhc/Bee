@@ -53,8 +53,7 @@ template <Scheduler S, std::random_access_iterator It, typename T, typename Bina
                 acc = op(acc, *it);
             }
             partial_results[i] = std::move(acc);
-        }
-        catch (...) {
+        } catch (...) {
             exceptions[i] = std::current_exception();
         }
         done.count_down();
@@ -113,8 +112,7 @@ template <Scheduler S, std::random_access_iterator It, typename T, typename Bina
                 acc = op(acc, *it);
             }
             partial_results[i] = std::move(acc);
-        }
-        catch (...) {
+        } catch (...) {
             exceptions[i] = std::current_exception();
         }
         done.count_down();
@@ -155,8 +153,7 @@ template <Scheduler S, std::ranges::random_access_range R, typename T, typename 
 /// 先变换每个元素再归约。融合执行——无中间分配。
 /// reduce_op 必须满足结合律和交换律。
 template <Scheduler S, std::random_access_iterator It, typename T, typename ReduceOp, typename TransformOp>
-[[nodiscard]] auto parallel_transform_reduce(
-    S& scheduler, It first, It last, T init, ReduceOp reduce_op, TransformOp transform_op) -> T
+[[nodiscard]] auto parallel_transform_reduce(S& scheduler, It first, It last, T init, ReduceOp reduce_op, TransformOp transform_op) -> T
 {
     const auto n = static_cast<std::size_t>(std::distance(first, last));
     if (n == 0)
@@ -181,8 +178,7 @@ template <Scheduler S, std::random_access_iterator It, typename T, typename Redu
                 acc = reduce_op(acc, transform_op(*it));
             }
             partial_results[i] = std::move(acc);
-        }
-        catch (...) {
+        } catch (...) {
             exceptions[i] = std::current_exception();
         }
         done.count_down();
@@ -200,7 +196,14 @@ template <Scheduler S, std::random_access_iterator It, typename T, typename Redu
 /// 带取消支持的并行变换归约。
 template <Scheduler S, std::random_access_iterator It, typename T, typename ReduceOp, typename TransformOp>
 [[nodiscard]] auto parallel_transform_reduce(
-    S& scheduler, It first, It last, T init, ReduceOp reduce_op, TransformOp transform_op, std::stop_token token) -> T
+    S&              scheduler,
+    It              first,
+    It              last,
+    T               init,
+    ReduceOp        reduce_op,
+    TransformOp     transform_op,
+    std::stop_token token
+) -> T
 {
     const auto n = static_cast<std::size_t>(std::distance(first, last));
     if (n == 0)
@@ -242,8 +245,7 @@ template <Scheduler S, std::random_access_iterator It, typename T, typename Redu
                 acc = reduce_op(acc, transform_op(*it));
             }
             partial_results[i] = std::move(acc);
-        }
-        catch (...) {
+        } catch (...) {
             exceptions[i] = std::current_exception();
         }
         done.count_down();
@@ -272,7 +274,8 @@ template <Scheduler S, std::ranges::random_access_range R, typename T, typename 
 }
 
 template <Scheduler S, std::ranges::random_access_range R, typename T, typename ReduceOp, typename TransformOp>
-[[nodiscard]] auto parallel_transform_reduce(S& scheduler, R&& range, T init, ReduceOp reduce_op, TransformOp transform_op, std::stop_token token) -> T
+[[nodiscard]] auto parallel_transform_reduce(S& scheduler, R&& range, T init, ReduceOp reduce_op, TransformOp transform_op, std::stop_token token)
+    -> T
 {
     return parallel_transform_reduce(scheduler, std::ranges::begin(range), std::ranges::end(range), init, reduce_op, transform_op, token);
 }

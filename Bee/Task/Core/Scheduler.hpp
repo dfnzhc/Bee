@@ -55,8 +55,7 @@ template <Scheduler S, typename Fn>
     co_await scheduler.schedule();
     if constexpr (std::is_void_v<std::invoke_result_t<Fn>>) {
         fn();
-    }
-    else {
+    } else {
         co_return fn();
     }
 }

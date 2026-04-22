@@ -83,7 +83,7 @@ TEST(PartitionerTests, OversubscriptionFactor)
 
 TEST(PartitionerTests, ExecuteChunksBasic)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::vector<int> data(500, 0);
 
     detail::execute_chunks(pool, data.size(), [&data](size_t begin, size_t end) {
@@ -99,11 +99,9 @@ TEST(PartitionerTests, ExecuteChunksBasic)
 TEST(PartitionerTests, ExecuteChunksEmpty)
 {
     WorkPool pool(4);
-    bool called = false;
+    bool     called = false;
 
-    detail::execute_chunks(pool, 0, [&called](size_t, size_t) {
-        called = true;
-    });
+    detail::execute_chunks(pool, 0, [&called](size_t, size_t) { called = true; });
 
     EXPECT_FALSE(called);
 }
@@ -113,31 +111,32 @@ TEST(PartitionerTests, ExecuteChunksException)
     WorkPool pool(4);
 
     EXPECT_THROW(
-        detail::execute_chunks(pool, 100, [](size_t begin, size_t) {
-            if (begin == 0) {
-                throw std::runtime_error("test error");
+        detail::execute_chunks(
+            pool,
+            100,
+            [](size_t begin, size_t) {
+                if (begin == 0) {
+                    throw std::runtime_error("test error");
+                }
             }
-        }),
+        ),
         std::runtime_error
     );
 }
 
 TEST(PartitionerTests, ExecuteChunksCancellation)
 {
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::stop_source ss;
     ss.request_stop();
 
-    EXPECT_THROW(
-        detail::execute_chunks(pool, 1000, [](size_t, size_t) {}, ss.get_token()),
-        std::runtime_error
-    );
+    EXPECT_THROW(detail::execute_chunks(pool, 1000, [](size_t, size_t) {}, ss.get_token()), std::runtime_error);
 }
 
 TEST(PartitionerTests, ExecuteChunksConcurrency)
 {
     // 验证块确实在多线程上并行执行
-    WorkPool pool(4);
+    WorkPool         pool(4);
     std::atomic<int> max_concurrent{0};
     std::atomic<int> current{0};
 

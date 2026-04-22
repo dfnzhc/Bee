@@ -18,7 +18,8 @@
 using namespace bee;
 using namespace std::chrono_literals;
 
-namespace {
+namespace
+{
 
 TEST(EventCountTests, NotifyNoWaitersIsNoOp)
 {
@@ -32,7 +33,7 @@ TEST(EventCountTests, NotifyNoWaitersIsNoOp)
 TEST(EventCountTests, CancelWaitDoesNotDeadlock)
 {
     EventCount ec;
-    auto key = ec.prepare_wait();
+    auto       key = ec.prepare_wait();
     ec.cancel_wait();
     // 如果 waiter 计数泄漏，后续 notify 会尝试 syscall，但不会卡住
     ec.notify();
@@ -41,7 +42,7 @@ TEST(EventCountTests, CancelWaitDoesNotDeadlock)
 
 TEST(EventCountTests, SingleWaiterAwakenedByNotify)
 {
-    EventCount ec;
+    EventCount        ec;
     std::atomic<bool> ready{false};
     std::atomic<bool> awoke{false};
 
@@ -69,12 +70,10 @@ TEST(EventCountTests, SingleWaiterAwakenedByNotify)
 
 TEST(EventCountTests, AwaitHelperMatchesManualPattern)
 {
-    EventCount ec;
+    EventCount       ec;
     std::atomic<int> value{0};
 
-    std::thread waiter([&] {
-        ec.await([&] { return value.load(std::memory_order_acquire) == 42; });
-    });
+    std::thread waiter([&] { ec.await([&] { return value.load(std::memory_order_acquire) == 42; }); });
 
     std::this_thread::sleep_for(20ms);
     value.store(42, std::memory_order_release);
@@ -86,7 +85,7 @@ TEST(EventCountTests, AwaitHelperMatchesManualPattern)
 
 TEST(EventCountTests, AwaitReturnsImmediatelyIfPredicateTrue)
 {
-    EventCount ec;
+    EventCount       ec;
     std::atomic<int> calls{0};
     ec.await([&] {
         ++calls;
@@ -98,12 +97,12 @@ TEST(EventCountTests, AwaitReturnsImmediatelyIfPredicateTrue)
 
 TEST(EventCountTests, NotifyAllWakesEveryWaiter)
 {
-    EventCount ec;
-    constexpr int kN = 8;
-    std::atomic<int> ready{0};
-    std::atomic<int> awoke{0};
+    EventCount        ec;
+    constexpr int     kN = 8;
+    std::atomic<int>  ready{0};
+    std::atomic<int>  awoke{0};
     std::atomic<bool> go{false};
-    std::latch all_in(kN);
+    std::latch        all_in(kN);
 
     std::vector<std::thread> ts;
     for (int i = 0; i < kN; ++i) {
@@ -118,13 +117,14 @@ TEST(EventCountTests, NotifyAllWakesEveryWaiter)
     go.store(true, std::memory_order_release);
     ec.notify_all();
 
-    for (auto& t : ts) t.join();
+    for (auto& t : ts)
+        t.join();
     EXPECT_EQ(awoke.load(), kN);
 }
 
 TEST(EventCountTests, ProducerConsumerStress)
 {
-    EventCount ec;
+    EventCount    ec;
     constexpr int kProducers = 2;
     constexpr int kConsumers = 2;
     constexpr int kItems     = 2000;
@@ -137,8 +137,8 @@ TEST(EventCountTests, ProducerConsumerStress)
         consumers.emplace_back([&] {
             while (true) {
                 ec.await([&] {
-                    return consumed.load(std::memory_order_acquire) < produced.load(std::memory_order_acquire)
-                        || produced.load(std::memory_order_acquire) >= kItems * kProducers;
+                    return consumed.load(std::memory_order_acquire) < produced.load(std::memory_order_acquire) ||
+                           produced.load(std::memory_order_acquire) >= kItems * kProducers;
                 });
                 // 原子 CAS：只在 consumed < produced 时才 +1
                 int c = consumed.load(std::memory_order_acquire);
@@ -149,7 +149,8 @@ TEST(EventCountTests, ProducerConsumerStress)
                     }
                     continue;
                 }
-                if (p >= kItems * kProducers) break;
+                if (p >= kItems * kProducers)
+                    break;
             }
         });
     }
@@ -164,10 +165,12 @@ TEST(EventCountTests, ProducerConsumerStress)
         });
     }
 
-    for (auto& t : producers) t.join();
+    for (auto& t : producers)
+        t.join();
     // 所有生产完成后，唤醒可能卡在 wait 的消费者（边界：p == c）
     ec.notify_all();
-    for (auto& t : consumers) t.join();
+    for (auto& t : consumers)
+        t.join();
 
     EXPECT_EQ(consumed.load(), kItems * kProducers);
     EXPECT_EQ(produced.load(), kItems * kProducers);

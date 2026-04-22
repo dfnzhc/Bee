@@ -17,18 +17,18 @@ namespace bee
 
 // ─── 全局 reduce（返回 0-rank 标量张量）───────────────────────────────────────
 
-[[nodiscard]] auto sum(const Tensor& a)  -> Result<Tensor>;
+[[nodiscard]] auto sum(const Tensor& a) -> Result<Tensor>;
 [[nodiscard]] auto mean(const Tensor& a) -> Result<Tensor>;
-[[nodiscard]] auto min(const Tensor& a)  -> Result<Tensor>;
-[[nodiscard]] auto max(const Tensor& a)  -> Result<Tensor>;
+[[nodiscard]] auto min(const Tensor& a) -> Result<Tensor>;
+[[nodiscard]] auto max(const Tensor& a) -> Result<Tensor>;
 [[nodiscard]] auto prod(const Tensor& a) -> Result<Tensor>;
 
 // ─── 按轴 reduce（单一 dim，支持负索引；keepdim=false 时移除该维）────────────
 
-[[nodiscard]] auto sum(const Tensor& a,  int dim, bool keepdim = false) -> Result<Tensor>;
+[[nodiscard]] auto sum(const Tensor& a, int dim, bool keepdim = false) -> Result<Tensor>;
 [[nodiscard]] auto mean(const Tensor& a, int dim, bool keepdim = false) -> Result<Tensor>;
-[[nodiscard]] auto min(const Tensor& a,  int dim, bool keepdim = false) -> Result<Tensor>;
-[[nodiscard]] auto max(const Tensor& a,  int dim, bool keepdim = false) -> Result<Tensor>;
+[[nodiscard]] auto min(const Tensor& a, int dim, bool keepdim = false) -> Result<Tensor>;
+[[nodiscard]] auto max(const Tensor& a, int dim, bool keepdim = false) -> Result<Tensor>;
 [[nodiscard]] auto prod(const Tensor& a, int dim, bool keepdim = false) -> Result<Tensor>;
 
 } // namespace bee

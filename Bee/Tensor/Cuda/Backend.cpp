@@ -17,25 +17,19 @@ auto deallocate(void* /*p*/, std::size_t /*nbytes*/, std::size_t /*alignment*/) 
     // Stub 实现：不做任何操作
 }
 
-auto memcpy_h2d(void* /*dst*/, const void* /*src*/, std::size_t /*nbytes*/)
-    -> Result<void>
+auto memcpy_h2d(void* /*dst*/, const void* /*src*/, std::size_t /*nbytes*/) -> Result<void>
 {
-    return std::unexpected(
-        make_error("CUDA 后端不可用：memcpy_h2d", Severity::Recoverable));
+    return std::unexpected(make_error("CUDA 后端不可用：memcpy_h2d", Severity::Recoverable));
 }
 
-auto memcpy_d2h(void* /*dst*/, const void* /*src*/, std::size_t /*nbytes*/)
-    -> Result<void>
+auto memcpy_d2h(void* /*dst*/, const void* /*src*/, std::size_t /*nbytes*/) -> Result<void>
 {
-    return std::unexpected(
-        make_error("CUDA 后端不可用：memcpy_d2h", Severity::Recoverable));
+    return std::unexpected(make_error("CUDA 后端不可用：memcpy_d2h", Severity::Recoverable));
 }
 
-auto memcpy_d2d(void* /*dst*/, const void* /*src*/, std::size_t /*nbytes*/)
-    -> Result<void>
+auto memcpy_d2d(void* /*dst*/, const void* /*src*/, std::size_t /*nbytes*/) -> Result<void>
 {
-    return std::unexpected(
-        make_error("CUDA 后端不可用：memcpy_d2d", Severity::Recoverable));
+    return std::unexpected(make_error("CUDA 后端不可用：memcpy_d2d", Severity::Recoverable));
 }
 
 auto synchronize() -> Result<void>

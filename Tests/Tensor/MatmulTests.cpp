@@ -37,10 +37,16 @@ TEST(MatmulTests, F32Basic)
     ASSERT_OK(b);
 
     auto* pa = static_cast<float*>(a->data_ptr());
-    pa[0] = 1.f; pa[1] = 2.f; pa[2] = 3.f; pa[3] = 4.f;
+    pa[0]    = 1.f;
+    pa[1]    = 2.f;
+    pa[2]    = 3.f;
+    pa[3]    = 4.f;
 
     auto* pb = static_cast<float*>(b->data_ptr());
-    pb[0] = 5.f; pb[1] = 6.f; pb[2] = 7.f; pb[3] = 8.f;
+    pb[0]    = 5.f;
+    pb[1]    = 6.f;
+    pb[2]    = 7.f;
+    pb[3]    = 8.f;
 
     auto c = matmul(*a, *b);
     ASSERT_OK(c);
@@ -64,10 +70,14 @@ TEST(MatmulTests, F64Basic)
     ASSERT_OK(b);
 
     auto* pa = static_cast<double*>(a->data_ptr());
-    pa[0] = 1.0; pa[1] = 2.0; pa[2] = 3.0;
+    pa[0]    = 1.0;
+    pa[1]    = 2.0;
+    pa[2]    = 3.0;
 
     auto* pb = static_cast<double*>(b->data_ptr());
-    pb[0] = 1.0; pb[1] = 1.0; pb[2] = 1.0;
+    pb[0]    = 1.0;
+    pb[1]    = 1.0;
+    pb[2]    = 1.0;
 
     auto c = matmul(*a, *b);
     ASSERT_OK(c);
@@ -85,7 +95,9 @@ TEST(MatmulTests, I32IdentityMatmul)
     auto eye = Tensor::zeros({3, 3}, DType::I32);
     ASSERT_OK(eye);
     auto* pe = static_cast<int32_t*>(eye->data_ptr());
-    pe[0] = 1; pe[4] = 1; pe[8] = 1;   // 对角线
+    pe[0]    = 1;
+    pe[4]    = 1;
+    pe[8]    = 1; // 对角线
 
     auto mat = Tensor::empty({3, 3}, DType::I32);
     ASSERT_OK(mat);
@@ -108,12 +120,14 @@ TEST(MatmulTests, F32NumericalAccuracy)
 {
     constexpr int M = 17, K = 13, N = 11;
 
-    std::mt19937 rng(42);
+    std::mt19937                          rng(42);
     std::uniform_real_distribution<float> dist(-1.f, 1.f);
 
     std::vector<float> ra(M * K), rb(K * N), rc_ref(M * N, 0.f);
-    for (auto& x : ra) x = dist(rng);
-    for (auto& x : rb) x = dist(rng);
+    for (auto& x : ra)
+        x = dist(rng);
+    for (auto& x : rb)
+        x = dist(rng);
 
     // 标量参考实现
     for (int i = 0; i < M; ++i)
@@ -230,13 +244,20 @@ TEST(MatmulTests, NonContiguousInput)
     ASSERT_OK(b_cont);
 
     auto* pa = static_cast<float*>(a_cont->data_ptr());
-    pa[0] = 1.f; pa[1] = 2.f; pa[2] = 3.f;
-    pa[3] = 4.f; pa[4] = 5.f; pa[5] = 6.f;
+    pa[0]    = 1.f;
+    pa[1]    = 2.f;
+    pa[2]    = 3.f;
+    pa[3]    = 4.f;
+    pa[4]    = 5.f;
+    pa[5]    = 6.f;
 
     auto* pb = static_cast<float*>(b_cont->data_ptr());
-    pb[0] = 7.f;  pb[1] = 8.f;
-    pb[2] = 9.f;  pb[3] = 10.f;
-    pb[4] = 11.f; pb[5] = 12.f;
+    pb[0]    = 7.f;
+    pb[1]    = 8.f;
+    pb[2]    = 9.f;
+    pb[3]    = 10.f;
+    pb[4]    = 11.f;
+    pb[5]    = 12.f;
 
     // a_t: [3,2] 非连续
     auto a_t = a_cont->transpose(0, 1);

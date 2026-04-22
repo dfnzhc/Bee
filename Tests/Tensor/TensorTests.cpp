@@ -103,7 +103,7 @@ TEST(TensorTests, CloneIsIndependent)
 TEST(TensorTests, CloneUndefinedReturnsError)
 {
     Tensor t;
-    auto result = t.clone();
+    auto   result = t.clone();
     EXPECT_FALSE(result.has_value());
 }
 

@@ -57,8 +57,8 @@ TEST(StorageTests, SharedOwnership)
 TEST(StorageTests, HugeAllocationFails)
 {
     // 使用极大值触发 bad_alloc，验证返回 Err 而非抛出异常
-    const std::size_t huge = std::numeric_limits<std::size_t>::max() / 2;
-    auto result = Storage::allocate(huge, CpuAllocator::instance());
+    const std::size_t huge   = std::numeric_limits<std::size_t>::max() / 2;
+    auto              result = Storage::allocate(huge, CpuAllocator::instance());
     EXPECT_FALSE(result.has_value());
 }
 
@@ -68,8 +68,8 @@ TEST(StorageTests, NonDefaultAlignmentAllocateDeallocate)
 {
     // CpuAllocator 内部强制至少 64 字节对齐，但接口层应接受任意 alignment
     // 此处验证传入 128 时 allocate/deallocate 配对不崩溃
-    auto& alloc = CpuAllocator::instance();
-    auto result = alloc.allocate(128, 128);
+    auto& alloc  = CpuAllocator::instance();
+    auto  result = alloc.allocate(128, 128);
     ASSERT_TRUE(result.has_value());
     void* p = result.value();
     EXPECT_NE(p, nullptr);

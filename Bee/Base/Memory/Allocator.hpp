@@ -15,8 +15,8 @@ class IAllocator
 public:
     virtual ~IAllocator() = default;
 
-    [[nodiscard]] virtual auto allocate(std::size_t nbytes, std::size_t alignment) -> Result<void*> = 0;
-    virtual auto deallocate(void* p, std::size_t nbytes, std::size_t alignment) noexcept -> void   = 0;
+    [[nodiscard]] virtual auto allocate(std::size_t nbytes, std::size_t alignment) -> Result<void*>            = 0;
+    virtual auto               deallocate(void* p, std::size_t nbytes, std::size_t alignment) noexcept -> void = 0;
 
     [[nodiscard]] virtual auto device() const noexcept -> Device = 0;
 };
@@ -28,7 +28,7 @@ public:
     [[nodiscard]] static auto instance() noexcept -> CpuAllocator&;
 
     [[nodiscard]] auto allocate(std::size_t nbytes, std::size_t alignment) -> Result<void*> override;
-    auto deallocate(void* p, std::size_t nbytes, std::size_t alignment) noexcept -> void override;
+    auto               deallocate(void* p, std::size_t nbytes, std::size_t alignment) noexcept -> void override;
 
     [[nodiscard]] auto device() const noexcept -> Device override;
 };

@@ -6,8 +6,7 @@
 #include <cstring>
 #include <format>
 
-namespace bee
-{
+using namespace bee;
 
 // ── 内部辅助：按 DType 将 double 标量填充到原始缓冲区 ──────────────────────────
 
@@ -18,8 +17,8 @@ namespace
 template <DType D>
 auto fill_typed(void* data, std::size_t n, double value) -> void
 {
-    using T    = dtype_cpp_t<D>;
-    auto* ptr  = static_cast<T*>(data);
+    using T   = dtype_cpp_t<D>;
+    auto* ptr = static_cast<T*>(data);
     T     fill_val;
     if constexpr (D == DType::Bool) {
         // Bool：非零值视为 true
@@ -35,11 +34,11 @@ auto dispatch_fill(DType dt, void* data, std::size_t n, double value) -> void
 {
     switch (dt) {
     case DType::Bool: fill_typed<DType::Bool>(data, n, value); break;
-    case DType::U8:   fill_typed<DType::U8>(data, n, value);   break;
-    case DType::I32:  fill_typed<DType::I32>(data, n, value);  break;
-    case DType::I64:  fill_typed<DType::I64>(data, n, value);  break;
-    case DType::F32:  fill_typed<DType::F32>(data, n, value);  break;
-    case DType::F64:  fill_typed<DType::F64>(data, n, value);  break;
+    case DType::U8: fill_typed<DType::U8>(data, n, value); break;
+    case DType::I32: fill_typed<DType::I32>(data, n, value); break;
+    case DType::I64: fill_typed<DType::I64>(data, n, value); break;
+    case DType::F32: fill_typed<DType::F32>(data, n, value); break;
+    case DType::F64: fill_typed<DType::F64>(data, n, value); break;
     default: break;
     }
 }
@@ -58,7 +57,7 @@ auto arange_typed(void* data, std::size_t n, int64_t start, int64_t step) -> voi
 auto dispatch_arange(DType dt, void* data, std::size_t n, int64_t start, int64_t step) -> void
 {
     switch (dt) {
-    case DType::U8:  arange_typed<DType::U8>(data, n, start, step);  break;
+    case DType::U8: arange_typed<DType::U8>(data, n, start, step); break;
     case DType::I32: arange_typed<DType::I32>(data, n, start, step); break;
     case DType::I64: arange_typed<DType::I64>(data, n, start, step); break;
     case DType::F32: arange_typed<DType::F32>(data, n, start, step); break;
@@ -67,15 +66,13 @@ auto dispatch_arange(DType dt, void* data, std::size_t n, int64_t start, int64_t
     }
 }
 
-} // namespace
-
 // ── 内部辅助：将含 -1 占位符的 new_shape 解析为确定 shape ──────────────────────
 
-static auto resolve_shape(const Shape& new_shape, int64_t total_numel) -> Result<Shape>
+auto resolve_shape(const Shape& new_shape, int64_t total_numel) -> Result<Shape>
 {
-    int     neg_count    = 0;
-    int     neg_idx      = -1;
-    int64_t known_prod   = 1;
+    int     neg_count  = 0;
+    int     neg_idx    = -1;
+    int64_t known_prod = 1;
 
     for (int i = 0; i < static_cast<int>(new_shape.size()); ++i) {
         const int64_t d = new_shape[i];
@@ -83,16 +80,14 @@ static auto resolve_shape(const Shape& new_shape, int64_t total_numel) -> Result
             ++neg_count;
             neg_idx = i;
         } else if (d < 0) {
-            return std::unexpected(make_error(
-                std::format("shape 中含非法负维度 {}", d), Severity::Recoverable));
+            return std::unexpected(make_error(std::format("shape 中含非法负维度 {}", d), Severity::Recoverable));
         } else {
             known_prod *= d;
         }
     }
 
     if (neg_count > 1)
-        return std::unexpected(
-            make_error("shape 中至多允许一个 -1", Severity::Recoverable));
+        return std::unexpected(make_error("shape 中至多允许一个 -1", Severity::Recoverable));
 
     Shape resolved = new_shape;
 
@@ -100,28 +95,25 @@ static auto resolve_shape(const Shape& new_shape, int64_t total_numel) -> Result
         if (known_prod == 0) {
             // 已知维度中有 0；只有 total_numel 也为 0 时可推断为 0
             if (total_numel != 0)
-                return std::unexpected(
-                    make_error("无法从已知维度（含零）推断 -1 所在维度", Severity::Recoverable));
+                return std::unexpected(make_error("无法从已知维度（含零）推断 -1 所在维度", Severity::Recoverable));
             resolved[neg_idx] = 0;
         } else {
             if (total_numel % known_prod != 0)
-                return std::unexpected(
-                    make_error("元素总数无法被已知维度整除，无法推断 -1", Severity::Recoverable));
+                return std::unexpected(make_error("元素总数无法被已知维度整除，无法推断 -1", Severity::Recoverable));
             resolved[neg_idx] = total_numel / known_prod;
         }
     }
 
     if (::bee::numel(resolved) != total_numel)
         return std::unexpected(
-            make_error(std::format("reshape 元素数 {} 与原张量 {} 不匹配",
-                                   ::bee::numel(resolved), total_numel),
-                       Severity::Recoverable));
+            make_error(std::format("reshape 元素数 {} 与原张量 {} 不匹配", ::bee::numel(resolved), total_numel), Severity::Recoverable)
+        );
 
     return resolved;
 }
 
 // ── 内部辅助：将非连续 TensorImpl 按 stride 逐元素拷贝到已分配目标缓冲区 ──────
-static void contiguous_copy_into(void* dst, const TensorImpl& src, std::size_t elem_sz)
+void contiguous_copy_into(void* dst, const TensorImpl& src, std::size_t elem_sz)
 {
     const auto* src_base = static_cast<const uint8_t*>(src.storage->data());
     auto*       dst_ptr  = static_cast<uint8_t*>(dst);
@@ -139,9 +131,7 @@ static void contiguous_copy_into(void* dst, const TensorImpl& src, std::size_t e
         for (int i = 0; i < nd; ++i)
             src_off += idx[i] * st[i];
 
-        std::memcpy(dst_ptr + linear * static_cast<int64_t>(elem_sz),
-                    src_base + src_off * static_cast<int64_t>(elem_sz),
-                    elem_sz);
+        std::memcpy(dst_ptr + linear * static_cast<int64_t>(elem_sz), src_base + src_off * static_cast<int64_t>(elem_sz), elem_sz);
 
         // 推进多维索引（末尾维度最快）
         for (int i = nd - 1; i >= 0; --i) {
@@ -152,6 +142,11 @@ static void contiguous_copy_into(void* dst, const TensorImpl& src, std::size_t e
         }
     }
 }
+
+} // namespace
+
+namespace bee
+{
 
 // ── 构造器 ──────────────────────────────────────────────────────────────────
 
@@ -170,8 +165,7 @@ auto Tensor::empty(Shape shape, DType dtype, Device device) -> Result<Tensor>
     // 校验 shape：负维度非法
     for (auto d : shape) {
         if (d < 0) {
-            return std::unexpected(make_error(
-                std::format("Tensor::empty: 非法的负维度 {} in shape", d), Severity::Recoverable));
+            return std::unexpected(make_error(std::format("Tensor::empty: 非法的负维度 {} in shape", d), Severity::Recoverable));
         }
     }
 
@@ -182,12 +176,12 @@ auto Tensor::empty(Shape shape, DType dtype, Device device) -> Result<Tensor>
     if (!storage_result)
         return std::unexpected(std::move(storage_result.error()));
 
-    auto ti      = std::make_shared<TensorImpl>();
-    ti->storage  = std::move(*storage_result);
-    ti->dtype    = dtype;
-    ti->strides  = compute_contiguous_strides(shape);
-    ti->shape    = std::move(shape);
-    ti->offset   = 0;
+    auto ti     = std::make_shared<TensorImpl>();
+    ti->storage = std::move(*storage_result);
+    ti->dtype   = dtype;
+    ti->strides = compute_contiguous_strides(shape);
+    ti->shape   = std::move(shape);
+    ti->offset  = 0;
 
     return Tensor(std::move(ti));
 }
@@ -232,29 +226,22 @@ auto Tensor::full(Shape shape, DType dtype, double value, Device device) -> Resu
 
 // ── arange ───────────────────────────────────────────────────────────────────
 
-auto Tensor::arange(int64_t start, int64_t end, int64_t step, DType dtype, Device device)
-    -> Result<Tensor>
+auto Tensor::arange(int64_t start, int64_t end, int64_t step, DType dtype, Device device) -> Result<Tensor>
 {
     // Bool 类型不支持
     if (dtype == DType::Bool)
-        return std::unexpected(
-            make_error("arange 不支持 Bool 类型", Severity::Recoverable));
+        return std::unexpected(make_error("arange 不支持 Bool 类型", Severity::Recoverable));
 
     // step 为 0 非法
     if (step == 0)
-        return std::unexpected(
-            make_error("arange: step 不能为 0", Severity::Recoverable));
+        return std::unexpected(make_error("arange: step 不能为 0", Severity::Recoverable));
 
     // 区间方向校验
     if (step > 0 && start > end)
-        return std::unexpected(make_error(
-            std::format("arange: step>0 但 start({}) > end({})", start, end),
-            Severity::Recoverable));
+        return std::unexpected(make_error(std::format("arange: step>0 但 start({}) > end({})", start, end), Severity::Recoverable));
 
     if (step < 0 && start < end)
-        return std::unexpected(make_error(
-            std::format("arange: step<0 但 start({}) < end({})", start, end),
-            Severity::Recoverable));
+        return std::unexpected(make_error(std::format("arange: step<0 但 start({}) < end({})", start, end), Severity::Recoverable));
 
     // 计算元素数（PyTorch 语义：ceil 除法）
     int64_t n = 0;
@@ -388,10 +375,9 @@ auto Tensor::contiguous() const -> Result<Tensor>
         return *this; // 共享 storage，引用计数递增
 
     if (device() == Device::CUDA)
-        return std::unexpected(
-            make_error("CUDA contiguous 尚未实现", Severity::Recoverable));
+        return std::unexpected(make_error("CUDA contiguous 尚未实现", Severity::Recoverable));
 
-    const int64_t   n         = numel();
+    const int64_t     n       = numel();
     const std::size_t elem_sz = dtype_size(impl_->dtype);
     const std::size_t nbytes  = static_cast<std::size_t>(n) * elem_sz;
 
@@ -417,8 +403,7 @@ auto Tensor::contiguous() const -> Result<Tensor>
 auto Tensor::view(Shape new_shape) const -> Result<Tensor>
 {
     if (!is_contiguous())
-        return std::unexpected(make_error(
-            "view requires contiguous tensor, use reshape instead", Severity::Recoverable));
+        return std::unexpected(make_error("view requires contiguous tensor, use reshape instead", Severity::Recoverable));
 
     Shape resolved;
     BEE_TRY_ASSIGN(resolved, resolve_shape(new_shape, numel()));
@@ -453,22 +438,15 @@ auto Tensor::permute(std::span<const int> dims) const -> Result<Tensor>
     const int64_t nd = ndim();
 
     if (static_cast<int64_t>(dims.size()) != nd)
-        return std::unexpected(make_error(
-            std::format("permute: 给定 {} 个维度，张量 ndim 为 {}",
-                        dims.size(), nd),
-            Severity::Recoverable));
+        return std::unexpected(make_error(std::format("permute: 给定 {} 个维度，张量 ndim 为 {}", dims.size(), nd), Severity::Recoverable));
 
     // 验证：值在 [0, ndim)，无重复
     std::vector<bool> seen(static_cast<std::size_t>(nd), false);
     for (const int d : dims) {
         if (d < 0 || d >= nd)
-            return std::unexpected(make_error(
-                std::format("permute: 维度索引 {} 超出范围 [0, {})", d, nd),
-                Severity::Recoverable));
+            return std::unexpected(make_error(std::format("permute: 维度索引 {} 超出范围 [0, {})", d, nd), Severity::Recoverable));
         if (seen[static_cast<std::size_t>(d)])
-            return std::unexpected(make_error(
-                std::format("permute: 维度索引 {} 重复", d),
-                Severity::Recoverable));
+            return std::unexpected(make_error(std::format("permute: 维度索引 {} 重复", d), Severity::Recoverable));
         seen[static_cast<std::size_t>(d)] = true;
     }
 
@@ -501,21 +479,20 @@ auto Tensor::transpose(int dim0, int dim1) const -> Result<Tensor>
     const int nd = static_cast<int>(ndim());
 
     // 支持负数索引
-    if (dim0 < 0) dim0 += nd;
-    if (dim1 < 0) dim1 += nd;
+    if (dim0 < 0)
+        dim0 += nd;
+    if (dim1 < 0)
+        dim1 += nd;
 
     if (dim0 < 0 || dim0 >= nd || dim1 < 0 || dim1 >= nd)
-        return std::unexpected(make_error(
-            std::format("transpose: 维度索引越界（dim0={}, dim1={}, ndim={}）",
-                        dim0, dim1, nd),
-            Severity::Recoverable));
+        return std::unexpected(
+            make_error(std::format("transpose: 维度索引越界（dim0={}, dim1={}, ndim={}）", dim0, dim1, nd), Severity::Recoverable)
+        );
 
     // 拷贝 TensorImpl（shared_ptr<Storage> 共享所有权，shape/strides 深拷贝）
     auto ti = std::make_shared<TensorImpl>(*impl_);
-    std::swap(ti->shape[static_cast<std::size_t>(dim0)],
-              ti->shape[static_cast<std::size_t>(dim1)]);
-    std::swap(ti->strides[static_cast<std::size_t>(dim0)],
-              ti->strides[static_cast<std::size_t>(dim1)]);
+    std::swap(ti->shape[static_cast<std::size_t>(dim0)], ti->shape[static_cast<std::size_t>(dim1)]);
+    std::swap(ti->strides[static_cast<std::size_t>(dim0)], ti->strides[static_cast<std::size_t>(dim1)]);
 
     return Tensor(std::move(ti));
 }
@@ -526,12 +503,11 @@ auto Tensor::squeeze(int dim) const -> Result<Tensor>
 {
     const int nd = static_cast<int>(ndim());
 
-    if (dim < 0) dim += nd;
+    if (dim < 0)
+        dim += nd;
 
     if (dim < 0 || dim >= nd)
-        return std::unexpected(make_error(
-            std::format("squeeze: 维度索引 {} 越界（ndim={}）", dim, nd),
-            Severity::Recoverable));
+        return std::unexpected(make_error(std::format("squeeze: 维度索引 {} 越界（ndim={}）", dim, nd), Severity::Recoverable));
 
     // 若该维度 size != 1，返回浅拷贝（语义与 PyTorch 一致，不报错）
     if (impl_->shape[static_cast<std::size_t>(dim)] != 1)
@@ -567,12 +543,12 @@ auto Tensor::unsqueeze(int dim) const -> Result<Tensor>
 
     // dim 有效范围 [-ndim-1, ndim]
     if (dim < -(nd + 1) || dim > nd)
-        return std::unexpected(make_error(
-            std::format("unsqueeze: 维度索引 {} 越界（有效范围 [{}, {}]）",
-                        dim, -(nd + 1), nd),
-            Severity::Recoverable));
+        return std::unexpected(
+            make_error(std::format("unsqueeze: 维度索引 {} 越界（有效范围 [{}, {}]）", dim, -(nd + 1), nd), Severity::Recoverable)
+        );
 
-    if (dim < 0) dim += (nd + 1);
+    if (dim < 0)
+        dim += (nd + 1);
 
     Shape   new_shape;
     Strides new_strides;
@@ -583,9 +559,7 @@ auto Tensor::unsqueeze(int dim) const -> Result<Tensor>
         if (i == dim) {
             new_shape.push_back(1);
             // stride：取右邻维度的步长；若 dim == nd（末尾插入）则取 1
-            const int64_t s = (dim < nd)
-                                  ? impl_->strides[static_cast<std::size_t>(dim)]
-                                  : int64_t{1};
+            const int64_t s = (dim < nd) ? impl_->strides[static_cast<std::size_t>(dim)] : int64_t{1};
             new_strides.push_back(s);
         } else {
             const int orig = (i < dim) ? i : i - 1;
@@ -610,38 +584,32 @@ auto Tensor::slice(int dim, int64_t start, int64_t end, int64_t step) const -> R
 {
     const int nd = static_cast<int>(ndim());
 
-    if (dim < 0) dim += nd;
+    if (dim < 0)
+        dim += nd;
 
     if (dim < 0 || dim >= nd)
-        return std::unexpected(make_error(
-            std::format("slice: 维度索引 {} 越界（ndim={}）", dim, nd),
-            Severity::Recoverable));
+        return std::unexpected(make_error(std::format("slice: 维度索引 {} 越界（ndim={}）", dim, nd), Severity::Recoverable));
 
     if (step < 1)
-        return std::unexpected(make_error(
-            std::format("slice: step={} 非法，必须 >= 1", step),
-            Severity::Recoverable));
+        return std::unexpected(make_error(std::format("slice: step={} 非法，必须 >= 1", step), Severity::Recoverable));
 
     const int64_t dim_size = impl_->shape[static_cast<std::size_t>(dim)];
 
     // 要求 0 <= start <= end <= dim_size（不做负索引处理）
     if (start < 0 || end < start || end > dim_size)
-        return std::unexpected(make_error(
-            std::format("slice: [start={}, end={}) 在维度 {} (size={}) 上越界",
-                        start, end, dim, dim_size),
-            Severity::Recoverable));
+        return std::unexpected(
+            make_error(std::format("slice: [start={}, end={}) 在维度 {} (size={}) 上越界", start, end, dim, dim_size), Severity::Recoverable)
+        );
 
     // ceil((end - start) / step)
     const int64_t new_dim_size = (end - start + step - 1) / step;
 
-    Shape   new_shape   = impl_->shape;
-    Strides new_strides = impl_->strides;
+    Shape   new_shape                          = impl_->shape;
+    Strides new_strides                        = impl_->strides;
     new_shape[static_cast<std::size_t>(dim)]   = new_dim_size;
-    new_strides[static_cast<std::size_t>(dim)] =
-        impl_->strides[static_cast<std::size_t>(dim)] * step;
+    new_strides[static_cast<std::size_t>(dim)] = impl_->strides[static_cast<std::size_t>(dim)] * step;
 
-    const int64_t new_offset =
-        impl_->offset + start * impl_->strides[static_cast<std::size_t>(dim)];
+    const int64_t new_offset = impl_->offset + start * impl_->strides[static_cast<std::size_t>(dim)];
 
     auto ti     = std::make_shared<TensorImpl>();
     ti->storage = impl_->storage;

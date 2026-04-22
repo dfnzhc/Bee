@@ -20,15 +20,17 @@ TEST(IntegrationTests, I64IdentityMatmul)
     auto eye = Tensor::zeros({2, 2}, DType::I64);
     ASSERT_OK(eye);
     auto* pe = static_cast<int64_t*>(eye->data_ptr());
-    pe[0] = 1LL;
-    pe[3] = 1LL;
+    pe[0]    = 1LL;
+    pe[3]    = 1LL;
 
     // 目标矩阵 [[10, 20], [30, 40]]
     auto mat = Tensor::empty({2, 2}, DType::I64);
     ASSERT_OK(mat);
     auto* pm = static_cast<int64_t*>(mat->data_ptr());
-    pm[0] = 10LL; pm[1] = 20LL;
-    pm[2] = 30LL; pm[3] = 40LL;
+    pm[0]    = 10LL;
+    pm[1]    = 20LL;
+    pm[2]    = 30LL;
+    pm[3]    = 40LL;
 
     auto c = matmul(*eye, *mat);
     ASSERT_OK(c);
@@ -70,8 +72,8 @@ TEST(IntegrationTests, ChainArangeReshapeTransposeContiguous)
     EXPECT_EQ(cont->shape(), (Shape{4, 3}));
 
     // 验证逐元素：转置后 (i,j) 对应原始 (j,i)，即值为 j*4+i
-    const auto* p = static_cast<const int64_t*>(cont->data_ptr());
-    int idx = 0;
+    const auto* p   = static_cast<const int64_t*>(cont->data_ptr());
+    int         idx = 0;
     for (int i = 0; i < 4; ++i) {
         for (int j = 0; j < 3; ++j) {
             int64_t expected = static_cast<int64_t>(j * 4 + i);
@@ -93,13 +95,20 @@ TEST(IntegrationTests, CastThenMatmulMatchesNativeF32)
     ASSERT_OK(bi32);
 
     auto* pa = static_cast<int32_t*>(ai32->data_ptr());
-    pa[0]=1; pa[1]=2; pa[2]=3;
-    pa[3]=4; pa[4]=5; pa[5]=6;
+    pa[0]    = 1;
+    pa[1]    = 2;
+    pa[2]    = 3;
+    pa[3]    = 4;
+    pa[4]    = 5;
+    pa[5]    = 6;
 
     auto* pb = static_cast<int32_t*>(bi32->data_ptr());
-    pb[0]=7;  pb[1]=8;
-    pb[2]=9;  pb[3]=10;
-    pb[4]=11; pb[5]=12;
+    pb[0]    = 7;
+    pb[1]    = 8;
+    pb[2]    = 9;
+    pb[3]    = 10;
+    pb[4]    = 11;
+    pb[5]    = 12;
 
     // cast 到 F32
     auto af32 = cast(*ai32, DType::F32);
@@ -118,13 +127,20 @@ TEST(IntegrationTests, CastThenMatmulMatchesNativeF32)
     ASSERT_OK(bf32_direct);
 
     auto* paf = static_cast<float*>(af32_direct->data_ptr());
-    paf[0]=1.f; paf[1]=2.f; paf[2]=3.f;
-    paf[3]=4.f; paf[4]=5.f; paf[5]=6.f;
+    paf[0]    = 1.f;
+    paf[1]    = 2.f;
+    paf[2]    = 3.f;
+    paf[3]    = 4.f;
+    paf[4]    = 5.f;
+    paf[5]    = 6.f;
 
     auto* pbf = static_cast<float*>(bf32_direct->data_ptr());
-    pbf[0]=7.f;  pbf[1]=8.f;
-    pbf[2]=9.f;  pbf[3]=10.f;
-    pbf[4]=11.f; pbf[5]=12.f;
+    pbf[0]    = 7.f;
+    pbf[1]    = 8.f;
+    pbf[2]    = 9.f;
+    pbf[3]    = 10.f;
+    pbf[4]    = 11.f;
+    pbf[5]    = 12.f;
 
     auto c_direct = matmul(*af32_direct, *bf32_direct);
     ASSERT_OK(c_direct);
@@ -150,10 +166,16 @@ TEST(IntegrationTests, SumAddEqualsSumPlusSum)
     ASSERT_OK(b);
 
     auto* pa = static_cast<float*>(a->data_ptr());
-    pa[0]=1.f; pa[1]=2.f; pa[2]=3.f; pa[3]=4.f;
+    pa[0]    = 1.f;
+    pa[1]    = 2.f;
+    pa[2]    = 3.f;
+    pa[3]    = 4.f;
 
     auto* pb = static_cast<float*>(b->data_ptr());
-    pb[0]=5.f; pb[1]=6.f; pb[2]=7.f; pb[3]=8.f;
+    pb[0]    = 5.f;
+    pb[1]    = 6.f;
+    pb[2]    = 7.f;
+    pb[3]    = 8.f;
 
     // sum(add(a, b))
     auto ab = add(*a, *b);
@@ -238,18 +260,24 @@ TEST(IntegrationTests, I64MatmulNumerical)
     ASSERT_OK(b);
 
     auto* pa = static_cast<int64_t*>(a->data_ptr());
-    pa[0]=1LL; pa[1]=2LL; pa[2]=3LL; pa[3]=4LL;
+    pa[0]    = 1LL;
+    pa[1]    = 2LL;
+    pa[2]    = 3LL;
+    pa[3]    = 4LL;
 
     auto* pb = static_cast<int64_t*>(b->data_ptr());
-    pb[0]=2LL; pb[1]=0LL; pb[2]=1LL; pb[3]=2LL;
+    pb[0]    = 2LL;
+    pb[1]    = 0LL;
+    pb[2]    = 1LL;
+    pb[3]    = 2LL;
 
     auto c = matmul(*a, *b);
     ASSERT_OK(c);
     EXPECT_EQ(c->shape(), (Shape{2, 2}));
 
     const auto* pc = static_cast<const int64_t*>(c->data_ptr());
-    EXPECT_EQ(pc[0], 4LL);   // 1*2+2*1=4
-    EXPECT_EQ(pc[1], 4LL);   // 1*0+2*2=4
-    EXPECT_EQ(pc[2], 10LL);  // 3*2+4*1=10
-    EXPECT_EQ(pc[3], 8LL);   // 3*0+4*2=8
+    EXPECT_EQ(pc[0], 4LL);  // 1*2+2*1=4
+    EXPECT_EQ(pc[1], 4LL);  // 1*0+2*2=4
+    EXPECT_EQ(pc[2], 10LL); // 3*2+4*1=10
+    EXPECT_EQ(pc[3], 8LL);  // 3*0+4*2=8
 }

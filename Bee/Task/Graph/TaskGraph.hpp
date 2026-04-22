@@ -56,9 +56,9 @@ namespace detail
         // 第一参数是消费节点自身的索引，用于 extract_args 类型错配时
         // 生成精确的诊断信息。
         mutable MoveOnlyFunction<std::any(std::size_t, const std::vector<std::any>&)> callable;
-        std::vector<std::size_t> predecessors;
-        std::vector<std::size_t> successors;
-        std::string label;
+        std::vector<std::size_t>                                                      predecessors;
+        std::vector<std::size_t>                                                      successors;
+        std::string                                                                   label;
     };
 
     // =====================================================================
@@ -67,7 +67,7 @@ namespace detail
 
     struct NodeRuntime
     {
-        std::any result;
+        std::any           result;
         std::exception_ptr exception;
     };
 
@@ -94,20 +94,26 @@ namespace detail
     // （见 `Doc/Task 系统设计哲学与改进路线.md` P2 说明）。
 
     [[noreturn]] inline auto graph_type_mismatch(
-        std::string_view where, std::size_t node_index,
-        const std::type_info& expected, const std::type_info& actual) -> void
+        std::string_view      where,
+        std::size_t           node_index,
+        const std::type_info& expected,
+        const std::type_info& actual
+    ) -> void
     {
         auto msg = std::format(
             "TaskGraph: 类型错配于 {}（节点 #{}）：期望 `{}`，实际 `{}`。"
             "常见原因：NodeHandle<T> 的 T 与节点实际返回类型不一致，"
             "或跨 TaskGraph 使用了旧的 NodeHandle。",
-            where, node_index, expected.name(), actual.name());
+            where,
+            node_index,
+            expected.name(),
+            actual.name()
+        );
         throw std::logic_error(std::move(msg));
     }
 
     template <typename T>
-    auto checked_any_ref(const std::any& a, std::string_view where,
-                         std::size_t node_index) -> const T&
+    auto checked_any_ref(const std::any& a, std::string_view where, std::size_t node_index) -> const T&
     {
         if (a.type() != typeid(T)) {
             graph_type_mismatch(where, node_index, typeid(T), a.type());
@@ -116,8 +122,7 @@ namespace detail
     }
 
     template <typename T>
-    auto checked_any_value(const std::any& a, std::string_view where,
-                           std::size_t node_index) -> T
+    auto checked_any_value(const std::any& a, std::string_view where, std::size_t node_index) -> T
     {
         if (a.type() != typeid(T)) {
             graph_type_mismatch(where, node_index, typeid(T), a.type());
@@ -133,20 +138,15 @@ namespace detail
     // =====================================================================
 
     template <typename... Ts, std::size_t... Is>
-    auto extract_args_impl(const std::vector<std::any>& inputs,
-                           std::size_t consumer_index,
-                           std::index_sequence<Is...>) -> std::tuple<Ts...>
+    auto extract_args_impl(const std::vector<std::any>& inputs, std::size_t consumer_index, std::index_sequence<Is...>) -> std::tuple<Ts...>
     {
-        return std::tuple<Ts...>{
-            checked_any_value<Ts>(inputs[Is], "节点输入参数", consumer_index)...};
+        return std::tuple<Ts...>{checked_any_value<Ts>(inputs[Is], "节点输入参数", consumer_index)...};
     }
 
     template <typename... Ts>
-    auto extract_args(const std::vector<std::any>& inputs,
-                      std::size_t consumer_index) -> std::tuple<Ts...>
+    auto extract_args(const std::vector<std::any>& inputs, std::size_t consumer_index) -> std::tuple<Ts...>
     {
-        return extract_args_impl<Ts...>(
-            inputs, consumer_index, std::index_sequence_for<Ts...>{});
+        return extract_args_impl<Ts...>(inputs, consumer_index, std::index_sequence_for<Ts...>{});
     }
 
     // =====================================================================
@@ -157,22 +157,24 @@ namespace detail
     struct GraphExecutionContext
     {
         // 静态拓扑（构建期确定，执行期 const 引用到 TaskGraph::defs_）
-        const std::vector<NodeDef>& defs;
+        const std::vector<NodeDef>&     defs;
         const std::vector<std::size_t>& root_indices;
-        S& scheduler;
+        S&                              scheduler;
         // 运行态（本次执行独占，生命周期与 ctx 绑定）
-        std::vector<NodeRuntime> runtimes;
+        std::vector<NodeRuntime>              runtimes;
         std::vector<std::atomic<std::size_t>> counters;
-        std::atomic<std::size_t> remaining;
-        std::coroutine_handle<> continuation{nullptr};
-        std::exception_ptr first_exception{nullptr};
-        std::mutex exception_mutex;
+        std::atomic<std::size_t>              remaining;
+        std::coroutine_handle<>               continuation{nullptr};
+        std::exception_ptr                    first_exception{nullptr};
+        std::mutex                            exception_mutex;
 
-        GraphExecutionContext(const std::vector<NodeDef>& d,
-                              const std::vector<std::size_t>& roots,
-                              S& s)
-            : defs(d), root_indices(roots), scheduler(s),
-              runtimes(d.size()), counters(d.size()), remaining(d.size() + 1)
+        GraphExecutionContext(const std::vector<NodeDef>& d, const std::vector<std::size_t>& roots, S& s)
+            : defs(d)
+            , root_indices(roots)
+            , scheduler(s)
+            , runtimes(d.size())
+            , counters(d.size())
+            , remaining(d.size() + 1)
         {
             // 采用 "+1 trick"：remaining 初始为 N+1，由 await_suspend 在
             // 全部根节点 post 完毕后投出最后一票。这样可避免某个工作线程
@@ -193,7 +195,7 @@ namespace detail
     auto run_node(std::shared_ptr<GraphExecutionContext<S>> ctx, std::size_t index) -> void
     {
         const auto& def = ctx->defs[index];
-        auto& rt        = ctx->runtimes[index];
+        auto&       rt  = ctx->runtimes[index];
 
         // 检查前驱是否有异常（级联失败）
         bool predecessor_failed = false;
@@ -214,8 +216,7 @@ namespace detail
                     inputs.push_back(ctx->runtimes[pred].result);
                 }
                 rt.result = def.callable(index, inputs);
-            }
-            catch (...) {
+            } catch (...) {
                 rt.exception = std::current_exception();
             }
         }
@@ -237,18 +238,14 @@ namespace detail
         for (auto succ : def.successors) {
             if (ctx->counters[succ].fetch_sub(1, std::memory_order_acq_rel) == 1) {
                 try {
-                    ctx->scheduler.post([ctx, succ]() {
-                        run_node(ctx, succ);
-                    });
-                }
-                catch (...) {
+                    ctx->scheduler.post([ctx, succ]() { run_node(ctx, succ); });
+                } catch (...) {
                     // post 失败：后继无法执行。
                     // 将其标记为异常并递减 remaining 以防止死锁。
                     {
                         std::lock_guard lock(ctx->exception_mutex);
                         if (!ctx->first_exception) {
-                            ctx->first_exception =
-                                std::make_exception_ptr(std::runtime_error("TaskGraph: failed to post successor node"));
+                            ctx->first_exception = std::make_exception_ptr(std::runtime_error("TaskGraph: failed to post successor node"));
                         }
                     }
                     if (ctx->remaining.fetch_sub(1, std::memory_order_acq_rel) == 1) {
@@ -300,11 +297,8 @@ namespace detail
             std::size_t unposted = 0;
             for (auto i : local_ctx->root_indices) {
                 try {
-                    local_ctx->scheduler.post([local_ctx, i]() {
-                        run_node(local_ctx, i);
-                    });
-                }
-                catch (...) {
+                    local_ctx->scheduler.post([local_ctx, i]() { run_node(local_ctx, i); });
+                } catch (...) {
                     {
                         std::lock_guard lock(local_ctx->exception_mutex);
                         if (!local_ctx->first_exception) {
@@ -324,7 +318,9 @@ namespace detail
             }
         }
 
-        auto await_resume() const noexcept -> void {}
+        auto await_resume() const noexcept -> void
+        {
+        }
     };
 
 } // namespace detail
@@ -348,12 +344,12 @@ public:
                 if constexpr (std::is_void_v<R>) {
                     fn();
                     return std::any{};
-                }
-                else {
+                } else {
                     return std::any{fn()};
                 }
             },
-            {});
+            {}
+        );
     }
 
     template <typename Fn>
@@ -366,12 +362,12 @@ public:
                 if constexpr (std::is_void_v<R>) {
                     fn();
                     return std::any{};
-                }
-                else {
+                } else {
                     return std::any{fn()};
                 }
             },
-            {});
+            {}
+        );
     }
 
     // ===== 类型化依赖节点 =====
@@ -387,17 +383,16 @@ public:
                 if constexpr (std::is_void_v<R>) {
                     std::apply(fn, std::move(args));
                     return std::any{};
-                }
-                else {
+                } else {
                     return std::any{std::apply(fn, std::move(args))};
                 }
             },
-            {deps.index...});
+            {deps.index...}
+        );
     }
 
     template <typename Fn, typename... Deps>
-    auto node(std::string_view label, Fn fn, NodeHandle<Deps>... deps)
-        -> NodeHandle<std::invoke_result_t<Fn, Deps...>>
+    auto node(std::string_view label, Fn fn, NodeHandle<Deps>... deps) -> NodeHandle<std::invoke_result_t<Fn, Deps...>>
     {
         using R = std::invoke_result_t<Fn, Deps...>;
         return add_node_impl<R>(
@@ -407,12 +402,12 @@ public:
                 if constexpr (std::is_void_v<R>) {
                     std::apply(fn, std::move(args));
                     return std::any{};
-                }
-                else {
+                } else {
                     return std::any{std::apply(fn, std::move(args))};
                 }
             },
-            {deps.index...});
+            {deps.index...}
+        );
     }
 
     // ===== void 依赖节点（不消费前驱结果）=====
@@ -427,17 +422,16 @@ public:
                 if constexpr (std::is_void_v<R>) {
                     fn();
                     return std::any{};
-                }
-                else {
+                } else {
                     return std::any{fn()};
                 }
             },
-            {deps.index...});
+            {deps.index...}
+        );
     }
 
     template <typename Fn, typename... Deps>
-    auto node_after(std::string_view label, Fn fn, NodeHandle<Deps>... deps)
-        -> NodeHandle<std::invoke_result_t<Fn>>
+    auto node_after(std::string_view label, Fn fn, NodeHandle<Deps>... deps) -> NodeHandle<std::invoke_result_t<Fn>>
     {
         using R = std::invoke_result_t<Fn>;
         return add_node_impl<R>(
@@ -446,12 +440,12 @@ public:
                 if constexpr (std::is_void_v<R>) {
                     fn();
                     return std::any{};
-                }
-                else {
+                } else {
                     return std::any{fn()};
                 }
             },
-            {deps.index...});
+            {deps.index...}
+        );
     }
 
     // ===== 查询 API =====
@@ -562,12 +556,13 @@ private:
 
     template <typename R>
     auto add_node_impl(
-        std::string label,
+        std::string                                                           label,
         MoveOnlyFunction<std::any(std::size_t, const std::vector<std::any>&)> callable,
-        std::vector<std::size_t> predecessors) -> NodeHandle<R>
+        std::vector<std::size_t>                                              predecessors
+    ) -> NodeHandle<R>
     {
-        auto idx  = defs_.size();
-        auto& def = defs_.emplace_back();
+        auto  idx        = defs_.size();
+        auto& def        = defs_.emplace_back();
         def.callable     = std::move(callable);
         def.predecessors = std::move(predecessors);
         def.label        = std::move(label);
@@ -593,8 +588,7 @@ private:
         }
         if constexpr (std::is_void_v<R>) {
             return std::format("node_{} (void)", idx);
-        }
-        else {
+        } else {
             return std::format("node_{} ({})", idx, type_name_short<R>());
         }
     }

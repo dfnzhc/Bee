@@ -209,10 +209,21 @@ namespace detail
     {
         struct promise_type
         {
-            auto get_return_object() -> DetachedTask { return {}; }
-            auto initial_suspend() noexcept -> std::suspend_never { return {}; }
-            auto final_suspend() noexcept -> std::suspend_never { return {}; }
-            auto return_void() -> void {}
+            auto get_return_object() -> DetachedTask
+            {
+                return {};
+            }
+            auto initial_suspend() noexcept -> std::suspend_never
+            {
+                return {};
+            }
+            auto final_suspend() noexcept -> std::suspend_never
+            {
+                return {};
+            }
+            auto return_void() -> void
+            {
+            }
 
             auto unhandled_exception() -> void
             {
@@ -262,11 +273,13 @@ public:
 
     Task() = default;
 
-    explicit Task(handle_type h) noexcept : handle_(h)
+    explicit Task(handle_type h) noexcept
+        : handle_(h)
     {
     }
 
-    Task(Task&& other) noexcept : handle_(std::exchange(other.handle_, nullptr))
+    Task(Task&& other) noexcept
+        : handle_(std::exchange(other.handle_, nullptr))
     {
     }
 
@@ -319,8 +332,7 @@ public:
                 std::rethrow_exception(ex);
             }
             return std::move(*tmp);
-        }
-        else {
+        } else {
             destroy_if_valid();
             if (ex) {
                 std::rethrow_exception(ex);
@@ -373,7 +385,8 @@ public:
         constexpr auto poll_interval = std::chrono::milliseconds{1};
         while (!is_ready()) {
             const auto now = std::chrono::steady_clock::now();
-            if (now >= deadline) break;
+            if (now >= deadline)
+                break;
             const auto remaining = deadline - now;
             std::this_thread::sleep_for(remaining < poll_interval ? remaining : poll_interval);
         }
@@ -385,14 +398,16 @@ public:
 
     [[nodiscard]] auto is_ready() const noexcept -> bool
     {
-        if (!handle_) return false;
+        if (!handle_)
+            return false;
         auto s = handle_.promise().state->task_state.load(std::memory_order_acquire);
         return s == TaskState::Completed || s == TaskState::Failed;
     }
 
     [[nodiscard]] auto state() const noexcept -> TaskState
     {
-        if (!handle_) return TaskState::Pending;
+        if (!handle_)
+            return TaskState::Pending;
         return handle_.promise().state->task_state.load(std::memory_order_acquire);
     }
 
@@ -411,9 +426,15 @@ public:
         {
             handle_type handle;
 
-            explicit TaskAwaiter(handle_type h) noexcept : handle(h) {}
+            explicit TaskAwaiter(handle_type h) noexcept
+                : handle(h)
+            {
+            }
 
-            TaskAwaiter(TaskAwaiter&& other) noexcept : handle(std::exchange(other.handle, nullptr)) {}
+            TaskAwaiter(TaskAwaiter&& other) noexcept
+                : handle(std::exchange(other.handle, nullptr))
+            {
+            }
 
             TaskAwaiter(const TaskAwaiter&)                    = delete;
             auto operator=(const TaskAwaiter&) -> TaskAwaiter& = delete;
@@ -439,8 +460,7 @@ public:
                 // co_await 仅允许在未启动的 Task 上调用：若已被 get/wait 启动，
                 // continuation 与 FinalAwaiter 之间无同步，存在 TOCTOU 双重恢复竞态。
                 bool expected = false;
-                BEE_CHECK(promise.started.compare_exchange_strong(
-                    expected, true, std::memory_order_acq_rel));
+                BEE_CHECK(promise.started.compare_exchange_strong(expected, true, std::memory_order_acq_rel));
 
                 state.continuation = caller;
                 state.task_state.store(TaskState::Running, std::memory_order_release);
@@ -500,7 +520,7 @@ private:
 
     auto start_if_needed() -> void
     {
-        auto& promise = handle_.promise();
+        auto& promise  = handle_.promise();
         bool  expected = false;
         if (promise.started.compare_exchange_strong(expected, true, std::memory_order_acq_rel)) {
             promise.state->task_state.store(TaskState::Running, std::memory_order_release);
@@ -524,8 +544,7 @@ private:
     friend auto detail::then_impl(Task<U> pred, Fn fn) -> Task<detail::ContinuationResult_t<U, Fn>>;
 
     template <typename U, typename S, typename Fn>
-    friend auto detail::then_impl_scheduled(Task<U> pred, S& scheduler, Fn fn)
-        -> Task<detail::ContinuationResult_t<U, Fn>>;
+    friend auto detail::then_impl_scheduled(Task<U> pred, S& scheduler, Fn fn) -> Task<detail::ContinuationResult_t<U, Fn>>;
 };
 
 // ===========================================================================
@@ -575,16 +594,13 @@ namespace detail
         if constexpr (std::is_void_v<T> && std::is_void_v<R>) {
             co_await std::move(pred);
             fn();
-        }
-        else if constexpr (std::is_void_v<T>) {
+        } else if constexpr (std::is_void_v<T>) {
             co_await std::move(pred);
             co_return fn();
-        }
-        else if constexpr (std::is_void_v<R>) {
+        } else if constexpr (std::is_void_v<R>) {
             T val = co_await std::move(pred);
             fn(std::move(val));
-        }
-        else {
+        } else {
             T val = co_await std::move(pred);
             co_return fn(std::move(val));
         }
@@ -599,18 +615,15 @@ namespace detail
             co_await std::move(pred);
             co_await scheduler.schedule();
             fn();
-        }
-        else if constexpr (std::is_void_v<T>) {
+        } else if constexpr (std::is_void_v<T>) {
             co_await std::move(pred);
             co_await scheduler.schedule();
             co_return fn();
-        }
-        else if constexpr (std::is_void_v<R>) {
+        } else if constexpr (std::is_void_v<R>) {
             T val = co_await std::move(pred);
             co_await scheduler.schedule();
             fn(std::move(val));
-        }
-        else {
+        } else {
             T val = co_await std::move(pred);
             co_await scheduler.schedule();
             co_return fn(std::move(val));

@@ -13,8 +13,8 @@ using namespace bee::simd;
 
 TEST(SimdScalar, WidthIsOne)
 {
-    EXPECT_EQ((SimdBackend<float,   IsaScalar>::width), 1u);
-    EXPECT_EQ((SimdBackend<double,  IsaScalar>::width), 1u);
+    EXPECT_EQ((SimdBackend<float, IsaScalar>::width), 1u);
+    EXPECT_EQ((SimdBackend<double, IsaScalar>::width), 1u);
     EXPECT_EQ((SimdBackend<int32_t, IsaScalar>::width), 1u);
     EXPECT_EQ((SimdBackend<int64_t, IsaScalar>::width), 1u);
     EXPECT_EQ((SimdBackend<uint8_t, IsaScalar>::width), 1u);
@@ -22,7 +22,7 @@ TEST(SimdScalar, WidthIsOne)
 
 TEST(SimdScalar, Float_LoadStore)
 {
-    using B = SimdBackend<float, IsaScalar>;
+    using B   = SimdBackend<float, IsaScalar>;
     float src = 3.14f;
     float dst = 0.0f;
     B::store(&dst, B::load(&src));
@@ -31,7 +31,7 @@ TEST(SimdScalar, Float_LoadStore)
 
 TEST(SimdScalar, Double_LoadStore)
 {
-    using B = SimdBackend<double, IsaScalar>;
+    using B    = SimdBackend<double, IsaScalar>;
     double src = 2.718281828;
     double dst = 0.0;
     B::storeu(&dst, B::loadu(&src));
@@ -40,7 +40,7 @@ TEST(SimdScalar, Double_LoadStore)
 
 TEST(SimdScalar, I32_LoadStore)
 {
-    using B = SimdBackend<int32_t, IsaScalar>;
+    using B     = SimdBackend<int32_t, IsaScalar>;
     int32_t src = -42;
     int32_t dst = 0;
     B::store(&dst, B::load(&src));
@@ -49,7 +49,7 @@ TEST(SimdScalar, I32_LoadStore)
 
 TEST(SimdScalar, I64_LoadStore)
 {
-    using B = SimdBackend<int64_t, IsaScalar>;
+    using B     = SimdBackend<int64_t, IsaScalar>;
     int64_t src = 9000000000LL;
     int64_t dst = 0;
     B::store(&dst, B::load(&src));
@@ -59,7 +59,7 @@ TEST(SimdScalar, I64_LoadStore)
 TEST(SimdScalar, Float_Set1)
 {
     using B = SimdBackend<float, IsaScalar>;
-    auto r = B::set1(7.5f);
+    auto r  = B::set1(7.5f);
     EXPECT_FLOAT_EQ(r, 7.5f);
 }
 
@@ -112,7 +112,7 @@ TEST(SimdScalar, I32_AddSubMulDiv)
     using B = SimdBackend<int32_t, IsaScalar>;
     EXPECT_EQ(B::add(B::set1(10), B::set1(3)), 13);
     EXPECT_EQ(B::sub(B::set1(10), B::set1(3)), 7);
-    EXPECT_EQ(B::mul(B::set1(4),  B::set1(5)), 20);
+    EXPECT_EQ(B::mul(B::set1(4), B::set1(5)), 20);
     EXPECT_EQ(B::div(B::set1(10), B::set1(2)), 5);
 }
 
@@ -128,8 +128,8 @@ TEST(SimdScalar, U8_AddSubMinMax)
     using B = SimdBackend<uint8_t, IsaScalar>;
     EXPECT_EQ(B::add(B::set1(100), B::set1(50)), uint8_t(150));
     EXPECT_EQ(B::sub(B::set1(100), B::set1(50)), uint8_t(50));
-    EXPECT_EQ(B::min(B::set1(10),  B::set1(20)), uint8_t(10));
-    EXPECT_EQ(B::max(B::set1(10),  B::set1(20)), uint8_t(20));
+    EXPECT_EQ(B::min(B::set1(10), B::set1(20)), uint8_t(10));
+    EXPECT_EQ(B::max(B::set1(10), B::set1(20)), uint8_t(20));
 }
 
 // =====================================================================
@@ -139,8 +139,8 @@ TEST(SimdScalar, U8_AddSubMinMax)
 
 TEST(SimdAvx2, Widths)
 {
-    EXPECT_EQ((SimdBackend<float,   IsaAvx2>::width), 8u);
-    EXPECT_EQ((SimdBackend<double,  IsaAvx2>::width), 4u);
+    EXPECT_EQ((SimdBackend<float, IsaAvx2>::width), 8u);
+    EXPECT_EQ((SimdBackend<double, IsaAvx2>::width), 4u);
     EXPECT_EQ((SimdBackend<int32_t, IsaAvx2>::width), 8u);
     EXPECT_EQ((SimdBackend<int64_t, IsaAvx2>::width), 4u);
     EXPECT_EQ((SimdBackend<uint8_t, IsaAvx2>::width), 32u);
@@ -168,9 +168,9 @@ TEST(SimdAvx2, Float_Set1)
 
 TEST(SimdAvx2, Float_AddSubMulDiv)
 {
-    using B = SimdBackend<float, IsaAvx2>;
-    auto a = B::set1(6.0f);
-    auto b = B::set1(2.0f);
+    using B             = SimdBackend<float, IsaAvx2>;
+    auto              a = B::set1(6.0f);
+    auto              b = B::set1(2.0f);
     alignas(32) float buf[8];
 
     B::store(buf, B::add(a, b));
@@ -219,22 +219,22 @@ TEST(SimdAvx2, Float_ReduceSum)
     using B = SimdBackend<float, IsaAvx2>;
     // {1,2,3,4,5,6,7,8} → 36
     alignas(32) float src[8] = {1, 2, 3, 4, 5, 6, 7, 8};
-    auto v = B::load(src);
+    auto              v      = B::load(src);
     EXPECT_NEAR(B::reduce_sum(v), 36.0f, 1e-4f);
 }
 
 TEST(SimdAvx2, Float_ReduceMinMax)
 {
-    using B = SimdBackend<float, IsaAvx2>;
+    using B                  = SimdBackend<float, IsaAvx2>;
     alignas(32) float src[8] = {5, 2, 8, 1, 7, 3, 9, 4};
-    auto v = B::load(src);
+    auto              v      = B::load(src);
     EXPECT_FLOAT_EQ(B::reduce_min(v), 1.0f);
     EXPECT_FLOAT_EQ(B::reduce_max(v), 9.0f);
 }
 
 TEST(SimdAvx2, Double_LoadStore)
 {
-    using B = SimdBackend<double, IsaAvx2>;
+    using B       = SimdBackend<double, IsaAvx2>;
     double src[4] = {1.0, 2.0, 3.0, 4.0};
     double dst[4] = {};
     B::storeu(dst, B::loadu(src));
@@ -244,23 +244,23 @@ TEST(SimdAvx2, Double_LoadStore)
 
 TEST(SimdAvx2, Double_ReduceSum)
 {
-    using B = SimdBackend<double, IsaAvx2>;
+    using B                   = SimdBackend<double, IsaAvx2>;
     alignas(32) double src[4] = {1.0, 2.0, 3.0, 4.0};
     EXPECT_NEAR(B::reduce_sum(B::load(src)), 10.0, 1e-12);
 }
 
 TEST(SimdAvx2, Double_ReduceMinMax)
 {
-    using B = SimdBackend<double, IsaAvx2>;
+    using B                   = SimdBackend<double, IsaAvx2>;
     alignas(32) double src[4] = {3.0, 1.0, 4.0, 2.0};
-    auto v = B::load(src);
+    auto               v      = B::load(src);
     EXPECT_DOUBLE_EQ(B::reduce_min(v), 1.0);
     EXPECT_DOUBLE_EQ(B::reduce_max(v), 4.0);
 }
 
 TEST(SimdAvx2, I32_LoadStore)
 {
-    using B = SimdBackend<int32_t, IsaAvx2>;
+    using B                    = SimdBackend<int32_t, IsaAvx2>;
     alignas(32) int32_t src[8] = {1, -2, 3, -4, 5, -6, 7, -8};
     alignas(32) int32_t dst[8] = {};
     B::store(dst, B::load(src));
@@ -270,9 +270,9 @@ TEST(SimdAvx2, I32_LoadStore)
 
 TEST(SimdAvx2, I32_AddSub)
 {
-    using B = SimdBackend<int32_t, IsaAvx2>;
-    auto a = B::set1(10);
-    auto b = B::set1(3);
+    using B               = SimdBackend<int32_t, IsaAvx2>;
+    auto                a = B::set1(10);
+    auto                b = B::set1(3);
     alignas(32) int32_t buf[8];
     B::store(buf, B::add(a, b));
     EXPECT_EQ(buf[0], 13);
@@ -302,23 +302,23 @@ TEST(SimdAvx2, I32_NegAbs)
 
 TEST(SimdAvx2, I32_ReduceSum)
 {
-    using B = SimdBackend<int32_t, IsaAvx2>;
+    using B                    = SimdBackend<int32_t, IsaAvx2>;
     alignas(32) int32_t src[8] = {1, 2, 3, 4, 5, 6, 7, 8};
     EXPECT_EQ(B::reduce_sum(B::load(src)), 36);
 }
 
 TEST(SimdAvx2, I32_ReduceMinMax)
 {
-    using B = SimdBackend<int32_t, IsaAvx2>;
+    using B                    = SimdBackend<int32_t, IsaAvx2>;
     alignas(32) int32_t src[8] = {4, -1, 7, 2, -3, 8, 0, 5};
-    auto v = B::load(src);
+    auto                v      = B::load(src);
     EXPECT_EQ(B::reduce_min(v), -3);
     EXPECT_EQ(B::reduce_max(v), 8);
 }
 
 TEST(SimdAvx2, I64_LoadStore)
 {
-    using B = SimdBackend<int64_t, IsaAvx2>;
+    using B                    = SimdBackend<int64_t, IsaAvx2>;
     alignas(32) int64_t src[4] = {100LL, -200LL, 300LL, -400LL};
     alignas(32) int64_t dst[4] = {};
     B::store(dst, B::load(src));
@@ -348,7 +348,7 @@ TEST(SimdAvx2, I64_NegAbs)
 
 TEST(SimdAvx2, I64_ReduceSum)
 {
-    using B = SimdBackend<int64_t, IsaAvx2>;
+    using B                    = SimdBackend<int64_t, IsaAvx2>;
     alignas(32) int64_t src[4] = {10LL, 20LL, 30LL, 40LL};
     EXPECT_EQ(B::reduce_sum(B::load(src)), 100LL);
 }
@@ -421,8 +421,8 @@ TEST(SimdDetect, CurrentIsaCached)
 TEST(SimdDetect, IsaNameNonEmpty)
 {
     EXPECT_STREQ(bee::simd::isa_name(bee::simd::Isa::Scalar), "Scalar");
-    EXPECT_STREQ(bee::simd::isa_name(bee::simd::Isa::Sse2),   "Sse2");
-    EXPECT_STREQ(bee::simd::isa_name(bee::simd::Isa::Avx2),   "Avx2");
+    EXPECT_STREQ(bee::simd::isa_name(bee::simd::Isa::Sse2), "Sse2");
+    EXPECT_STREQ(bee::simd::isa_name(bee::simd::Isa::Avx2), "Avx2");
     EXPECT_STREQ(bee::simd::isa_name(bee::simd::Isa::Avx512), "Avx512");
 }
 
@@ -440,4 +440,3 @@ TEST(SimdDetect, CompileCapabilityAtLeastRuntime)
     EXPECT_LT(isa, bee::simd::Isa::Sse2);
 #endif
 }
-

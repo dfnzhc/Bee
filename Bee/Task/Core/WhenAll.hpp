@@ -44,7 +44,8 @@ namespace detail
         std::exception_ptr       first_ex;
         std::mutex               ex_mutex;
 
-        explicit WhenAllControl(std::size_t n) : remaining(n + 1)
+        explicit WhenAllControl(std::size_t n)
+            : remaining(n + 1)
         {
         }
     };
@@ -57,12 +58,10 @@ namespace detail
             if constexpr (std::is_void_v<T>) {
                 co_await std::move(task);
                 // value_type 是 monostate，已在 tuple 中默认构造
-            }
-            else {
+            } else {
                 std::get<I>(ctrl->results) = co_await std::move(task);
             }
-        }
-        catch (...) {
+        } catch (...) {
             std::lock_guard lock(ctrl->ex_mutex);
             if (!ctrl->first_ex) {
                 ctrl->first_ex = std::current_exception();
@@ -132,21 +131,19 @@ namespace detail
         std::exception_ptr            first_ex;
         std::mutex                    ex_mutex;
 
-        explicit VectorWhenAllControl(std::size_t n) : remaining(n + 1), results(n)
+        explicit VectorWhenAllControl(std::size_t n)
+            : remaining(n + 1)
+            , results(n)
         {
         }
     };
 
     template <typename T>
-    auto vector_when_all_wrapper(
-        std::shared_ptr<VectorWhenAllControl<T>> ctrl,
-        std::size_t index,
-        Task<T> task) -> DetachedTask
+    auto vector_when_all_wrapper(std::shared_ptr<VectorWhenAllControl<T>> ctrl, std::size_t index, Task<T> task) -> DetachedTask
     {
         try {
             ctrl->results[index].emplace(co_await std::move(task));
-        }
-        catch (...) {
+        } catch (...) {
             std::lock_guard lock(ctrl->ex_mutex);
             if (!ctrl->first_ex) {
                 ctrl->first_ex = std::current_exception();

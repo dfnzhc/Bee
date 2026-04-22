@@ -376,9 +376,7 @@ TEST(ViewTests, SliceBasic)
     EXPECT_EQ(sr->storage_offset(), 2);
 
     // data_ptr 偏移应为 2 * sizeof(float)
-    const auto diff =
-        static_cast<const uint8_t*>(sr->data_ptr()) -
-        static_cast<const uint8_t*>(r->data_ptr());
+    const auto diff = static_cast<const uint8_t*>(sr->data_ptr()) - static_cast<const uint8_t*>(r->data_ptr());
     EXPECT_EQ(diff, static_cast<ptrdiff_t>(2 * sizeof(float)));
 }
 

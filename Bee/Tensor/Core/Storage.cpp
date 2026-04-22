@@ -4,9 +4,12 @@
 namespace bee
 {
 
-Storage::Storage(void* data, std::size_t nbytes, std::size_t alignment, Device device,
-                 IAllocator* allocator) noexcept
-    : data_(data), nbytes_(nbytes), alignment_(alignment), device_(device), allocator_(allocator)
+Storage::Storage(void* data, std::size_t nbytes, std::size_t alignment, Device device, IAllocator* allocator) noexcept
+    : data_(data)
+    , nbytes_(nbytes)
+    , alignment_(alignment)
+    , device_(device)
+    , allocator_(allocator)
 {
 }
 
@@ -23,8 +26,7 @@ auto Storage::allocate(std::size_t nbytes, IAllocator& allocator) -> Result<std:
         return std::unexpected(std::move(result.error()));
 
     // Storage 构造函数为私有，无法使用 make_shared，直接用 new
-    return std::shared_ptr<Storage>(
-        new Storage(result.value(), nbytes, 64u, allocator.device(), &allocator));
+    return std::shared_ptr<Storage>(new Storage(result.value(), nbytes, 64u, allocator.device(), &allocator));
 }
 
 auto Storage::data() noexcept -> void*

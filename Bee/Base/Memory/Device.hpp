@@ -17,9 +17,9 @@ enum class Device : uint8_t
 [[nodiscard]] constexpr auto device_name(Device d) noexcept -> std::string_view
 {
     switch (d) {
-    case Device::CPU:  return "CPU";
+    case Device::CPU: return "CPU";
     case Device::CUDA: return "CUDA";
-    default:           return "Unknown";
+    default: return "Unknown";
     }
 }
 

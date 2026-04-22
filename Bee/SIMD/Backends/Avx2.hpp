@@ -4,11 +4,11 @@
 
 #ifdef BEE_SIMD_ENABLE_AVX2
 
-#include <immintrin.h>
+    #include <immintrin.h>
 
-#include <cmath>
-#include <cstddef>
-#include <cstdint>
+    #include <cmath>
+    #include <cstddef>
+    #include <cstdint>
 
 namespace bee::simd
 {
@@ -20,7 +20,7 @@ template <>
 struct SimdBackend<float, IsaAvx2>
 {
     static constexpr std::size_t width = 8;
-    using reg = __m256;
+    using reg                          = __m256;
 
     // clang-format off
     static auto load(const float* p) -> reg { return _mm256_load_ps(p); }
@@ -50,7 +50,10 @@ struct SimdBackend<float, IsaAvx2>
         return _mm256_andnot_ps(_mm256_set1_ps(-0.0f), a);
     }
 
-    static auto sqrt(reg a) -> reg { return _mm256_sqrt_ps(a); }
+    static auto sqrt(reg a) -> reg
+    {
+        return _mm256_sqrt_ps(a);
+    }
 
     // exp/log 回退到标量逐元素计算
     static auto exp(reg v) -> reg
@@ -74,8 +77,8 @@ struct SimdBackend<float, IsaAvx2>
     // 水平求和：8 个 float → 1 个 float
     static auto reduce_sum(reg v) -> float
     {
-        __m256 t = _mm256_hadd_ps(v, v);
-        t = _mm256_hadd_ps(t, t);
+        __m256 t   = _mm256_hadd_ps(v, v);
+        t          = _mm256_hadd_ps(t, t);
         __m128 lo  = _mm256_castps256_ps128(t);
         __m128 hi  = _mm256_extractf128_ps(t, 1);
         __m128 sum = _mm_add_ss(lo, hi);
@@ -88,8 +91,8 @@ struct SimdBackend<float, IsaAvx2>
         __m128 lo = _mm256_castps256_ps128(v);
         __m128 hi = _mm256_extractf128_ps(v, 1);
         __m128 mn = _mm_min_ps(lo, hi);
-        mn = _mm_min_ps(mn, _mm_movehl_ps(mn, mn));
-        mn = _mm_min_ss(mn, _mm_shuffle_ps(mn, mn, 0x01));
+        mn        = _mm_min_ps(mn, _mm_movehl_ps(mn, mn));
+        mn        = _mm_min_ss(mn, _mm_shuffle_ps(mn, mn, 0x01));
         return _mm_cvtss_f32(mn);
     }
 
@@ -99,8 +102,8 @@ struct SimdBackend<float, IsaAvx2>
         __m128 lo = _mm256_castps256_ps128(v);
         __m128 hi = _mm256_extractf128_ps(v, 1);
         __m128 mx = _mm_max_ps(lo, hi);
-        mx = _mm_max_ps(mx, _mm_movehl_ps(mx, mx));
-        mx = _mm_max_ss(mx, _mm_shuffle_ps(mx, mx, 0x01));
+        mx        = _mm_max_ps(mx, _mm_movehl_ps(mx, mx));
+        mx        = _mm_max_ss(mx, _mm_shuffle_ps(mx, mx, 0x01));
         return _mm_cvtss_f32(mx);
     }
 };
@@ -112,7 +115,7 @@ template <>
 struct SimdBackend<double, IsaAvx2>
 {
     static constexpr std::size_t width = 4;
-    using reg = __m256d;
+    using reg                          = __m256d;
 
     // clang-format off
     static auto load(const double* p) -> reg { return _mm256_load_pd(p); }
@@ -140,7 +143,10 @@ struct SimdBackend<double, IsaAvx2>
         return _mm256_andnot_pd(_mm256_set1_pd(-0.0), a);
     }
 
-    static auto sqrt(reg a) -> reg { return _mm256_sqrt_pd(a); }
+    static auto sqrt(reg a) -> reg
+    {
+        return _mm256_sqrt_pd(a);
+    }
 
     static auto exp(reg v) -> reg
     {
@@ -176,7 +182,7 @@ struct SimdBackend<double, IsaAvx2>
         __m128d lo = _mm256_castpd256_pd128(v);
         __m128d hi = _mm256_extractf128_pd(v, 1);
         __m128d mn = _mm_min_pd(lo, hi);
-        mn = _mm_min_sd(mn, _mm_unpackhi_pd(mn, mn));
+        mn         = _mm_min_sd(mn, _mm_unpackhi_pd(mn, mn));
         return _mm_cvtsd_f64(mn);
     }
 
@@ -186,7 +192,7 @@ struct SimdBackend<double, IsaAvx2>
         __m128d lo = _mm256_castpd256_pd128(v);
         __m128d hi = _mm256_extractf128_pd(v, 1);
         __m128d mx = _mm_max_pd(lo, hi);
-        mx = _mm_max_sd(mx, _mm_unpackhi_pd(mx, mx));
+        mx         = _mm_max_sd(mx, _mm_unpackhi_pd(mx, mx));
         return _mm_cvtsd_f64(mx);
     }
 };
@@ -199,7 +205,7 @@ template <>
 struct SimdBackend<int32_t, IsaAvx2>
 {
     static constexpr std::size_t width = 8;
-    using reg = __m256i;
+    using reg                          = __m256i;
 
     static auto load(const int32_t* p) -> reg
     {
@@ -217,19 +223,40 @@ struct SimdBackend<int32_t, IsaAvx2>
     {
         _mm256_storeu_si256(reinterpret_cast<__m256i*>(p), v);
     }
-    static auto set1(int32_t x) -> reg { return _mm256_set1_epi32(x); }
+    static auto set1(int32_t x) -> reg
+    {
+        return _mm256_set1_epi32(x);
+    }
 
-    static auto add(reg a, reg b) -> reg { return _mm256_add_epi32(a, b); }
-    static auto sub(reg a, reg b) -> reg { return _mm256_sub_epi32(a, b); }
+    static auto add(reg a, reg b) -> reg
+    {
+        return _mm256_add_epi32(a, b);
+    }
+    static auto sub(reg a, reg b) -> reg
+    {
+        return _mm256_sub_epi32(a, b);
+    }
 
-    static auto min(reg a, reg b) -> reg { return _mm256_min_epi32(a, b); }
-    static auto max(reg a, reg b) -> reg { return _mm256_max_epi32(a, b); }
+    static auto min(reg a, reg b) -> reg
+    {
+        return _mm256_min_epi32(a, b);
+    }
+    static auto max(reg a, reg b) -> reg
+    {
+        return _mm256_max_epi32(a, b);
+    }
 
     // 取反：0 - v
-    static auto neg(reg a) -> reg { return _mm256_sub_epi32(_mm256_setzero_si256(), a); }
+    static auto neg(reg a) -> reg
+    {
+        return _mm256_sub_epi32(_mm256_setzero_si256(), a);
+    }
 
     // 绝对值
-    static auto abs(reg a) -> reg { return _mm256_abs_epi32(a); }
+    static auto abs(reg a) -> reg
+    {
+        return _mm256_abs_epi32(a);
+    }
 
     // 水平求和：8 个 int32 → 1 个 int32
     static auto reduce_sum(reg v) -> int32_t
@@ -237,8 +264,8 @@ struct SimdBackend<int32_t, IsaAvx2>
         __m128i lo  = _mm256_castsi256_si128(v);
         __m128i hi  = _mm256_extracti128_si256(v, 1);
         __m128i sum = _mm_add_epi32(lo, hi);
-        sum = _mm_hadd_epi32(sum, sum);
-        sum = _mm_hadd_epi32(sum, sum);
+        sum         = _mm_hadd_epi32(sum, sum);
+        sum         = _mm_hadd_epi32(sum, sum);
         return _mm_cvtsi128_si32(sum);
     }
 
@@ -248,8 +275,8 @@ struct SimdBackend<int32_t, IsaAvx2>
         __m128i lo = _mm256_castsi256_si128(v);
         __m128i hi = _mm256_extracti128_si256(v, 1);
         __m128i mn = _mm_min_epi32(lo, hi);
-        mn = _mm_min_epi32(mn, _mm_srli_si128(mn, 8));
-        mn = _mm_min_epi32(mn, _mm_srli_si128(mn, 4));
+        mn         = _mm_min_epi32(mn, _mm_srli_si128(mn, 8));
+        mn         = _mm_min_epi32(mn, _mm_srli_si128(mn, 4));
         return _mm_cvtsi128_si32(mn);
     }
 
@@ -259,8 +286,8 @@ struct SimdBackend<int32_t, IsaAvx2>
         __m128i lo = _mm256_castsi256_si128(v);
         __m128i hi = _mm256_extracti128_si256(v, 1);
         __m128i mx = _mm_max_epi32(lo, hi);
-        mx = _mm_max_epi32(mx, _mm_srli_si128(mx, 8));
-        mx = _mm_max_epi32(mx, _mm_srli_si128(mx, 4));
+        mx         = _mm_max_epi32(mx, _mm_srli_si128(mx, 8));
+        mx         = _mm_max_epi32(mx, _mm_srli_si128(mx, 4));
         return _mm_cvtsi128_si32(mx);
     }
 };
@@ -273,7 +300,7 @@ template <>
 struct SimdBackend<int64_t, IsaAvx2>
 {
     static constexpr std::size_t width = 4;
-    using reg = __m256i;
+    using reg                          = __m256i;
 
     static auto load(const int64_t* p) -> reg
     {
@@ -291,13 +318,25 @@ struct SimdBackend<int64_t, IsaAvx2>
     {
         _mm256_storeu_si256(reinterpret_cast<__m256i*>(p), v);
     }
-    static auto set1(int64_t x) -> reg { return _mm256_set1_epi64x(x); }
+    static auto set1(int64_t x) -> reg
+    {
+        return _mm256_set1_epi64x(x);
+    }
 
-    static auto add(reg a, reg b) -> reg { return _mm256_add_epi64(a, b); }
-    static auto sub(reg a, reg b) -> reg { return _mm256_sub_epi64(a, b); }
+    static auto add(reg a, reg b) -> reg
+    {
+        return _mm256_add_epi64(a, b);
+    }
+    static auto sub(reg a, reg b) -> reg
+    {
+        return _mm256_sub_epi64(a, b);
+    }
 
     // 取反：0 - v
-    static auto neg(reg a) -> reg { return _mm256_sub_epi64(_mm256_setzero_si256(), a); }
+    static auto neg(reg a) -> reg
+    {
+        return _mm256_sub_epi64(_mm256_setzero_si256(), a);
+    }
 
     // 绝对值：AVX2 无 _mm256_abs_epi64，手工用符号掩码实现
     // sign[i] = (v[i] < 0) ? -1 : 0；result = (v ^ sign) - sign
@@ -324,7 +363,7 @@ template <>
 struct SimdBackend<uint8_t, IsaAvx2>
 {
     static constexpr std::size_t width = 32;
-    using reg = __m256i;
+    using reg                          = __m256i;
 
     static auto load(const uint8_t* p) -> reg
     {
@@ -342,27 +381,40 @@ struct SimdBackend<uint8_t, IsaAvx2>
     {
         _mm256_storeu_si256(reinterpret_cast<__m256i*>(p), v);
     }
-    static auto set1(uint8_t x) -> reg { return _mm256_set1_epi8(static_cast<char>(x)); }
+    static auto set1(uint8_t x) -> reg
+    {
+        return _mm256_set1_epi8(static_cast<char>(x));
+    }
 
     // 字节加法（饱和无符号用 _mm256_adds_epu8；此处用环绕加法与标量行为一致）
-    static auto add(reg a, reg b) -> reg { return _mm256_add_epi8(a, b); }
-    static auto sub(reg a, reg b) -> reg { return _mm256_sub_epi8(a, b); }
+    static auto add(reg a, reg b) -> reg
+    {
+        return _mm256_add_epi8(a, b);
+    }
+    static auto sub(reg a, reg b) -> reg
+    {
+        return _mm256_sub_epi8(a, b);
+    }
 
-    static auto min(reg a, reg b) -> reg { return _mm256_min_epu8(a, b); }
-    static auto max(reg a, reg b) -> reg { return _mm256_max_epu8(a, b); }
+    static auto min(reg a, reg b) -> reg
+    {
+        return _mm256_min_epu8(a, b);
+    }
+    static auto max(reg a, reg b) -> reg
+    {
+        return _mm256_max_epu8(a, b);
+    }
 
     // 水平求和：使用 _mm256_sad_epu8 对 32 个 uint8 求和
     // sad_epu8 将每 8 字节组的绝对差之和存入对应 64-bit lane 的低 16 位
     static auto reduce_sum(reg v) -> uint8_t
     {
-        __m256i zero = _mm256_setzero_si256();
-        __m256i sad  = _mm256_sad_epu8(v, zero);
+        __m256i              zero = _mm256_setzero_si256();
+        __m256i              sad  = _mm256_sad_epu8(v, zero);
         alignas(32) uint64_t buf[4];
         _mm256_store_si256(reinterpret_cast<__m256i*>(buf), sad);
-        uint32_t total = static_cast<uint32_t>(buf[0] & 0xFFFF)
-                       + static_cast<uint32_t>(buf[1] & 0xFFFF)
-                       + static_cast<uint32_t>(buf[2] & 0xFFFF)
-                       + static_cast<uint32_t>(buf[3] & 0xFFFF);
+        uint32_t total = static_cast<uint32_t>(buf[0] & 0xFFFF) + static_cast<uint32_t>(buf[1] & 0xFFFF) + static_cast<uint32_t>(buf[2] & 0xFFFF) +
+                         static_cast<uint32_t>(buf[3] & 0xFFFF);
         return static_cast<uint8_t>(total);
     }
 };

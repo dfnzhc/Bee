@@ -21,7 +21,7 @@ using namespace bee;
 
 TEST(AsyncScopeTests, SpawnAndJoin)
 {
-    WorkPool pool(2);
+    WorkPool   pool(2);
     AsyncScope scope;
 
     std::atomic<int> counter{0};
@@ -40,7 +40,7 @@ TEST(AsyncScopeTests, SpawnAndJoin)
 
 TEST(AsyncScopeTests, JoinIdempotent)
 {
-    WorkPool pool(2);
+    WorkPool   pool(2);
     AsyncScope scope;
 
     scope.spawn(pool, spawn_task(pool, [] {}));
@@ -54,7 +54,7 @@ TEST(AsyncScopeTests, JoinIdempotent)
 
 TEST(AsyncScopeTests, DestructorAutoJoins)
 {
-    WorkPool pool(2);
+    WorkPool         pool(2);
     std::atomic<int> counter{0};
 
     {
@@ -82,7 +82,7 @@ TEST(AsyncScopeTests, PendingCountTracking)
 
 TEST(AsyncScopeTests, JoinRethrowsFirstException)
 {
-    WorkPool pool(2);
+    WorkPool   pool(2);
     AsyncScope scope;
 
     scope.spawn(pool, spawn_task(pool, [] {}));
@@ -96,7 +96,7 @@ TEST(AsyncScopeTests, JoinRethrowsFirstException)
 
 TEST(AsyncScopeTests, RequestStopSetsToken)
 {
-    WorkPool pool(2);
+    WorkPool   pool(2);
     AsyncScope scope;
 
     scope.spawn(pool, [](WorkPool& p) -> Task<void> {
@@ -113,8 +113,8 @@ TEST(AsyncScopeTests, RequestStopSetsToken)
 
 TEST(AsyncScopeTests, LargeScaleSpawn)
 {
-    WorkPool pool(8);
-    AsyncScope scope;
+    WorkPool      pool(8);
+    AsyncScope    scope;
     constexpr int N = 1000;
 
     std::atomic<int> sum{0};
@@ -132,7 +132,7 @@ TEST(AsyncScopeTests, LargeScaleSpawn)
 
 TEST(AsyncScopeTests, SpawnAfterJoin)
 {
-    WorkPool pool(2);
+    WorkPool   pool(2);
     AsyncScope scope;
 
     std::atomic<int> counter{0};

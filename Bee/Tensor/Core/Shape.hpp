@@ -33,7 +33,7 @@ using Strides = std::vector<int64_t>;
         return {};
 
     const auto ndim = static_cast<int>(shape.size());
-    Strides strides(ndim);
+    Strides    strides(ndim);
     strides[ndim - 1] = 1;
     for (int i = ndim - 2; i >= 0; --i)
         strides[i] = strides[i + 1] * shape[i + 1];

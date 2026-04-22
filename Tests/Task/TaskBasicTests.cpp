@@ -145,7 +145,7 @@ TEST(TaskBasicTests, MoveConstructTransfersOwnership)
 
 TEST(TaskBasicTests, MoveAssignTransfersOwnership)
 {
-    auto t1 = coro_return_int(10);
+    auto      t1 = coro_return_int(10);
     Task<int> t2;
     t2 = std::move(t1);
 
@@ -157,8 +157,12 @@ TEST(TaskBasicTests, MoveAssignTransfersOwnership)
 
 TEST(TaskBasicTests, UnstartedTaskDestroySafely)
 {
-    { auto t = coro_return_int(1); }
-    { auto t = coro_return_void(); }
+    {
+        auto t = coro_return_int(1);
+    }
+    {
+        auto t = coro_return_void();
+    }
     // 无崩溃即通过
 }
 

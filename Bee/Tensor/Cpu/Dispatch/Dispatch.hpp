@@ -14,35 +14,30 @@ namespace bee::cpu
 
 // 每个 ISA 命名空间都声明同一组函数原型；
 // 链接期选择由运行期 switch 决定
-#define BEE_DECL_DISPATCH_NS(NS)                                                \
-    namespace NS {                                                              \
-        /* 二元 elementwise */                                                  \
-        auto ew_add(const Tensor& a, const Tensor& b, Tensor& out) -> void;     \
-        auto ew_sub(const Tensor& a, const Tensor& b, Tensor& out) -> void;     \
-        auto ew_mul(const Tensor& a, const Tensor& b, Tensor& out) -> void;     \
-        auto ew_div(const Tensor& a, const Tensor& b, Tensor& out) -> void;     \
-        /* 一元 elementwise */                                                  \
-        auto ew_neg(const Tensor& a, Tensor& out) -> void;                      \
-        auto ew_abs(const Tensor& a, Tensor& out) -> void;                      \
-        auto ew_sqrt(const Tensor& a, Tensor& out) -> void;                     \
-        auto ew_exp(const Tensor& a, Tensor& out) -> void;                      \
-        auto ew_log(const Tensor& a, Tensor& out) -> void;                      \
-        /* 全局 reduce */                                                       \
-        auto rd_sum_global(const Tensor& a, Tensor& out) -> void;               \
-        auto rd_min_global(const Tensor& a, Tensor& out) -> void;               \
-        auto rd_max_global(const Tensor& a, Tensor& out) -> void;               \
-        auto rd_prod_global(const Tensor& a, Tensor& out) -> void;              \
-        /* matmul（仅 F32/F64/I32/I64）*/                                       \
-        auto mm_f32(std::int64_t M, std::int64_t K, std::int64_t N,             \
-                    const float* A, const float* B, float* C) -> void;          \
-        auto mm_f64(std::int64_t M, std::int64_t K, std::int64_t N,             \
-                    const double* A, const double* B, double* C) -> void;       \
-        auto mm_i32(std::int64_t M, std::int64_t K, std::int64_t N,             \
-                    const std::int32_t* A, const std::int32_t* B,               \
-                    std::int32_t* C) -> void;                                   \
-        auto mm_i64(std::int64_t M, std::int64_t K, std::int64_t N,             \
-                    const std::int64_t* A, const std::int64_t* B,               \
-                    std::int64_t* C) -> void;                                   \
+#define BEE_DECL_DISPATCH_NS(NS)                                                                                                            \
+    namespace NS                                                                                                                            \
+    {                                                                                                                                       \
+        /* 二元 elementwise */                                                                                                              \
+        auto ew_add(const Tensor& a, const Tensor& b, Tensor& out) -> void;                                                                 \
+        auto ew_sub(const Tensor& a, const Tensor& b, Tensor& out) -> void;                                                                 \
+        auto ew_mul(const Tensor& a, const Tensor& b, Tensor& out) -> void;                                                                 \
+        auto ew_div(const Tensor& a, const Tensor& b, Tensor& out) -> void;                                                                 \
+        /* 一元 elementwise */                                                                                                              \
+        auto ew_neg(const Tensor& a, Tensor& out) -> void;                                                                                  \
+        auto ew_abs(const Tensor& a, Tensor& out) -> void;                                                                                  \
+        auto ew_sqrt(const Tensor& a, Tensor& out) -> void;                                                                                 \
+        auto ew_exp(const Tensor& a, Tensor& out) -> void;                                                                                  \
+        auto ew_log(const Tensor& a, Tensor& out) -> void;                                                                                  \
+        /* 全局 reduce */                                                                                                                   \
+        auto rd_sum_global(const Tensor& a, Tensor& out) -> void;                                                                           \
+        auto rd_min_global(const Tensor& a, Tensor& out) -> void;                                                                           \
+        auto rd_max_global(const Tensor& a, Tensor& out) -> void;                                                                           \
+        auto rd_prod_global(const Tensor& a, Tensor& out) -> void;                                                                          \
+        /* matmul（仅 F32/F64/I32/I64）*/                                                                                                   \
+        auto mm_f32(std::int64_t M, std::int64_t K, std::int64_t N, const float* A, const float* B, float* C) -> void;                      \
+        auto mm_f64(std::int64_t M, std::int64_t K, std::int64_t N, const double* A, const double* B, double* C) -> void;                   \
+        auto mm_i32(std::int64_t M, std::int64_t K, std::int64_t N, const std::int32_t* A, const std::int32_t* B, std::int32_t* C) -> void; \
+        auto mm_i64(std::int64_t M, std::int64_t K, std::int64_t N, const std::int64_t* A, const std::int64_t* B, std::int64_t* C) -> void; \
     }
 
 BEE_DECL_DISPATCH_NS(scalar)
@@ -59,35 +54,35 @@ BEE_DECL_DISPATCH_NS(avx512)
 // ─────────────────────────────────────────────────────────────────────────────
 
 #if defined(BEE_TENSOR_HAVE_AVX512)
-#  define BEE_RT_CASE_AVX512(FN, ...) \
+    #define BEE_RT_CASE_AVX512(FN, ...)                                        \
     case ::bee::simd::Isa::Avx512: return ::bee::cpu::avx512::FN(__VA_ARGS__);
 #else
-#  define BEE_RT_CASE_AVX512(FN, ...)
+    #define BEE_RT_CASE_AVX512(FN, ...)
 #endif
 
 #if defined(BEE_TENSOR_HAVE_AVX2)
-#  define BEE_RT_CASE_AVX2(FN, ...) \
+    #define BEE_RT_CASE_AVX2(FN, ...)                                      \
     case ::bee::simd::Isa::Avx2: return ::bee::cpu::avx2::FN(__VA_ARGS__);
 #else
-#  define BEE_RT_CASE_AVX2(FN, ...)
+    #define BEE_RT_CASE_AVX2(FN, ...)
 #endif
 
 #if defined(BEE_TENSOR_HAVE_SSE2)
-#  define BEE_RT_CASE_SSE2(FN, ...) \
+    #define BEE_RT_CASE_SSE2(FN, ...)                                      \
     case ::bee::simd::Isa::Sse2: return ::bee::cpu::sse2::FN(__VA_ARGS__);
 #else
-#  define BEE_RT_CASE_SSE2(FN, ...)
+    #define BEE_RT_CASE_SSE2(FN, ...)
 #endif
 
-#define BEE_RT_DISPATCH(FN, ...)                                                \
-    do {                                                                        \
-        switch (::bee::simd::current_isa()) {                                   \
-            BEE_RT_CASE_AVX512(FN, __VA_ARGS__)                                 \
-            BEE_RT_CASE_AVX2(FN, __VA_ARGS__)                                   \
-            BEE_RT_CASE_SSE2(FN, __VA_ARGS__)                                   \
-            default: break;                                                     \
-        }                                                                       \
-        return ::bee::cpu::scalar::FN(__VA_ARGS__);                             \
+#define BEE_RT_DISPATCH(FN, ...)                    \
+    do {                                            \
+        switch (::bee::simd::current_isa()) {       \
+            BEE_RT_CASE_AVX512(FN, __VA_ARGS__)     \
+            BEE_RT_CASE_AVX2(FN, __VA_ARGS__)       \
+            BEE_RT_CASE_SSE2(FN, __VA_ARGS__)       \
+        default: break;                             \
+        }                                           \
+        return ::bee::cpu::scalar::FN(__VA_ARGS__); \
     } while (0)
 
 } // namespace bee::cpu

@@ -15,10 +15,10 @@ class Storage;
 struct TensorImpl
 {
     std::shared_ptr<Storage> storage;
-    DType   dtype;
-    Shape   shape;
-    Strides strides;    // 元素单位，非字节
-    int64_t offset = 0; // 元素单位
+    DType                    dtype;
+    Shape                    shape;
+    Strides                  strides;    // 元素单位，非字节
+    int64_t                  offset = 0; // 元素单位
 
     [[nodiscard]] auto numel() const noexcept -> int64_t
     {

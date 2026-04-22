@@ -22,6 +22,9 @@ auto isa_name(Isa isa) noexcept -> const char*;
 auto detect_isa() noexcept -> Isa;
 
 // 等价于 detect_isa()，命名上更贴近"当前最优 ISA"的语义
-inline auto current_isa() noexcept -> Isa { return detect_isa(); }
+inline auto current_isa() noexcept -> Isa
+{
+    return detect_isa();
+}
 
 } // namespace bee::simd

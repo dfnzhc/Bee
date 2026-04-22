@@ -51,17 +51,16 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
     {
         std::latch done(static_cast<std::ptrdiff_t>(chunks.size()));
         detail::safe_post_loop(scheduler, chunks.size(), done, [&](std::size_t i) {
-                try {
-                    auto in_begin  = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
-                    auto in_end    = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
-                    auto out_begin = std::next(d_first, static_cast<std::ptrdiff_t>(chunks[i].begin));
-                    std::inclusive_scan(in_begin, in_end, out_begin, op);
-                    chunk_totals[i] = *std::next(d_first, static_cast<std::ptrdiff_t>(chunks[i].end - 1));
-                }
-                catch (...) {
-                    exceptions[i] = std::current_exception();
-                }
-                done.count_down();
+            try {
+                auto in_begin  = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
+                auto in_end    = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
+                auto out_begin = std::next(d_first, static_cast<std::ptrdiff_t>(chunks[i].begin));
+                std::inclusive_scan(in_begin, in_end, out_begin, op);
+                chunk_totals[i] = *std::next(d_first, static_cast<std::ptrdiff_t>(chunks[i].end - 1));
+            } catch (...) {
+                exceptions[i] = std::current_exception();
+            }
+            done.count_down();
         });
     }
 
@@ -78,18 +77,17 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
         std::vector<std::exception_ptr> fixup_exceptions(chunks.size() - 1);
         std::latch                      fixup_done(static_cast<std::ptrdiff_t>(chunks.size() - 1));
         detail::safe_post_loop(scheduler, chunks.size() - 1, fixup_done, [&](std::size_t idx) {
-                const std::size_t i = idx + 1;
-                try {
-                    auto out_begin = std::next(d_first, static_cast<std::ptrdiff_t>(chunks[i].begin));
-                    auto out_end   = std::next(d_first, static_cast<std::ptrdiff_t>(chunks[i].end));
-                    for (auto it = out_begin; it != out_end; ++it) {
-                        *it = op(chunk_offsets[i], *it);
-                    }
+            const std::size_t i = idx + 1;
+            try {
+                auto out_begin = std::next(d_first, static_cast<std::ptrdiff_t>(chunks[i].begin));
+                auto out_end   = std::next(d_first, static_cast<std::ptrdiff_t>(chunks[i].end));
+                for (auto it = out_begin; it != out_end; ++it) {
+                    *it = op(chunk_offsets[i], *it);
                 }
-                catch (...) {
-                    fixup_exceptions[idx] = std::current_exception();
-                }
-                fixup_done.count_down();
+            } catch (...) {
+                fixup_exceptions[idx] = std::current_exception();
+            }
+            fixup_done.count_down();
         });
 
         detail::rethrow_first(fixup_exceptions);
@@ -136,22 +134,21 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
     {
         std::latch done(static_cast<std::ptrdiff_t>(chunks.size()));
         detail::safe_post_loop(scheduler, chunks.size(), done, [&](std::size_t i) {
-                if (token.stop_requested()) {
-                    cancelled.store(true, std::memory_order_relaxed);
-                    done.count_down();
-                    return;
-                }
-                try {
-                    auto in_begin  = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
-                    auto in_end    = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
-                    auto out_begin = std::next(d_first, static_cast<std::ptrdiff_t>(chunks[i].begin));
-                    std::inclusive_scan(in_begin, in_end, out_begin, op);
-                    chunk_totals[i] = *std::next(d_first, static_cast<std::ptrdiff_t>(chunks[i].end - 1));
-                }
-                catch (...) {
-                    exceptions[i] = std::current_exception();
-                }
+            if (token.stop_requested()) {
+                cancelled.store(true, std::memory_order_relaxed);
                 done.count_down();
+                return;
+            }
+            try {
+                auto in_begin  = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
+                auto in_end    = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
+                auto out_begin = std::next(d_first, static_cast<std::ptrdiff_t>(chunks[i].begin));
+                std::inclusive_scan(in_begin, in_end, out_begin, op);
+                chunk_totals[i] = *std::next(d_first, static_cast<std::ptrdiff_t>(chunks[i].end - 1));
+            } catch (...) {
+                exceptions[i] = std::current_exception();
+            }
+            done.count_down();
         });
     }
 
@@ -170,23 +167,22 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
         std::vector<std::exception_ptr> fixup_exceptions(chunks.size() - 1);
         std::latch                      fixup_done(static_cast<std::ptrdiff_t>(chunks.size() - 1));
         detail::safe_post_loop(scheduler, chunks.size() - 1, fixup_done, [&](std::size_t idx) {
-                const std::size_t i = idx + 1;
-                if (token.stop_requested()) {
-                    cancelled.store(true, std::memory_order_relaxed);
-                    fixup_done.count_down();
-                    return;
-                }
-                try {
-                    auto out_begin = std::next(d_first, static_cast<std::ptrdiff_t>(chunks[i].begin));
-                    auto out_end   = std::next(d_first, static_cast<std::ptrdiff_t>(chunks[i].end));
-                    for (auto it = out_begin; it != out_end; ++it) {
-                        *it = op(chunk_offsets[i], *it);
-                    }
-                }
-                catch (...) {
-                    fixup_exceptions[idx] = std::current_exception();
-                }
+            const std::size_t i = idx + 1;
+            if (token.stop_requested()) {
+                cancelled.store(true, std::memory_order_relaxed);
                 fixup_done.count_down();
+                return;
+            }
+            try {
+                auto out_begin = std::next(d_first, static_cast<std::ptrdiff_t>(chunks[i].begin));
+                auto out_end   = std::next(d_first, static_cast<std::ptrdiff_t>(chunks[i].end));
+                for (auto it = out_begin; it != out_end; ++it) {
+                    *it = op(chunk_offsets[i], *it);
+                }
+            } catch (...) {
+                fixup_exceptions[idx] = std::current_exception();
+            }
+            fixup_done.count_down();
         });
 
         detail::rethrow_first(fixup_exceptions);
@@ -240,20 +236,19 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
     {
         std::latch done(static_cast<std::ptrdiff_t>(chunks.size()));
         detail::safe_post_loop(scheduler, chunks.size(), done, [&](std::size_t i) {
-                try {
-                    auto in_begin = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
-                    auto in_end   = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
-                    T    acc      = *in_begin;
-                    ++in_begin;
-                    for (; in_begin != in_end; ++in_begin) {
-                        acc = op(acc, *in_begin);
-                    }
-                    chunk_sums[i] = std::move(acc);
+            try {
+                auto in_begin = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
+                auto in_end   = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
+                T    acc      = *in_begin;
+                ++in_begin;
+                for (; in_begin != in_end; ++in_begin) {
+                    acc = op(acc, *in_begin);
                 }
-                catch (...) {
-                    exceptions[i] = std::current_exception();
-                }
-                done.count_down();
+                chunk_sums[i] = std::move(acc);
+            } catch (...) {
+                exceptions[i] = std::current_exception();
+            }
+            done.count_down();
         });
     }
 
@@ -271,20 +266,19 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
     {
         std::latch done(static_cast<std::ptrdiff_t>(chunks.size()));
         detail::safe_post_loop(scheduler, chunks.size(), done, [&](std::size_t i) {
-                try {
-                    auto in_begin  = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
-                    auto in_end    = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
-                    auto out_begin = std::next(d_first, static_cast<std::ptrdiff_t>(chunks[i].begin));
-                    T    running   = chunk_offsets[i];
-                    for (auto in_it = in_begin; in_it != in_end; ++in_it, ++out_begin) {
-                        *out_begin = running;
-                        running    = op(running, *in_it);
-                    }
+            try {
+                auto in_begin  = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
+                auto in_end    = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
+                auto out_begin = std::next(d_first, static_cast<std::ptrdiff_t>(chunks[i].begin));
+                T    running   = chunk_offsets[i];
+                for (auto in_it = in_begin; in_it != in_end; ++in_it, ++out_begin) {
+                    *out_begin = running;
+                    running    = op(running, *in_it);
                 }
-                catch (...) {
-                    write_exceptions[i] = std::current_exception();
-                }
-                done.count_down();
+            } catch (...) {
+                write_exceptions[i] = std::current_exception();
+            }
+            done.count_down();
         });
     }
 
@@ -295,8 +289,7 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
 
 /// 带取消支持的排除式扫描。
 template <Scheduler S, std::random_access_iterator InIt, std::random_access_iterator OutIt, typename T, typename BinaryOp>
-[[nodiscard]] auto parallel_exclusive_scan(S& scheduler, InIt first, InIt last, OutIt d_first, T init, BinaryOp op, std::stop_token token)
-    -> OutIt
+[[nodiscard]] auto parallel_exclusive_scan(S& scheduler, InIt first, InIt last, OutIt d_first, T init, BinaryOp op, std::stop_token token) -> OutIt
 {
     const auto n = static_cast<std::size_t>(std::distance(first, last));
     if (n == 0)
@@ -327,25 +320,24 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
     {
         std::latch done(static_cast<std::ptrdiff_t>(chunks.size()));
         detail::safe_post_loop(scheduler, chunks.size(), done, [&](std::size_t i) {
-                if (token.stop_requested()) {
-                    cancelled.store(true, std::memory_order_relaxed);
-                    done.count_down();
-                    return;
-                }
-                try {
-                    auto in_begin = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
-                    auto in_end   = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
-                    T    acc      = *in_begin;
-                    ++in_begin;
-                    for (; in_begin != in_end; ++in_begin) {
-                        acc = op(acc, *in_begin);
-                    }
-                    chunk_sums[i] = std::move(acc);
-                }
-                catch (...) {
-                    exceptions[i] = std::current_exception();
-                }
+            if (token.stop_requested()) {
+                cancelled.store(true, std::memory_order_relaxed);
                 done.count_down();
+                return;
+            }
+            try {
+                auto in_begin = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
+                auto in_end   = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
+                T    acc      = *in_begin;
+                ++in_begin;
+                for (; in_begin != in_end; ++in_begin) {
+                    acc = op(acc, *in_begin);
+                }
+                chunk_sums[i] = std::move(acc);
+            } catch (...) {
+                exceptions[i] = std::current_exception();
+            }
+            done.count_down();
         });
     }
 
@@ -365,25 +357,24 @@ template <Scheduler S, std::random_access_iterator InIt, std::random_access_iter
     {
         std::latch done(static_cast<std::ptrdiff_t>(chunks.size()));
         detail::safe_post_loop(scheduler, chunks.size(), done, [&](std::size_t i) {
-                if (token.stop_requested()) {
-                    cancelled.store(true, std::memory_order_relaxed);
-                    done.count_down();
-                    return;
-                }
-                try {
-                    auto in_begin  = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
-                    auto in_end    = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
-                    auto out_begin = std::next(d_first, static_cast<std::ptrdiff_t>(chunks[i].begin));
-                    T    running   = chunk_offsets[i];
-                    for (auto in_it = in_begin; in_it != in_end; ++in_it, ++out_begin) {
-                        *out_begin = running;
-                        running    = op(running, *in_it);
-                    }
-                }
-                catch (...) {
-                    write_exceptions[i] = std::current_exception();
-                }
+            if (token.stop_requested()) {
+                cancelled.store(true, std::memory_order_relaxed);
                 done.count_down();
+                return;
+            }
+            try {
+                auto in_begin  = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].begin));
+                auto in_end    = std::next(first, static_cast<std::ptrdiff_t>(chunks[i].end));
+                auto out_begin = std::next(d_first, static_cast<std::ptrdiff_t>(chunks[i].begin));
+                T    running   = chunk_offsets[i];
+                for (auto in_it = in_begin; in_it != in_end; ++in_it, ++out_begin) {
+                    *out_begin = running;
+                    running    = op(running, *in_it);
+                }
+            } catch (...) {
+                write_exceptions[i] = std::current_exception();
+            }
+            done.count_down();
         });
     }
 

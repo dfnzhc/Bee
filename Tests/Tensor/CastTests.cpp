@@ -61,7 +61,10 @@ TEST(CastTests, I32ToBool)
     auto src_r = Tensor::zeros({4}, DType::I32);
     ASSERT_TRUE(src_r.has_value());
     auto* p = static_cast<int32_t*>(src_r->data_ptr());
-    p[0] = 0; p[1] = 1; p[2] = -3; p[3] = 42;
+    p[0]    = 0;
+    p[1]    = 1;
+    p[2]    = -3;
+    p[3]    = 42;
 
     auto out_r = cast(*src_r, DType::Bool);
     ASSERT_TRUE(out_r.has_value());
@@ -80,7 +83,8 @@ TEST(CastTests, BoolToI32)
     auto src_r = Tensor::zeros({2}, DType::Bool);
     ASSERT_TRUE(src_r.has_value());
     auto* bp = static_cast<bool*>(src_r->data_ptr());
-    bp[0] = true; bp[1] = false;
+    bp[0]    = true;
+    bp[1]    = false;
 
     auto out_r = cast(*src_r, DType::I32);
     ASSERT_TRUE(out_r.has_value());
@@ -137,13 +141,12 @@ TEST(CastTests, NonContiguous_TransposeThenCast)
     EXPECT_EQ(out_r->shape()[1], 3);
 
     // 验证数据：transpose 后 (i,j) 对应原始 (j,i)，即 j*4+i
-    const auto* fp = static_cast<const float*>(out_r->data_ptr());
-    int idx = 0;
+    const auto* fp  = static_cast<const float*>(out_r->data_ptr());
+    int         idx = 0;
     for (int i = 0; i < 4; ++i) {
         for (int j = 0; j < 3; ++j) {
             float expected = static_cast<float>(j * 4 + i);
-            EXPECT_FLOAT_EQ(fp[idx++], expected)
-                << "i=" << i << " j=" << j;
+            EXPECT_FLOAT_EQ(fp[idx++], expected) << "i=" << i << " j=" << j;
         }
     }
 }
