@@ -1,12 +1,12 @@
-if(TARGET Bee::cuKernels)
+if(TARGET Bee::CUDA)
     include(CheckLanguage)
 
-    # 纯 C++ 测试继续走统一组件测试入口。
+    # 纯 C++ 测试走统一组件测试入口。
     bee_add_component_test(
-        COMPONENT cuKernels
-        TARGET cuKernels.Tests
+        COMPONENT CUDA
+        TARGET CUDA.Tests
         SOURCES
-            CUDAKernelTests.cpp
+            ApiTests.cpp
     )
 
     if(NOT CMAKE_CUDA_COMPILER_LOADED)
@@ -17,19 +17,19 @@ if(TARGET Bee::cuKernels)
     endif()
 
     if(CMAKE_CUDA_COMPILER_LOADED)
-        target_sources(cuKernels.Tests PRIVATE
-            KernelOpsTests.cu
+        target_sources(CUDA.Tests PRIVATE
+            KernelTests.cu
         )
 
-        set_target_properties(cuKernels.Tests PROPERTIES
+        set_target_properties(CUDA.Tests PROPERTIES
             CUDA_STANDARD 20
             CUDA_STANDARD_REQUIRED ON
             CUDA_SEPARABLE_COMPILATION OFF
             CUDA_ARCHITECTURES "${CMAKE_CUDA_ARCHITECTURES}"
         )
     else()
-        message(STATUS "CUDA language is unavailable, skip CUDA sources in cuKernels.Tests.")
+        message(STATUS "CUDA language is unavailable, skip CUDA sources in CUDA.Tests.")
     endif()
 else()
-    message(STATUS "cuKernels tests are skipped because cuKernels component is unavailable.")
+    message(STATUS "CUDA tests are skipped because Bee::CUDA component is unavailable.")
 endif()

@@ -6,6 +6,8 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 if(MSVC)
     add_compile_options($<$<COMPILE_LANGUAGE:C,CXX>:/utf-8>)
+    # nvcc 也需要把 /utf-8 透传到 MSVC 宿主编译器，否则 .cu 中的中文字符串会被 MBCS 误解。
+    add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/utf-8>)
 endif()
 
 option(BEE_BUILD_TESTS "Build tests for Bee components" ON)

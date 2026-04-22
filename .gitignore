@@ -369,6 +369,7 @@ MigrationBackup/
 
 /.idea/
 /build/
+/build-*/
 /Bin/
 /Tools/tracy/
 cmake-build-*
