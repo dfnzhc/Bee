@@ -21,24 +21,24 @@
 
 // Execute expr. If it returns non-cudaSuccess, return its cudaError_t (cast to int).
 // Caller function must have `int` return type (or compatible).
-#define BEE_CUDA_RET_ON_ERR(expr)                                           \
-    do {                                                                    \
-        const cudaError_t _bee_cu_err = (expr);                             \
-        if (_bee_cu_err != cudaSuccess) {                                   \
-            (void)cudaGetLastError();                                       \
-            return static_cast<int>(_bee_cu_err);                           \
-        }                                                                   \
+#define BEE_CUDA_RET_ON_ERR(expr)                 \
+    do {                                          \
+        const cudaError_t _bee_cu_err = (expr);   \
+        if (_bee_cu_err != cudaSuccess) {         \
+            (void)cudaGetLastError();             \
+            return static_cast<int>(_bee_cu_err); \
+        }                                         \
     } while (0)
 
 // Launch a kernel (e.g. `kernel<<<g,b>>>(args)`) and return int on launch/last-error failure.
 // Variadic so the `<<<...>>>` triple-angle and arg-list commas don't break macro parsing.
-#define BEE_CUDA_LAUNCH_RET(...)                                            \
-    do {                                                                    \
-        __VA_ARGS__;                                                        \
-        const cudaError_t _bee_cu_launch_err = cudaGetLastError();          \
-        if (_bee_cu_launch_err != cudaSuccess) {                            \
-            return static_cast<int>(_bee_cu_launch_err);                    \
-        }                                                                   \
+#define BEE_CUDA_LAUNCH_RET(...)                                   \
+    do {                                                           \
+        __VA_ARGS__;                                               \
+        const cudaError_t _bee_cu_launch_err = cudaGetLastError(); \
+        if (_bee_cu_launch_err != cudaSuccess) {                   \
+            return static_cast<int>(_bee_cu_launch_err);           \
+        }                                                          \
     } while (0)
 
 // Return int (cudaSuccess == 0) from the current function.

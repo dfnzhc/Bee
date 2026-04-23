@@ -39,33 +39,51 @@ struct Reducer
 {
     __device__ static T identity()
     {
-        if constexpr (OP == kRdSum)  return T(0);
-        if constexpr (OP == kRdProd) return T(1);
+        if constexpr (OP == kRdSum)
+            return T(0);
+        if constexpr (OP == kRdProd)
+            return T(1);
         if constexpr (OP == kRdMin) {
-            if constexpr (std::is_same_v<T, float>)       return INFINITY;
-            else if constexpr (std::is_same_v<T, double>) return (double)INFINITY;
-            else if constexpr (std::is_same_v<T, std::uint8_t>)  return T(0xFF);
-            else if constexpr (std::is_same_v<T, std::int32_t>)  return T(INT32_MAX);
-            else if constexpr (std::is_same_v<T, std::int64_t>)  return T(INT64_MAX);
-            else                                                 return T();
+            if constexpr (std::is_same_v<T, float>)
+                return INFINITY;
+            else if constexpr (std::is_same_v<T, double>)
+                return (double)INFINITY;
+            else if constexpr (std::is_same_v<T, std::uint8_t>)
+                return T(0xFF);
+            else if constexpr (std::is_same_v<T, std::int32_t>)
+                return T(INT32_MAX);
+            else if constexpr (std::is_same_v<T, std::int64_t>)
+                return T(INT64_MAX);
+            else
+                return T();
         }
         if constexpr (OP == kRdMax) {
-            if constexpr (std::is_same_v<T, float>)       return -INFINITY;
-            else if constexpr (std::is_same_v<T, double>) return -(double)INFINITY;
-            else if constexpr (std::is_same_v<T, std::uint8_t>)  return T(0);
-            else if constexpr (std::is_same_v<T, std::int32_t>)  return T(INT32_MIN);
-            else if constexpr (std::is_same_v<T, std::int64_t>)  return T(INT64_MIN);
-            else                                                 return T();
+            if constexpr (std::is_same_v<T, float>)
+                return -INFINITY;
+            else if constexpr (std::is_same_v<T, double>)
+                return -(double)INFINITY;
+            else if constexpr (std::is_same_v<T, std::uint8_t>)
+                return T(0);
+            else if constexpr (std::is_same_v<T, std::int32_t>)
+                return T(INT32_MIN);
+            else if constexpr (std::is_same_v<T, std::int64_t>)
+                return T(INT64_MIN);
+            else
+                return T();
         }
         return T{};
     }
 
     __device__ static T combine(T a, T b)
     {
-        if constexpr (OP == kRdSum)  return a + b;
-        if constexpr (OP == kRdProd) return a * b;
-        if constexpr (OP == kRdMin)  return a < b ? a : b;
-        if constexpr (OP == kRdMax)  return a > b ? a : b;
+        if constexpr (OP == kRdSum)
+            return a + b;
+        if constexpr (OP == kRdProd)
+            return a * b;
+        if constexpr (OP == kRdMin)
+            return a < b ? a : b;
+        if constexpr (OP == kRdMax)
+            return a > b ? a : b;
         return a;
     }
 };
@@ -82,11 +100,11 @@ __global__ void reduce_global_kernel(const T* __restrict__ src, T* __restrict__ 
 {
     using R = Reducer<T, OP>;
     extern __shared__ unsigned char smem_raw[];
-    T* smem = reinterpret_cast<T*>(smem_raw);
+    T*                              smem = reinterpret_cast<T*>(smem_raw);
 
-    const std::size_t tid   = threadIdx.x;
+    const std::size_t tid    = threadIdx.x;
     const std::size_t stride = static_cast<std::size_t>(blockDim.x) * gridDim.x;
-    T acc = R::identity();
+    T                 acc    = R::identity();
     for (std::size_t i = static_cast<std::size_t>(blockIdx.x) * blockDim.x + tid; i < n; i += stride) {
         acc = R::combine(acc, src[i]);
     }
@@ -94,10 +112,12 @@ __global__ void reduce_global_kernel(const T* __restrict__ src, T* __restrict__ 
     __syncthreads();
 
     for (unsigned int s = blockDim.x / 2; s > 0; s >>= 1) {
-        if (tid < s) smem[tid] = R::combine(smem[tid], smem[tid + s]);
+        if (tid < s)
+            smem[tid] = R::combine(smem[tid], smem[tid + s]);
         __syncthreads();
     }
-    if (tid == 0) partial[blockIdx.x] = smem[0];
+    if (tid == 0)
+        partial[blockIdx.x] = smem[0];
 }
 
 // ── Axis reduce ───────────────────────────────────────────────────────────
@@ -107,17 +127,17 @@ __global__ void reduce_global_kernel(const T* __restrict__ src, T* __restrict__ 
 // This is simple and correct; optimization is future work.
 
 template <typename T, int OP>
-__global__ void reduce_axis_kernel(const T* __restrict__ src, T* __restrict__ dst,
-                                   std::size_t outer, std::size_t axis, std::size_t inner)
+__global__ void reduce_axis_kernel(const T* __restrict__ src, T* __restrict__ dst, std::size_t outer, std::size_t axis, std::size_t inner)
 {
-    using R = Reducer<T, OP>;
+    using R                 = Reducer<T, OP>;
     const std::size_t total = outer * inner;
     const std::size_t idx   = static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    if (idx >= total) return;
-    const std::size_t o = idx / inner;
-    const std::size_t i = idx % inner;
-    const T* base = src + o * axis * inner + i;
-    T acc = R::identity();
+    if (idx >= total)
+        return;
+    const std::size_t o    = idx / inner;
+    const std::size_t i    = idx % inner;
+    const T*          base = src + o * axis * inner + i;
+    T                 acc  = R::identity();
     for (std::size_t k = 0; k < axis; ++k) {
         acc = R::combine(acc, base[k * inner]);
     }
@@ -130,33 +150,37 @@ template <typename T>
 __global__ void scale_fp_kernel(T* buf, T factor, std::size_t n)
 {
     const std::size_t idx = static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    if (idx < n) buf[idx] *= factor;
+    if (idx < n)
+        buf[idx] *= factor;
 }
 
 template <typename T, int OP>
 int launch_global(const void* src, void* dst, std::size_t n, cudaStream_t stream)
 {
-    if (n == 0) return static_cast<int>(cudaErrorInvalidValue);
+    if (n == 0)
+        return static_cast<int>(cudaErrorInvalidValue);
 
     const unsigned int block = bee::cuda::kDefaultBlockSize;
-    unsigned int grid = static_cast<unsigned int>((n + block - 1) / block);
-    if (grid > 1024u) grid = 1024u;
+    unsigned int       grid  = static_cast<unsigned int>((n + block - 1) / block);
+    if (grid > 1024u)
+        grid = 1024u;
 
     // Stage 1: reduce to `grid` partials
-    T* partial = nullptr;
-    cudaError_t err = cudaMallocAsync(reinterpret_cast<void**>(&partial),
-                                      grid * sizeof(T), stream);
-    if (err != cudaSuccess) return static_cast<int>(err);
+    T*          partial = nullptr;
+    cudaError_t err     = cudaMallocAsync(reinterpret_cast<void**>(&partial), grid * sizeof(T), stream);
+    if (err != cudaSuccess)
+        return static_cast<int>(err);
 
     const std::size_t smem = block * sizeof(T);
-    reduce_global_kernel<T, OP><<<grid, block, smem, stream>>>(
-        static_cast<const T*>(src), partial, n);
+    reduce_global_kernel<T, OP><<<grid, block, smem, stream>>>(static_cast<const T*>(src), partial, n);
     err = cudaGetLastError();
-    if (err != cudaSuccess) { cudaFreeAsync(partial, stream); return static_cast<int>(err); }
+    if (err != cudaSuccess) {
+        cudaFreeAsync(partial, stream);
+        return static_cast<int>(err);
+    }
 
     // Stage 2: reduce `grid` partials to a single scalar
-    reduce_global_kernel<T, OP><<<1u, block, smem, stream>>>(
-        partial, static_cast<T*>(dst), grid);
+    reduce_global_kernel<T, OP><<<1u, block, smem, stream>>>(partial, static_cast<T*>(dst), grid);
     err = cudaGetLastError();
     cudaFreeAsync(partial, stream);
     return static_cast<int>(err);
@@ -166,31 +190,31 @@ template <typename T, int OP>
 int launch_axis(const void* src, void* dst, std::size_t outer, std::size_t axis, std::size_t inner, cudaStream_t stream)
 {
     const std::size_t total = outer * inner;
-    if (total == 0 || axis == 0) return static_cast<int>(cudaErrorInvalidValue);
+    if (total == 0 || axis == 0)
+        return static_cast<int>(cudaErrorInvalidValue);
     const unsigned int block = bee::cuda::kDefaultBlockSize;
     const unsigned int grid  = bee::cuda::compute_grid_1d(total, block);
-    reduce_axis_kernel<T, OP><<<grid, block, 0, stream>>>(
-        static_cast<const T*>(src), static_cast<T*>(dst), outer, axis, inner);
+    reduce_axis_kernel<T, OP><<<grid, block, 0, stream>>>(static_cast<const T*>(src), static_cast<T*>(dst), outer, axis, inner);
     return static_cast<int>(cudaGetLastError());
 }
 
-#define DISPATCH_DT_ALL(CALL)                                                \
-    switch (dt) {                                                            \
-    case kDtU8:  err = CALL(std::uint8_t);  break;                           \
-    case kDtI32: err = CALL(std::int32_t);  break;                           \
-    case kDtI64: err = CALL(std::int64_t);  break;                           \
-    case kDtF32: err = CALL(float);         break;                           \
-    case kDtF64: err = CALL(double);        break;                           \
-    default: return static_cast<int>(cudaErrorInvalidValue);                 \
+#define DISPATCH_DT_ALL(CALL)                                \
+    switch (dt) {                                            \
+    case kDtU8: err = CALL(std::uint8_t); break;             \
+    case kDtI32: err = CALL(std::int32_t); break;            \
+    case kDtI64: err = CALL(std::int64_t); break;            \
+    case kDtF32: err = CALL(float); break;                   \
+    case kDtF64: err = CALL(double); break;                  \
+    default: return static_cast<int>(cudaErrorInvalidValue); \
     }
 
-#define DISPATCH_DT_NOU8(CALL)                                               \
-    switch (dt) {                                                            \
-    case kDtI32: err = CALL(std::int32_t);  break;                           \
-    case kDtI64: err = CALL(std::int64_t);  break;                           \
-    case kDtF32: err = CALL(float);         break;                           \
-    case kDtF64: err = CALL(double);        break;                           \
-    default: return static_cast<int>(cudaErrorInvalidValue);                 \
+#define DISPATCH_DT_NOU8(CALL)                               \
+    switch (dt) {                                            \
+    case kDtI32: err = CALL(std::int32_t); break;            \
+    case kDtI64: err = CALL(std::int64_t); break;            \
+    case kDtF32: err = CALL(float); break;                   \
+    case kDtF64: err = CALL(double); break;                  \
+    default: return static_cast<int>(cudaErrorInvalidValue); \
     }
 
 } // namespace
@@ -201,7 +225,7 @@ namespace bee::cuda::detail
 int ops_reduce_global(int op, int dt, const void* src, void* dst, std::size_t n) noexcept
 {
     cudaStream_t stream = cudaStreamPerThread;
-    int err = 0;
+    int          err    = 0;
 
     // U8 only allowed for Min/Max.
     if (op == kRdMin) {
@@ -224,15 +248,15 @@ int ops_reduce_global(int op, int dt, const void* src, void* dst, std::size_t n)
         return static_cast<int>(cudaErrorInvalidValue);
     }
 
-    if (err != 0) return err;
+    if (err != 0)
+        return err;
     return static_cast<int>(cudaStreamSynchronize(stream));
 }
 
-int ops_reduce_axis(int op, int dt, const void* src, void* dst,
-                    std::size_t outer, std::size_t axis, std::size_t inner) noexcept
+int ops_reduce_axis(int op, int dt, const void* src, void* dst, std::size_t outer, std::size_t axis, std::size_t inner) noexcept
 {
     cudaStream_t stream = cudaStreamPerThread;
-    int err = 0;
+    int          err    = 0;
 
     if (op == kRdMin) {
 #define CALL(T) launch_axis<T, kRdMin>(src, dst, outer, axis, inner, stream)
@@ -254,29 +278,29 @@ int ops_reduce_axis(int op, int dt, const void* src, void* dst,
         return static_cast<int>(cudaErrorInvalidValue);
     }
 
-    if (err != 0) return err;
+    if (err != 0)
+        return err;
     return static_cast<int>(cudaStreamSynchronize(stream));
 }
 
 int ops_scale_fp(int dt, void* buf, double factor, std::size_t n) noexcept
 {
-    if (n == 0) return 0;
-    cudaStream_t stream = cudaStreamPerThread;
-    const unsigned int block = bee::cuda::kDefaultBlockSize;
-    const unsigned int grid  = bee::cuda::compute_grid_1d(n, block);
+    if (n == 0)
+        return 0;
+    cudaStream_t       stream = cudaStreamPerThread;
+    const unsigned int block  = bee::cuda::kDefaultBlockSize;
+    const unsigned int grid   = bee::cuda::compute_grid_1d(n, block);
     if (dt == kDtF32) {
-        scale_fp_kernel<float><<<grid, block, 0, stream>>>(
-            static_cast<float*>(buf), static_cast<float>(factor), n);
+        scale_fp_kernel<float><<<grid, block, 0, stream>>>(static_cast<float*>(buf), static_cast<float>(factor), n);
     } else if (dt == kDtF64) {
-        scale_fp_kernel<double><<<grid, block, 0, stream>>>(
-            static_cast<double*>(buf), factor, n);
+        scale_fp_kernel<double><<<grid, block, 0, stream>>>(static_cast<double*>(buf), factor, n);
     } else {
         return static_cast<int>(cudaErrorInvalidValue);
     }
     cudaError_t err = cudaGetLastError();
-    if (err != cudaSuccess) return static_cast<int>(err);
+    if (err != cudaSuccess)
+        return static_cast<int>(err);
     return static_cast<int>(cudaStreamSynchronize(stream));
 }
 
 } // namespace bee::cuda::detail
-

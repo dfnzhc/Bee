@@ -29,7 +29,7 @@ __device__ __forceinline__ void vec_load16(const T* ptr, T (&out)[16 / sizeof(T)
 {
     using Vec = uint4;
     static_assert(sizeof(Vec) == 16, "uint4 must be 16 bytes");
-    const Vec v = *reinterpret_cast<const Vec*>(ptr);
+    const Vec v                  = *reinterpret_cast<const Vec*>(ptr);
     *reinterpret_cast<Vec*>(out) = v;
 }
 
@@ -39,7 +39,7 @@ __device__ __forceinline__ void vec_store16(T* ptr, const T (&in)[16 / sizeof(T)
 {
     using Vec = uint4;
     static_assert(sizeof(Vec) == 16, "uint4 must be 16 bytes");
-    const Vec v = *reinterpret_cast<const Vec*>(in);
+    const Vec v                  = *reinterpret_cast<const Vec*>(in);
     *reinterpret_cast<Vec*>(ptr) = v;
 }
 

@@ -14,19 +14,19 @@
 
 // 主架构门：sm_120 及以上。
 #ifdef __CUDA_ARCH__
-  #define BEE_CUDA_ARCH __CUDA_ARCH__
+    #define BEE_CUDA_ARCH __CUDA_ARCH__
 #else
-  #define BEE_CUDA_ARCH 0
+    #define BEE_CUDA_ARCH 0
 #endif
 
-#define BEE_CUDA_ARCH_IS_SM120_PLUS  (BEE_CUDA_ARCH >= 1200)
-#define BEE_CUDA_ARCH_IS_SM90        (BEE_CUDA_ARCH >= 900 && BEE_CUDA_ARCH < 1000)
-#define BEE_CUDA_ARCH_IS_SM80_PLUS   (BEE_CUDA_ARCH >= 800)
+#define BEE_CUDA_ARCH_IS_SM120_PLUS (BEE_CUDA_ARCH >= 1200)
+#define BEE_CUDA_ARCH_IS_SM90       (BEE_CUDA_ARCH >= 900 && BEE_CUDA_ARCH < 1000)
+#define BEE_CUDA_ARCH_IS_SM80_PLUS  (BEE_CUDA_ARCH >= 800)
 
 // 能力位（宏即结果；未来可按需细分 sm_120a 等）。
-#define BEE_CUDA_HAS_CP_ASYNC        (BEE_CUDA_ARCH >= 800)
-#define BEE_CUDA_HAS_CP_ASYNC_BULK   (BEE_CUDA_ARCH >= 900)
-#define BEE_CUDA_HAS_TMA             (BEE_CUDA_ARCH >= 900)
-#define BEE_CUDA_HAS_WGMMA           (BEE_CUDA_ARCH >= 900 && BEE_CUDA_ARCH < 1000)
-#define BEE_CUDA_HAS_UMMA            (BEE_CUDA_ARCH >= 1200)
-#define BEE_CUDA_HAS_WMMA            (BEE_CUDA_ARCH >= 700)
+#define BEE_CUDA_HAS_CP_ASYNC      (BEE_CUDA_ARCH >= 800)
+#define BEE_CUDA_HAS_CP_ASYNC_BULK (BEE_CUDA_ARCH >= 900)
+#define BEE_CUDA_HAS_TMA           (BEE_CUDA_ARCH >= 900)
+#define BEE_CUDA_HAS_WGMMA         (BEE_CUDA_ARCH >= 900 && BEE_CUDA_ARCH < 1000)
+#define BEE_CUDA_HAS_UMMA          (BEE_CUDA_ARCH >= 1200)
+#define BEE_CUDA_HAS_WMMA          (BEE_CUDA_ARCH >= 700)

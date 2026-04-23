@@ -24,11 +24,11 @@ struct SimdBackend<float, IsaSse2>
     using reg                          = __m128;
 
     // clang-format off
-    static auto load(const float* p)  -> reg  { return _mm_load_ps(p); }
-    static auto loadu(const float* p) -> reg  { return _mm_loadu_ps(p); }
+    static auto load(const float* p)    -> reg  { return _mm_load_ps(p); }
+    static auto loadu(const float* p)   -> reg  { return _mm_loadu_ps(p); }
     static auto store(float* p, reg v)  -> void { _mm_store_ps(p, v); }
     static auto storeu(float* p, reg v) -> void { _mm_storeu_ps(p, v); }
-    static auto set1(float x) -> reg { return _mm_set1_ps(x); }
+    static auto set1(float x)           -> reg  { return _mm_set1_ps(x); }
 
     static auto add(reg a, reg b) -> reg { return _mm_add_ps(a, b); }
     static auto sub(reg a, reg b) -> reg { return _mm_sub_ps(a, b); }
@@ -112,11 +112,11 @@ struct SimdBackend<double, IsaSse2>
     using reg                          = __m128d;
 
     // clang-format off
-    static auto load(const double* p)  -> reg  { return _mm_load_pd(p); }
-    static auto loadu(const double* p) -> reg  { return _mm_loadu_pd(p); }
+    static auto load(const double* p)    -> reg  { return _mm_load_pd(p); }
+    static auto loadu(const double* p)   -> reg  { return _mm_loadu_pd(p); }
     static auto store(double* p, reg v)  -> void { _mm_store_pd(p, v); }
     static auto storeu(double* p, reg v) -> void { _mm_storeu_pd(p, v); }
-    static auto set1(double x) -> reg { return _mm_set1_pd(x); }
+    static auto set1(double x)           -> reg  { return _mm_set1_pd(x); }
 
     static auto add(reg a, reg b) -> reg { return _mm_add_pd(a, b); }
     static auto sub(reg a, reg b) -> reg { return _mm_sub_pd(a, b); }

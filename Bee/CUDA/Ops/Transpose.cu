@@ -12,12 +12,11 @@
 namespace
 {
 
-constexpr int TILE = 32;
+constexpr int TILE       = 32;
 constexpr int BLOCK_ROWS = 8;
 
 template <typename T>
-__global__ void transpose_kernel(const T* __restrict__ src, T* __restrict__ dst,
-                                 std::size_t rows, std::size_t cols)
+__global__ void transpose_kernel(const T* __restrict__ src, T* __restrict__ dst, std::size_t rows, std::size_t cols)
 {
     __shared__ T tile[TILE][TILE + 1];
 
@@ -45,10 +44,8 @@ template <typename T>
 int launch_transpose(const void* src, void* dst, std::size_t rows, std::size_t cols, cudaStream_t stream)
 {
     dim3 block(TILE, BLOCK_ROWS);
-    dim3 grid(static_cast<unsigned int>((cols + TILE - 1) / TILE),
-              static_cast<unsigned int>((rows + TILE - 1) / TILE));
-    transpose_kernel<T><<<grid, block, 0, stream>>>(
-        static_cast<const T*>(src), static_cast<T*>(dst), rows, cols);
+    dim3 grid(static_cast<unsigned int>((cols + TILE - 1) / TILE), static_cast<unsigned int>((rows + TILE - 1) / TILE));
+    transpose_kernel<T><<<grid, block, 0, stream>>>(static_cast<const T*>(src), static_cast<T*>(dst), rows, cols);
     return static_cast<int>(cudaGetLastError());
 }
 
@@ -57,22 +54,24 @@ int launch_transpose(const void* src, void* dst, std::size_t rows, std::size_t c
 namespace bee::cuda::detail
 {
 
-int ops_transpose_2d(int dt, const void* src, void* dst,
-                     std::size_t rows, std::size_t cols) noexcept
+int ops_transpose_2d(int dt, const void* src, void* dst, std::size_t rows, std::size_t cols) noexcept
 {
-    if (rows == 0 || cols == 0) return 0;
+    if (rows == 0 || cols == 0)
+        return 0;
     cudaStream_t stream = cudaStreamPerThread;
-    int err = 0;
+    int          err    = 0;
     // 以元素大小分派（dtype 编码为 0..5，对应 Bool/U8/I32/I64/F32/F64）。
     switch (dt) {
-    case 0: case 1: err = launch_transpose<std::uint8_t >(src, dst, rows, cols, stream); break;
+    case 0:
+    case 1: err = launch_transpose<std::uint8_t>(src, dst, rows, cols, stream); break;
     case 2: err = launch_transpose<std::int32_t>(src, dst, rows, cols, stream); break;
     case 3: err = launch_transpose<std::int64_t>(src, dst, rows, cols, stream); break;
-    case 4: err = launch_transpose<float       >(src, dst, rows, cols, stream); break;
-    case 5: err = launch_transpose<double      >(src, dst, rows, cols, stream); break;
+    case 4: err = launch_transpose<float>(src, dst, rows, cols, stream); break;
+    case 5: err = launch_transpose<double>(src, dst, rows, cols, stream); break;
     default: return static_cast<int>(cudaErrorInvalidValue);
     }
-    if (err != 0) return err;
+    if (err != 0)
+        return err;
     return static_cast<int>(cudaStreamSynchronize(stream));
 }
 

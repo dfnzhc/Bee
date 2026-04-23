@@ -78,7 +78,8 @@ TEST(CudaBackend, ZerosOnCudaIsAllZero)
     if (!cuda_available())
         GTEST_SKIP() << "No CUDA device";
     constexpr std::size_t N = 64;
-    auto                  t = Tensor::zeros({static_cast<std::int64_t>(N)}, DType::F32, Device::CUDA);
+
+    auto t = Tensor::zeros({static_cast<std::int64_t>(N)}, DType::F32, Device::CUDA);
     ASSERT_TRUE(t.has_value()) << t.error().message.view();
 
     auto cpu_r = t->to(Device::CPU);
@@ -93,8 +94,9 @@ TEST(CudaBackend, ToDeviceRoundTripPreservesValues)
     if (!cuda_available())
         GTEST_SKIP() << "No CUDA device";
 
-    constexpr std::int64_t N   = 128;
-    auto                   cpu = Tensor::arange(0, N, 1, DType::F32, Device::CPU);
+    constexpr std::int64_t N = 128;
+
+    auto cpu = Tensor::arange(0, N, 1, DType::F32, Device::CPU);
     ASSERT_TRUE(cpu.has_value());
 
     auto on_cuda = cpu->to(Device::CUDA);
@@ -176,10 +178,11 @@ TEST(CudaOps, BinaryAddF32MatchesCpu)
 {
     if (!cuda_available())
         GTEST_SKIP() << "No CUDA device";
-    constexpr std::int64_t N     = 257;
-    auto                   a_cpu = Tensor::arange(0, N, 1, DType::F32, Device::CPU).value();
-    auto                   b_cpu = Tensor::arange(N, 2 * N, 1, DType::F32, Device::CPU).value();
-    auto                   c_cpu = add(a_cpu, b_cpu).value();
+    constexpr std::int64_t N = 257;
+
+    auto a_cpu = Tensor::arange(0, N, 1, DType::F32, Device::CPU).value();
+    auto b_cpu = Tensor::arange(N, 2 * N, 1, DType::F32, Device::CPU).value();
+    auto c_cpu = add(a_cpu, b_cpu).value();
 
     auto a_cu = a_cpu.to(Device::CUDA).value();
     auto b_cu = b_cpu.to(Device::CUDA).value();
@@ -196,11 +199,12 @@ TEST(CudaOps, BinarySubMulDivF32MatchesCpu)
 {
     if (!cuda_available())
         GTEST_SKIP() << "No CUDA device";
-    constexpr std::int64_t N     = 131;
-    auto                   a_cpu = Tensor::arange(1, N + 1, 1, DType::F32, Device::CPU).value();
-    auto                   b_cpu = Tensor::full({N}, DType::F32, 2.0, Device::CPU).value();
-    auto                   a_cu  = a_cpu.to(Device::CUDA).value();
-    auto                   b_cu  = b_cpu.to(Device::CUDA).value();
+    constexpr std::int64_t N = 131;
+
+    auto a_cpu = Tensor::arange(1, N + 1, 1, DType::F32, Device::CPU).value();
+    auto b_cpu = Tensor::full({N}, DType::F32, 2.0, Device::CPU).value();
+    auto a_cu  = a_cpu.to(Device::CUDA).value();
+    auto b_cu  = b_cpu.to(Device::CUDA).value();
 
     auto sub_cpu = sub(a_cpu, b_cpu).value();
     auto sub_cu  = sub(a_cu, b_cu).value();
@@ -224,9 +228,10 @@ TEST(CudaOps, UnaryNegAbsSqrtExpLogF32MatchesCpu)
 {
     if (!cuda_available())
         GTEST_SKIP() << "No CUDA device";
-    constexpr std::int64_t N       = 64;
-    auto                   src_cpu = Tensor::arange(1, N + 1, 1, DType::F32, Device::CPU).value();
-    auto                   src_cu  = src_cpu.to(Device::CUDA).value();
+    constexpr std::int64_t N = 64;
+
+    auto src_cpu = Tensor::arange(1, N + 1, 1, DType::F32, Device::CPU).value();
+    auto src_cu  = src_cpu.to(Device::CUDA).value();
 
     auto cmp = [&](const Tensor& cpu, const Tensor& cu, float tol) {
         auto        gpu = to_cpu_floats(cu);
@@ -240,12 +245,13 @@ TEST(CudaOps, UnaryNegAbsSqrtExpLogF32MatchesCpu)
     cmp(sqrt(src_cpu).value(), sqrt(src_cu).value(), 1e-5f);
     // exp over 1..64 溢出；只对前 8 个元素对拍。
     {
-        auto        small_cpu = Tensor::arange(0, 8, 1, DType::F32, Device::CPU).value();
-        auto        small_cu  = small_cpu.to(Device::CUDA).value();
-        auto        e_cpu     = exp(small_cpu).value();
-        auto        e_cu      = exp(small_cu).value();
-        auto        gpu       = to_cpu_floats(e_cu);
-        const auto* r         = static_cast<const float*>(e_cpu.data_ptr());
+        auto small_cpu = Tensor::arange(0, 8, 1, DType::F32, Device::CPU).value();
+        auto small_cu  = small_cpu.to(Device::CUDA).value();
+        auto e_cpu     = exp(small_cpu).value();
+        auto e_cu      = exp(small_cu).value();
+        auto gpu       = to_cpu_floats(e_cu);
+
+        const auto* r = static_cast<const float*>(e_cpu.data_ptr());
         for (int i = 0; i < 8; ++i)
             EXPECT_NEAR(gpu[i], r[i], std::abs(r[i]) * 1e-4f);
     }
@@ -256,11 +262,12 @@ TEST(CudaOps, InplaceAddF32MatchesCpu)
 {
     if (!cuda_available())
         GTEST_SKIP() << "No CUDA device";
-    constexpr std::int64_t N     = 100;
-    auto                   a_cpu = Tensor::arange(0, N, 1, DType::F32, Device::CPU).value();
-    auto                   b_cpu = Tensor::full({N}, DType::F32, 3.0, Device::CPU).value();
-    auto                   a_cu  = a_cpu.to(Device::CUDA).value();
-    auto                   b_cu  = b_cpu.to(Device::CUDA).value();
+    constexpr std::int64_t N = 100;
+
+    auto a_cpu = Tensor::arange(0, N, 1, DType::F32, Device::CPU).value();
+    auto b_cpu = Tensor::full({N}, DType::F32, 3.0, Device::CPU).value();
+    auto a_cu  = a_cpu.to(Device::CUDA).value();
+    auto b_cu  = b_cpu.to(Device::CUDA).value();
 
     ASSERT_TRUE(add_inplace(a_cpu, b_cpu).has_value());
     ASSERT_TRUE(add_inplace(a_cu, b_cu).has_value());
@@ -275,9 +282,10 @@ TEST(CudaOps, CastF32ToI32MatchesCpu)
 {
     if (!cuda_available())
         GTEST_SKIP() << "No CUDA device";
-    constexpr std::int64_t N       = 32;
-    auto                   src_cpu = Tensor::arange(0, N, 1, DType::F32, Device::CPU).value();
-    auto                   src_cu  = src_cpu.to(Device::CUDA).value();
+    constexpr std::int64_t N = 32;
+
+    auto src_cpu = Tensor::arange(0, N, 1, DType::F32, Device::CPU).value();
+    auto src_cu  = src_cpu.to(Device::CUDA).value();
 
     auto dst_cpu = cast(src_cpu, DType::I32).value();
     auto dst_cu  = cast(src_cu, DType::I32).value();
@@ -293,9 +301,10 @@ TEST(CudaOps, CastI32ToF64MatchesCpu)
 {
     if (!cuda_available())
         GTEST_SKIP() << "No CUDA device";
-    constexpr std::int64_t N       = 48;
-    auto                   src_cpu = Tensor::arange(-16, N - 16, 1, DType::I32, Device::CPU).value();
-    auto                   src_cu  = src_cpu.to(Device::CUDA).value();
+    constexpr std::int64_t N = 48;
+
+    auto src_cpu = Tensor::arange(-16, N - 16, 1, DType::I32, Device::CPU).value();
+    auto src_cu  = src_cpu.to(Device::CUDA).value();
 
     auto dst_cpu = cast(src_cpu, DType::F64).value();
     auto dst_cu  = cast(src_cu, DType::F64).value();
@@ -323,9 +332,10 @@ TEST(CudaOps, ReduceGlobalSumF32MatchesCpu)
 {
     if (!cuda_available())
         GTEST_SKIP() << "No CUDA device";
-    constexpr std::int64_t N   = 257;
-    auto                   cpu = Tensor::arange(0, N, 1, DType::F32, Device::CPU).value();
-    auto                   cu  = cpu.to(Device::CUDA).value();
+    constexpr std::int64_t N = 257;
+
+    auto cpu = Tensor::arange(0, N, 1, DType::F32, Device::CPU).value();
+    auto cu  = cpu.to(Device::CUDA).value();
 
     auto s_cpu = sum(cpu).value();
     auto s_cu  = sum(cu).value();
@@ -356,9 +366,10 @@ TEST(CudaOps, ReduceGlobalMeanF32MatchesCpu)
 {
     if (!cuda_available())
         GTEST_SKIP() << "No CUDA device";
-    constexpr std::int64_t N   = 128;
-    auto                   cpu = Tensor::arange(0, N, 1, DType::F32, Device::CPU).value();
-    auto                   cu  = cpu.to(Device::CUDA).value();
+    constexpr std::int64_t N = 128;
+
+    auto cpu = Tensor::arange(0, N, 1, DType::F32, Device::CPU).value();
+    auto cu  = cpu.to(Device::CUDA).value();
 
     auto m_cpu = mean(cpu).value();
     auto m_cu  = mean(cu).value().to(Device::CPU).value();
@@ -430,11 +441,12 @@ TEST(CudaOps, RandIntOnCudaSameSeedMatchesCpu)
 {
     if (!cuda_available())
         GTEST_SKIP() << "No CUDA device";
-    auto        cpu  = randint(-5, 5, {64}, DType::I32, 123, Device::CPU).value();
-    auto        cu   = randint(-5, 5, {64}, DType::I32, 123, Device::CUDA).value();
-    auto        back = cu.to(Device::CPU).value();
-    const auto* g    = static_cast<const std::int32_t*>(back.data_ptr());
-    const auto* r    = static_cast<const std::int32_t*>(cpu.data_ptr());
+    auto cpu  = randint(-5, 5, {64}, DType::I32, 123, Device::CPU).value();
+    auto cu   = randint(-5, 5, {64}, DType::I32, 123, Device::CUDA).value();
+    auto back = cu.to(Device::CPU).value();
+
+    const auto* g = static_cast<const std::int32_t*>(back.data_ptr());
+    const auto* r = static_cast<const std::int32_t*>(cpu.data_ptr());
     for (int i = 0; i < 64; ++i)
         EXPECT_EQ(g[i], r[i]);
 }
@@ -446,9 +458,10 @@ TEST(CudaOps, MatmulF32MatchesCpu)
     if (!cuda_available())
         GTEST_SKIP() << "No CUDA device";
     const int M = 17, K = 33, N = 21;
-    auto      a       = randn({M, K}, DType::F32, 1, Device::CPU).value();
-    auto      b       = randn({K, N}, DType::F32, 2, Device::CPU).value();
-    auto      cpu_res = matmul(a, b).value();
+
+    auto a       = randn({M, K}, DType::F32, 1, Device::CPU).value();
+    auto b       = randn({K, N}, DType::F32, 2, Device::CPU).value();
+    auto cpu_res = matmul(a, b).value();
 
     auto ac     = a.to(Device::CUDA).value();
     auto bc     = b.to(Device::CUDA).value();
@@ -466,9 +479,10 @@ TEST(CudaOps, MatmulF64MatchesCpu)
     if (!cuda_available())
         GTEST_SKIP() << "No CUDA device";
     const int M = 8, K = 16, N = 12;
-    auto      a       = randn({M, K}, DType::F64, 5, Device::CPU).value();
-    auto      b       = randn({K, N}, DType::F64, 6, Device::CPU).value();
-    auto      cpu_res = matmul(a, b).value();
+
+    auto a       = randn({M, K}, DType::F64, 5, Device::CPU).value();
+    auto b       = randn({K, N}, DType::F64, 6, Device::CPU).value();
+    auto cpu_res = matmul(a, b).value();
 
     auto cu_res = matmul(a.to(Device::CUDA).value(), b.to(Device::CUDA).value()).value();
     auto back   = cu_res.to(Device::CPU).value();
@@ -484,11 +498,12 @@ TEST(CudaOps, MatmulI32MatchesCpu)
     if (!cuda_available())
         GTEST_SKIP() << "No CUDA device";
     const int M = 5, K = 7, N = 6;
-    auto      a       = randint(-3, 3, {M, K}, DType::I32, 11, Device::CPU).value();
-    auto      b       = randint(-3, 3, {K, N}, DType::I32, 12, Device::CPU).value();
-    auto      cpu_res = matmul(a, b).value();
-    auto      cu_res  = matmul(a.to(Device::CUDA).value(), b.to(Device::CUDA).value()).value();
-    auto      back    = cu_res.to(Device::CPU).value();
+
+    auto a       = randint(-3, 3, {M, K}, DType::I32, 11, Device::CPU).value();
+    auto b       = randint(-3, 3, {K, N}, DType::I32, 12, Device::CPU).value();
+    auto cpu_res = matmul(a, b).value();
+    auto cu_res  = matmul(a.to(Device::CUDA).value(), b.to(Device::CUDA).value()).value();
+    auto back    = cu_res.to(Device::CPU).value();
 
     const auto* p = static_cast<const std::int32_t*>(back.data_ptr());
     const auto* r = static_cast<const std::int32_t*>(cpu_res.data_ptr());
@@ -501,14 +516,16 @@ TEST(CudaOps, MatmulSmallOnTileBoundary)
     if (!cuda_available())
         GTEST_SKIP() << "No CUDA device";
     // Exercise shapes that are exact multiples of TILE and larger than 1 tile.
-    const int   M = 32, K = 48, N = 32;
-    auto        a       = randn({M, K}, DType::F32, 7, Device::CPU).value();
-    auto        b       = randn({K, N}, DType::F32, 8, Device::CPU).value();
-    auto        cpu_res = matmul(a, b).value();
-    auto        cu_res  = matmul(a.to(Device::CUDA).value(), b.to(Device::CUDA).value()).value();
-    auto        back    = cu_res.to(Device::CPU).value();
-    const auto* p       = static_cast<const float*>(back.data_ptr());
-    const auto* r       = static_cast<const float*>(cpu_res.data_ptr());
+    const int M = 32, K = 48, N = 32;
+
+    auto a       = randn({M, K}, DType::F32, 7, Device::CPU).value();
+    auto b       = randn({K, N}, DType::F32, 8, Device::CPU).value();
+    auto cpu_res = matmul(a, b).value();
+    auto cu_res  = matmul(a.to(Device::CUDA).value(), b.to(Device::CUDA).value()).value();
+    auto back    = cu_res.to(Device::CPU).value();
+
+    const auto* p = static_cast<const float*>(back.data_ptr());
+    const auto* r = static_cast<const float*>(cpu_res.data_ptr());
     for (int i = 0; i < M * N; ++i)
         EXPECT_NEAR(p[i], r[i], 1e-3f);
 }

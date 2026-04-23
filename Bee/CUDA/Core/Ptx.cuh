@@ -22,20 +22,16 @@ namespace bee::cuda::ptx
 template <int SizeBytes>
 __device__ __forceinline__ void cp_async_cg(void* smem_dst, const void* gmem_src)
 {
-    static_assert(SizeBytes == 4 || SizeBytes == 8 || SizeBytes == 16,
-                  "cp.async size must be 4, 8, or 16 bytes");
+    static_assert(SizeBytes == 4 || SizeBytes == 8 || SizeBytes == 16, "cp.async size must be 4, 8, or 16 bytes");
 #if BEE_CUDA_HAS_CP_ASYNC
     const unsigned int smem_ptr = __cvta_generic_to_shared(smem_dst);
-    asm volatile(
-        "cp.async.cg.shared.global [%0], [%1], %2;\n"
-        :
-        : "r"(smem_ptr), "l"(gmem_src), "n"(SizeBytes)
-    );
+    asm volatile("cp.async.cg.shared.global [%0], [%1], %2;\n" : : "r"(smem_ptr), "l"(gmem_src), "n"(SizeBytes));
 #else
     // 非支持架构：退化为同步拷贝（仅用于占位，运行期一般不会到达）。
-    auto* d = static_cast<char*>(smem_dst);
+    auto*       d = static_cast<char*>(smem_dst);
     const auto* s = static_cast<const char*>(gmem_src);
-    for (int i = 0; i < SizeBytes; ++i) d[i] = s[i];
+    for (int i = 0; i < SizeBytes; ++i)
+        d[i] = s[i];
 #endif
 }
 
@@ -52,7 +48,7 @@ template <int N>
 __device__ __forceinline__ void cp_async_wait_group()
 {
 #if BEE_CUDA_HAS_CP_ASYNC
-    asm volatile("cp.async.wait_group %0;\n" :: "n"(N));
+    asm volatile("cp.async.wait_group %0;\n" ::"n"(N));
 #endif
 }
 

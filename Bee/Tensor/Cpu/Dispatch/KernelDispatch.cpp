@@ -81,24 +81,12 @@ namespace BEE_CURRENT_NS
     // ─── 一元 elementwise ────────────────────────────────────────────────────────
     auto ew_neg(const Tensor& a, Tensor& out) -> void
     {
-        switch (out.dtype()) {
-        case ::bee::DType::F32: cpu_elementwise_unary<float, _ISA, OpNeg>(a, out); return;
-        case ::bee::DType::F64: cpu_elementwise_unary<double, _ISA, OpNeg>(a, out); return;
-        case ::bee::DType::I32: cpu_elementwise_unary<int32_t, _ISA, OpNeg>(a, out); return;
-        case ::bee::DType::I64: cpu_elementwise_unary<int64_t, _ISA, OpNeg>(a, out); return;
-        default: return;
-        }
+        BEE_EW_UN_ANY_DTYPE_DISPATCH(OpNeg, a, out);
     }
 
     auto ew_abs(const Tensor& a, Tensor& out) -> void
     {
-        switch (out.dtype()) {
-        case ::bee::DType::F32: cpu_elementwise_unary<float, _ISA, OpAbs>(a, out); return;
-        case ::bee::DType::F64: cpu_elementwise_unary<double, _ISA, OpAbs>(a, out); return;
-        case ::bee::DType::I32: cpu_elementwise_unary<int32_t, _ISA, OpAbs>(a, out); return;
-        case ::bee::DType::I64: cpu_elementwise_unary<int64_t, _ISA, OpAbs>(a, out); return;
-        default: return;
-        }
+        BEE_EW_UN_ANY_DTYPE_DISPATCH(OpAbs, a, out);
     }
 
     auto ew_sqrt(const Tensor& a, Tensor& out) -> void

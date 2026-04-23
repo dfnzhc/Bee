@@ -19,9 +19,10 @@ namespace bee::cuda::detail
 
 int runtime_get_device_count(int* out) noexcept
 {
-    int n = 0;
+    int        n   = 0;
     const auto err = cudaGetDeviceCount(&n);
-    if (out) *out = (err == cudaSuccess) ? n : 0;
+    if (out)
+        *out = (err == cudaSuccess) ? n : 0;
     if (err != cudaSuccess) {
         (void)cudaGetLastError();
     }

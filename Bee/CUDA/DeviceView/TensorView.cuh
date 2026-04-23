@@ -28,15 +28,16 @@ struct TensorView
 {
     static_assert(Rank >= 0 && Rank <= kMaxTensorRank, "Rank out of range");
 
-    T*  data      = nullptr;
+    T*  data                        = nullptr;
     Idx shape[Rank > 0 ? Rank : 1]  = {};
     Idx stride[Rank > 0 ? Rank : 1] = {};
 
     __host__ __device__ [[nodiscard]] Idx numel() const noexcept
     {
         Idx n = 1;
-        #pragma unroll
-        for (int i = 0; i < Rank; ++i) n *= shape[i];
+#pragma unroll
+        for (int i = 0; i < Rank; ++i)
+            n *= shape[i];
         return n;
     }
 
@@ -44,13 +45,13 @@ struct TensorView
     __host__ __device__ [[nodiscard]] Idx offset_linear(Idx idx) const noexcept
     {
         Idx off = 0;
-        #pragma unroll
+#pragma unroll
         for (int i = Rank - 1; i >= 0; --i) {
-            const Idx d = shape[i];
-            const Idx q = idx / d;
-            const Idx r = idx - q * d;
-            off += r * stride[i];
-            idx = q;
+            const Idx d  = shape[i];
+            const Idx q  = idx / d;
+            const Idx r  = idx - q * d;
+            off         += r * stride[i];
+            idx          = q;
         }
         return off;
     }
@@ -60,8 +61,8 @@ struct TensorView
 template <typename T>
 struct ContigView
 {
-    T*             data   = nullptr;
-    std::int64_t   numel  = 0;
+    T*           data  = nullptr;
+    std::int64_t numel = 0;
 };
 
 } // namespace bee::cuda

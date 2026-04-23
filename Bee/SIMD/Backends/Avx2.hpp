@@ -23,11 +23,11 @@ struct SimdBackend<float, IsaAvx2>
     using reg                          = __m256;
 
     // clang-format off
-    static auto load(const float* p) -> reg { return _mm256_load_ps(p); }
-    static auto loadu(const float* p) -> reg { return _mm256_loadu_ps(p); }
-    static auto store(float* p, reg v) -> void { _mm256_store_ps(p, v); }
+    static auto load(const float* p)    -> reg  { return _mm256_load_ps(p); }
+    static auto loadu(const float* p)   -> reg  { return _mm256_loadu_ps(p); }
+    static auto store(float* p, reg v)  -> void { _mm256_store_ps(p, v); }
     static auto storeu(float* p, reg v) -> void { _mm256_storeu_ps(p, v); }
-    static auto set1(float x) -> reg { return _mm256_set1_ps(x); }
+    static auto set1(float x)           -> reg  { return _mm256_set1_ps(x); }
 
     static auto add(reg a, reg b) -> reg { return _mm256_add_ps(a, b); }
     static auto sub(reg a, reg b) -> reg { return _mm256_sub_ps(a, b); }
@@ -118,11 +118,11 @@ struct SimdBackend<double, IsaAvx2>
     using reg                          = __m256d;
 
     // clang-format off
-    static auto load(const double* p) -> reg { return _mm256_load_pd(p); }
-    static auto loadu(const double* p) -> reg { return _mm256_loadu_pd(p); }
-    static auto store(double* p, reg v) -> void { _mm256_store_pd(p, v); }
+    static auto load(const double* p)    -> reg  { return _mm256_load_pd(p); }
+    static auto loadu(const double* p)   -> reg  { return _mm256_loadu_pd(p); }
+    static auto store(double* p, reg v)  -> void { _mm256_store_pd(p, v); }
     static auto storeu(double* p, reg v) -> void { _mm256_storeu_pd(p, v); }
-    static auto set1(double x) -> reg { return _mm256_set1_pd(x); }
+    static auto set1(double x)           -> reg  { return _mm256_set1_pd(x); }
 
     static auto add(reg a, reg b) -> reg { return _mm256_add_pd(a, b); }
     static auto sub(reg a, reg b) -> reg { return _mm256_sub_pd(a, b); }

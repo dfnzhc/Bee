@@ -32,7 +32,7 @@ inline constexpr int kDefaultBlockSize = 256;
 // 根据元素总数与 block size 计算 grid，截断到 CUDA 最大 X 维（2^31-1）。
 [[nodiscard]] inline unsigned int compute_grid_1d(unsigned long long n, unsigned int block = kDefaultBlockSize) noexcept
 {
-    const unsigned long long g = ceil_div_u64(n, static_cast<unsigned long long>(block));
+    const unsigned long long     g         = ceil_div_u64(n, static_cast<unsigned long long>(block));
     constexpr unsigned long long kMaxGridX = 2147483647ull; // 2^31 - 1
     return static_cast<unsigned int>(g > kMaxGridX ? kMaxGridX : g);
 }
@@ -42,11 +42,11 @@ inline constexpr int kDefaultBlockSize = 256;
 // 启动 kernel 表达式，形如 kernel<<<grid, block, smem, stream>>>(args...)。
 // 变参宏：允许 <<<...>>> 与参数列表中包含逗号。
 // 启动/上次错误若失败则 return int（与 BEE_CUDA_RET_ON_ERR 的 int 约定一致）。
-#define BEE_CUDA_LAUNCH(...)                                               \
-    do {                                                                   \
-        __VA_ARGS__;                                                       \
-        const cudaError_t _bee_cu_launch_err = cudaGetLastError();         \
-        if (_bee_cu_launch_err != cudaSuccess) {                           \
-            return static_cast<int>(_bee_cu_launch_err);                   \
-        }                                                                  \
+#define BEE_CUDA_LAUNCH(...)                                       \
+    do {                                                           \
+        __VA_ARGS__;                                               \
+        const cudaError_t _bee_cu_launch_err = cudaGetLastError(); \
+        if (_bee_cu_launch_err != cudaSuccess) {                   \
+            return static_cast<int>(_bee_cu_launch_err);           \
+        }                                                          \
     } while (0)

@@ -21,11 +21,11 @@ struct SimdBackend<float, IsaScalar>
     using reg                          = float;
 
     // clang-format off
-    static auto load(const float* p) -> reg { return *p; }
-    static auto loadu(const float* p) -> reg { return *p; }
-    static auto store(float* p, reg v) -> void { *p = v; }
+    static auto load(const float* p)    -> reg  { return *p; }
+    static auto loadu(const float* p)   -> reg  { return *p; }
+    static auto store(float* p, reg v)  -> void { *p = v; }
     static auto storeu(float* p, reg v) -> void { *p = v; }
-    static auto set1(float x) -> reg { return x; }
+    static auto set1(float x)           -> reg  { return x; }
 
     static auto add(reg a, reg b) -> reg { return a + b; }
     static auto sub(reg a, reg b) -> reg { return a - b; }
@@ -56,11 +56,11 @@ struct SimdBackend<double, IsaScalar>
     using reg                          = double;
 
     // clang-format off
-    static auto load(const double* p) -> reg { return *p; }
-    static auto loadu(const double* p) -> reg { return *p; }
-    static auto store(double* p, reg v) -> void { *p = v; }
+    static auto load(const double* p)    -> reg  { return *p; }
+    static auto loadu(const double* p)   -> reg  { return *p; }
+    static auto store(double* p, reg v)  -> void { *p = v; }
     static auto storeu(double* p, reg v) -> void { *p = v; }
-    static auto set1(double x) -> reg { return x; }
+    static auto set1(double x)           -> reg  { return x; }
 
     static auto add(reg a, reg b) -> reg { return a + b; }
     static auto sub(reg a, reg b) -> reg { return a - b; }
@@ -91,11 +91,11 @@ struct SimdBackend<int32_t, IsaScalar>
     using reg                          = int32_t;
 
     // clang-format off
-    static auto load(const int32_t* p) -> reg { return *p; }
-    static auto loadu(const int32_t* p) -> reg { return *p; }
-    static auto store(int32_t* p, reg v) -> void { *p = v; }
+    static auto load(const int32_t* p)    -> reg  { return *p; }
+    static auto loadu(const int32_t* p)   -> reg  { return *p; }
+    static auto store(int32_t* p, reg v)  -> void { *p = v; }
     static auto storeu(int32_t* p, reg v) -> void { *p = v; }
-    static auto set1(int32_t x) -> reg { return x; }
+    static auto set1(int32_t x)           -> reg  { return x; }
 
     static auto add(reg a, reg b) -> reg { return a + b; }
     static auto sub(reg a, reg b) -> reg { return a - b; }
@@ -123,11 +123,11 @@ struct SimdBackend<int64_t, IsaScalar>
     using reg                          = int64_t;
 
     // clang-format off
-    static auto load(const int64_t* p) -> reg { return *p; }
-    static auto loadu(const int64_t* p) -> reg { return *p; }
-    static auto store(int64_t* p, reg v) -> void { *p = v; }
+    static auto load(const int64_t* p)    -> reg  { return *p; }
+    static auto loadu(const int64_t* p)   -> reg  { return *p; }
+    static auto store(int64_t* p, reg v)  -> void { *p = v; }
     static auto storeu(int64_t* p, reg v) -> void { *p = v; }
-    static auto set1(int64_t x) -> reg { return x; }
+    static auto set1(int64_t x)           -> reg  { return x; }
 
     static auto add(reg a, reg b) -> reg { return a + b; }
     static auto sub(reg a, reg b) -> reg { return a - b; }

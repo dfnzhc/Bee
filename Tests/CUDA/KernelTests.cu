@@ -44,7 +44,16 @@ TEST(CudaM1Infra, LaunchKernelWritesExpectedValues)
     int* d = nullptr;
     ASSERT_EQ(cudaMalloc(&d, N * sizeof(int)), cudaSuccess);
 
-    EXPECT_EQ(bee_m1_touch_launch(d, N), 0);
+    const int launch_err = bee_m1_touch_launch(d, N);
+    if (launch_err != BEE_CUDA_OK) {
+        if (launch_err == static_cast<int>(cudaErrorNoKernelImageForDevice) || launch_err == static_cast<int>(cudaErrorInvalidDeviceFunction)) {
+            (void)cudaFree(d);
+            GTEST_SKIP() << "Kernel image is incompatible with current GPU architecture (err=" << launch_err << ")";
+        }
+        EXPECT_EQ(launch_err, BEE_CUDA_OK);
+        (void)cudaFree(d);
+        return;
+    }
 
     int h[N] = {};
     ASSERT_EQ(cudaMemcpy(h, d, N * sizeof(int), cudaMemcpyDeviceToHost), cudaSuccess);
