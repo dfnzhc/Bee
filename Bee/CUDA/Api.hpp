@@ -128,6 +128,16 @@ namespace ops
     // 2D tiled-shared transpose：dst[i,j] = src[j,i]，src 为 [rows, cols] 连续。
     [[nodiscard]] auto transpose_2d(ScalarType dt, const void* src, void* dst, std::size_t rows, std::size_t cols) -> Result<void>;
 
+    // ── 设备侧随机数（B7） ──────────────────────────────────────────────────────
+    // Philox4x32-10 on-device：同一 seed 与 numel 下输出确定；dtype 仅支持 F32/F64。
+    [[nodiscard]] auto random_uniform(ScalarType dt, void* dst, std::size_t n, std::uint64_t seed) -> Result<void>;
+
+    // 正态 N(0,1)；dtype 仅支持 F32/F64；内部以 Box-Muller 转换。
+    [[nodiscard]] auto random_normal(ScalarType dt, void* dst, std::size_t n, std::uint64_t seed) -> Result<void>;
+
+    // 整数区间 [low, high)；dtype 支持 U8/I32/I64。
+    [[nodiscard]] auto random_int(ScalarType dt, void* dst, std::size_t n, std::int64_t low, std::int64_t high, std::uint64_t seed) -> Result<void>;
+
     // ── Matmul 后端切换（M6/M7 脚手架） ─────────────────────────────────────────
     //
     // L1 = Wmma（当前实装的 tile-shared baseline；覆盖 F32/F64/I32/I64）

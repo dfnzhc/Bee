@@ -254,6 +254,30 @@ namespace ops
         return wrap(err, "cuda::ops::transpose_2d");
     }
 
+    auto random_uniform(ScalarType dt, void* dst, std::size_t n, std::uint64_t seed) -> Result<void>
+    {
+        if (n == 0)
+            return {};
+        const int err = detail::ops_random_uniform(static_cast<int>(dt), dst, n, seed);
+        return wrap(err, "cuda::ops::random_uniform");
+    }
+
+    auto random_normal(ScalarType dt, void* dst, std::size_t n, std::uint64_t seed) -> Result<void>
+    {
+        if (n == 0)
+            return {};
+        const int err = detail::ops_random_normal(static_cast<int>(dt), dst, n, seed);
+        return wrap(err, "cuda::ops::random_normal");
+    }
+
+    auto random_int(ScalarType dt, void* dst, std::size_t n, std::int64_t low, std::int64_t high, std::uint64_t seed) -> Result<void>
+    {
+        if (n == 0)
+            return {};
+        const int err = detail::ops_random_int(static_cast<int>(dt), dst, n, low, high, seed);
+        return wrap(err, "cuda::ops::random_int");
+    }
+
     // ── Matmul 后端切换（M6/M7 脚手架） ─────────────────────────────────────────
 
     namespace

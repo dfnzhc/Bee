@@ -3,6 +3,7 @@
 #include "Base/Diagnostics/Error.hpp"
 
 #include <cstddef>
+#include <cstdint>
 
 namespace bee::tensor::cuda
 {
@@ -69,6 +70,13 @@ auto deallocate(void* p, std::size_t nbytes, std::size_t alignment) -> void;
 
 // 2D tiled-shared transpose：dst[i,j] = src[j,i]。
 [[nodiscard]] auto transpose_2d(int dt, const void* src, void* dst, std::size_t rows, std::size_t cols) -> Result<void>;
+
+// 设备侧随机数填充（Philox4x32-10）。dtype 仅 F32/F64。
+[[nodiscard]] auto random_uniform(int dt, void* dst, std::size_t n, std::uint64_t seed) -> Result<void>;
+[[nodiscard]] auto random_normal(int dt, void* dst, std::size_t n, std::uint64_t seed) -> Result<void>;
+
+// 整数区间 [low, high)；dtype ∈ {U8, I32, I64}。
+[[nodiscard]] auto random_int(int dt, void* dst, std::size_t n, std::int64_t low, std::int64_t high, std::uint64_t seed) -> Result<void>;
 
 // 同步 CUDA 设备，等待所有待处理操作完成。
 // @return 成功时返回 void；失败时返回 NotImplemented 错误

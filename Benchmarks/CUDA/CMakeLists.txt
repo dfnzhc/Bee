@@ -11,4 +11,5 @@ bee_add_component_benchmark(
         MatmulCudaBench.cpp
         MemcpyBench.cpp
         ReduceCudaBench.cpp
+        RandomCudaBench.cpp
 )

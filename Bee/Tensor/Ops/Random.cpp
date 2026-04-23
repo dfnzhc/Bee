@@ -1,4 +1,5 @@
 #include "Tensor/Ops/Random.hpp"
+#include "Tensor/Cuda/Backend.hpp"
 
 #include <format>
 #include <random>
@@ -20,12 +21,17 @@ namespace
         return std::mt19937_64{seed};
     }
 
-    // 在目标 device 上分配 out；如为 CUDA，则先在 CPU 上生成再 to(CUDA)。
-    auto finalize(Tensor cpu_out, Device device) -> Result<Tensor>
+    // 对 seed=0 的 CUDA 路径派生非零种子。Philox 在 counter/key 全 0 时输出仍满足
+    // 均匀性，但为与 CPU 行为一致（seed=0 表示"真随机"），派生一个随机 u64。
+    auto resolve_cuda_seed(uint64_t seed) -> uint64_t
     {
-        if (device == Device::CPU)
-            return cpu_out;
-        return cpu_out.to(device);
+        if (seed != 0)
+            return seed;
+        std::random_device rd;
+        const uint64_t     hi = static_cast<uint64_t>(rd()) << 32;
+        const uint64_t     lo = static_cast<uint64_t>(rd());
+        const uint64_t     s  = hi | lo;
+        return s == 0 ? 0x9E3779B97F4A7C15ull : s;
     }
 
 } // namespace
@@ -35,13 +41,24 @@ auto rand(Shape shape, DType dtype, uint64_t seed, Device device) -> Result<Tens
     if (dtype != DType::F32 && dtype != DType::F64)
         return std::unexpected(make_error(std::format("rand: 不支持 DType::{}，仅允许 F32/F64", dtype_name(dtype)), Severity::Recoverable));
 
-    auto out_r = Tensor::empty(shape, dtype, Device::CPU);
+    auto out_r = Tensor::empty(shape, dtype, device);
     if (!out_r)
         return std::unexpected(std::move(out_r.error()));
     Tensor out = std::move(*out_r);
 
-    auto          eng = make_engine(seed);
-    const int64_t n   = out.numel();
+    const int64_t n = out.numel();
+    if (n == 0)
+        return out;
+
+    if (device == Device::CUDA) {
+        const uint64_t s = resolve_cuda_seed(seed);
+        auto r = tensor::cuda::random_uniform(static_cast<int>(dtype), out.data_ptr(), static_cast<std::size_t>(n), s);
+        if (!r)
+            return std::unexpected(std::move(r.error()));
+        return out;
+    }
+
+    auto eng = make_engine(seed);
 
     if (dtype == DType::F32) {
         std::uniform_real_distribution<float> dist(0.0f, 1.0f);
@@ -55,7 +72,7 @@ auto rand(Shape shape, DType dtype, uint64_t seed, Device device) -> Result<Tens
             ptr[i] = dist(eng);
     }
 
-    return finalize(std::move(out), device);
+    return out;
 }
 
 auto randn(Shape shape, DType dtype, uint64_t seed, Device device) -> Result<Tensor>
@@ -63,13 +80,24 @@ auto randn(Shape shape, DType dtype, uint64_t seed, Device device) -> Result<Ten
     if (dtype != DType::F32 && dtype != DType::F64)
         return std::unexpected(make_error(std::format("randn: 不支持 DType::{}，仅允许 F32/F64", dtype_name(dtype)), Severity::Recoverable));
 
-    auto out_r = Tensor::empty(shape, dtype, Device::CPU);
+    auto out_r = Tensor::empty(shape, dtype, device);
     if (!out_r)
         return std::unexpected(std::move(out_r.error()));
     Tensor out = std::move(*out_r);
 
-    auto          eng = make_engine(seed);
-    const int64_t n   = out.numel();
+    const int64_t n = out.numel();
+    if (n == 0)
+        return out;
+
+    if (device == Device::CUDA) {
+        const uint64_t s = resolve_cuda_seed(seed);
+        auto r = tensor::cuda::random_normal(static_cast<int>(dtype), out.data_ptr(), static_cast<std::size_t>(n), s);
+        if (!r)
+            return std::unexpected(std::move(r.error()));
+        return out;
+    }
+
+    auto eng = make_engine(seed);
 
     if (dtype == DType::F32) {
         std::normal_distribution<float> dist(0.0f, 1.0f);
@@ -83,7 +111,7 @@ auto randn(Shape shape, DType dtype, uint64_t seed, Device device) -> Result<Ten
             ptr[i] = dist(eng);
     }
 
-    return finalize(std::move(out), device);
+    return out;
 }
 
 auto randint(int64_t low, int64_t high, Shape shape, DType dtype, uint64_t seed, Device device) -> Result<Tensor>
@@ -113,13 +141,24 @@ auto randint(int64_t low, int64_t high, Shape shape, DType dtype, uint64_t seed,
         }
     }
 
-    auto out_r = Tensor::empty(shape, dtype, Device::CPU);
+    auto out_r = Tensor::empty(shape, dtype, device);
     if (!out_r)
         return std::unexpected(std::move(out_r.error()));
     Tensor out = std::move(*out_r);
 
-    auto          eng = make_engine(seed);
-    const int64_t n   = out.numel();
+    const int64_t n = out.numel();
+    if (n == 0)
+        return out;
+
+    if (device == Device::CUDA) {
+        const uint64_t s = resolve_cuda_seed(seed);
+        auto r = tensor::cuda::random_int(static_cast<int>(dtype), out.data_ptr(), static_cast<std::size_t>(n), low, high, s);
+        if (!r)
+            return std::unexpected(std::move(r.error()));
+        return out;
+    }
+
+    auto eng = make_engine(seed);
 
     if (dtype == DType::I32) {
         std::uniform_int_distribution<int32_t> dist(static_cast<int32_t>(low), static_cast<int32_t>(high) - 1);
@@ -138,7 +177,7 @@ auto randint(int64_t low, int64_t high, Shape shape, DType dtype, uint64_t seed,
             ptr[i] = static_cast<uint8_t>(dist(eng));
     }
 
-    return finalize(std::move(out), device);
+    return out;
 }
 
 } // namespace bee

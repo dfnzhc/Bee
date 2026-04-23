@@ -23,6 +23,7 @@ if(TARGET Bee::CUDA)
             WarpBlockTests.cu
             ElementWiseTests.cu
             ReduceTests.cu
+            RandomTests.cu
         )
 
         set_target_properties(CUDA.Tests PROPERTIES

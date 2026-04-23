@@ -358,7 +358,61 @@ GEMM 方阵：{128, 256, 512, 1024, 2048} —— 2048 是 CPU 朴素版本的舒
 - 中小 n（≤1M）瓶颈切至 launch + partial 缓冲区分配释放，本次不覆盖；后续 B7/B8 的 persistent kernel 或共享 scratch pool 可继续压缩这部分固定开销。
 - 代码结构更清晰：去掉 dynamic smem 依赖、去除传统 tree-reduce 循环，`BlockReduce` 成为 CUDA 端规约的唯一路径。
 
-### B7 — CUDA Random 原生 Philox（TODO）
+### B7 — CUDA Random 原生 Philox
+
+#### 现状（pre-B7）
+
+- `Bee/Tensor/Ops/Random.cpp` 中 `rand/randn/randint` 对 `Device::CUDA` 的处理方式为：
+  1. 在 CPU 上用 `std::mt19937_64` + `uniform_real_distribution`/`normal_distribution`/`uniform_int_distribution` 生成整张 Tensor；
+  2. 调用 `cpu_out.to(Device::CUDA)` 把结果 H2D 拷贝到显存。
+- 即 CUDA 路径完全没有使用 GPU 算力；16M F32 rand 的 2/3 时间花在 CPU normal_distribution，1/3 花在 PCIe H2D。
+
+#### 方案
+
+1. 新建 `Bee/CUDA/Ops/Random.cu`：
+   - 标准 **Philox4x32-10** 设备侧实现（DE Shaw SC'11）：`mulhilo32` + 10 轮，key bump 用 Weyl 常量 `0x9E3779B9 / 0xBB67AE85`。
+   - 每线程用 `(counter=thread_idx, subseq, seed)` 作为 `(ctr, key)`，一次 `philox_gen` 产出 4 × u32，subseq 区分 uniform/normal/int 三条数据流避免与同 seed 的其他 op 重叠。
+   - F32 uniform：`u32 >> 8` 构 24-bit mantissa，映射 `[0, 1)`。
+   - F64 uniform：合并两个 u32 → `u64 >> 11` 构 53-bit mantissa。
+   - F32/F64 normal：成对 uniform 过 Box-Muller（`sqrt(-2 log u1) * {cos,sin}(2π u2)`）。
+   - Int：u32 mod range + low（MVP，I64 也走 32-bit → 对大 range 有轻微偏态，够用）。
+   - Launch 配置：`Block=256`, `grid = min(1024, ceil(threads / Block))`；grid-stride 循环保证 n 任意。
+2. `OpsBridge.hpp` 暴露 `ops_random_{uniform,normal,int}` 三个 int-returning 桥函数；`CUDA/Api.hpp/Api.cpp` 加 `cuda::ops::random_*` 的 Result<void> 包装。
+3. `Bee/Tensor/Cuda/Backend.hpp/cpp` 转发一层 `tensor::cuda::random_*`（保持 Tensor 组件不直接 include CUDA 头的约束）。
+4. `Bee/Tensor/Ops/Random.cpp` 在 `Device::CUDA` 分支直接在 CUDA device 上 `Tensor::empty` + 调 CUDA API 填充；`seed=0` 时派生一次非零 u64（与 CPU "真随机" 语义对齐）。
+
+#### 基准（`BM_Rand*_CUDA`）
+
+> "before" = stash 掉 `Tensor/Ops/Random.cpp`，走旧的 CPU 生成 + `to(CUDA)` 路径；"after" = 原生 CUDA kernel。
+
+| Bench | Size | Before | After | 加速 |
+|-------|------|--------|-------|------|
+| RandF32    | 4K    | 806 MB/s | 1.41 GB/s | ×2.2 |
+| RandF32    | 1M    | 1.52 GB/s | **268.8 GB/s** | **×177** |
+| RandF32    | 16M   | 1.57 GB/s | **617.9 GB/s** | **×394** |
+| RandnF32   | 4K    | 320 MB/s | 1.44 GB/s | ×4.6 |
+| RandnF32   | 1M    | 426 MB/s | **235.0 GB/s** | **×552** |
+| RandnF32   | 16M   | 439 MB/s | **614.4 GB/s** | **×1434** |
+| RandintI32 | 16M   | 1.50 GB/s | **358.4 GB/s** | **×239** |
+
+> 存档：`Benchmarks/baseline/cuda_b7_before.json`、`cuda_b7_after.json`。
+
+#### 正确性
+
+新增 `Tests/CUDA/RandomTests.cu`（9 个用例）：
+- `UniformF32_Range` / `UniformF64_Range`：验证 `[0, 1)` 半开区间与 mean ≈ 0.5；
+- `UniformF32_Deterministic`：同 seed 两次调用结果按位相等；
+- `UniformF32_NonPow2Size`：n = 1/3/5/1025/1027 的尾部分支不越界；
+- `NormalF32_Moments` / `NormalF64_Moments`：大样本下 `|mean| < 0.03`、`|stddev − 1| < 0.05`；
+- `IntI32_Range` / `IntU8_Range` / `IntI64_Range`：输出全部落在 `[low, high)`。
+
+9 组测试全通过。Tensor.Tests 原有 12 组 CPU Random 用例同样通过（未触及 CPU 路径）。
+
+#### 结论
+
+- rand/randn/randint 的 CUDA 路径吞吐提升 2–3 个数量级：大 n RandF32 从 1.57 GB/s 涨到 **617 GB/s**（5070 Ti 显存 896 GB/s 的 69%），RandnF32 从 439 MB/s 涨到 **614 GB/s**（×1434）。
+- 之前"CPU 生成 + H2D"的瓶颈一是 CPU 单线程 `std::normal_distribution` 极慢（每元素 ~70 ns），二是 PCIe 4.0 x16 理论 32 GB/s 仍远低于显存；彻底解耦后 kernel 本身的指令密度小、内存仅 1W/elem，直接撞显存带宽上限。
+- Philox stateless 设计不维护 per-thread state、无 init kernel，4K 样本下 ~11 µs 几乎全为 cudaMallocAsync + streamSynchronize 开销，与 B6 小 size 瓶颈同根；后续若做 scratch pool / cudaGraph 缓存 launch 可同时改善。
 
 ### B8 — CUDA Matmul L2 CUTLASS（TODO）
 

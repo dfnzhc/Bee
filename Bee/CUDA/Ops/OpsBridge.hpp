@@ -11,6 +11,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 
 namespace bee::cuda::detail
 {
@@ -33,5 +34,10 @@ int ops_matmul(int dt, const void* A, const void* B, void* C, std::size_t M, std
 
 // 2D tiled-shared transpose：dst[i,j] = src[j,i]，src 为 [rows, cols] 连续。
 int ops_transpose_2d(int dt, const void* src, void* dst, std::size_t rows, std::size_t cols) noexcept;
+
+// 设备侧 Philox4x32-10 随机数（B7）。
+int ops_random_uniform(int dt, void* dst, std::size_t n, std::uint64_t seed) noexcept;
+int ops_random_normal(int dt, void* dst, std::size_t n, std::uint64_t seed) noexcept;
+int ops_random_int(int dt, void* dst, std::size_t n, std::int64_t low, std::int64_t high, std::uint64_t seed) noexcept;
 
 } // namespace bee::cuda::detail

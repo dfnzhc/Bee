@@ -4,6 +4,8 @@
     #include "CUDA/Api.hpp"
 #endif
 
+#include <cstdint>
+
 namespace bee::tensor::cuda
 {
 
@@ -84,6 +86,21 @@ auto transpose_2d(int dt, const void* src, void* dst, std::size_t rows, std::siz
     return ::bee::cuda::ops::transpose_2d(static_cast<::bee::cuda::ScalarType>(dt), src, dst, rows, cols);
 }
 
+auto random_uniform(int dt, void* dst, std::size_t n, std::uint64_t seed) -> Result<void>
+{
+    return ::bee::cuda::ops::random_uniform(static_cast<::bee::cuda::ScalarType>(dt), dst, n, seed);
+}
+
+auto random_normal(int dt, void* dst, std::size_t n, std::uint64_t seed) -> Result<void>
+{
+    return ::bee::cuda::ops::random_normal(static_cast<::bee::cuda::ScalarType>(dt), dst, n, seed);
+}
+
+auto random_int(int dt, void* dst, std::size_t n, std::int64_t low, std::int64_t high, std::uint64_t seed) -> Result<void>
+{
+    return ::bee::cuda::ops::random_int(static_cast<::bee::cuda::ScalarType>(dt), dst, n, low, high, seed);
+}
+
 auto synchronize() -> Result<void>
 {
     return ::bee::cuda::device_synchronize();
@@ -162,6 +179,21 @@ auto matmul(int, const void*, const void*, void*, std::size_t, std::size_t, std:
 auto transpose_2d(int, const void*, void*, std::size_t, std::size_t) -> Result<void>
 {
     return std::unexpected(make_error("CUDA 后端不可用：transpose_2d", Severity::Recoverable));
+}
+
+auto random_uniform(int, void*, std::size_t, std::uint64_t) -> Result<void>
+{
+    return std::unexpected(make_error("CUDA 后端不可用：random_uniform", Severity::Recoverable));
+}
+
+auto random_normal(int, void*, std::size_t, std::uint64_t) -> Result<void>
+{
+    return std::unexpected(make_error("CUDA 后端不可用：random_normal", Severity::Recoverable));
+}
+
+auto random_int(int, void*, std::size_t, std::int64_t, std::int64_t, std::uint64_t) -> Result<void>
+{
+    return std::unexpected(make_error("CUDA 后端不可用：random_int", Severity::Recoverable));
 }
 
 auto synchronize() -> Result<void>
