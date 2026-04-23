@@ -420,6 +420,59 @@ GEMM 方阵：{128, 256, 512, 1024, 2048} —— 2048 是 CPU 朴素版本的舒
 
 ### B10 — CUDA Matmul L3 TMA + tcgen05.mma（TODO）
 
-### B11 — CPU Cast/Transpose SIMD（TODO）
+### B11 — CPU Cast/Transpose SIMD
 
-### B12 — 回归监控 / 文档收尾（TODO）
+**现状**：
+- `Cast` 在 B1 基线是逐元素 `static_cast` 循环（F32→F64 16M 仅 8.77 GB/s；F32→I32 9.8 GB/s）；
+- `contiguous()` 对非连续 tensor 走通用 stride-loop + 逐元素 memcpy，Transpose+物化在 2048² F32 仅 794 MiB/s（严重缓存抖动）。
+
+**方案**：
+1. 新增 `Bee/Tensor/Cpu/CastCpu.hpp`：
+   - SSE2/AVX2 手写 intrinsics 覆盖常用数值对（F32↔F64/I32/U8、F32→Bool 等）；
+   - 其余 pair 回落到 `static_cast` 标量循环；
+   - `n ≥ 64K` 走 `parallel_for`（grain = 128 KB/elem_bytes），复用 Base 的 `parallel::parallel_for`。
+2. 新增 `Bee/Tensor/Cpu/TransposeCpu.hpp`：
+   - 通用 32×32 字节级 blocked-tile 拷贝（任意 `elem_sz`）+ 外层 tile-row 并行；
+   - F32 AVX2 专用 8×8 寄存器转置（3 级 unpack/shuffle/permute2f128）+ 外层并行；
+   - 当 `rows ≥ 64` 时并行。
+3. `Bee/Tensor/Cpu/Dispatch/Dispatch.hpp` 在 `BEE_DECL_DISPATCH_NS` 宏中新增 `ct_cast` 与 `tr_copy_2d` 声明，`KernelDispatch.cpp` 对 4 套 ISA OBJECT 库各提供一份实现。
+4. `Cast.cpp` 改走 `BEE_RT_DISPATCH_STMT(ct_cast, ...)`（新增的"语句版"宏，不含 `return`，适合嵌在 `Result<Tensor>` 函数中）；`Tensor::contiguous()` 的 CPU 分支对 2D tensor 走 `BEE_RT_DISPATCH_STMT(tr_copy_2d, ...)`，其余维度保留通用 stride-loop。
+
+**基准（13700k，Release，单进程）**：
+
+| 用例                             | Before (GB/s) | After (GB/s) | 加速  |
+|----------------------------------|--------------:|-------------:|------:|
+| Cast F32→F64 16M                 |          8.77 |        28.28 | 3.23× |
+| Cast F64→F32 16M                 |         13.48 |        41.74 | 3.10× |
+| Cast F32→I32 16M                 |          9.83 |        40.09 | 4.08× |
+| Cast I32→F32 16M                 |         ~10.0 |        35.19 | 3.5×  |
+| Cast F32→U8  16M                 |          ~4.0 |        55.93 |  14×  |
+| Cast U8→F32  16M                 |          ~3.8 |        26.74 |   7×  |
+| Cast F32→Bool 16M                |          ~4.2 |        53.69 |  13×  |
+| Transpose+Contig F32 2048²       |    0.79 MiB/s |  20.02 GB/s  |  ~25× |
+| Transpose+Contig F32 Tall 262144 |    ~1.0 GB/s  |  15.16 GB/s  |  ~15× |
+
+> 说明：Cast 小 n（256/4K）波动较大且受 overhead 主导；Transpose 4K 的 Tall 用例（16384 行）受写侧并行冲突影响，效率较 2K 略低，属预期。
+
+**正确性**：`Tensor.Tests` 232/232 全通过，重点覆盖 `CastTests`（跨 dtype round-trip）与 `ReshapeTests::*Transpose*Contiguous`（stride view 物化）。
+
+**结论**：Cast 主要数值对 ~3–14×，Transpose 2D 路径 ~15–25×，瓶颈从"逐元素处理"转移到"内存带宽 + 线程扩展"。后续若继续优化可考虑：(1) 大 tensor 走 NT-store 绕 cache；(2) AVX-512 全类型 pack/unpack；(3) `contiguous_copy_into` 通用维度自动合并。
+
+### B12 — 回归监控 / 文档收尾
+
+**目标**：固化一条命令跑完整 CPU + CUDA 基准并落盘，为后续 B8-B10 的性能回归提供基线对比入口。
+
+**交付**：
+1. `Scripts/run_bench.ps1`：按 git short SHA 命名输出 `Benchmarks/baseline/{bench}_{sha}.json`，默认包含 Tensor.Bench + CUDA.Bench（若 `--cuda` 参数）。
+2. `.gitignore` 确保 `Benchmarks/baseline/` 不进仓库（保护机器间差异不污染历史）。
+3. 本日志补齐 B11 段落、更新顶部完成情况。
+
+**回归跑法**（13700k + RTX 5070 Ti）：
+```powershell
+pwsh Scripts/run_bench.ps1            # 仅 CPU (Tensor.Bench)
+pwsh Scripts/run_bench.ps1 -IncludeCuda  # 加上 CUDA.Bench
+```
+脚本落盘格式为 google-benchmark JSON，便于 `ConvertFrom-Json` 做对比脚本。
+
+**已完成里程碑索引**：B0 → B1 → B2 → B3 → B4 → B5 → B6 → B7 → B11 → B12。B8/B9/B10（CUTLASS + TMA + tcgen05）推迟为独立后续里程碑。
+
