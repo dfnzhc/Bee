@@ -68,12 +68,32 @@ int launch_matmul(const void* A, const void* B, void* C, std::size_t M, std::siz
 namespace bee::cuda::detail
 {
 
+#if BEE_HAS_CUTLASS
+// 声明：实现在 MatmulCutlass.cu
+int ops_matmul_f32_cutlass(const void* A, const void* B, void* C,
+                           std::size_t M, std::size_t K, std::size_t N,
+                           cudaStream_t stream) noexcept;
+#endif
+
 int ops_matmul(int dt, const void* A, const void* B, void* C, std::size_t M, std::size_t K, std::size_t N) noexcept
 {
     if (M == 0 || N == 0)
         return 0;
     cudaStream_t stream = cudaStreamPerThread;
     int          err    = 0;
+
+#if BEE_HAS_CUTLASS
+    // F32：优先走 CUTLASS TF32 tensor-core 路径（B8），失败则回退到手写 tile kernel
+    // - 小 GEMM（M < 384 或 N < 384）ThreadblockShape 128×128 无法填满 SM，改走手写 tile kernel
+    if (dt == kDtF32 && M >= 384 && N >= 384 && K >= 32) {
+        int cu_err = ops_matmul_f32_cutlass(A, B, C, M, K, N, stream);
+        if (cu_err == 0) {
+            return static_cast<int>(cudaStreamSynchronize(stream));
+        }
+        // 非 4 对齐等情况：回退
+    }
+#endif
+
     switch (dt) {
     case kDtI32: err = launch_matmul<std::int32_t>(A, B, C, M, K, N, stream); break;
     case kDtI64: err = launch_matmul<std::int64_t>(A, B, C, M, K, N, stream); break;

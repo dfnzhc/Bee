@@ -92,6 +92,10 @@ target_include_directories(CUDA
 
 if (BEE_HAS_CUTLASS)
     target_include_directories(CUDA PRIVATE ${BEE_CUTLASS_INCLUDE_DIR})
+    # CUTLASS 对 constexpr __host__ 调用的要求：需要 relaxed-constexpr
+    target_compile_options(CUDA PRIVATE
+        $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>
+    )
 endif ()
 
 target_link_libraries(CUDA

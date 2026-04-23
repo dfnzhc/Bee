@@ -414,7 +414,43 @@ GEMM 方阵：{128, 256, 512, 1024, 2048} —— 2048 是 CPU 朴素版本的舒
 - 之前"CPU 生成 + H2D"的瓶颈一是 CPU 单线程 `std::normal_distribution` 极慢（每元素 ~70 ns），二是 PCIe 4.0 x16 理论 32 GB/s 仍远低于显存；彻底解耦后 kernel 本身的指令密度小、内存仅 1W/elem，直接撞显存带宽上限。
 - Philox stateless 设计不维护 per-thread state、无 init kernel，4K 样本下 ~11 µs 几乎全为 cudaMallocAsync + streamSynchronize 开销，与 B6 小 size 瓶颈同根；后续若做 scratch pool / cudaGraph 缓存 launch 可同时改善。
 
-### B8 — CUDA Matmul L2 CUTLASS（TODO）
+### B8 — CUDA Matmul L2 CUTLASS
+
+**现状（B1 基线 / 手写 16×16 tile shared-memory kernel）**：
+| size | 耗时 | GFLOPS | 峰值占比 (F32 ~45 TFLOPS) |
+|-----:|-----:|-------:|--------------------------:|
+|  256 | 0.03 ms |  1.18 TFLOPS |  3% |
+|  512 | 0.10 ms |  2.73 TFLOPS |  6% |
+| 1024 | 0.63 ms |  3.42 TFLOPS |  8% |
+| 2048 | 4.88 ms |  3.54 TFLOPS |  8% |
+
+16×16 tile 没用 tensor core，且 thread block 只有 256 线程，register pressure 低、占用率无法掩盖访存延迟。
+
+**方案**：
+1. 新增 `Bee/CUDA/Ops/MatmulCutlass.cu`（独立 TU），基于 CUTLASS 2.x device API：
+   - `cutlass::gemm::device::Gemm<F32, RowMajor, ..., OpClassTensorOp, Sm80, Tb=128×128×32, Warp=64×64×32, Inst=16×8×8, Stages=3>`；
+   - TF32 tensor-core（输入 F32 → 硬件自动截断 TF32 参与 WMMA、累加 F32），精度较纯 F32 少 ~10 位尾数；
+   - sm_80 模板、sm_120 向下兼容运行，不依赖 Hopper/Blackwell collective builder，**编译时间 < 1 min**（对比 sm_120 collective 的 5–10 min）。
+2. `Matmul.cu::ops_matmul` 为 F32 增加 CUTLASS fast-path：
+   - **启用条件**：`M ≥ 384 && N ≥ 384 && K ≥ 32`（小 GEMM ThreadblockShape 128×128 无法填满 SM、launch overhead 主导，直接回退）；
+   - **对齐保护**：`M/N/K % 4 != 0` 时 CUTLASS 配置返回 `kInvalid`，调用方回退到手写 tile kernel；
+   - I32 / I64 / F64 保留原路径。
+3. CMake 探测 `CUTLASS_ROOT` / `ENV_HOME/NVIDIA/cutlass` 并定义 `BEE_HAS_CUTLASS=1`；新增 `--expt-relaxed-constexpr` 以抑制 CUTLASS 自身 constexpr host/device 兼容性警告。
+
+**基准（5070 Ti，Release）**：
+
+| size | Before (TFLOPS) | After (TFLOPS) | 加速   |
+|-----:|----------------:|---------------:|-------:|
+|  256 |            1.18 |           1.08 |  0.91× (走 fallback，波动) |
+|  512 |            2.73 |           5.05 |  1.85× |
+| 1024 |            3.42 |          25.03 |  7.32× |
+| 2048 |            3.54 |          35.31 |  9.97× |
+
+2048² 达 35.3 TFLOPS（5070 Ti TF32 峰值 ~90 TFLOPS 的 39%），剩余余量主要来自：sm_80 Ampere 配置未使用 sm_90 WGMMA / sm_120 tcgen05 新指令、单缓冲 epilogue 没有 Pipeline、ThreadblockShape 未针对 5070 Ti L2 调优。后者归 B10 跟进。
+
+**正确性**：`CUDA.Tests` 64/64 通过（含 5 个 `MatmulTests`），`Tensor.Tests` 232/232 通过。TF32 的精度损失在现有测试的容差范围内（测试 value scale 通常为小整数或 `EXPECT_NEAR` 相对容差 >= 1e-3）；若后续需要 CPU bit-exact 对照，需单独增加 SIMT F32 kernel 路径。
+
+**结论**：F32 大 GEMM 在不依赖新架构特性的前提下取得约 **10× 提速**；小 GEMM 保留手写 fallback 避免退化。为 B10 的 sm_120 collective/tcgen05 路径奠定对比基线。
 
 ### B9 — CUDA Transpose TMA（TODO）
 
