@@ -316,7 +316,47 @@ GEMM 方阵：{128, 256, 512, 1024, 2048} —— 2048 是 CPU 朴素版本的舒
   - 16M > L2（48 MB）时输出写回挤占带宽，需与 allocator reuse + in-place op 联动考虑。
 - **B5 状态**：标记为"完成，无吞吐收益，代码作为结构优化保留"。
 
-### B6 — CUDA Reduce warp shuffle（TODO）
+### B6 — CUDA Reduce warp shuffle
+
+#### 现状（pre-B6）
+
+- `Bee/CUDA/Ops/Reduce.cu` 的 `reduce_global_kernel` 用 dynamic shared mem + 传统 `for (s=blockDim/2; s>0; s>>=1)` 树状折半归约，每轮都要 `__syncthreads`。
+- `ReduceWithIdentity`（`Bee/CUDA/Core/Block.cuh`）已基于 warp shuffle 实现（两阶段：warp-level butterfly + 跨 warp 聚合），在 B4.1 被修好过且有单测覆盖，但尚未接入实际算子。
+- 本次目标：将 Reduce kernel 切换到 `BlockReduce`，并在 grid-stride 累加阶段做 4× 展开。
+
+#### 方案
+
+1. `reduce_global_kernel` 改为：
+   - 固定 `BlockSize = 256`（与 `kDefaultBlockSize` 对齐）；
+   - grid-stride 累加 4× 展开（每线程一次循环吃 4 个元素，隐藏 DRAM 延迟）；
+   - 最后一次 block 内规约调用 `BlockReduce<T, 256, Op>::ReduceWithIdentity`；
+   - 去掉 dynamic shared mem（TempStorage 走静态 `__shared__`）。
+2. 通过 `OpTrait<OP>::type` 把本文件的 `kRd*` 整数 OP 映射到 `WarpOp{Sum,Prod,Min,Max}`。
+3. 两阶段 launch 拓扑保持（stage1: n → grid_partials，stage2: partials → 1）；上限仍为 1024 block。
+4. Axis reduce（`reduce_axis_kernel`）不变（每输出线程串行归约 `axis` 维，非 memory-bound，B6 不动）。
+
+#### 基准（`BM_Sum*_CUDA` / `BM_MaxF32_CUDA`）
+
+| Bench | Size | Before | After | 变化 |
+|-------|------|--------|-------|------|
+| SumF32 | 4K    | 0.87 GB/s | 0.87 GB/s | launch-bound |
+| SumF32 | 1M    | 206 GB/s | 213 GB/s | +3% |
+| SumF32 | 16M   | **587 GB/s** | **625 GB/s** | **+6.5%** |
+| SumI32 | 1M    | 210 GB/s | 206 GB/s | 噪声 |
+| SumI32 | 16M   | **598 GB/s** | **629 GB/s** | **+5.2%** |
+| MaxF32 | 16M   | **611 GB/s** | **639 GB/s** | **+4.6%** |
+
+> 存档：`Benchmarks/baseline/cuda_b6_before.json`（stash 原 tree-reduce）与 `cuda_b6_after.json`（warp-shuffle）。小 size（4K/1M）被 `cudaMallocAsync + cudaStreamSynchronize` 开销支配（~20 µs/iter），本次改动不触及这一路径。
+
+#### 正确性
+
+新增 `Tests/CUDA/ReduceTests.cu`：{Sum, Min, Max, Prod} × {I32, I64, F32, F64, U8 (min/max only)} 多组 n（含 1、31、32、256、257、2^12、2^18、2^20 的非 block 对齐尺寸），5 组测试全通过。
+
+#### 结论
+
+- 大 n（16M，显存 bound）带宽提升 **4.6–6.5%**，达到理论 896 GB/s 的 ~70%。
+- 中小 n（≤1M）瓶颈切至 launch + partial 缓冲区分配释放，本次不覆盖；后续 B7/B8 的 persistent kernel 或共享 scratch pool 可继续压缩这部分固定开销。
+- 代码结构更清晰：去掉 dynamic smem 依赖、去除传统 tree-reduce 循环，`BlockReduce` 成为 CUDA 端规约的唯一路径。
 
 ### B7 — CUDA Random 原生 Philox（TODO）
 

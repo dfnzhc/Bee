@@ -10,6 +10,8 @@
 #include "CUDA/Ops/OpsBridge.hpp"
 #include "CUDA/Core/Check.cuh"
 #include "CUDA/Core/Launch.cuh"
+#include "CUDA/Core/Warp.cuh"
+#include "CUDA/Core/Block.cuh"
 
 #include <cuda_runtime.h>
 #include <cooperative_groups.h>
@@ -88,36 +90,71 @@ struct Reducer
     }
 };
 
+template <int OP>
+struct OpTrait;
+
+template <>
+struct OpTrait<kRdSum>
+{
+    using type = bee::cuda::WarpOpSum;
+};
+
+template <>
+struct OpTrait<kRdProd>
+{
+    using type = bee::cuda::WarpOpProd;
+};
+
+template <>
+struct OpTrait<kRdMin>
+{
+    using type = bee::cuda::WarpOpMin;
+};
+
+template <>
+struct OpTrait<kRdMax>
+{
+    using type = bee::cuda::WarpOpMax;
+};
+
 // ── Global reduce ─────────────────────────────────────────────────────────
 //
-// Two-stage: (1) each block reduces its chunk to one scalar, (2) host
-// launches the same kernel on the partial array until it collapses to 1.
-// For simplicity and latency we cap block count at 1024 and run one extra
-// pass on the host side; a two-kernel dance keeps things contained.
+// Two-stage: (1) each block reduces its chunk to one scalar via
+// BlockReduce (warp-shuffle based), (2) host launches the same kernel on
+// the partial array until it collapses to 1.
+
+constexpr int kReduceBlockSize = 256;
 
 template <typename T, int OP>
 __global__ void reduce_global_kernel(const T* __restrict__ src, T* __restrict__ partial, std::size_t n)
 {
-    using R = Reducer<T, OP>;
-    extern __shared__ unsigned char smem_raw[];
-    T*                              smem = reinterpret_cast<T*>(smem_raw);
+    using R     = Reducer<T, OP>;
+    using Op    = typename OpTrait<OP>::type;
+    using Block = bee::cuda::BlockReduce<T, kReduceBlockSize, Op>;
+
+    __shared__ typename Block::TempStorage smem;
 
     const std::size_t tid    = threadIdx.x;
     const std::size_t stride = static_cast<std::size_t>(blockDim.x) * gridDim.x;
-    T                 acc    = R::identity();
-    for (std::size_t i = static_cast<std::size_t>(blockIdx.x) * blockDim.x + tid; i < n; i += stride) {
+
+    // Grid-stride accumulate, unrolled by 4 to hide memory latency.
+    T        acc = R::identity();
+    std::size_t i = static_cast<std::size_t>(blockIdx.x) * blockDim.x + tid;
+    const std::size_t stride4 = stride * 4;
+    for (; i + stride4 <= n; i += stride4) {
+        acc = R::combine(acc, src[i]);
+        acc = R::combine(acc, src[i + stride]);
+        acc = R::combine(acc, src[i + stride * 2]);
+        acc = R::combine(acc, src[i + stride * 3]);
+    }
+    for (; i < n; i += stride) {
         acc = R::combine(acc, src[i]);
     }
-    smem[tid] = acc;
-    __syncthreads();
 
-    for (unsigned int s = blockDim.x / 2; s > 0; s >>= 1) {
-        if (tid < s)
-            smem[tid] = R::combine(smem[tid], smem[tid + s]);
-        __syncthreads();
-    }
+    // Warp-shuffle block reduction.
+    T out = Block(smem).ReduceWithIdentity(acc, R::identity(), Op{});
     if (tid == 0)
-        partial[blockIdx.x] = smem[0];
+        partial[blockIdx.x] = out;
 }
 
 // ── Axis reduce ───────────────────────────────────────────────────────────
@@ -160,8 +197,8 @@ int launch_global(const void* src, void* dst, std::size_t n, cudaStream_t stream
     if (n == 0)
         return static_cast<int>(cudaErrorInvalidValue);
 
-    const unsigned int block = bee::cuda::kDefaultBlockSize;
-    unsigned int       grid  = static_cast<unsigned int>((n + block - 1) / block);
+    constexpr unsigned int block = static_cast<unsigned int>(kReduceBlockSize);
+    unsigned int           grid  = static_cast<unsigned int>((n + block - 1) / block);
     if (grid > 1024u)
         grid = 1024u;
 
@@ -171,8 +208,7 @@ int launch_global(const void* src, void* dst, std::size_t n, cudaStream_t stream
     if (err != cudaSuccess)
         return static_cast<int>(err);
 
-    const std::size_t smem = block * sizeof(T);
-    reduce_global_kernel<T, OP><<<grid, block, smem, stream>>>(static_cast<const T*>(src), partial, n);
+    reduce_global_kernel<T, OP><<<grid, block, 0, stream>>>(static_cast<const T*>(src), partial, n);
     err = cudaGetLastError();
     if (err != cudaSuccess) {
         cudaFreeAsync(partial, stream);
@@ -180,7 +216,7 @@ int launch_global(const void* src, void* dst, std::size_t n, cudaStream_t stream
     }
 
     // Stage 2: reduce `grid` partials to a single scalar
-    reduce_global_kernel<T, OP><<<1u, block, smem, stream>>>(partial, static_cast<T*>(dst), grid);
+    reduce_global_kernel<T, OP><<<1u, block, 0, stream>>>(partial, static_cast<T*>(dst), grid);
     err = cudaGetLastError();
     cudaFreeAsync(partial, stream);
     return static_cast<int>(err);
