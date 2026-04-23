@@ -4,6 +4,7 @@
 #include "Tensor/Core/Storage.hpp"
 #include "Tensor/Cuda/CudaAllocator.hpp"
 #include "Tensor/Cuda/Backend.hpp"
+#include "Tensor/Cpu/Dispatch/Dispatch.hpp"
 
 #include <algorithm>
 #include <cstring>
@@ -515,8 +516,20 @@ auto Tensor::contiguous() const -> Result<Tensor>
     if (!storage_result)
         return std::unexpected(std::move(storage_result.error()));
 
-    // 委托辅助函数按 stride 拷贝
-    contiguous_copy_into((*storage_result)->data(), *impl_, elem_sz);
+    // B11 CPU fast-path：2D 情形走 blocked-tile 拷贝（F32 AVX2 还会进 8×8 寄存器转置）
+    if (impl_->shape.size() == 2) {
+        const auto*   src_base  = static_cast<const uint8_t*>(impl_->storage->data());
+        const int64_t off_bytes = impl_->offset * static_cast<int64_t>(elem_sz);
+        BEE_RT_DISPATCH_STMT(tr_copy_2d,
+                             src_base + off_bytes,
+                             (*storage_result)->data(),
+                             impl_->shape[0], impl_->shape[1],
+                             impl_->strides[0], impl_->strides[1],
+                             elem_sz);
+    } else {
+        // 通用 stride-loop 拷贝
+        contiguous_copy_into((*storage_result)->data(), *impl_, elem_sz);
+    }
 
     auto ti     = std::make_shared<TensorImpl>();
     ti->storage = std::move(*storage_result);

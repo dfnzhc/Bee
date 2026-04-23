@@ -5,6 +5,8 @@
 #include "Tensor/Cpu/ElementWiseCpu.hpp"
 #include "Tensor/Cpu/ReduceCpu.hpp"
 #include "Tensor/Cpu/MatmulCpu.hpp"
+#include "Tensor/Cpu/CastCpu.hpp"
+#include "Tensor/Cpu/TransposeCpu.hpp"
 #include "Tensor/Cpu/Gemm/GemmDispatch.hpp"
 
 #include "SIMD/SIMD.hpp"
@@ -179,6 +181,22 @@ namespace BEE_CURRENT_NS
     {
         std::memset(C, 0, static_cast<size_t>(M) * N * sizeof(int32_t));
         gemm_impl::gemm_i8_i32(M, K, N, A, B, C);
+    }
+
+    // ─── Cast（B11）───────────────────────────────────────────────────────────────
+    auto ct_cast(::bee::DType src_dt, ::bee::DType dst_dt, const void* src, void* dst, int64_t n) -> void
+    {
+        cpu_cast_dispatch<_ISA>(src_dt, dst_dt, src, dst, n);
+    }
+
+    // ─── 2D strided→contiguous 拷贝（B11）────────────────────────────────────────
+    auto tr_copy_2d(const void* src, void* dst,
+                    int64_t rows, int64_t cols,
+                    int64_t src_row_stride_elems, int64_t src_col_stride_elems,
+                    std::size_t elem_sz) -> void
+    {
+        cpu_transpose_2d_dispatch<_ISA>(src, dst, rows, cols,
+                                        src_row_stride_elems, src_col_stride_elems, elem_sz);
     }
 
 } // namespace BEE_CURRENT_NS
