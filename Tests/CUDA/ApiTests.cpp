@@ -8,6 +8,7 @@
 
 #include <cstdint>
 #include <vector>
+#include <cmath>
 
 #include "CUDA/Api.hpp"
 
@@ -139,7 +140,7 @@ TEST(CUDAMatmulBackend, AvailabilityReflectsBuildStatus)
     EXPECT_TRUE(cuda::ops::matmul_backend_available(cuda::ops::MatmulBackend::Auto));
     EXPECT_TRUE(cuda::ops::matmul_backend_available(cuda::ops::MatmulBackend::Wmma));
     EXPECT_FALSE(cuda::ops::matmul_backend_available(cuda::ops::MatmulBackend::Cutlass));
-    EXPECT_FALSE(cuda::ops::matmul_backend_available(cuda::ops::MatmulBackend::Native));
+    EXPECT_TRUE(cuda::ops::matmul_backend_available(cuda::ops::MatmulBackend::Native));
 }
 
 TEST(CUDAMatmulBackend, SetReturnsPrevious)
@@ -174,7 +175,52 @@ TEST(CUDAMatmulBackend, CutlassReturnsNotImplemented)
     cuda::deallocate(C, 4 * 4 * sizeof(float), 16);
 }
 
-TEST(CUDAMatmulBackend, NativeReturnsNotImplemented)
+// B10：Native 后端 = TMA + WMMA TF32 路径（要求严格对齐）
+TEST(CUDAMatmulBackend, NativeTmaWmmaProducesCorrectResult)
+{
+    if (cuda::device_count() == 0)
+        GTEST_SKIP() << "No CUDA device";
+
+    constexpr std::size_t M = 128, K = 32, N = 128;
+    const std::size_t bytes_a = M * K * sizeof(float);
+    const std::size_t bytes_b = K * N * sizeof(float);
+    const std::size_t bytes_c = M * N * sizeof(float);
+
+    auto dA = cuda::allocate(bytes_a, 128).value();
+    auto dB = cuda::allocate(bytes_b, 128).value();
+    auto dC = cuda::allocate(bytes_c, 128).value();
+
+    std::vector<float> hA(M * K), hB(K * N), hC(M * N), hRef(M * N, 0.0f);
+    for (std::size_t i = 0; i < hA.size(); ++i) hA[i] = static_cast<float>((i % 7) - 3) * 0.125f;
+    for (std::size_t i = 0; i < hB.size(); ++i) hB[i] = static_cast<float>((i % 5) - 2) * 0.25f;
+
+    for (std::size_t m = 0; m < M; ++m)
+        for (std::size_t n = 0; n < N; ++n) {
+            float s = 0.0f;
+            for (std::size_t k = 0; k < K; ++k) s += hA[m * K + k] * hB[k * N + n];
+            hRef[m * N + n] = s;
+        }
+
+    ASSERT_TRUE(cuda::memcpy_h2d(dA, hA.data(), bytes_a));
+    ASSERT_TRUE(cuda::memcpy_h2d(dB, hB.data(), bytes_b));
+
+    const auto prev = cuda::ops::set_matmul_backend(cuda::ops::MatmulBackend::Native);
+    auto       r    = cuda::ops::matmul(cuda::ScalarType::F32, dA, dB, dC, M, K, N);
+    cuda::ops::set_matmul_backend(prev);
+    ASSERT_TRUE(r) << (r ? "" : r.error().message.view());
+
+    ASSERT_TRUE(cuda::memcpy_d2h(hC.data(), dC, bytes_c));
+    for (std::size_t i = 0; i < hC.size(); ++i) {
+        const float diff = std::abs(hC[i] - hRef[i]);
+        EXPECT_LE(diff, 1e-3f) << "i=" << i;
+    }
+
+    cuda::deallocate(dA, bytes_a, 128);
+    cuda::deallocate(dB, bytes_b, 128);
+    cuda::deallocate(dC, bytes_c, 128);
+}
+
+TEST(CUDAMatmulBackend, NativeTmaWmmaRejectsUnaligned)
 {
     if (cuda::device_count() == 0)
         GTEST_SKIP() << "No CUDA device";
@@ -184,10 +230,8 @@ TEST(CUDAMatmulBackend, NativeReturnsNotImplemented)
 
     const auto prev = cuda::ops::set_matmul_backend(cuda::ops::MatmulBackend::Native);
     auto       r    = cuda::ops::matmul(cuda::ScalarType::F32, A, B, C, 4, 4, 4);
-    EXPECT_FALSE(r);
-    if (!r)
-        EXPECT_NE(r.error().message.view().find("Native"), std::string_view::npos);
     cuda::ops::set_matmul_backend(prev);
+    EXPECT_FALSE(r);
 
     cuda::deallocate(A, 4 * 4 * sizeof(float), 16);
     cuda::deallocate(B, 4 * 4 * sizeof(float), 16);

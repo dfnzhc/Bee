@@ -75,6 +75,26 @@ int ops_matmul_f32_cutlass(const void* A, const void* B, void* C,
                            cudaStream_t stream) noexcept;
 #endif
 
+// 声明：实现在 MatmulTmaWmma.cu（B10：TMA + WMMA TF32 手写路径，sm_120 优化）
+// 仅 F32 且 M%128==N%128==K%32==0、A/B/C 16B 对齐时返回 0；否则返回 sentinel。
+int ops_matmul_f32_tma_wmma(const void* A, const void* B, void* C,
+                            std::size_t M, std::size_t K, std::size_t N,
+                            cudaStream_t stream) noexcept;
+
+int ops_matmul_force_tma_wmma(int dt, const void* A, const void* B, void* C,
+                              std::size_t M, std::size_t K, std::size_t N) noexcept
+{
+    if (M == 0 || N == 0)
+        return 0;
+    if (dt != kDtF32)
+        return static_cast<int>(cudaErrorInvalidValue);
+    cudaStream_t stream = cudaStreamPerThread;
+    int rc = ops_matmul_f32_tma_wmma(A, B, C, M, K, N, stream);
+    if (rc != 0)
+        return rc;
+    return static_cast<int>(cudaStreamSynchronize(stream));
+}
+
 int ops_matmul(int dt, const void* A, const void* B, void* C, std::size_t M, std::size_t K, std::size_t N) noexcept
 {
     if (M == 0 || N == 0)
@@ -82,9 +102,10 @@ int ops_matmul(int dt, const void* A, const void* B, void* C, std::size_t M, std
     cudaStream_t stream = cudaStreamPerThread;
     int          err    = 0;
 
+    // 优先级：
+    //  - F32 大尺寸（M,N ≥ 384）走 B8 CUTLASS TF32（峰值 ~35 TFLOPS @5070 Ti）
+    //  - 其余回退手写 tile kernel（B10 手写 TMA+WMMA 路径走 MatmulBackend::Native 显式入口）
 #if BEE_HAS_CUTLASS
-    // F32：优先走 CUTLASS TF32 tensor-core 路径（B8），失败则回退到手写 tile kernel
-    // - 小 GEMM（M < 384 或 N < 384）ThreadblockShape 128×128 无法填满 SM，改走手写 tile kernel
     if (dt == kDtF32 && M >= 384 && N >= 384 && K >= 32) {
         int cu_err = ops_matmul_f32_cutlass(A, B, C, M, K, N, stream);
         if (cu_err == 0) {

@@ -230,13 +230,17 @@ namespace ops
         if (M == 0 || N == 0)
             return {};
 
-        // 按当前全局后端设置分派：L2/L3 未实装时直接返回 NotImplemented；
-        // Auto/Wmma 走现有 tile-shared baseline。
+        // 按当前全局后端设置分派：
+        //  - Cutlass：未独立暴露（Auto/Wmma 在 detail::ops_matmul 内部已优先选择 CUTLASS）
+        //  - Native：B10 手写 TMA + WMMA TF32 路径（要求严格对齐，否则返回错误）
+        //  - Auto/Wmma：内部启发式（CUTLASS 或 native tile）
         const auto backend = get_matmul_backend();
         switch (backend) {
-        case MatmulBackend::Cutlass: return std::unexpected(make_error("cuda::ops::matmul: Cutlass 后端尚未实装（M6）", Severity::Recoverable));
-        case MatmulBackend::Native:
-            return std::unexpected(make_error("cuda::ops::matmul: Native(TMA+tcgen05) 后端尚未实装（M7）", Severity::Recoverable));
+        case MatmulBackend::Cutlass: return std::unexpected(make_error("cuda::ops::matmul: Cutlass 后端尚未暴露（Auto 已自动启用）", Severity::Recoverable));
+        case MatmulBackend::Native: {
+            const int err = detail::ops_matmul_force_tma_wmma(static_cast<int>(dt), A, B, C, M, K, N);
+            return wrap(err, "cuda::ops::matmul[Native:TMA+WMMA]");
+        }
         case MatmulBackend::Auto:
         case MatmulBackend::Wmma:
         default: break;
@@ -308,8 +312,8 @@ namespace ops
         switch (backend) {
         case MatmulBackend::Auto: return true; // 退化到 Wmma
         case MatmulBackend::Wmma: return true;
-        case MatmulBackend::Cutlass: return false; // L2 未实装
-        case MatmulBackend::Native: return false;  // L3 未实装
+        case MatmulBackend::Cutlass: return false; // 由 Auto 内部启用，不独立暴露
+        case MatmulBackend::Native: return true;   // B10：TMA + WMMA TF32 路径
         }
         return false;
     }

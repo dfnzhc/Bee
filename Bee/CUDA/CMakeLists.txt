@@ -102,6 +102,7 @@ target_link_libraries(CUDA
         PUBLIC
         Bee::Base
         CUDA::cudart
+        CUDA::cuda_driver
 )
 
 if (TARGET cutlass::cutlass)

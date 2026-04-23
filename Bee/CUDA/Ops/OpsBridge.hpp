@@ -31,6 +31,8 @@ int ops_scale_fp(int dt, void* buf, double factor, std::size_t n) noexcept;
 
 // 2D tiled-shared matmul：C[M,N] = A[M,K] * B[K,N]；A/B/C 同 dtype、均连续。
 int ops_matmul(int dt, const void* A, const void* B, void* C, std::size_t M, std::size_t K, std::size_t N) noexcept;
+// B10：手写 TMA + WMMA TF32 GEMM 显式入口（仅 F32，要求 M%128==N%128==K%32==0、16B 对齐）。
+int ops_matmul_force_tma_wmma(int dt, const void* A, const void* B, void* C, std::size_t M, std::size_t K, std::size_t N) noexcept;
 
 // 2D tiled-shared transpose：dst[i,j] = src[j,i]，src 为 [rows, cols] 连续。
 int ops_transpose_2d(int dt, const void* src, void* dst, std::size_t rows, std::size_t cols) noexcept;
