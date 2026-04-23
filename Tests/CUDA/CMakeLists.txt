@@ -20,6 +20,7 @@ if(TARGET Bee::CUDA)
     if(CMAKE_CUDA_COMPILER_LOADED)
         target_sources(CUDA.Tests PRIVATE
             KernelTests.cu
+            WarpBlockTests.cu
         )
 
         set_target_properties(CUDA.Tests PROPERTIES
