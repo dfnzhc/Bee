@@ -1,14 +1,17 @@
 #pragma once
 
 // CPU 元素级算子内核：fast-path（连续 SIMD）与 slow-path（广播 stride 迭代）
+// B2：大规模连续路径支持 parallel_for + non-temporal store。
 
 #include "Tensor/Core/DType.hpp"
 #include "Tensor/Core/Shape.hpp"
 #include "Tensor/Core/Tensor.hpp"
 #include "SIMD/SIMD.hpp"
+#include "Base/Parallel/ParallelFor.hpp"
 
 #include <cmath>
 #include <cstdint>
+#include <cstddef>
 #include <type_traits>
 #include <vector>
 
@@ -496,16 +499,47 @@ struct OpLog
 // 连续线性 fast-path
 // ─────────────────────────────────────────────────────────────────────────────
 
-template <typename T, typename ISA, typename Op>
-auto cpu_binary_linear(int64_t n, const T* a, const T* b, T* out) -> void
+// B2 阈值：大于该字节数的输出使用 NT-store 绕过 LLC（优于 RMW 写入）。
+// 13700k：P-core L2 = 2MB；对 a+b→out 三缓冲总量超过 ~6MB 时 NT 更优。
+inline constexpr int64_t kStreamBytesThreshold = 4 * 1024 * 1024;
+// parallel_for grain：以 128 KB 连续子区间为一块（对 F32 = 32K 元素）。
+inline constexpr int64_t kEWiseGrainBytes = 128 * 1024;
+
+// 运行时候选：单线程回退阈值（小于该元素数直接单线程跑 linear，省派发）。
+inline constexpr int64_t kSerialFallbackElems = 64 * 1024;
+
+// UseStream 为真时：在对齐的 SIMD bulk 段使用 NT-store；
+// 否则完全走普通 store / scalar。对齐不满足或尾部仍走普通路径。
+template <typename T, typename ISA, typename Op, bool UseStream>
+inline auto cpu_binary_linear_chunk(int64_t n, const T* a, const T* b, T* out) -> void
 {
     using B = simd::SimdBackend<T, ISA>;
     if constexpr (Op::template has_simd<T, ISA>) {
-        constexpr auto W = static_cast<int64_t>(B::width);
-        int64_t        i = 0;
-        for (; i + W <= n; i += W) {
-            B::storeu(out + i, Op::template simd_apply<T, ISA>(B::loadu(a + i), B::loadu(b + i)));
+        constexpr auto W         = static_cast<int64_t>(B::width);
+        constexpr auto kAlignReg = sizeof(T) * W; // 寄存器字节宽度（对齐粒度）
+        int64_t        i         = 0;
+
+        if constexpr (UseStream) {
+            // 头部：推进到 out 按寄存器宽度对齐
+            const auto out_addr = reinterpret_cast<std::uintptr_t>(out);
+            const auto misalign = out_addr % kAlignReg;
+            if (misalign != 0) {
+                const int64_t to_align = static_cast<int64_t>((kAlignReg - misalign) / sizeof(T));
+                const int64_t head     = to_align < n ? to_align : n;
+                for (; i < head; ++i)
+                    out[i] = Op::template scalar<T>(a[i], b[i]);
+            }
+            // 主体：aligned NT-store
+            for (; i + W <= n; i += W) {
+                auto v = Op::template simd_apply<T, ISA>(B::loadu(a + i), B::loadu(b + i));
+                simd::simd_stream<T, ISA>(out + i, v);
+            }
+        } else {
+            for (; i + W <= n; i += W) {
+                B::storeu(out + i, Op::template simd_apply<T, ISA>(B::loadu(a + i), B::loadu(b + i)));
+            }
         }
+        // 尾部标量
         for (; i < n; ++i)
             out[i] = Op::template scalar<T>(a[i], b[i]);
     } else {
@@ -514,21 +548,116 @@ auto cpu_binary_linear(int64_t n, const T* a, const T* b, T* out) -> void
     }
 }
 
-template <typename T, typename ISA, typename Op>
-auto cpu_unary_linear(int64_t n, const T* a, T* out) -> void
+template <typename T, typename ISA, typename Op, bool UseStream>
+inline auto cpu_unary_linear_chunk(int64_t n, const T* a, T* out) -> void
 {
     using B = simd::SimdBackend<T, ISA>;
     if constexpr (Op::template has_simd<T, ISA>) {
-        constexpr auto W = static_cast<int64_t>(B::width);
-        int64_t        i = 0;
-        for (; i + W <= n; i += W) {
-            B::storeu(out + i, Op::template simd_apply<T, ISA>(B::loadu(a + i)));
+        constexpr auto W         = static_cast<int64_t>(B::width);
+        constexpr auto kAlignReg = sizeof(T) * W;
+        int64_t        i         = 0;
+
+        if constexpr (UseStream) {
+            const auto out_addr = reinterpret_cast<std::uintptr_t>(out);
+            const auto misalign = out_addr % kAlignReg;
+            if (misalign != 0) {
+                const int64_t to_align = static_cast<int64_t>((kAlignReg - misalign) / sizeof(T));
+                const int64_t head     = to_align < n ? to_align : n;
+                for (; i < head; ++i)
+                    out[i] = Op::template scalar<T>(a[i]);
+            }
+            for (; i + W <= n; i += W) {
+                auto v = Op::template simd_apply<T, ISA>(B::loadu(a + i));
+                simd::simd_stream<T, ISA>(out + i, v);
+            }
+        } else {
+            for (; i + W <= n; i += W) {
+                B::storeu(out + i, Op::template simd_apply<T, ISA>(B::loadu(a + i)));
+            }
         }
         for (; i < n; ++i)
             out[i] = Op::template scalar<T>(a[i]);
     } else {
         for (int64_t i = 0; i < n; ++i)
             out[i] = Op::template scalar<T>(a[i]);
+    }
+}
+
+// 对外保持原 API 不变（无 NT 版本）：尾部 slow-path / 非连续仍调用它
+template <typename T, typename ISA, typename Op>
+auto cpu_binary_linear(int64_t n, const T* a, const T* b, T* out) -> void
+{
+    cpu_binary_linear_chunk<T, ISA, Op, false>(n, a, b, out);
+}
+
+template <typename T, typename ISA, typename Op>
+auto cpu_unary_linear(int64_t n, const T* a, T* out) -> void
+{
+    cpu_unary_linear_chunk<T, ISA, Op, false>(n, a, out);
+}
+
+// parallel + 可选 NT：顶层分派使用
+template <typename T, typename ISA, typename Op>
+auto cpu_binary_linear_parallel(int64_t n, const T* a, const T* b, T* out) -> void
+{
+    const bool use_stream = n * static_cast<int64_t>(sizeof(T)) >= kStreamBytesThreshold;
+    if (n < kSerialFallbackElems) {
+        if (use_stream)
+            cpu_binary_linear_chunk<T, ISA, Op, true>(n, a, b, out);
+        else
+            cpu_binary_linear_chunk<T, ISA, Op, false>(n, a, b, out);
+        if (use_stream)
+            simd::sfence();
+        return;
+    }
+    const std::size_t grain = static_cast<std::size_t>(std::max<int64_t>(1, kEWiseGrainBytes / static_cast<int64_t>(sizeof(T))));
+    if (use_stream) {
+        parallel::parallel_for(
+            std::size_t{0}, static_cast<std::size_t>(n), grain,
+            [&](std::size_t lo, std::size_t hi) {
+                cpu_binary_linear_chunk<T, ISA, Op, true>(
+                    static_cast<int64_t>(hi - lo), a + lo, b + lo, out + lo);
+            });
+        simd::sfence();
+    } else {
+        parallel::parallel_for(
+            std::size_t{0}, static_cast<std::size_t>(n), grain,
+            [&](std::size_t lo, std::size_t hi) {
+                cpu_binary_linear_chunk<T, ISA, Op, false>(
+                    static_cast<int64_t>(hi - lo), a + lo, b + lo, out + lo);
+            });
+    }
+}
+
+template <typename T, typename ISA, typename Op>
+auto cpu_unary_linear_parallel(int64_t n, const T* a, T* out) -> void
+{
+    const bool use_stream = n * static_cast<int64_t>(sizeof(T)) >= kStreamBytesThreshold;
+    if (n < kSerialFallbackElems) {
+        if (use_stream)
+            cpu_unary_linear_chunk<T, ISA, Op, true>(n, a, out);
+        else
+            cpu_unary_linear_chunk<T, ISA, Op, false>(n, a, out);
+        if (use_stream)
+            simd::sfence();
+        return;
+    }
+    const std::size_t grain = static_cast<std::size_t>(std::max<int64_t>(1, kEWiseGrainBytes / static_cast<int64_t>(sizeof(T))));
+    if (use_stream) {
+        parallel::parallel_for(
+            std::size_t{0}, static_cast<std::size_t>(n), grain,
+            [&](std::size_t lo, std::size_t hi) {
+                cpu_unary_linear_chunk<T, ISA, Op, true>(
+                    static_cast<int64_t>(hi - lo), a + lo, out + lo);
+            });
+        simd::sfence();
+    } else {
+        parallel::parallel_for(
+            std::size_t{0}, static_cast<std::size_t>(n), grain,
+            [&](std::size_t lo, std::size_t hi) {
+                cpu_unary_linear_chunk<T, ISA, Op, false>(
+                    static_cast<int64_t>(hi - lo), a + lo, out + lo);
+            });
     }
 }
 
@@ -624,7 +753,7 @@ auto cpu_elementwise_binary(const Tensor& a, const Tensor& b, Tensor& out) -> vo
     auto*       out_ptr = static_cast<T*>(out.data_ptr());
 
     if (a.is_contiguous() && b.is_contiguous() && a.shape() == out.shape() && b.shape() == out.shape()) {
-        cpu_binary_linear<T, ISA, Op>(n, a_ptr, b_ptr, out_ptr);
+        cpu_binary_linear_parallel<T, ISA, Op>(n, a_ptr, b_ptr, out_ptr);
         return;
     }
 
@@ -646,7 +775,7 @@ auto cpu_elementwise_unary(const Tensor& a, Tensor& out) -> void
     auto*       out_ptr = static_cast<T*>(out.data_ptr());
 
     if (a.is_contiguous() && a.shape() == out.shape()) {
-        cpu_unary_linear<T, ISA, Op>(n, a_ptr, out_ptr);
+        cpu_unary_linear_parallel<T, ISA, Op>(n, a_ptr, out_ptr);
         return;
     }
 

@@ -2,15 +2,19 @@
 
 // CPU Reduce 算子内核：全局 reduce（SIMD fast-path + scalar slow-path）
 // 与按轴 reduce（连续快速路径 + 通用步长慢速路径）
+// B3：全局 reduce 支持 4 路 SIMD 累加器（打破 FP 依赖链）+ parallel_for。
 
 #include "Tensor/Core/DType.hpp"
 #include "Tensor/Core/Shape.hpp"
 #include "Tensor/Core/Tensor.hpp"
 #include "SIMD/SIMD.hpp"
+#include "Base/Parallel/ParallelFor.hpp"
 
 #include <climits>
 #include <cstdint>
+#include <cstddef>
 #include <limits>
+#include <mutex>
 #include <type_traits>
 #include <vector>
 
@@ -287,7 +291,7 @@ struct OpReduceProd
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 全局 reduce：连续 SIMD fast-path
+// 全局 reduce：连续 SIMD fast-path（4 路累加器打破 FP 依赖链）
 // ─────────────────────────────────────────────────────────────────────────────
 
 // 对 n 个连续元素执行 reduce，支持 SIMD 加速（若 Op 支持该类型/ISA）
@@ -298,15 +302,36 @@ auto cpu_global_reduce_linear(int64_t n, const T* ptr) -> T
 
     if constexpr (Op::template has_simd<T, ISA>) {
         constexpr auto W = static_cast<int64_t>(B::width);
+        if (n >= 4 * W) {
+            // 4 路独立累加器，每轮吃 4*W 个元素；打破 FP add 的依赖链
+            auto    a0 = B::set1(Op::template identity<T>());
+            auto    a1 = a0;
+            auto    a2 = a0;
+            auto    a3 = a0;
+            int64_t i  = 0;
+            for (; i + 4 * W <= n; i += 4 * W) {
+                a0 = Op::template simd_acc<T, ISA>(a0, B::loadu(ptr + i + 0 * W));
+                a1 = Op::template simd_acc<T, ISA>(a1, B::loadu(ptr + i + 1 * W));
+                a2 = Op::template simd_acc<T, ISA>(a2, B::loadu(ptr + i + 2 * W));
+                a3 = Op::template simd_acc<T, ISA>(a3, B::loadu(ptr + i + 3 * W));
+            }
+            // 处理余下 [0..3] 个 SIMD 宽度块
+            auto acc = Op::template simd_acc<T, ISA>(Op::template simd_acc<T, ISA>(a0, a1),
+                                                    Op::template simd_acc<T, ISA>(a2, a3));
+            for (; i + W <= n; i += W)
+                acc = Op::template simd_acc<T, ISA>(acc, B::loadu(ptr + i));
+            T result = Op::template simd_reduce<T, ISA>(acc);
+            // 处理尾部不足一 SIMD 宽度的元素
+            for (; i < n; ++i)
+                result = Op::template scalar<T>(result, ptr[i]);
+            return result;
+        }
         if (n >= W) {
-            // 以恒等元初始化 SIMD 累加器
             auto    acc = B::set1(Op::template identity<T>());
             int64_t i   = 0;
             for (; i + W <= n; i += W)
                 acc = Op::template simd_acc<T, ISA>(acc, B::loadu(ptr + i));
-            // 水平折叠得到标量
             T result = Op::template simd_reduce<T, ISA>(acc);
-            // 处理尾部不足一 SIMD 宽度的元素
             for (; i < n; ++i)
                 result = Op::template scalar<T>(result, ptr[i]);
             return result;
@@ -359,8 +384,14 @@ auto cpu_global_reduce_strided(const Tensor& a) -> T
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 全局 reduce：dispatch（连续 → SIMD；非连续 → stride 迭代）
+// 全局 reduce：dispatch（连续 → parallel SIMD；非连续 → stride 迭代）
 // ─────────────────────────────────────────────────────────────────────────────
+
+// B3 阈值：按输出字节量判断是否并行（小于 L2 的数据保留单线程，避免派发开销）。
+// 13700k：P-core L2=2MB；single-thread reduce 在 1MB 数据上就能接近 LLC 带宽峰值。
+inline constexpr int64_t kReduceParallelBytes  = 4 * 1024 * 1024;
+// 每 worker 分块字节数（64 KB ~ L2 命中 + 并行收益的平衡点）。
+inline constexpr int64_t kReduceChunkBytes     = 64 * 1024;
 
 // 将 reduce 结果写入 0-rank 输出张量
 template <typename T, typename ISA, typename Op>
@@ -368,12 +399,31 @@ auto cpu_reduce_global_dispatch(const Tensor& a, Tensor& out) -> void
 {
     const auto* in_ptr  = static_cast<const T*>(a.data_ptr());
     auto*       out_ptr = static_cast<T*>(out.data_ptr());
+    const int64_t n     = a.numel();
+    const int64_t bytes = n * static_cast<int64_t>(sizeof(T));
 
     T result;
-    if (a.is_contiguous())
-        result = cpu_global_reduce_linear<T, ISA, Op>(a.numel(), in_ptr);
-    else
+    if (!a.is_contiguous()) {
         result = cpu_global_reduce_strided<T, Op>(a);
+    } else if (bytes < kReduceParallelBytes) {
+        result = cpu_global_reduce_linear<T, ISA, Op>(n, in_ptr);
+    } else {
+        const std::size_t grain = static_cast<std::size_t>(std::max<int64_t>(1, kReduceChunkBytes / static_cast<int64_t>(sizeof(T))));
+        // 工人局部 partial，最终主线程做 N 路合并。
+        std::vector<T> partials;
+        std::mutex     mu;
+        parallel::parallel_for(
+            std::size_t{0}, static_cast<std::size_t>(n), grain,
+            [&](std::size_t lo, std::size_t hi) {
+                T p = cpu_global_reduce_linear<T, ISA, Op>(
+                    static_cast<int64_t>(hi - lo), in_ptr + lo);
+                std::lock_guard lk(mu);
+                partials.push_back(p);
+            });
+        result = Op::template identity<T>();
+        for (const T& p : partials)
+            result = Op::template scalar<T>(result, p);
+    }
 
     out_ptr[0] = result;
 }

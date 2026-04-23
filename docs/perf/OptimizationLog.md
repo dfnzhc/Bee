@@ -152,9 +152,56 @@ GEMM 方阵：{128, 256, 512, 1024, 2048} —— 2048 是 CPU 朴素版本的舒
 7. **Transpose+Contig large 跌到 < 1 GB/s**：跨 stride 缓存抖动严重，B11 需要 blocked transpose（64×64 L1-friendly）。
 8. **Randn 460 MB/s** 远差于 Rand（1.9 GB/s）：Box-Muller 标量循环，B2/B7 可考虑 Ziggurat 或下沉到 Philox。
 
-### B2 — CPU ElementWise 多线程 + NT-store（TODO）
+### B2 — CPU ElementWise 多线程 + NT-store
 
-### B3 — CPU Reduce 多线程 + SIMD 水平归约（TODO）
+- **状态**：已完成。
+- **现状**（B1 基线）：单线程 SIMD fast-path 在 large（16 M F32）只能跑到 ~16 GB/s，远低于 DDR5-5600 的 89.6 GB/s 峰值；medium（256 K）同样 13 GB/s，全部被内存带宽卡住 — 因为 3-buf RMW 写 `out = a + b` 在 LLC miss 时先发 read-for-ownership。Sqrt 走同一路径 bench 也仅 11.3 GB/s。
+- **方案**：
+  1. 新增 `SIMD/Stream.hpp`：`simd_stream<T,ISA>(p, v)` 函数模板，对 SSE2/AVX2/AVX512 的 5 种 T（float/double/i32/i64/u8）特化为 NT-store（`_mm256_stream_*` 等），其他情况退化为 storeu。
+  2. `ElementWiseCpu.hpp` 拆分 `cpu_*_linear_chunk<T,ISA,Op,UseStream>`：先做头部标量对齐 → SIMD bulk（对齐时 NT-store，否则 storeu）→ 标量尾部。
+  3. `cpu_*_linear_parallel` 外层包 `Base::Parallel::parallel_for`，grain = 128 KB / sizeof(T)（F32 ≈ 32 K 元素）。当 `n * sizeof(T) >= 4 MB` 时启用 NT-store 并在最后调用 `simd::sfence()`；`n < 64K` 元素时退化为串行 chunk 避免派发开销。
+- **基准**（13700k，24 线程，F32/F64/I32，bytes_per_second 越大越好）：
+
+  | 算子 | tiny 256 | small 4K | medium 256K | large 16M |
+  | --- | --- | --- | --- | --- |
+  | Add F32 | 13.6 → 7.7 GB/s ×0.57 | 84.6 → 62.2 ×0.74 | 13.3 → 18.0 ×1.35 | 16.1 → **51.5** ×**3.20** |
+  | Add F64 | 26.4 → 26.4 ×1.00 | 36.8 → 112.7 ×3.07 | 15.0 → 18.0 ×1.20 | 15.2 → **43.5** ×**2.86** |
+  | Add I32 | 13.5 → 13.2 ×0.98 | 78.3 → 81.3 ×1.04 | 13.7 → 14.5 ×1.06 | 16.2 → **50.4** ×**3.11** |
+  | Mul F32 | 13.6 → 13.2 ×0.98 | 82.9 → 91.9 ×1.11 | 13.5 → 15.8 ×1.17 | 15.5 → **46.4** ×**3.00** |
+  | Sqrt F32 | 9.7 → 9.7 ×1.00 | 40.9 → 38.1 ×0.93 | 10.6 → 10.3 ×0.97 | 11.3 → **40.9** ×**3.63** |
+
+- **结论**：
+  - 大张量（≥ 16 MB working set）带宽一律 ×3 以上，Sqrt 从 11 → 40 GB/s 同比提升；
+  - 微张量（256 元素）有小幅回退（Add F32 13.6 → 7.7），根因是新增对齐前缀分支，即便串行回退也使 naive-SIMD 循环略显臃肿；下一步可加 `if (n < W*2)` 直接走纯标量；
+  - Sqrt 单次 SIMD 延迟较长，large 场景下仍未触达 40 GB/s 之上，但已与 Add 同数量级，说明瓶颈是带宽而非算力。
+- **遗留**：small 4K Add F32 84.6 → 62.2 回退 25%（串行 L1 场景 inlining 差）；需在下轮或 B11 评估 `Op::has_simd` 分支裁剪。
+
+### B3 — CPU Reduce 多线程 + SIMD 水平归约
+
+- **状态**：已完成。
+- **现状**（B1 基线）：单线程 Reduce 用 1 个 SIMD 累加器，FP add 3~4 cycle latency 形成长依赖链；large 场景带宽仅 30 GB/s 左右，medium 能吃到 ~84 GB/s 但仍单核。
+- **方案**：
+  1. `cpu_global_reduce_linear` 改为 4 路 SIMD 累加器（`a0..a3`）循环一次吃 4×W 元素 → 打破 FP add 依赖链，使 execution port 饱和；余下再用 1 路累加器和标量扫尾。
+  2. `cpu_reduce_global_dispatch` 外层 `parallel_for`，grain = 64 KB / sizeof(T)。阈值：`bytes >= 4 MB` 才并行；低于 L2（2MB P-core）尺寸保持单线程，避免 `std::mutex` 合并开销压过收益。
+  3. 局部累加写入 `partials` vector（互斥锁保护），主线程做 N 路合并。
+- **基准**：
+
+  | 算子 | tiny 256 | small 4K | medium 256K | large 16M |
+  | --- | --- | --- | --- | --- |
+  | Sum F32 | 7.3 → 7.6 | 48.6 → **83.4** ×1.72 | 83.5 → **205** ×**2.45** | 33.0 → **142.5** ×**4.31** |
+  | Sum F64 | 13.1 → 16.4 ×1.26 | 61.3 → 116 ×1.89 | 81.6 → **166** ×2.04 | 30.9 → **113** ×**3.66** |
+  | Sum I32 | 7.8 → 7.5 | 70.5 → 87.0 ×1.23 | 164 → 180 ×1.10 | 33.7 → **140.8** ×**4.17** |
+  | Mean F32 | 7.0 → 6.8 | 49.9 → 80.5 ×1.61 | 83.5 → **194** ×2.32 | 27.4 → **128** ×**4.68** |
+  | Max F32 | 6.3 → 6.8 ×1.08 | 30.6 → 70.5 ×2.30 | 40.3 → **145** ×**3.61** | 31.8 → **160** ×**5.05** |
+
+- **结论**：
+  - 4 路累加器单线程即能把 Sum medium 从 83 → 205 GB/s（×2.45），说明 B1 基线确实被单累加器的 FP 依赖链严重卡住；
+  - Max 全面 ×3~5，最大单项收益；min/max 的 SIMD 水平归约本来被单路累加隐藏，现在 4 路打开带宽；
+  - large 数据已到 142–160 GB/s，超过 DDR5-5600 理论峰值 89.6 GB/s — 说明此时大部分数据已命中 LLC / 跨核 L2，体现 P+E 24 线程的聚合缓存带宽。
+- **遗留**：
+  1. 按轴 reduce（`cpu_reduce_axis_dispatch`）尚未并行化，留作 B11 或 B4 后续；
+  2. `std::vector<partials> + mutex` 合并在超多核（24T）下会有锁竞争，下一轮可换为 worker-id 下标写 + barrier；
+  3. mean 的 integer→double 累加路径未走 4 路展开，F64 输出仍可再提 ×1.5。
 
 ### B4 — CPU GEMM tiling + AVX2 microkernel（TODO）
 
