@@ -203,7 +203,52 @@ GEMM 方阵：{128, 256, 512, 1024, 2048} —— 2048 是 CPU 朴素版本的舒
   2. `std::vector<partials> + mutex` 合并在超多核（24T）下会有锁竞争，下一轮可换为 worker-id 下标写 + barrier；
   3. mean 的 integer→double 累加路径未走 4 路展开，F64 输出仍可再提 ×1.5。
 
-### B4 — CPU GEMM tiling + AVX2 microkernel（TODO）
+### B4 — CPU GEMM tiling + AVX2 microkernel
+
+#### B4.1 CUDA Warp/Block 原语修正（提交 6e95574）
+
+**现状**：Bee/CUDA 已有 Warp/Block 协作原语（shuffle/reduce/scan），但 BlockReduce 存在若干小问题：
+- `BlockReduce::Reduce` 对 Max/Min/Prod 用 `T{}` 作占位（应为 identity，零值会污染结果）。
+- `ReduceWithIdentity` 在 kNumWarps 非 2 幂次时 shuffle 轮数偏多。
+- 缺少 `Broadcast(src_tid)` 便利接口。
+- warp_reduce_{sum,min,max} 对 i32/u32 未利用 sm_80+ 的 `__reduce_*_sync` 单指令。
+
+**方案**：
+- 删除有缺陷的 `BlockReduce::Reduce`，保留/修正 `ReduceWithIdentity`。
+- 引入 `kAggrWidthP2 = next_pow2(kNumWarps)`：`lane >= kNumWarps` 注入 identity，之后在 `kAggrWidthP2/2` 宽度内折半。BlockSize=256 → kNumWarps=8 → 3 轮 shuffle（原 5 轮）。
+- 新增 `BlockReduce::Broadcast(input, src_tid)` 复用 `storage.broadcast` 字段。
+- `warp_reduce_sum/min/max<int32|uint32>` 在 `width==kWarpSize && mask==kFullMask32` 时走 `__reduce_*_sync`。
+
+**验证**：`Tests/CUDA/WarpBlockTests.cu` 44 tests PASSED（含 shuffle/reduce/scan/broadcast/any-all/ballot）。
+
+#### B4.2 CPU GEMM 外层多线程（提交本次）
+
+**现状**：单线程 Goto 三层分块 GEMM（AVX2 8×8 / SSE2 4×4 microkernel）SGEMM 1024 = 121 GFLOPS（AVX2 单 P-core 峰值 172.8 GFLOPS 的 70%）。13700k 有 8P+8E 共 24T，单线程利用率 < 5%。
+
+**方案**：
+- 抽出共享 driver 到 `Bee/Tensor/Cpu/Gemm/GemmDriver.hpp`，AVX2 / SSE2 两个 .inl 统一调用。
+- 并行策略：外 `jc`/`pc` 串行；`pack B` 主线程串行（共享给所有 worker）；内层 `ic` 循环切成 `num_ic_chunks = ceil(M_main/MC)` 块，`bee::parallel::parallel_for` 分派。
+- **per-worker A_pack**：`thread_local AlignedBuffer`（576 KB，覆盖 AVX2 MC=192×KC=384 最大 packed panel），懒分配，持续复用；24 线程 ≈ 13.8 MB，可接受。
+- **并行阈值** `kGemmParallelFlops = 4 M FLOPs`：小矩阵退化到 `gemm_driver_serial`，避免 fork-join 开销。
+
+**基准（SGEMM，GFLOPS）**：
+
+| Shape | before | after | 加速比 | 备注 |
+| ----- | ------ | ----- | ----- | --- |
+| 128³  |  53.7  |  55.7 | 1.04× | 2.1 MF < 阈值，走 serial |
+| 256³  |  93.2  | 216.7 | 2.33× | 33 MF，8 ic chunks |
+| 512³  | 106.9  | 251.6 | 2.35× | 锁 B_pack 串行是瓶颈 |
+| 1024³ | 121.1  | **669.3** | **5.53×** | 8 ic chunks × ~83 GF/chunk，接近 8P 满载 |
+
+**结论**：1024 达 669 GFLOPS，超过 B4.2 目标（600 GFLOPS）。256/512 加速比偏低，原因：
+1. `pack B` 主线程串行，K=512 时 pack 占比 ~30%（B4.3 候选优化：pack B 也并行，按 jc tile 分）。
+2. `num_ic_chunks = M_main/MC = 1~2`（256→MC=192→1 chunk；512→3 chunks），并行度不足；可考虑对中等 M 把 MC 调小到 96/128。
+
+**遗留**：
+- F64/I32/I8 当前未纳入 bench，B4.4 补齐基准表。
+- DGEMM `NC=2048` 对 KC=384 下 B panel = 6 MB 超 L3 有 buffer 压力（B4.3 候选：DGEMM NC 单独调小到 1024）。
+- tiny 256 AddF32 的 B2 回退（13.6→7.7 GB/s）未修，属下个循环。
+
 
 ### B5 — CUDA ElementWise float4 向量化（TODO）
 
