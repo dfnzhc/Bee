@@ -510,7 +510,88 @@ GEMM 方阵：{128, 256, 512, 1024, 2048} —— 2048 是 CPU 朴素版本的舒
 - `Benchmarks/baseline/cuda_b9_{before,after}.json`
 
 
-### B10 — CUDA Matmul L3 TMA + tcgen05.mma（TODO）
+### B10 — CUDA Matmul L3 手写 TMA + WMMA TF32
+
+**目标**：与 B8 CUTLASS 路径并行存在的、完全手写的 TF32 GEMM kernel，作为可读的"教科书参考实现"，并尽可能利用 RTX 5070 Ti（sm_120, Blackwell GeForce）的 TMA 异步搬运与 WMMA TensorCore。
+
+**架构现实（决定性约束）**：
+- sm_120 GeForce 不支持 wgmma (sm_90a) / tcgen05 (datacenter Blackwell)，**F32/TF32 TensorCore 只能走 sm_80 级 `mma.sync m16n16k8 tf32`**。
+- TMA (`cp.async.bulk.tensor.2d`) 在 sm_120 可用，但**无 multicast**。
+- libcu++ 提供高层封装：`cuda::device::experimental::cp_async_bulk_tensor_2d_global_to_shared(dst, &tmap, c0, c1, bar)`（`<cuda/barrier>`）。
+- 主机端用 driver API `cuTensorMapEncodeTiled` 创建 `CUtensorMap`，以 `__grid_constant__ const` 传入 kernel。
+
+**设计参数（已固化）**：
+
+| 参数 | 取值 |
+|---|---|
+| Block tile | BM=BN=128, BK=32 |
+| Warps/block | 4（128 threads） |
+| Warp tile | WM=WN=64（每 warp 4×4 fragment tile, m16n16k8） |
+| Pipeline stages | 3（96 KB 动态共享内存） |
+| 累加 dtype | f32（mma.sync TF32 → f32 acc） |
+| 同步 | mbarrier per-stage，`barrier_arrive_tx(bar, 1, kStageBytes)` 由 thread 0 发起，其余 127 threads `bar.arrive()` |
+| 共享内存对齐 | `extern __shared__ __align__(128) uint8_t smem_raw[]` |
+
+**关键代码段（位置 `Bee/CUDA/Ops/MatmulTmaWmma.cu`）**：
+
+```cpp
+// stage 共享内存切片
+struct alignas(128) StageBuffer { float a[BM*BK]; float b[BK*BN]; };
+
+// barrier 构造（ADL 受 namespace 干扰，改用 placement new + ctor）
+::new (&bars[s]) ::cuda::barrier<::cuda::thread_scope_block>(NUM_THREADS);
+
+// arrival_token 不可默认构造、不能数组初始化 → raw 字节缓冲 + placement new
+alignas(::cuda::barrier<...>::arrival_token) uint8_t token_buf[STAGES][sizeof(token)];
+
+// TMA 发起（thread 0）
+::cuda::device::experimental::cp_async_bulk_tensor_2d_global_to_shared(
+    &stage->a, &gA_map, k_off, m_off, bars[s]);
+::cuda::barrier_arrive_tx(bars[s], 1, kStageBytes);
+
+// 主循环
+for (int kt = 0; kt < num_k_tiles; ++kt) {
+    bars[s].wait(std::move(*reinterpret_cast<token*>(token_buf[s])));
+    // wmma.load + __float_to_tf32 显式转换 + mma_sync
+    ...
+    // 预取下一 stage
+}
+```
+
+**实现踩坑（按时间序）**：
+1. `cuda::` 前缀在 `bee::cuda::detail` 内部被解析为 `bee::cuda` → 改用 `::cuda::`。
+2. `cuda::barrier::init(barrier*, count)` 是 hidden friend，ADL 在我们 namespace 不生效 → 改 `barrier(NUM_THREADS)` ctor placement new。
+3. `arrival_token` 无默认构造、无平凡复制赋值 → 用 `alignas(token) uint8_t buf[STAGES][sizeof(token)]` 字节缓冲。
+4. **运行时 cudaErrorMisalignedAddress (716)**：dynamic shared 默认仅 16 B 对齐，TMA 要求 128 B → 强制 `__align__(128)`。
+5. WMMA TF32 load 后必须 `__float_to_tf32` 显式截断每个 fragment 元素，不会编译错但结果错。
+6. `cudaFuncSetAttribute(kernel, MaxDynamicSharedMemorySize, 96*1024)` 必须在 launch 前调用。
+
+**正确性容差**：TF32 截断尾数 13 bit；K=64 累加误差最大相对 ~1.5% / 绝对 ~1e-2。测试 `NativeTmaWmmaProducesCorrectResult` 用 M=128, K=32, N=128 小尺寸 + `EXPECT_LE(diff, 1e-3)`（K 较小，误差小于阈值即可）。
+
+**性能基准（Release，5070 Ti，square F32）**：
+
+| N | TMA+WMMA (B10) | CUTLASS (B8) | Native tile baseline |
+|---|---:|---:|---:|
+| 256  | **0.61 TFLOPS** | n/a (auto: skip) | **1.08 TFLOPS** |
+| 512  | 4.77 TFLOPS  | **5.05 TFLOPS** | n/a |
+| 1024 | **25.16 TFLOPS** | 25.03 TFLOPS | n/a |
+| 2048 | n/a (CUTLASS 接管) | **37.84 TFLOPS** | n/a |
+
+**关键结论（负结果）**：
+- sm_120 GeForce 上 TMA+WMMA TF32 路径**没有性能 sweet spot**：CUTLASS 在大尺寸已贴近 mma 吞吐封顶（~38 TFLOPS）；native tile 在 256² launch overhead 占主导且 16×16 thread tile 比 128×128 block tile 覆盖更佳。
+- 决策：**取消 TMA 自动 dispatch**，改为 explicit 入口 `ops_matmul_force_tma_wmma`，由 `MatmulBackend::Native` 显式触发。
+- 自动路径维持 B9 行为：CUTLASS (≥384) + native tile 兜底。
+
+**接口接入**：
+- `Bee/CUDA/Api.cpp` 中 `MatmulBackend::Native` case → `detail::ops_matmul_force_tma_wmma`，错误 wrap 为 Result。
+- `matmul_backend_available(Native)` 改为 `true`。
+- `Tests/CUDA/ApiTests.cpp` 新增 `NativeTmaWmmaProducesCorrectResult`（128×32×128，对齐符合）+ `NativeTmaWmmaRejectsUnaligned`（4×4×4，应失败）。
+
+**遗留**：
+1. 严格对齐约束（M%128==N%128==K%32==0、缓冲 16 B 对齐）：可加 padding kernel 或在 dispatch 层做形状外推。
+2. 跨 stage 的双缓冲尚未严格做到 compute / memcpy 重叠的极致（mbarrier wait 后 prefetch 下一 stage，prologue 仅预取 1 个 stage）。
+3. 若日后接入 sm_90a / sm_100，本路径可作为对比 baseline，无须改 dispatch 结构。
+
 
 ### B11 — CPU Cast/Transpose SIMD
 
