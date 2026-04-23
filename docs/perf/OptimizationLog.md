@@ -452,7 +452,63 @@ GEMM 方阵：{128, 256, 512, 1024, 2048} —— 2048 是 CPU 朴素版本的舒
 
 **结论**：F32 大 GEMM 在不依赖新架构特性的前提下取得约 **10× 提速**；小 GEMM 保留手写 fallback 避免退化。为 B10 的 sm_120 collective/tcgen05 路径奠定对比基线。
 
-### B9 — CUDA Transpose TMA（TODO）
+### B9 — CUDA Transpose 向量化 load
+
+**现状（B9 前）**：`Transpose.cu` 用 32×33 padded shared tile + `dim3(32,8)` block、每线程 4 iter 串行 load/store。2D contiguous 物化吞吐：
+
+| Shape          | Before (μs) | GB/s  |
+|----------------|------------:|------:|
+| F32  1024²     | 18.40       | ~450  |
+| F32  2048²     | 25.04       | ~1244 ¹ |
+| F32  4096²     | 225.92      | ~591  |
+| I32  4096²     | 226.79      | ~597  |
+| F64  4096²     | 426.45      | ~639  |
+| F32 16384×64   | 17.53       | ~485  |
+| F32 262144×64  | 209.27      | ~636  |
+
+¹ 2048² F32 工作集 32 MiB 部分驻留 L2，实测超 HBM 理论带宽，属非均匀测量。以 4096² 为真实带宽参考。
+
+**方案**：
+
+1. 保留现有 32×33 tile kernel 作为通用/回退路径（非对齐、非 32 倍数、U8/I64/F64）。
+2. 新增 F32/I32 专用的**向量化 global load + 向量化 global store** 快速路径：
+   - `TILE=32`、`block=(8,32)=256 threads`；每线程 x 方向处理 4 连续元素；
+   - 读：单条 `float4/int4` global load → 逐元素写入 shared（共享行步长 33 非 16B 倍数，必须标量写，避免 `cudaErrorMisalignedAddress`）；
+   - 写：逐元素从 shared 按列读取组装寄存器 → 单条 `float4/int4` global store。
+3. 触发条件：`rows%32==0 && cols%32==0 && src/dst 16B 对齐`；`cudaMalloc` 默认 256B 对齐满足。
+
+**实施要点**：
+- 初版错将 shared pointer 也按 `float4*` reinterpret，ty=1 时 tile 行基址偏移 132 字节（4 mod 16）触发 misaligned，测试即崩；改为 shared 端标量 load/store 后修复。
+- CUDA 测试 64/64、Tensor 测试 232/232 全绿。
+
+**结果（4096² F32 为真带宽代表）**：
+
+| Shape          | Before μs | After μs | Speedup | After GB/s |
+|----------------|----------:|---------:|--------:|-----------:|
+| F32 1024²      | 18.40     | 16.56    | 1.11×   | ~521       |
+| F32 2048²      | 25.04     | 25.13    | 1.00×   | ~1347 ¹    |
+| F32 4096²      | 225.92    | 223.03   | 1.01×   | ~611       |
+| I32 1024²      | 17.91     | 16.55    | 1.08×   | ~542       |
+| I32 4096²      | 226.79    | 226.65   | 1.00×   | ~611       |
+| F32 16384×64   | 17.53     | 16.76    | 1.05×   | ~501       |
+
+¹ 同前注。
+
+**结论**：当前 32×32 shared-tile kernel 在 4096² 已达 ~600 GB/s，相对 RTX 5070 Ti GDDR7 256-bit 28 Gbps 理论 ~896 GB/s 约 68%，原生单块 SM 路径下继续压榨空间有限；向量化 load/store 主要在小规模（1024²、瘦阵）收 5–11%、大规模基本持平。
+
+**未采纳方案**：
+
+1. **TMA (`cp.async.bulk.tensor.2d`)**：需要构造 `CUtensorMap` 描述符 + shared barrier 协议，pattern 与 WGMMA mainloop 类似，收益对 memcpy-bound transpose 应接近 0（瓶颈已在 HBM 带宽），实现 ROI 低。
+2. **Swizzled shared (XOR)**：节约 1 行 padding，对 smem 容量无压力、对 occupancy 无实质帮助。
+3. **TILE=64**：单 block smem 翻 4×（17 KB），5070 Ti SM 每个 SM 100 KB smem 仍可容纳，但 per-block 线程不足会限制 ILP，未在本轮实现。
+
+保留为 B10 之后若 profiling 显示带宽偏离 HBM 理论峰值再回来。
+
+**产物**：
+- `Bee/CUDA/Ops/Transpose.cu`（新增 `transpose_vec4_kernel` + 阈值路由）
+- `Benchmarks/CUDA/TransposeCudaBench.cpp`（新建；方阵 F32/I32/F64 + 瘦阵 F32）
+- `Benchmarks/baseline/cuda_b9_{before,after}.json`
+
 
 ### B10 — CUDA Matmul L3 TMA + tcgen05.mma（TODO）
 
