@@ -22,6 +22,7 @@ enum class DType : uint8_t
     I64,
     F32,
     F64,
+    I8,
     // —— 扩展占位（CPU 上不可计算）——
     F16,
     BF16,
@@ -36,6 +37,7 @@ enum class DType : uint8_t
     switch (dt) {
     case DType::Bool: return 1;
     case DType::U8: return 1;
+    case DType::I8: return 1;
     case DType::I32: return 4;
     case DType::I64: return 8;
     case DType::F32: return 4;
@@ -57,6 +59,7 @@ enum class DType : uint8_t
     switch (dt) {
     case DType::Bool: return "Bool";
     case DType::U8: return "U8";
+    case DType::I8: return "I8";
     case DType::I32: return "I32";
     case DType::I64: return "I64";
     case DType::F32: return "F32";
@@ -76,6 +79,7 @@ enum class DType : uint8_t
     switch (dt) {
     case DType::Bool:
     case DType::U8:
+    case DType::I8:
     case DType::I32:
     case DType::I64:
     case DType::F32:
@@ -98,6 +102,12 @@ template <>
 struct DTypeToCpp<DType::U8>
 {
     using type = uint8_t;
+};
+
+template <>
+struct DTypeToCpp<DType::I8>
+{
+    using type = int8_t;
 };
 
 template <>
@@ -138,6 +148,12 @@ template <>
 struct CppToDType<uint8_t>
 {
     static constexpr DType value = DType::U8;
+};
+
+template <>
+struct CppToDType<int8_t>
+{
+    static constexpr DType value = DType::I8;
 };
 
 template <>

@@ -5,8 +5,21 @@
 #include "Tensor/Cpu/ElementWiseCpu.hpp"
 #include "Tensor/Cpu/ReduceCpu.hpp"
 #include "Tensor/Cpu/MatmulCpu.hpp"
+#include "Tensor/Cpu/Gemm/GemmDispatch.hpp"
 
 #include "SIMD/SIMD.hpp"
+
+#include <cstring>
+
+// ─── 按当前 ISA include GEMM 实现 .inl（在对应 OBJECT 库沿用 ISA flags）────────
+#if defined(BEE_DISPATCH_ISA_AVX2)
+    #include "Tensor/Cpu/Gemm/GemmAvx2.inl"
+#elif defined(BEE_DISPATCH_ISA_SSE2)
+    #include "Tensor/Cpu/Gemm/GemmSse2.inl"
+#elif defined(BEE_DISPATCH_ISA_SCALAR)
+    #include "Tensor/Cpu/Gemm/GemmScalar.inl"
+#endif
+// AVX512 OBJECT 库不定义 gemm::avx512::*；AVX512 dispatch 下游复用 avx2 实现
 
 // ─── 选择当前 TU 的 ISA 标签与命名空间 ────────────────────────────────────────
 #if defined(BEE_DISPATCH_ISA_AVX512)
@@ -131,21 +144,41 @@ namespace BEE_CURRENT_NS
     }
 
     // ─── matmul ──────────────────────────────────────────────────────────────────
+    // 选择 GEMM 实现命名空间：AVX512 复用 AVX2（x86 下 AVX512F 蕴含 AVX2）
+#if defined(BEE_DISPATCH_ISA_AVX512)
+    namespace gemm_impl = ::bee::cpu::gemm::avx2;
+#elif defined(BEE_DISPATCH_ISA_AVX2)
+    namespace gemm_impl = ::bee::cpu::gemm::avx2;
+#elif defined(BEE_DISPATCH_ISA_SSE2)
+    namespace gemm_impl = ::bee::cpu::gemm::sse2;
+#else
+    namespace gemm_impl = ::bee::cpu::gemm::scalar;
+#endif
+
     auto mm_f32(int64_t M, int64_t K, int64_t N, const float* A, const float* B, float* C) -> void
     {
-        cpu_matmul_kernel<float, _ISA>(M, K, N, A, B, C);
+        std::memset(C, 0, static_cast<size_t>(M) * N * sizeof(float));
+        gemm_impl::gemm_f32(M, K, N, A, B, C);
     }
     auto mm_f64(int64_t M, int64_t K, int64_t N, const double* A, const double* B, double* C) -> void
     {
-        cpu_matmul_kernel<double, _ISA>(M, K, N, A, B, C);
+        std::memset(C, 0, static_cast<size_t>(M) * N * sizeof(double));
+        gemm_impl::gemm_f64(M, K, N, A, B, C);
     }
     auto mm_i32(int64_t M, int64_t K, int64_t N, const int32_t* A, const int32_t* B, int32_t* C) -> void
     {
-        cpu_matmul_kernel<int32_t, _ISA>(M, K, N, A, B, C);
+        std::memset(C, 0, static_cast<size_t>(M) * N * sizeof(int32_t));
+        gemm_impl::gemm_i32(M, K, N, A, B, C);
     }
     auto mm_i64(int64_t M, int64_t K, int64_t N, const int64_t* A, const int64_t* B, int64_t* C) -> void
     {
+        // I64 无 SIMD GEMM 实现，沿用原模板化内核（它自身初始化 C）
         cpu_matmul_kernel<int64_t, _ISA>(M, K, N, A, B, C);
+    }
+    auto mm_i8(int64_t M, int64_t K, int64_t N, const int8_t* A, const int8_t* B, int32_t* C) -> void
+    {
+        std::memset(C, 0, static_cast<size_t>(M) * N * sizeof(int32_t));
+        gemm_impl::gemm_i8_i32(M, K, N, A, B, C);
     }
 
 } // namespace BEE_CURRENT_NS

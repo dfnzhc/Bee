@@ -13,19 +13,21 @@ namespace
 {
 
     // 分派到对应类型的 CPU 内核（运行期 ISA 分派）
-    auto dispatch_matmul_cpu(int64_t M, int64_t K, int64_t N, DType dtype, const void* A, const void* B, void* C) -> void
+    // in_dtype：输入 A/B 的 dtype；out_dtype：输出 C 的 dtype（通常同 in_dtype，
+    // 但 I8×I8→I32 时不同）
+    auto dispatch_matmul_cpu(int64_t M, int64_t K, int64_t N, DType in_dtype, DType out_dtype, const void* A, const void* B, void* C) -> void
     {
-        // 先将输出缓冲区置零
-        const std::size_t nbytes = static_cast<std::size_t>(M * N) * dtype_size(dtype);
+        // 输出缓冲区按 out_dtype 大小置零
+        const std::size_t nbytes = static_cast<std::size_t>(M * N) * dtype_size(out_dtype);
         std::memset(C, 0, nbytes);
 
-        switch (dtype) {
+        switch (in_dtype) {
         case DType::F32: BEE_RT_DISPATCH(mm_f32, M, K, N, static_cast<const float*>(A), static_cast<const float*>(B), static_cast<float*>(C));
         case DType::F64: BEE_RT_DISPATCH(mm_f64, M, K, N, static_cast<const double*>(A), static_cast<const double*>(B), static_cast<double*>(C));
         case DType::I32: BEE_RT_DISPATCH(mm_i32, M, K, N, static_cast<const int32_t*>(A), static_cast<const int32_t*>(B), static_cast<int32_t*>(C));
         case DType::I64: BEE_RT_DISPATCH(mm_i64, M, K, N, static_cast<const int64_t*>(A), static_cast<const int64_t*>(B), static_cast<int64_t*>(C));
+        case DType::I8:  BEE_RT_DISPATCH(mm_i8,  M, K, N, static_cast<const int8_t*>(A),  static_cast<const int8_t*>(B),  static_cast<int32_t*>(C));
         default:
-            // 不应到达此处（调用方已校验 dtype）
             break;
         }
     }
@@ -113,6 +115,9 @@ auto matmul(const Tensor& a, const Tensor& b) -> Result<Tensor>
     if (dt == DType::Bool || dt == DType::U8)
         return std::unexpected(make_error(std::format("matmul: 不支持 DType::{}", dtype_name(dt)), Severity::Recoverable));
 
+    // I8 输入 → I32 输出（累加到更宽类型避免溢出）
+    const DType out_dt = (dt == DType::I8) ? DType::I32 : dt;
+
     // ── 维度检查：仅支持 2D × 2D ─────────────────────────────────────────────
     if (a.ndim() != 2)
         return std::unexpected(make_error(std::format("matmul: a 必须是 2D 张量，当前 ndim={}", a.ndim()), Severity::Recoverable));
@@ -133,14 +138,14 @@ auto matmul(const Tensor& a, const Tensor& b) -> Result<Tensor>
 
     // ── M 或 N 为 0：直接返回形状正确的零张量 ────────────────────────────────
     if (M == 0 || N == 0) {
-        auto out = Tensor::zeros({M, N}, dt);
+        auto out = Tensor::zeros({M, N}, out_dt);
         if (!out)
             return std::unexpected(std::move(out.error()));
         return *out;
     }
 
     // ── 输出张量（全零，contiguous）──────────────────────────────────────────
-    auto out = Tensor::zeros({M, N}, dt);
+    auto out = Tensor::zeros({M, N}, out_dt);
     if (!out)
         return std::unexpected(std::move(out.error()));
 
@@ -166,7 +171,7 @@ auto matmul(const Tensor& a, const Tensor& b) -> Result<Tensor>
     }
 
     // ── 调用 CPU 内核 ─────────────────────────────────────────────────────────
-    dispatch_matmul_cpu(M, K, N, dt, ca.data_ptr(), cb.data_ptr(), out->data_ptr());
+    dispatch_matmul_cpu(M, K, N, dt, out_dt, ca.data_ptr(), cb.data_ptr(), out->data_ptr());
 
     return *out;
 }

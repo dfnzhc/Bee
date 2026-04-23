@@ -38,6 +38,7 @@ namespace bee::cpu
         auto mm_f64(std::int64_t M, std::int64_t K, std::int64_t N, const double* A, const double* B, double* C) -> void;                   \
         auto mm_i32(std::int64_t M, std::int64_t K, std::int64_t N, const std::int32_t* A, const std::int32_t* B, std::int32_t* C) -> void; \
         auto mm_i64(std::int64_t M, std::int64_t K, std::int64_t N, const std::int64_t* A, const std::int64_t* B, std::int64_t* C) -> void; \
+        auto mm_i8(std::int64_t M, std::int64_t K, std::int64_t N, const std::int8_t* A, const std::int8_t* B, std::int32_t* C) -> void;    \
     }
 
 BEE_DECL_DISPATCH_NS(scalar)
