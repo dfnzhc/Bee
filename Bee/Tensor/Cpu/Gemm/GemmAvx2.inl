@@ -24,7 +24,7 @@
 #include "Tensor/Cpu/Gemm/GemmCommon.hpp"
 #include "Tensor/Cpu/Gemm/GemmDispatch.hpp"
 #include "Tensor/Cpu/Gemm/KernelAvx2.hpp"
-#include "Tensor/Cpu/Gemm/PackAvx2.hpp"
+#include "Tensor/Cpu/Gemm/PackCommon.hpp"
 
 #include <cstdint>
 #include <cstring>
