@@ -245,9 +245,33 @@ GEMM 方阵：{128, 256, 512, 1024, 2048} —— 2048 是 CPU 朴素版本的舒
 2. `num_ic_chunks = M_main/MC = 1~2`（256→MC=192→1 chunk；512→3 chunks），并行度不足；可考虑对中等 M 把 MC 调小到 96/128。
 
 **遗留**：
-- F64/I32/I8 当前未纳入 bench，B4.4 补齐基准表。
+- F64/I32 GEMM 已加入 bench（见 MatmulBench.cpp），baseline 存 `tensor_b4.json`。
 - DGEMM `NC=2048` 对 KC=384 下 B panel = 6 MB 超 L3 有 buffer 压力（B4.3 候选：DGEMM NC 单独调小到 1024）。
 - tiny 256 AddF32 的 B2 回退（13.6→7.7 GB/s）未修，属下个循环。
+
+#### B4.3 DGEMM 分块微调（负结果 / 回退）
+
+**假设**：DGEMM 的 B panel = KC×NC×8 = 384×2048×8 = **6 MB** 超过 P-core L2（2 MB）；缩小 NC=1024（3 MB）应能提升 L2 命中。
+
+**实验**：在 `Avx2BlockSize` 加 `NC_D=1024` 并让 `gemm_f64` 使用；F64 matmul 测试全过。
+
+**结果**：
+- DGEMM 1024³：371 → **334** GFLOPS（反而略降）；256/512 也无收益。
+- 分析：L2 本来就装不下任何合理大小的 B panel（即使 NC=1024 的 3 MB 也超 2 MB L2），收益来自 L3；而 NC 减半直接使 A 重扫次数翻倍、pack B 总次数翻倍，成本压过收益。
+- **结论**：回退 DGEMM NC 到 2048（与 SGEMM 一致）。真正的 DGEMM 提升需要更深入的优化（更大的 MR、SIMD 向量化 B pack、使用 P-core-only 线程亲和性），留作后续迭代。
+
+#### B4.4 回归与文档
+
+- 新增 F64/I32 的 matmul bench（`Benchmarks/Tensor/MatmulBench.cpp`）。
+- baseline 存档：`Benchmarks/baseline/tensor_b4.json`（F32/F64/I32 × 128/256/512/1024 方阵）。
+- **B4 总览数据**（AVX2 Release，google-benchmark `min_time=0.5s`，多次运行存在 ±15% 波动）：
+
+| dtype \ N | 128 | 256 | 512 | 1024 | 单核峰值% (1024) |
+| --- | ---:| ---:| ---:| ---:| ---:|
+| F32 (GFLOPS)  |  52  | 202–217  | 252–321  | **669–950**  | 8P × 172.8 GF = 1382 GF → 48–69% |
+| F64 (GFLOPS)  |  28–35  |  98–109  | 115–128  | **334–371**  | 8P × 86.4 GF = 691 GF → 48–54% |
+| I32 (GOPS)    |  43  | 141  | 181  | **579**  | ≈55% vs SGEMM（mullo 吞吐较低） |
+
 
 
 ### B5 — CUDA ElementWise float4 向量化（TODO）

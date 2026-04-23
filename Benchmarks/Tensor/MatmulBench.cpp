@@ -38,4 +38,46 @@ BENCHMARK(BM_MatmulF32_Square)
     ->Arg(128)->Arg(256)->Arg(512)->Arg(1024)
     ->Unit(benchmark::kMillisecond);
 
+static void BM_MatmulF64_Square(benchmark::State& state)
+{
+    const int64_t n = state.range(0);
+    auto a = make_filled_2d(n, n, DType::F64, 1.0);
+    auto b = make_filled_2d(n, n, DType::F64, 2.0);
+    for (auto _ : state) {
+        auto c = bee::matmul(a, b);
+        benchmark::DoNotOptimize(c);
+        benchmark::ClobberMemory();
+    }
+    const double flops = 2.0 * static_cast<double>(n) * n * n;
+    state.counters["flops/iter"] = flops;
+    state.counters["gflops"] = benchmark::Counter(
+        flops, benchmark::Counter::kIsIterationInvariantRate,
+        benchmark::Counter::OneK::kIs1000);
+    state.SetItemsProcessed(state.iterations() * n * n);
+}
+BENCHMARK(BM_MatmulF64_Square)
+    ->Arg(128)->Arg(256)->Arg(512)->Arg(1024)
+    ->Unit(benchmark::kMillisecond);
+
+static void BM_MatmulI32_Square(benchmark::State& state)
+{
+    const int64_t n = state.range(0);
+    auto a = make_filled_2d(n, n, DType::I32, 1.0);
+    auto b = make_filled_2d(n, n, DType::I32, 2.0);
+    for (auto _ : state) {
+        auto c = bee::matmul(a, b);
+        benchmark::DoNotOptimize(c);
+        benchmark::ClobberMemory();
+    }
+    const double flops = 2.0 * static_cast<double>(n) * n * n;
+    state.counters["flops/iter"] = flops;
+    state.counters["gflops"] = benchmark::Counter(
+        flops, benchmark::Counter::kIsIterationInvariantRate,
+        benchmark::Counter::OneK::kIs1000);
+    state.SetItemsProcessed(state.iterations() * n * n);
+}
+BENCHMARK(BM_MatmulI32_Square)
+    ->Arg(128)->Arg(256)->Arg(512)->Arg(1024)
+    ->Unit(benchmark::kMillisecond);
+
 } // namespace
