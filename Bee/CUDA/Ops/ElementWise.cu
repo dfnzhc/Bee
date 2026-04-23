@@ -45,22 +45,78 @@ constexpr int kUnSqrt = 2;
 constexpr int kUnExp  = 3;
 constexpr int kUnLog  = 4;
 
+// ─── 向量化 traits：每个 dtype 选择最合适的 128-bit 载入向量 ──────────────────
+template <typename T> struct VecTraits;
+
+template <> struct VecTraits<std::uint8_t>  { using vec_t = uint4;    static constexpr int kVecN = 16; };
+template <> struct VecTraits<std::int32_t>  { using vec_t = int4;     static constexpr int kVecN = 4;  };
+template <> struct VecTraits<float>         { using vec_t = float4;   static constexpr int kVecN = 4;  };
+template <> struct VecTraits<std::int64_t>  { using vec_t = longlong2;static constexpr int kVecN = 2;  };
+template <> struct VecTraits<double>        { using vec_t = double2;  static constexpr int kVecN = 2;  };
+
+template <typename T, typename VT>
+__device__ __forceinline__ void load_vec(const T* p, T (&out)[VecTraits<T>::kVecN])
+{
+    const VT v = *reinterpret_cast<const VT*>(p);
+    #pragma unroll
+    for (int k = 0; k < VecTraits<T>::kVecN; ++k)
+        out[k] = reinterpret_cast<const T*>(&v)[k];
+}
+
+template <typename T, typename VT>
+__device__ __forceinline__ void store_vec(T* p, const T (&in)[VecTraits<T>::kVecN])
+{
+    VT v;
+    #pragma unroll
+    for (int k = 0; k < VecTraits<T>::kVecN; ++k)
+        reinterpret_cast<T*>(&v)[k] = in[k];
+    *reinterpret_cast<VT*>(p) = v;
+}
+
+template <typename T, int OP>
+__device__ __forceinline__ T apply_bin(T av, T bv)
+{
+    if constexpr (OP == kBinAdd) return av + bv;
+    else if constexpr (OP == kBinSub) return av - bv;
+    else if constexpr (OP == kBinMul) return av * bv;
+    else return av / bv;
+}
+
+// Grid-stride 向量化 binary kernel：每线程处理 VEC_N 元素（128-bit），
+// 尾部 (n % VEC_N) 由尾核处理。
+template <typename T, int OP>
+__global__ void binary_kernel_vec(const T* __restrict__ a, const T* __restrict__ b, T* __restrict__ out, std::size_t n_vec)
+{
+    using VT = typename VecTraits<T>::vec_t;
+    constexpr int N = VecTraits<T>::kVecN;
+    const std::size_t tid    = static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    const std::size_t stride = static_cast<std::size_t>(gridDim.x) * blockDim.x;
+    for (std::size_t v = tid; v < n_vec; v += stride) {
+        T a_buf[N], b_buf[N], o_buf[N];
+        load_vec<T, VT>(a + v * N, a_buf);
+        load_vec<T, VT>(b + v * N, b_buf);
+        #pragma unroll
+        for (int k = 0; k < N; ++k)
+            o_buf[k] = apply_bin<T, OP>(a_buf[k], b_buf[k]);
+        store_vec<T, VT>(out + v * N, o_buf);
+    }
+}
+
+template <typename T, int OP>
+__global__ void binary_kernel_tail(const T* __restrict__ a, const T* __restrict__ b, T* __restrict__ out, std::size_t start, std::size_t n)
+{
+    const std::size_t i = start + static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (i >= n) return;
+    out[i] = apply_bin<T, OP>(a[i], b[i]);
+}
+
 template <typename T, int OP>
 __global__ void binary_kernel(const T* __restrict__ a, const T* __restrict__ b, T* __restrict__ out, std::size_t n)
 {
     const std::size_t i = static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
     if (i >= n)
         return;
-    const T av = a[i];
-    const T bv = b[i];
-    if constexpr (OP == kBinAdd)
-        out[i] = av + bv;
-    else if constexpr (OP == kBinSub)
-        out[i] = av - bv;
-    else if constexpr (OP == kBinMul)
-        out[i] = av * bv;
-    else /* Div */
-        out[i] = av / bv;
+    out[i] = apply_bin<T, OP>(a[i], b[i]);
 }
 
 template <typename T>
@@ -72,6 +128,52 @@ __device__ inline T abs_dev(T v)
         return v;
     else
         return v < T(0) ? T(-v) : v;
+}
+
+template <typename T, int OP>
+__device__ __forceinline__ T apply_un(T v)
+{
+    if constexpr (OP == kUnNeg) {
+        if constexpr (std::is_unsigned_v<T>)
+            return static_cast<T>(-static_cast<std::int64_t>(v));
+        else
+            return static_cast<T>(-v);
+    }
+    else if constexpr (OP == kUnAbs) {
+        if constexpr (std::is_unsigned_v<T>) return v;
+        else if constexpr (std::is_floating_point_v<T>) {
+            if constexpr (std::is_same_v<T, float>)  return fabsf(v);
+            else                                     return fabs(v);
+        }
+        else return v < T(0) ? T(-v) : v;
+    }
+    return v;
+}
+
+// 向量化 unary kernel（只覆盖 neg/abs 这类 memory-bound op；sqrt/exp/log 仍走标量）
+template <typename T, int OP>
+__global__ void unary_kernel_vec(const T* __restrict__ a, T* __restrict__ out, std::size_t n_vec)
+{
+    using VT = typename VecTraits<T>::vec_t;
+    constexpr int N = VecTraits<T>::kVecN;
+    const std::size_t tid    = static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    const std::size_t stride = static_cast<std::size_t>(gridDim.x) * blockDim.x;
+    for (std::size_t v = tid; v < n_vec; v += stride) {
+        T a_buf[N], o_buf[N];
+        load_vec<T, VT>(a + v * N, a_buf);
+        #pragma unroll
+        for (int k = 0; k < N; ++k)
+            o_buf[k] = apply_un<T, OP>(a_buf[k]);
+        store_vec<T, VT>(out + v * N, o_buf);
+    }
+}
+
+template <typename T, int OP>
+__global__ void unary_kernel_tail(const T* __restrict__ a, T* __restrict__ out, std::size_t start, std::size_t n)
+{
+    const std::size_t i = start + static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (i >= n) return;
+    out[i] = apply_un<T, OP>(a[i]);
 }
 
 template <typename T, int OP>
@@ -118,9 +220,26 @@ inline int launch_binary(const void* a, const void* b, void* out, std::size_t n,
 {
     if (n == 0)
         return 0;
+    using VT = typename VecTraits<T>::vec_t;
+    constexpr int N = VecTraits<T>::kVecN;
+    const std::size_t n_vec = n / N;
+    const std::size_t tail  = n_vec * N;
+
     const unsigned int block = bee::cuda::kDefaultBlockSize;
-    const unsigned int grid  = bee::cuda::compute_grid_1d(n, block);
-    binary_kernel<T, OP><<<grid, block, 0, stream>>>(static_cast<const T*>(a), static_cast<const T*>(b), static_cast<T*>(out), n);
+    if (n_vec > 0) {
+        // 限制 grid 到 SM 饱和规模，利用 grid-stride 处理大向量
+        const unsigned int grid = static_cast<unsigned int>(
+            n_vec < 512 ? n_vec : 512
+        );
+        binary_kernel_vec<T, OP><<<grid, block, 0, stream>>>(
+            static_cast<const T*>(a), static_cast<const T*>(b), static_cast<T*>(out), n_vec);
+    }
+    if (tail < n) {
+        const std::size_t rem = n - tail;
+        const unsigned int grid_tail = bee::cuda::compute_grid_1d(rem, block);
+        binary_kernel_tail<T, OP><<<grid_tail, block, 0, stream>>>(
+            static_cast<const T*>(a), static_cast<const T*>(b), static_cast<T*>(out), tail, n);
+    }
     return static_cast<int>(cudaGetLastError());
 }
 
@@ -130,8 +249,24 @@ inline int launch_unary(const void* a, void* out, std::size_t n, cudaStream_t st
     if (n == 0)
         return 0;
     const unsigned int block = bee::cuda::kDefaultBlockSize;
-    const unsigned int grid  = bee::cuda::compute_grid_1d(n, block);
-    unary_kernel<T, OP><<<grid, block, 0, stream>>>(static_cast<const T*>(a), static_cast<T*>(out), n);
+    // Neg/Abs 走向量化路径（memory-bound，128-bit 读写收益最高）
+    if constexpr (OP == kUnNeg || OP == kUnAbs) {
+        constexpr int N = VecTraits<T>::kVecN;
+        const std::size_t n_vec = n / N;
+        const std::size_t tail  = n_vec * N;
+        if (n_vec > 0) {
+            const unsigned int grid = static_cast<unsigned int>(n_vec < 512 ? n_vec : 512);
+            unary_kernel_vec<T, OP><<<grid, block, 0, stream>>>(static_cast<const T*>(a), static_cast<T*>(out), n_vec);
+        }
+        if (tail < n) {
+            const std::size_t rem = n - tail;
+            const unsigned int grid_tail = bee::cuda::compute_grid_1d(rem, block);
+            unary_kernel_tail<T, OP><<<grid_tail, block, 0, stream>>>(static_cast<const T*>(a), static_cast<T*>(out), tail, n);
+        }
+    } else {
+        const unsigned int grid = bee::cuda::compute_grid_1d(n, block);
+        unary_kernel<T, OP><<<grid, block, 0, stream>>>(static_cast<const T*>(a), static_cast<T*>(out), n);
+    }
     return static_cast<int>(cudaGetLastError());
 }
 
@@ -141,8 +276,23 @@ inline int launch_unary_f32(const void* a, void* out, std::size_t n, cudaStream_
     if (n == 0)
         return 0;
     const unsigned int block = bee::cuda::kDefaultBlockSize;
-    const unsigned int grid  = bee::cuda::compute_grid_1d(n, block);
-    unary_kernel_f32<OP><<<grid, block, 0, stream>>>(static_cast<const float*>(a), static_cast<float*>(out), n);
+    if constexpr (OP == kUnNeg || OP == kUnAbs) {
+        constexpr int N = VecTraits<float>::kVecN;
+        const std::size_t n_vec = n / N;
+        const std::size_t tail  = n_vec * N;
+        if (n_vec > 0) {
+            const unsigned int grid = static_cast<unsigned int>(n_vec < 512 ? n_vec : 512);
+            unary_kernel_vec<float, OP><<<grid, block, 0, stream>>>(static_cast<const float*>(a), static_cast<float*>(out), n_vec);
+        }
+        if (tail < n) {
+            const std::size_t rem = n - tail;
+            const unsigned int grid_tail = bee::cuda::compute_grid_1d(rem, block);
+            unary_kernel_tail<float, OP><<<grid_tail, block, 0, stream>>>(static_cast<const float*>(a), static_cast<float*>(out), tail, n);
+        }
+    } else {
+        const unsigned int grid = bee::cuda::compute_grid_1d(n, block);
+        unary_kernel_f32<OP><<<grid, block, 0, stream>>>(static_cast<const float*>(a), static_cast<float*>(out), n);
+    }
     return static_cast<int>(cudaGetLastError());
 }
 

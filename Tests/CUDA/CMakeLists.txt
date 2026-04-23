@@ -21,6 +21,7 @@ if(TARGET Bee::CUDA)
         target_sources(CUDA.Tests PRIVATE
             KernelTests.cu
             WarpBlockTests.cu
+            ElementWiseTests.cu
         )
 
         set_target_properties(CUDA.Tests PROPERTIES

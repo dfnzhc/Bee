@@ -274,7 +274,47 @@ GEMM 方阵：{128, 256, 512, 1024, 2048} —— 2048 是 CPU 朴素版本的舒
 
 
 
-### B5 — CUDA ElementWise float4 向量化（TODO）
+### B5 — CUDA ElementWise 128-bit 向量化
+
+#### 现状（pre-B5）
+
+- `Bee/CUDA/Ops/ElementWise.cu` 中 `binary_kernel` / `unary_kernel` 均为 1 thread / 1 element 的朴素实现：每个线程做一次 32-bit load × 2 + 32-bit store，grid 覆盖全部元素。
+- B1 基线（F32 Add，`cuda_baseline.json`）：1M = **773 GB/s**，16M = **693 GB/s**，已达理论 896 GB/s 的 77–86%，且 kernel 阶段内 `cudaStreamSynchronize` 确保 bench 计时覆盖真实执行。
+
+#### 方案
+
+1. 对**纯内存 bound** 的 op 使用 128-bit 向量化 load/store，减少 LD/ST 指令条数、提高访存效率：
+   - `u8 → uint4` (16 元素/线程)
+   - `i32 / f32 → int4 / float4` (4 元素/线程)
+   - `i64 / f64 → longlong2 / double2` (2 元素/线程)
+2. 加 `VecTraits<T>` + `load_vec` / `store_vec` / `apply_bin` / `apply_un` 模板辅助，保持原 op 语义。
+3. 保留"尾部 kernel"：`n - (n/VEC_N)*VEC_N` 个元素走标量 kernel，处理非对齐尾巴（CUDA `cudaMalloc` 天然 256-byte 对齐，无需额外对齐检查）。
+4. 用 `grid-stride loop`，vec kernel grid 上限设为 512 饱和 SM，超大 n 通过 stride 循环覆盖。
+5. **仅对 memory-bound 的 op 向量化**：
+   - binary：add / sub / mul / div 全部走 vec。
+   - unary：neg / abs 走 vec；sqrt / exp / log 含数学库调用，compute-bound，保持标量。
+
+#### 基准
+
+| Bench | Size | Before (B1) | After (B5) | 变化 |
+|-------|------|-------------|-----------|------|
+| BM_AddF32_CUDA | 4096 | 4.65 GB/s | 4.38 GB/s | –6% (launch overhead dominates) |
+| BM_AddF32_CUDA | 1M  | **773 GB/s** | 752 GB/s | –3% 噪声 |
+| BM_AddF32_CUDA | 16M | **693 GB/s** | 679 GB/s | –2% 噪声 |
+| BM_MulF32_CUDA | 1M  | 757 GB/s | 771 GB/s | +2% 噪声 |
+| BM_MulF32_CUDA | 16M | 701 GB/s | 656 GB/s | –6% 噪声 |
+
+> 数字档：`Benchmarks/baseline/cuda_baseline.json`（B1）与 `cuda_baseline/cuda_b5.json`（B5，未入库）。
+
+#### 结论（负结果）
+
+- **吞吐未提升**，基本在 ±6% 运行噪声区间内波动。
+- 根因：B1 基线已达显存带宽的 77–86%（RTX 5070 Ti 理论 896 GB/s）。grid 足够大时，coalesced 32-bit 访问已在 LD/ST unit 层面被硬件合并为全 cache line 访问，显式向量化只能节省指令带宽，对 memory-bound kernel 不构成瓶颈。
+- **代码仍保留**：向量化版本对未来 op fusion、L2 residency 优化、mixed-dtype 融合核更友好；且正确性通过 `Tests/CUDA/ElementWiseTests.cu`（6 组 × 多 n size，含非对齐尾部）验证通过。
+- **下一步建议**（不在 B5 范围）：
+  - 小 size（4K）瓶颈已切换为 launch latency，后续可通过 persistent kernel / cudaGraph 去掉反复 launch。
+  - 16M > L2（48 MB）时输出写回挤占带宽，需与 allocator reuse + in-place op 联动考虑。
+- **B5 状态**：标记为"完成，无吞吐收益，代码作为结构优化保留"。
 
 ### B6 — CUDA Reduce warp shuffle（TODO）
 
