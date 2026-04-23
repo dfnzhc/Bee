@@ -54,6 +54,16 @@ struct BlockReduce
     static_assert(BlockSize > 0 && BlockSize <= 1024, "BlockSize 需在 (0,1024]");
     static constexpr int kNumWarps = (BlockSize + kWarpSize - 1) / kWarpSize;
 
+    // 把 kNumWarps 向上取整到 2 的幂，用于第二阶段 shuffle reduce 的 width。
+    // 这样可以在 lane >= kNumWarps 注入 identity 后安全 reduce，避免对超出部分
+    // 做多余 shuffle 轮数。
+    static constexpr int kAggrWidthP2 = []() constexpr
+    {
+        int w = 1;
+        while (w < kNumWarps) w <<= 1;
+        return w;
+    }();
+
     struct TempStorage
     {
         T warp_sums[kNumWarps];
@@ -67,69 +77,35 @@ struct BlockReduce
     {
     }
 
-    // 完整 reduce，结果返回到 tid == 0；其他线程返回未定义值。
-    __device__ __forceinline__ auto Reduce(T input, Op op = Op{}) -> T
-    {
-        const unsigned int tid  = block_thread_rank();
-        const unsigned int lane = tid & (kWarpSize - 1);
-        const unsigned int wid  = tid / kWarpSize;
-
-        T warp_val = warp_reduce(input, op, static_cast<int>(kWarpSize));
-        if (lane == 0) {
-            storage.warp_sums[wid] = warp_val;
-        }
-        block_sync();
-
-        // 第二阶段：warp 0 聚合前 kNumWarps 个 warp sum
-        if (wid == 0) {
-            T v = (lane < kNumWarps) ? storage.warp_sums[lane] : warp_val /* 占位 */;
-            // 对于 lane >= kNumWarps 的元素，注入 identity：使用 op 的"吸收性"不通用，
-            // 更稳妥的是：用 warp_sums[0] 当 seed，对多余 lane 填 warp_sums[0] 即可。
-            if (lane >= kNumWarps) {
-                v = storage.warp_sums[0];
-            }
-            // 若 kNumWarps < 32 且 op 非幂等（例如 Sum 会重复累加 warp_sums[0]），
-            // 因此改走只激活 kNumWarps 个 lane 的 reduce：使用 sub-warp width。
-            // 为简化，选 width = 最接近 kNumWarps 的 2 的幂，并单独处理 tail。
-            T acc = (lane < kNumWarps) ? storage.warp_sums[lane] : T{};
-// 用折半 reduce，仅在 lane < kNumWarps 范围内有效
-#pragma unroll
-            for (int offset = 16; offset > 0; offset >>= 1) {
-                T other = warp_shfl_xor(acc, offset, kWarpSize);
-                // 仅当对侧 lane 也在有效范围内才累加；但 Op 可能不具可选性，
-                // 故我们把无效 lane 的 acc 设为 identity。Sum/Prod/Min/Max 都有
-                // 可区分的 identity，这里交由调用者通过 ReduceWithIdentity 指定。
-                acc = op(acc, other);
-            }
-            (void)v;
-            if (lane == 0) {
-                storage.broadcast = acc;
-            }
-        }
-        block_sync();
-        return storage.broadcast;
-    }
-
-    // 更通用的版本：显式指定 identity，处理 kNumWarps 非 32 的情况时更可靠。
+    // 通用 reduce，显式指定 identity（Sum=0，Prod=1，Min=MAX，Max=MIN 等）。
+    // 结果广播到 block 内所有线程（从 storage.broadcast 读出）。
     __device__ __forceinline__ auto ReduceWithIdentity(T input, T identity, Op op = Op{}) -> T
     {
         const unsigned int tid  = block_thread_rank();
         const unsigned int lane = tid & (kWarpSize - 1);
         const unsigned int wid  = tid / kWarpSize;
 
+        // 第一阶段：每个 warp 内 reduce，lane 0 写 smem
         T warp_val = warp_reduce(input, op, static_cast<int>(kWarpSize));
         if (lane == 0) {
             storage.warp_sums[wid] = warp_val;
         }
         block_sync();
 
+        // 第二阶段：warp 0 对 kNumWarps 条 partial 做 reduce
         if (wid == 0) {
-            T acc = (lane < kNumWarps) ? storage.warp_sums[lane] : identity;
+            // lane >= kNumWarps 的线程注入 identity，保证 butterfly reduce 正确
+            T acc = (static_cast<int>(lane) < kNumWarps) ? storage.warp_sums[lane] : identity;
+
+            // 只在 next_pow2(kNumWarps) 宽度内折半 —— 对 kNumWarps=8 从 5 轮减到 3 轮
+            if constexpr (kAggrWidthP2 > 1) {
 #pragma unroll
-            for (int offset = 16; offset > 0; offset >>= 1) {
-                T other = warp_shfl_xor(acc, offset, kWarpSize);
-                acc     = op(acc, other);
+                for (int offset = kAggrWidthP2 / 2; offset > 0; offset >>= 1) {
+                    T other = warp_shfl_xor(acc, offset, kWarpSize);
+                    acc     = op(acc, other);
+                }
             }
+
             if (lane == 0) {
                 storage.broadcast = acc;
             }
@@ -138,7 +114,7 @@ struct BlockReduce
         return storage.broadcast;
     }
 
-    // 便捷函数
+    // 便捷函数：Sum 固定 identity = T{0}
     __device__ __forceinline__ auto Sum(T input) -> T
     {
         return ReduceWithIdentity(input, T{0}, WarpOpSum{});
@@ -152,6 +128,17 @@ struct BlockReduce
     __device__ __forceinline__ auto Max(T input, T identity) -> T
     {
         return ReduceWithIdentity(input, identity, WarpOpMax{});
+    }
+
+    // 复用 TempStorage::broadcast 做一次 block 广播（节省 smem，避免再单开
+    // BlockBroadcast::TempStorage）。需在 Reduce 后调用。
+    __device__ __forceinline__ auto Broadcast(T input, unsigned int src_tid) -> T
+    {
+        if (block_thread_rank() == src_tid) {
+            storage.broadcast = input;
+        }
+        block_sync();
+        return storage.broadcast;
     }
 };
 

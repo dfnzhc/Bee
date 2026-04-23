@@ -170,9 +170,18 @@ __device__ __forceinline__ auto warp_reduce(T value, Op op, int width = kWarpSiz
     return value;
 }
 
+// 说明：对 int32 / uint32 类型，在整个 warp（width = 32 且 mask = kFullMask32）上的
+// reduce 可以直接使用 sm_80+ 的 __reduce_*_sync 内建（单指令完成 warp 级归约），
+// 比 5 轮 shuffle 折半快 ~3x。其他宽度、带 mask、或其他类型仍走 butterfly。
+
 template <typename T>
 __device__ __forceinline__ auto warp_reduce_sum(T value, int width = kWarpSize, unsigned int mask = kFullMask32) -> T
 {
+    if constexpr (std::is_same_v<T, int> || std::is_same_v<T, unsigned int>) {
+        if (width == static_cast<int>(kWarpSize) && mask == kFullMask32) {
+            return static_cast<T>(__reduce_add_sync(mask, static_cast<unsigned int>(value)));
+        }
+    }
     return warp_reduce(value, WarpOpSum{}, width, mask);
 }
 
@@ -185,12 +194,32 @@ __device__ __forceinline__ auto warp_reduce_prod(T value, int width = kWarpSize,
 template <typename T>
 __device__ __forceinline__ auto warp_reduce_min(T value, int width = kWarpSize, unsigned int mask = kFullMask32) -> T
 {
+    if constexpr (std::is_same_v<T, int>) {
+        if (width == static_cast<int>(kWarpSize) && mask == kFullMask32) {
+            return static_cast<T>(__reduce_min_sync(mask, static_cast<int>(value)));
+        }
+    }
+    else if constexpr (std::is_same_v<T, unsigned int>) {
+        if (width == static_cast<int>(kWarpSize) && mask == kFullMask32) {
+            return static_cast<T>(__reduce_min_sync(mask, static_cast<unsigned int>(value)));
+        }
+    }
     return warp_reduce(value, WarpOpMin{}, width, mask);
 }
 
 template <typename T>
 __device__ __forceinline__ auto warp_reduce_max(T value, int width = kWarpSize, unsigned int mask = kFullMask32) -> T
 {
+    if constexpr (std::is_same_v<T, int>) {
+        if (width == static_cast<int>(kWarpSize) && mask == kFullMask32) {
+            return static_cast<T>(__reduce_max_sync(mask, static_cast<int>(value)));
+        }
+    }
+    else if constexpr (std::is_same_v<T, unsigned int>) {
+        if (width == static_cast<int>(kWarpSize) && mask == kFullMask32) {
+            return static_cast<T>(__reduce_max_sync(mask, static_cast<unsigned int>(value)));
+        }
+    }
     return warp_reduce(value, WarpOpMax{}, width, mask);
 }
 
