@@ -3,6 +3,7 @@
 #include "Tensor/Cuda/Backend.hpp"
 #include "Tensor/Core/DType.hpp"
 #include "Tensor/Ops/Broadcast.hpp"
+#include "Tensor/Ops/Cast.hpp"
 
 #include <cstring>
 #include <format>
@@ -261,6 +262,21 @@ auto matmul(const Tensor& a, const Tensor& b) -> Result<Tensor>
     const DType dt = a.dtype();
     if (dt == DType::Bool || dt == DType::U8)
         return std::unexpected(make_error(std::format("matmul: 不支持 DType::{}", enum_to_name(dt)), Severity::Recoverable));
+
+    // ── 低精度桥接：F16/BF16 → F32 → matmul → 输出 F32 ────────────────────────
+    // 依据 dtype_accumulate_type(DTypeOpKind::Matmul, F16/BF16) == F32：
+    // 后端不具备可靠的 F16/BF16 matmul 路径（CPU dispatch 无对应内核；
+    // CUDA ScalarType 也未覆盖），故在入口统一升型后调用 F32 路径。
+    if (dt == DType::F16 || dt == DType::BF16) {
+        auto af32_r = cast(a, DType::F32);
+        if (!af32_r)
+            return std::unexpected(std::move(af32_r.error()));
+        auto bf32_r = cast(b, DType::F32);
+        if (!bf32_r)
+            return std::unexpected(std::move(bf32_r.error()));
+        // 递归调用时 dtype 为 F32，不会再次命中此分支
+        return matmul(*af32_r, *bf32_r);
+    }
 
     // ── 推导输出形状（含内维匹配校验）────────────────────────────────────────
     auto out_shape_r = infer_batched_matmul_shape(a.shape(), b.shape());
