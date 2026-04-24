@@ -18,5 +18,6 @@ bee_add_component_test(
         GemmTests.cpp
         CudaStubTests.cpp
         IntegrationTests.cpp
+        CudaRuntimeTests.cpp
 )
 

@@ -356,4 +356,68 @@ namespace ops
 
 } // namespace ops
 
+// ── 异步运行时 API 实现 ─────────────────────────────────────────────────────
+
+auto stream_from_handle(void* handle) -> Result<void*>
+{
+    // 骨架阶段直接传递 handle。
+    return handle;
+}
+
+auto memcpy_h2d_async(void* dst, const void* src, std::size_t nbytes, void* stream) -> Result<void>
+{
+    if (nbytes == 0)
+        return {};
+    auto cuda_stream = stream ? reinterpret_cast<cudaStream_t>(stream) : StreamView::per_thread().native_handle();
+    BEE_CUDA_CHECK(cudaMemcpyAsync(dst, src, nbytes, cudaMemcpyHostToDevice, cuda_stream));
+    return {};
+}
+
+auto memcpy_d2h_async(void* dst, const void* src, std::size_t nbytes, void* stream) -> Result<void>
+{
+    if (nbytes == 0)
+        return {};
+    auto cuda_stream = stream ? reinterpret_cast<cudaStream_t>(stream) : StreamView::per_thread().native_handle();
+    BEE_CUDA_CHECK(cudaMemcpyAsync(dst, src, nbytes, cudaMemcpyDeviceToHost, cuda_stream));
+    return {};
+}
+
+auto memcpy_d2d_async(void* dst, const void* src, std::size_t nbytes, void* stream) -> Result<void>
+{
+    if (nbytes == 0)
+        return {};
+    auto cuda_stream = stream ? reinterpret_cast<cudaStream_t>(stream) : StreamView::per_thread().native_handle();
+    BEE_CUDA_CHECK(cudaMemcpyAsync(dst, src, nbytes, cudaMemcpyDeviceToDevice, cuda_stream));
+    return {};
+}
+
+auto create_event() -> Result<void*>
+{
+    cudaEvent_t event;
+    BEE_CUDA_CHECK(cudaEventCreate(&event));
+    return reinterpret_cast<void*>(event);
+}
+
+auto record_event(void* event_handle, void* stream) -> Result<void>
+{
+    auto event       = reinterpret_cast<cudaEvent_t>(event_handle);
+    auto cuda_stream = stream ? reinterpret_cast<cudaStream_t>(stream) : StreamView::per_thread().native_handle();
+    BEE_CUDA_CHECK(cudaEventRecord(event, cuda_stream));
+    return {};
+}
+
+auto wait_event(void* event_handle, void* stream) -> Result<void>
+{
+    auto event       = reinterpret_cast<cudaEvent_t>(event_handle);
+    auto cuda_stream = stream ? reinterpret_cast<cudaStream_t>(stream) : StreamView::per_thread().native_handle();
+    BEE_CUDA_CHECK(cudaStreamWaitEvent(cuda_stream, event, 0));
+    return {};
+}
+
+auto request_workspace(std::size_t nbytes, void* stream) -> Result<void*>
+{
+    // 骨架实现：使用临时分配（后续可优化为池化管理）。
+    return allocate(nbytes, 256);
+}
+
 } // namespace bee::cuda

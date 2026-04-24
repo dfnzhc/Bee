@@ -83,4 +83,20 @@ auto deallocate(void* p, std::size_t nbytes, std::size_t alignment) -> void;
 // @return 成功时返回 void；失败时返回底层 CUDA 后端错误
 [[nodiscard]] auto synchronize() -> Result<void>;
 
+// 检查 CUDA 后端是否可用。
+[[nodiscard]] auto is_available() noexcept -> bool;
+
+// 异步内存拷贝接口（接受用户提供的 stream 句柄）。
+[[nodiscard]] auto memcpy_h2d_async(void* dst, const void* src, std::size_t nbytes, void* stream) -> Result<void>;
+[[nodiscard]] auto memcpy_d2h_async(void* dst, const void* src, std::size_t nbytes, void* stream) -> Result<void>;
+[[nodiscard]] auto memcpy_d2d_async(void* dst, const void* src, std::size_t nbytes, void* stream) -> Result<void>;
+
+// 事件 API。
+[[nodiscard]] auto create_event() -> Result<void*>;
+[[nodiscard]] auto record_event(void* event_handle, void* stream) -> Result<void>;
+[[nodiscard]] auto wait_event(void* event_handle, void* stream) -> Result<void>;
+
+// workspace 管理。
+[[nodiscard]] auto request_workspace(std::size_t nbytes, void* stream) -> Result<void*>;
+
 } // namespace bee::tensor::cuda

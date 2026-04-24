@@ -106,6 +106,46 @@ auto synchronize() -> Result<void>
     return ::bee::cuda::device_synchronize();
 }
 
+auto is_available() noexcept -> bool
+{
+    return true;
+}
+
+auto memcpy_h2d_async(void* dst, const void* src, std::size_t nbytes, void* stream) -> Result<void>
+{
+    return ::bee::cuda::memcpy_h2d_async(dst, src, nbytes, stream);
+}
+
+auto memcpy_d2h_async(void* dst, const void* src, std::size_t nbytes, void* stream) -> Result<void>
+{
+    return ::bee::cuda::memcpy_d2h_async(dst, src, nbytes, stream);
+}
+
+auto memcpy_d2d_async(void* dst, const void* src, std::size_t nbytes, void* stream) -> Result<void>
+{
+    return ::bee::cuda::memcpy_d2d_async(dst, src, nbytes, stream);
+}
+
+auto create_event() -> Result<void*>
+{
+    return ::bee::cuda::create_event();
+}
+
+auto record_event(void* event_handle, void* stream) -> Result<void>
+{
+    return ::bee::cuda::record_event(event_handle, stream);
+}
+
+auto wait_event(void* event_handle, void* stream) -> Result<void>
+{
+    return ::bee::cuda::wait_event(event_handle, stream);
+}
+
+auto request_workspace(std::size_t nbytes, void* stream) -> Result<void*>
+{
+    return ::bee::cuda::request_workspace(nbytes, stream);
+}
+
 #else // BEE_TENSOR_WITH_CUDA
 
 // CUDA 后端未启用时的 stub 实现。
@@ -199,6 +239,46 @@ auto random_int(int, void*, std::size_t, std::int64_t, std::int64_t, std::uint64
 auto synchronize() -> Result<void>
 {
     return std::unexpected(make_error("CUDA 后端不可用：synchronize", Severity::Recoverable));
+}
+
+auto is_available() noexcept -> bool
+{
+    return false;
+}
+
+auto memcpy_h2d_async(void*, const void*, std::size_t, void*) -> Result<void>
+{
+    return std::unexpected(make_error("CUDA 后端不可用：memcpy_h2d_async", Severity::Recoverable));
+}
+
+auto memcpy_d2h_async(void*, const void*, std::size_t, void*) -> Result<void>
+{
+    return std::unexpected(make_error("CUDA 后端不可用：memcpy_d2h_async", Severity::Recoverable));
+}
+
+auto memcpy_d2d_async(void*, const void*, std::size_t, void*) -> Result<void>
+{
+    return std::unexpected(make_error("CUDA 后端不可用：memcpy_d2d_async", Severity::Recoverable));
+}
+
+auto create_event() -> Result<void*>
+{
+    return std::unexpected(make_error("CUDA 后端不可用：create_event", Severity::Recoverable));
+}
+
+auto record_event(void*, void*) -> Result<void>
+{
+    return std::unexpected(make_error("CUDA 后端不可用：record_event", Severity::Recoverable));
+}
+
+auto wait_event(void*, void*) -> Result<void>
+{
+    return std::unexpected(make_error("CUDA 后端不可用：wait_event", Severity::Recoverable));
+}
+
+auto request_workspace(std::size_t, void*) -> Result<void*>
+{
+    return std::unexpected(make_error("CUDA 后端不可用：request_workspace", Severity::Recoverable));
 }
 
 #endif // BEE_TENSOR_WITH_CUDA

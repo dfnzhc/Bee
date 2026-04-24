@@ -65,6 +65,9 @@ public:
     // 设备迁移：在目标设备上分配等形状张量并搬运数据。
     // 若已在目标设备上则直接返回浅拷贝；非连续张量会先 contiguous() 再搬运。
     [[nodiscard]] auto to(Device target) const -> Result<Tensor>;
+    
+    // 异步设备迁移（接受执行上下文）。
+    [[nodiscard]] auto to(Device target, const void* exec_context) const -> Result<Tensor>;
 
     // ── 视图与形状变换（零拷贝，除非另行说明）──────────────────────────────
 

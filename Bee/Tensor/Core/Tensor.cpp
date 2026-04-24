@@ -463,6 +463,12 @@ auto Tensor::to(Device target) const -> Result<Tensor>
     return dst;
 }
 
+auto Tensor::to(Device target, const void* /*exec_context*/) const -> Result<Tensor>
+{
+    // 骨架实现：暂时忽略 exec_context，使用默认同步路径。
+    return to(target);
+}
+
 // ── contiguous ───────────────────────────────────────────────────────────────
 
 auto Tensor::contiguous() const -> Result<Tensor>
