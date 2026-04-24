@@ -84,8 +84,9 @@ public:
     [[nodiscard]] auto reshape(Shape new_shape) const -> Result<Tensor>;
 
     // 返回连续布局张量；若已连续则共享 storage，否则重新排列数据。
-    // 当前 CPU 有 2D 专用快路径；CUDA 仅对部分 2D transpose 形态做设备端物化。
-    [[nodiscard]] auto contiguous() const -> Result<Tensor>;
+    // CUDA 设备：使用通用 strided_copy kernel 在设备端完成，不再回退到 CPU。
+    // ctx 非空时可传入执行上下文（当前实现同步可见语义，ctx 保留供后续异步扩展）。
+    [[nodiscard]] auto contiguous(const tensor::cuda::ExecContext* ctx = nullptr) const -> Result<Tensor>;
 
     // 维度排列；dims 为 {0..ndim-1} 的一个排列
     [[nodiscard]] auto permute(std::span<const int> dims) const -> Result<Tensor>;

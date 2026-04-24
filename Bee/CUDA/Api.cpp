@@ -313,6 +313,15 @@ namespace ops
         return wrap(err, "cuda::ops::transpose_2d");
     }
 
+    auto strided_copy(ScalarType dt, const void* src, void* dst, const int64_t* shape, const int64_t* strides, int ndim,
+                      int64_t offset_elements, std::size_t numel) -> Result<void>
+    {
+        if (numel == 0)
+            return {};
+        const int err = detail::ops_strided_copy(static_cast<int>(dt), src, dst, shape, strides, ndim, offset_elements, numel);
+        return wrap(err, "cuda::ops::strided_copy");
+    }
+
     auto random_uniform(ScalarType dt, void* dst, std::size_t n, std::uint64_t seed) -> Result<void>
     {
         if (n == 0)

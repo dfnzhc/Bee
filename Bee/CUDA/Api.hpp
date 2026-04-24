@@ -132,6 +132,11 @@ namespace ops
     // 2D tiled-shared transpose：dst[i,j] = src[j,i]，src 为 [rows, cols] 连续。
     [[nodiscard]] auto transpose_2d(ScalarType dt, const void* src, void* dst, std::size_t rows, std::size_t cols) -> Result<void>;
 
+    // 通用 strided copy：将 src storage（基地址 + offset_elements 元素偏移）按 shape/strides 物化到连续 dst。
+    // shape/strides 为 host 侧指针，ndim 最多 8。
+    [[nodiscard]] auto strided_copy(ScalarType dt, const void* src, void* dst, const int64_t* shape, const int64_t* strides, int ndim,
+                                    int64_t offset_elements, std::size_t numel) -> Result<void>;
+
     // ── 设备侧随机数（B7） ──────────────────────────────────────────────────────
     // Philox4x32-10 on-device：同一 seed 与 numel 下输出确定；dtype 仅支持 F32/F64。
     [[nodiscard]] auto random_uniform(ScalarType dt, void* dst, std::size_t n, std::uint64_t seed) -> Result<void>;

@@ -19,5 +19,6 @@ bee_add_component_test(
         CudaStubTests.cpp
         IntegrationTests.cpp
         CudaRuntimeTests.cpp
+        ContiguousCudaTests.cpp
 )
 

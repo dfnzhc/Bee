@@ -477,10 +477,10 @@ auto Tensor::to(Device target, const tensor::cuda::ExecContext* exec_context) co
     if (device() == target)
         return *this;
 
-    // 非连续源先 contiguous 化
+    // 非连续源先 contiguous 化（传入 ctx，供 CUDA 路径使用）
     Tensor src = *this;
     if (!is_contiguous()) {
-        BEE_TRY_ASSIGN(src, contiguous());
+        BEE_TRY_ASSIGN(src, contiguous(exec_context));
     }
 
     Tensor dst;
@@ -490,7 +490,7 @@ auto Tensor::to(Device target, const tensor::cuda::ExecContext* exec_context) co
     if (nbytes > 0) {
         const Device from = src.device();
         const Device to   = target;
-        
+
         // 使用异步 memcpy bridge，传入 stream 参数
         if (from == Device::CPU && to == Device::CUDA) {
             BEE_TRY(tensor::cuda::memcpy_h2d_async(dst.data_ptr(), src.data_ptr(), nbytes, exec_context->stream));
@@ -501,8 +501,8 @@ auto Tensor::to(Device target, const tensor::cuda::ExecContext* exec_context) co
         } else {
             return std::unexpected(make_error("Tensor::to 遇到未支持的设备组合", Severity::Recoverable));
         }
-        
-        // 骨架阶段：保留同步可观察语义，确保测试稳定通过
+
+        // 保持同步可观察语义，确保测试稳定通过
         BEE_TRY(tensor::cuda::synchronize());
     }
 
@@ -511,47 +511,42 @@ auto Tensor::to(Device target, const tensor::cuda::ExecContext* exec_context) co
 
 // ── contiguous ───────────────────────────────────────────────────────────────
 
-auto Tensor::contiguous() const -> Result<Tensor>
+auto Tensor::contiguous(const tensor::cuda::ExecContext* /*ctx*/) const -> Result<Tensor>
 {
     if (is_contiguous())
         return *this; // 共享 storage，引用计数递增
 
     if (device() == Device::CUDA) {
-        // 2D transpose 快速路径：shape=[R,C]，strides=[1,R]（=src 原 [C,R] 行主序的 T）。
+        // 通用设备端物化：使用 strided_copy kernel，不再回退到 CPU。
+        // 该路径覆盖所有步长布局（2D transpose、3D permute、非零 offset 等）。
         const int64_t     n       = numel();
         const std::size_t elem_sz = dtype_size(impl_->dtype);
         const std::size_t nbytes  = static_cast<std::size_t>(n) * elem_sz;
 
-        if (impl_->shape.size() == 2 && impl_->strides.size() == 2 && impl_->offset == 0 && impl_->strides[0] == 1 &&
-            impl_->strides[1] == impl_->shape[0]) {
-            const std::size_t rows_src       = static_cast<std::size_t>(impl_->shape[1]);
-            const std::size_t cols_src       = static_cast<std::size_t>(impl_->shape[0]);
-            auto              storage_result = Storage::allocate(nbytes, impl_->storage->allocator());
-            if (!storage_result)
-                return std::unexpected(std::move(storage_result.error()));
+        auto storage_result = Storage::allocate(nbytes, impl_->storage->allocator());
+        if (!storage_result)
+            return std::unexpected(std::move(storage_result.error()));
 
-            auto rc =
-                tensor::cuda::transpose_2d(static_cast<int>(impl_->dtype), impl_->storage->data(), (*storage_result)->data(), rows_src, cols_src);
-            if (!rc)
-                return std::unexpected(std::move(rc.error()));
+        auto rc = tensor::cuda::strided_copy(
+            static_cast<int>(impl_->dtype),
+            impl_->storage->data(),        // storage 基地址
+            (*storage_result)->data(),     // 连续目标缓冲
+            impl_->shape.data(),
+            impl_->strides.data(),
+            static_cast<int>(impl_->shape.size()),
+            impl_->offset,                 // 元素单位的 storage 偏移
+            static_cast<std::size_t>(n)
+        );
+        if (!rc)
+            return std::unexpected(std::move(rc.error()));
 
-            auto ti     = std::make_shared<TensorImpl>();
-            ti->storage = std::move(*storage_result);
-            ti->dtype   = impl_->dtype;
-            ti->shape   = impl_->shape;
-            ti->strides = compute_contiguous_strides(impl_->shape);
-            ti->offset  = 0;
-            return Tensor(std::move(ti));
-        }
-
-        // 通用回退：D2H → CPU 重排 → H2D。功能正确但非最优。
-        auto host_r = to(Device::CPU);
-        if (!host_r)
-            return std::unexpected(std::move(host_r.error()));
-        auto host_contig = host_r->contiguous();
-        if (!host_contig)
-            return std::unexpected(std::move(host_contig.error()));
-        return host_contig->to(Device::CUDA);
+        auto ti     = std::make_shared<TensorImpl>();
+        ti->storage = std::move(*storage_result);
+        ti->dtype   = impl_->dtype;
+        ti->shape   = impl_->shape;
+        ti->strides = compute_contiguous_strides(impl_->shape);
+        ti->offset  = 0;
+        return Tensor(std::move(ti));
     }
 
     const int64_t     n       = numel();

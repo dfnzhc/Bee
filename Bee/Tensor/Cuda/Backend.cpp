@@ -86,6 +86,12 @@ auto transpose_2d(int dt, const void* src, void* dst, std::size_t rows, std::siz
     return ::bee::cuda::ops::transpose_2d(static_cast<::bee::cuda::ScalarType>(dt), src, dst, rows, cols);
 }
 
+auto strided_copy(int dt, const void* src, void* dst, const int64_t* shape, const int64_t* strides, int ndim, int64_t offset_elements,
+                  std::size_t numel) -> Result<void>
+{
+    return ::bee::cuda::ops::strided_copy(static_cast<::bee::cuda::ScalarType>(dt), src, dst, shape, strides, ndim, offset_elements, numel);
+}
+
 auto random_uniform(int dt, void* dst, std::size_t n, std::uint64_t seed) -> Result<void>
 {
     return ::bee::cuda::ops::random_uniform(static_cast<::bee::cuda::ScalarType>(dt), dst, n, seed);
@@ -219,6 +225,11 @@ auto matmul(int, const void*, const void*, void*, std::size_t, std::size_t, std:
 auto transpose_2d(int, const void*, void*, std::size_t, std::size_t) -> Result<void>
 {
     return std::unexpected(make_error("CUDA 后端不可用：transpose_2d", Severity::Recoverable));
+}
+
+auto strided_copy(int, const void*, void*, const int64_t*, const int64_t*, int, int64_t, std::size_t) -> Result<void>
+{
+    return std::unexpected(make_error("CUDA 后端不可用：strided_copy", Severity::Recoverable));
 }
 
 auto random_uniform(int, void*, std::size_t, std::uint64_t) -> Result<void>

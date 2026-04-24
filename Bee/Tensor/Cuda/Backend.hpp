@@ -72,6 +72,10 @@ auto deallocate(void* p, std::size_t nbytes, std::size_t alignment) -> void;
 // 2D tiled-shared transpose：dst[i,j] = src[j,i]。
 [[nodiscard]] auto transpose_2d(int dt, const void* src, void* dst, std::size_t rows, std::size_t cols) -> Result<void>;
 
+// 通用 strided copy：将 src storage（基地址 + offset_elements）按 shape/strides 物化到连续 dst。
+[[nodiscard]] auto strided_copy(int dt, const void* src, void* dst, const int64_t* shape, const int64_t* strides, int ndim,
+                                int64_t offset_elements, std::size_t numel) -> Result<void>;
+
 // 设备侧随机数填充（Philox4x32-10）。dtype 仅 F32/F64。
 [[nodiscard]] auto random_uniform(int dt, void* dst, std::size_t n, std::uint64_t seed) -> Result<void>;
 [[nodiscard]] auto random_normal(int dt, void* dst, std::size_t n, std::uint64_t seed) -> Result<void>;
