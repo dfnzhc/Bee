@@ -227,11 +227,31 @@ __global__ void rand_int_kernel(T* __restrict__ out, std::size_t n, std::uint64_
         BEE_UNROLL
         for (int k = 0; k < 4; ++k) {
             if (idx + k < n) {
-                // 对 I64 / 大 range 也用 32-bit → modulo 收敛（MVP，够用）。
                 const std::uint32_t u = arr[k];
                 const std::uint64_t r = static_cast<std::uint64_t>(u) % range;
                 out[idx + k]          = static_cast<T>(static_cast<std::int64_t>(r) + low);
             }
+        }
+    }
+}
+
+__global__ void rand_int_i64_kernel(std::int64_t* __restrict__ out, std::size_t n, std::uint64_t seed, std::int64_t low, std::uint64_t range)
+{
+    const std::uint32_t tid    = blockIdx.x * blockDim.x + threadIdx.x;
+    const std::uint32_t stride = gridDim.x * blockDim.x;
+    for (std::uint32_t base = tid; base * 2u < n; base += stride) {
+        const auto          v   = philox_gen(seed, base, 2u);
+        const std::uint64_t lo  = (static_cast<std::uint64_t>(v.y) << 32) | v.x;
+        const std::uint64_t hi  = (static_cast<std::uint64_t>(v.w) << 32) | v.z;
+        const std::size_t   idx = static_cast<std::size_t>(base) * 2u;
+
+        if (idx + 0 < n) {
+            const std::uint64_t mapped = static_cast<std::uint64_t>(low) + (lo % range);
+            out[idx + 0]               = static_cast<std::int64_t>(mapped);
+        }
+        if (idx + 1 < n) {
+            const std::uint64_t mapped = static_cast<std::uint64_t>(low) + (hi % range);
+            out[idx + 1]               = static_cast<std::int64_t>(mapped);
         }
     }
 }
@@ -298,7 +318,7 @@ int ops_random_int(int dt, void* dst, std::size_t n, std::int64_t low, std::int6
         return 0;
     if (low >= high)
         return static_cast<int>(cudaErrorInvalidValue);
-    const std::uint64_t range  = static_cast<std::uint64_t>(high - low);
+    const std::uint64_t range  = static_cast<std::uint64_t>(high) - static_cast<std::uint64_t>(low);
     cudaStream_t        stream = cudaStreamPerThread;
     const unsigned int  grid   = compute_grid(4, n);
     if (dt == kDtU8) {
@@ -306,7 +326,8 @@ int ops_random_int(int dt, void* dst, std::size_t n, std::int64_t low, std::int6
     } else if (dt == kDtI32) {
         rand_int_kernel<std::int32_t><<<grid, kRandBlock, 0, stream>>>(static_cast<std::int32_t*>(dst), n, seed, low, range);
     } else if (dt == kDtI64) {
-        rand_int_kernel<std::int64_t><<<grid, kRandBlock, 0, stream>>>(static_cast<std::int64_t*>(dst), n, seed, low, range);
+        const unsigned int i64_grid = compute_grid(2, n);
+        rand_int_i64_kernel<<<i64_grid, kRandBlock, 0, stream>>>(static_cast<std::int64_t*>(dst), n, seed, low, range);
     } else {
         return static_cast<int>(cudaErrorInvalidValue);
     }

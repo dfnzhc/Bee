@@ -1,11 +1,12 @@
 /**
  * @File Ops/Matmul.cu
  * @Author dfnzhc (https://github.com/dfnzhc)
- * @Brief M5 baseline: tiled shared-memory GEMM (F32/F64/I32/I64).
+ * @Brief 通用 tiled shared-memory GEMM，实现 Bee::CUDA 的基础 matmul 路径。
  *
- * This is the L1 fallback referenced in plan-cuda §6. It is correct for all
- * shapes including non-multiples of TILE. CUTLASS / tcgen05.mma / TMA paths
- * live in separate TUs (M6/M7) and are not implemented here.
+ * 本文件承担所有设备都可用的 baseline 行为：
+ * - 支持 F32/F64/I32/I64；
+ * - 正确处理非 TILE 整倍数的边界；
+ * - 更高阶的 CUTLASS / Native(TMA) 路径放在独立 TU 中，由上层显式选择或自动回退。
  */
 
 #include "CUDA/Ops/OpsBridge.hpp"
@@ -73,8 +74,8 @@ namespace bee::cuda::detail
 int ops_matmul_f32_cutlass(const void* A, const void* B, void* C, std::size_t M, std::size_t K, std::size_t N, cudaStream_t stream) noexcept;
 #endif
 
-// 声明：实现在 MatmulTmaWmma.cu（B10：TMA + WMMA TF32 手写路径，sm_120 优化）
-// 仅 F32 且 M%128==N%128==K%32==0、A/B/C 16B 对齐时返回 0；否则返回 sentinel。
+// 声明：实现在 MatmulTmaWmma.cu。
+// 该路径当前仅对 Blackwell Native 后端开放；其余设备返回明确错误或由上层阻止进入。
 int ops_matmul_f32_tma_wmma(const void* A, const void* B, void* C, std::size_t M, std::size_t K, std::size_t N, cudaStream_t stream) noexcept;
 
 int ops_matmul_force_tma_wmma(int dt, const void* A, const void* B, void* C, std::size_t M, std::size_t K, std::size_t N) noexcept
@@ -97,9 +98,7 @@ int ops_matmul(int dt, const void* A, const void* B, void* C, std::size_t M, std
     cudaStream_t stream = cudaStreamPerThread;
     int          err    = 0;
 
-    // 优先级：
-    //  - F32 大尺寸（M,N ≥ 384）走 B8 CUTLASS TF32（峰值 ~35 TFLOPS @5070 Ti）
-    //  - 其余回退手写 tile kernel（B10 手写 TMA+WMMA 路径走 MatmulBackend::Native 显式入口）
+    // 自动路径优先尝试更高性能实现；若条件不满足，则稳定回退到 baseline kernel。
 #if BEE_HAS_CUTLASS
     if (dt == kDtF32 && M >= 384 && N >= 384 && K >= 32) {
         int cu_err = ops_matmul_f32_cutlass(A, B, C, M, K, N, stream);

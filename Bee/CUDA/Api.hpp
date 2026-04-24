@@ -138,17 +138,12 @@ namespace ops
     // 整数区间 [low, high)；dtype 支持 U8/I32/I64。
     [[nodiscard]] auto random_int(ScalarType dt, void* dst, std::size_t n, std::int64_t low, std::int64_t high, std::uint64_t seed) -> Result<void>;
 
-    // ── Matmul 后端切换（M6/M7 脚手架） ─────────────────────────────────────────
+    // ── Matmul 后端切换 ─────────────────────────────────────────────────────────
     //
-    // L1 = Wmma（当前实装的 tile-shared baseline；覆盖 F32/F64/I32/I64）
-    // L2 = Cutlass（CUTLASS 3.8+ Blackwell collective；FP16/BF16/FP8/FP4 优化路径）
-    // L3 = Native（手写 TMA + tcgen05.mma；F16/BF16/FP8 主路径）
-    //
-    // Auto：运行期根据设备算力与 dtype 自动选择；当前由于 L2/L3 未实装，
-    // Auto 等同 L1（Wmma）。
-    //
-    // L2/L3 当前 scaffolding 状态：set_matmul_backend(Cutlass/Native) 允许设置，
-    // 但 matmul() 调用对应后端时返回 NotImplemented；Auto 分支保持可用。
+    // Auto：按当前构建与当前设备能力自动选择可用实现。
+    // Wmma：通用 WMMA / baseline 路径，sm_70 及以上可用。
+    // Cutlass：依赖 CUTLASS 且要求当前设备具备对应矩阵乘能力。
+    // Native：当前指 Blackwell 专用的 TMA + WMMA F32 路径。
     enum class MatmulBackend : uint8_t
     {
         Auto    = 0,
@@ -163,7 +158,8 @@ namespace ops
     // 查询当前全局默认 matmul 后端。
     [[nodiscard]] auto get_matmul_backend() noexcept -> MatmulBackend;
 
-    // 查询后端是否在当前构建中可用（L2/L3 目前始终返回 false）。
+    // 查询后端在“当前构建 + 当前设备”组合下是否可用。
+    // 返回 false 代表当前构建未包含所需实现，或当前设备不具备该后端要求的硬件能力。
     [[nodiscard]] auto matmul_backend_available(MatmulBackend backend) noexcept -> bool;
 
 } // namespace ops

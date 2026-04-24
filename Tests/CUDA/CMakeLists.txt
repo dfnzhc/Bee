@@ -21,9 +21,12 @@ if(TARGET Bee::CUDA)
         target_sources(CUDA.Tests PRIVATE
             KernelTests.cu
             WarpBlockTests.cu
+            CastTests.cu
             ElementWiseTests.cu
             ReduceTests.cu
+            ReduceAxisTests.cu
             RandomTests.cu
+            TransposeTests.cu
         )
 
         set_target_properties(CUDA.Tests PROPERTIES

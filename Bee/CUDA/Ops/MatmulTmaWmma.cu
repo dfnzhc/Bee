@@ -1,31 +1,16 @@
 /**
  * @File Ops/MatmulTmaWmma.cu
  * @Author dfnzhc (https://github.com/dfnzhc)
- * @Brief B10：手写 TMA + WMMA TF32 F32 GEMM，针对 sm_120 (RTX 50 系) 优化。
+ * @Brief Native matmul 的 Blackwell 专用 TMA + WMMA F32 实现。
  *
- * 设计要点：
- * - 数据流：
- *   * Host 端用 driver API `cuTensorMapEncodeTiled` 为 A/B 各创建一个 2D `CUtensorMap`，
- *     通过 `__grid_constant__` 传入 kernel；
- *   * Kernel 中由 thread 0 触发 `cp.async.bulk.tensor.2d.shared::cluster.global`
- *     将 BM×BK / BK×BN tile 一次性载入 shared，配合 mbarrier 同步异步完成；
- *   * 计算阶段所有 warp 用 nvcuda::wmma TF32 fragment（m16n16k8）做 mma.sync。
- *
- * - Tile 配置：
- *   * Threadblock tile  BM×BN×BK = 128×128×32
- *   * 每 block 4 warps（2×2 warp grid），每 warp 处理 64×64 输出（4×4 m16n16 fragment）
- *   * 主 K 循环每 stage 4 个 m16n16k8 子积（K=32/8=4）
- *   * 流水线深度 STAGES=3，shared 用量 = 3 × 32 KB = 96 KB（>48 KB 默认上限，需
- *     `cudaFuncSetAttribute(cudaFuncAttributeMaxDynamicSharedMemorySize, ...)` 提升至 100 KB）
- *
- * - 触发条件：F32、M/N/K 分别是 BM/BN/BK 的倍数、A/B/C 设备指针 16B 对齐。
- *   任一不满足时返回非零 sentinel，由 Matmul.cu 回退到 CUTLASS 或手写 tile。
- *
- * - 与 B8 (CUTLASS 2.x Ampere TF32) 关系：并行存在；二者性能曲线在不同 size
- *   有差异（B10 主攻流水线/异步 supply，B8 是 cp.async.ca 路径）。
+ * 本文件只负责当前 Native 后端中依赖 TensorMap/TMA 的专用路径：
+ * - 设备侧使用 `ArchDispatch.cuh` 的能力宏裁剪 Blackwell 专属代码；
+ * - host 侧在当前设备不满足要求时返回明确错误；
+ * - 对 sm_89 等缺少 TMA 的设备暂不补实现，只保留 TODO 说明原因。
  */
 
-#include "Core/Check.cuh"
+#include "CUDA/Core/ArchDispatch.cuh"
+#include "CUDA/Core/Check.cuh"
 
 #include <cuda.h> // CUtensorMap 与 cuTensorMapEncodeTiled
 #include <cuda_runtime.h>
@@ -56,14 +41,14 @@ namespace
     constexpr int NUM_THREADS = NUM_WARPS * 32;    // 128
     constexpr int STAGES      = 3;
 
-    constexpr int FRAG_M = 16, FRAG_N = 16, FRAG_K = 8;
-    constexpr int FM_TILES = WM / FRAG_M; // 4
-    constexpr int FN_TILES = WN / FRAG_N; // 4
-    constexpr int FK_TILES = BK / FRAG_K; // 4
+    constexpr int FRAG_M   = 16;
+    constexpr int FRAG_N   = 16;
+    constexpr int FRAG_K   = 8;
+    [[maybe_unused]] constexpr int FM_TILES = WM / FRAG_M; // 4
+    [[maybe_unused]] constexpr int FN_TILES = WN / FRAG_N; // 4
+    [[maybe_unused]] constexpr int FK_TILES = BK / FRAG_K; // 4
 
-    // 单 stage 的 shared 布局：紧凑放置 A/B tile（无 padding）。
-    // load_matrix_sync 端会发生 bank conflict（约 10-15% smem 吞吐损失），
-    // 通过双缓冲 + 大量计算覆盖。
+    // 单个 stage 的 shared 布局：连续存放 A/B tile，不额外插入 padding。
     struct alignas(128) StageTile
     {
         float A[BM][BK];
@@ -71,6 +56,23 @@ namespace
     };
 
     constexpr int kStageBytes = sizeof(StageTile); // 32 KB
+
+    [[nodiscard]] auto current_device_supports_native_tma_wmma() noexcept -> bool
+    {
+        int dev = 0;
+        if (cudaGetDevice(&dev) != cudaSuccess) {
+            (void)cudaGetLastError();
+            return false;
+        }
+
+        cudaDeviceProp prop{};
+        if (cudaGetDeviceProperties(&prop, dev) != cudaSuccess) {
+            (void)cudaGetLastError();
+            return false;
+        }
+
+        return prop.major * 100 + prop.minor * 10 >= 1200;
+    }
 
     __global__ __launch_bounds__(NUM_THREADS, 1) void gemm_tma_wmma_tf32_kernel(
         const __grid_constant__ CUtensorMap tmap_a,
@@ -81,6 +83,7 @@ namespace
         int K
     )
     {
+#if BEE_CUDA_HAS_NATIVE_TMA_WMMA
         extern __shared__ __align__(128) std::uint8_t smem_raw[];
 
         StageTile* stages = reinterpret_cast<StageTile*>(smem_raw);
@@ -103,8 +106,7 @@ namespace
         const int tile_x  = blockIdx.x * BN; // N offset
         const int K_TILES = K / BK;
 
-        // tokens 在 register 中追踪每 stage 的 arrival_token。
-        // arrival_token 不可默认构造，使用 raw 字节缓冲规避，prologue/主循环必定在 wait 前赋值。
+        // arrival_token 不能默认构造，这里用原始字节缓冲延后原地构造。
         alignas(barrier::arrival_token) std::uint8_t token_buf[STAGES][sizeof(barrier::arrival_token)];
 
         auto token_at = [&](int s) -> barrier::arrival_token& {
@@ -112,8 +114,8 @@ namespace
         };
 
         auto issue_tma = [&](int kt, int stage) {
-            // A: [M,K] row-major，TMA dim0(fastest)=K, dim1=M；coord (k, y)
-            // B: [K,N] row-major，TMA dim0(fastest)=N, dim1=K；coord (x, k)
+            // A: [M, K] row-major，TMA 坐标为 (k, y)。
+            // B: [K, N] row-major，TMA 坐标为 (x, k)。
             if (threadIdx.x == 0) {
                 cde::cp_async_bulk_tensor_2d_global_to_shared(&stages[stage].A[0][0], &tmap_a, kt * BK, tile_y, bars[stage]);
                 cde::cp_async_bulk_tensor_2d_global_to_shared(&stages[stage].B[0][0], &tmap_b, tile_x, kt * BK, bars[stage]);
@@ -123,7 +125,7 @@ namespace
             }
         };
 
-        // ── Prologue：注入前 STAGES 个 K-tile 的 TMA 加载 ───────────────────
+        // Prologue：先填满流水线可容纳的 stage。
         const int prologue = K_TILES < STAGES ? K_TILES : STAGES;
         BEE_UNROLL
         for (int s = 0; s < STAGES; ++s) {
@@ -132,7 +134,7 @@ namespace
             }
         }
 
-        // ── 累加器初始化 ───────────────────────────────────────────────────
+        // 初始化每个 warp 负责的累加器分块。
         using namespace nvcuda::wmma;
         fragment<accumulator, FRAG_M, FRAG_N, FRAG_K, float> c_frag[FM_TILES][FN_TILES];
         BEE_UNROLL
@@ -143,7 +145,7 @@ namespace
             }
         }
 
-        // ── 主循环 ─────────────────────────────────────────────────────────
+        // 主循环：等待当前 stage 完成，然后执行对应 K 分块的 WMMA 累加。
         for (int kt = 0; kt < K_TILES; ++kt) {
             const int stage = kt % STAGES;
 
@@ -181,14 +183,14 @@ namespace
                 }
             }
 
-            // 流水线尾部预取
+            // 维持固定深度流水线，按需把下一个 K 分块注入当前 stage。
             const int next_kt = kt + STAGES;
             if (next_kt < K_TILES) {
                 issue_tma(next_kt, stage);
             }
         }
 
-        // ── 写回 C ─────────────────────────────────────────────────────────
+        // 写回当前 block 覆盖的 C 子块。
         BEE_UNROLL
         for (int i = 0; i < FM_TILES; ++i) {
             BEE_UNROLL
@@ -198,11 +200,20 @@ namespace
                 store_matrix_sync(&C[crow * N + ccol], c_frag[i][j], N, mem_row_major);
             }
         }
+#else
+        (void)tmap_a;
+        (void)tmap_b;
+        (void)C;
+        (void)M;
+        (void)N;
+        (void)K;
+#endif
     }
 
-    // ── Host：CUtensorMap 构造 ─────────────────────────────────────────────
-    // row-major matrix [outer][inner]：dim0(fastest)=inner，dim1=outer
-    // stride 数组长度 = rank-1，单位字节，描述 dim>=1 的步长。
+    // 构造二维 row-major TensorMap：
+    // - dim0（最快变化维）对应 inner；
+    // - dim1 对应 outer；
+    // - stride 数组长度为 rank - 1，单位为字节。
     inline CUresult make_tensor_map_2d(
         CUtensorMap&  out,
         const float*  base,
@@ -243,7 +254,13 @@ namespace
 
 int ops_matmul_f32_tma_wmma(const void* A, const void* B, void* C, std::size_t M, std::size_t K, std::size_t N, cudaStream_t stream) noexcept
 {
-    // 触发条件检查：尺寸对齐 + 指针 16B 对齐
+    if (!current_device_supports_native_tma_wmma()) {
+        // TODO(df): Ada(sm_89) 缺少当前实现依赖的 TensorMap/TMA 搬运能力。
+        // 后续若补 Ada 专用 Native kernel，应在此处按能力继续细分。
+        return static_cast<int>(cudaErrorNotSupported);
+    }
+
+    // 仅接受当前 Blackwell Native kernel 已验证的规整形状与对齐约束。
     if ((M % BM) != 0 || (N % BN) != 0 || (K % BK) != 0) {
         return 1;
     }

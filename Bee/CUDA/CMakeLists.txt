@@ -8,7 +8,7 @@ endif ()
 
 enable_language(CUDA)
 
-# 单一目标架构：sm_120（Blackwell, RTX 50 系列）。plan-cuda §4 规定。
+# 同时产出 Ada(sm_89) 与 Blackwell(sm_120) 镜像，便于在两代设备上验证能力分层。
 # 以 CACHE 方式发布，使 Tests/CUDA/ 等同级目录同样可见。
 set(CMAKE_CUDA_ARCHITECTURES "89;120" CACHE STRING "Bee::CUDA target architectures" FORCE)
 

@@ -6,6 +6,8 @@
 
 #include <gtest/gtest.h>
 
+#include <cuda_runtime.h>
+
 #include <cstdint>
 #include <vector>
 #include <cmath>
@@ -135,12 +137,24 @@ TEST(CUDAMatmulBackend, DefaultIsAuto)
     cuda::ops::set_matmul_backend(prev);
 }
 
-TEST(CUDAMatmulBackend, AvailabilityReflectsBuildStatus)
+TEST(CUDAMatmulBackend, AvailabilityReflectsCurrentDevice)
 {
     EXPECT_TRUE(cuda::ops::matmul_backend_available(cuda::ops::MatmulBackend::Auto));
-    EXPECT_TRUE(cuda::ops::matmul_backend_available(cuda::ops::MatmulBackend::Wmma));
-    EXPECT_FALSE(cuda::ops::matmul_backend_available(cuda::ops::MatmulBackend::Cutlass));
-    EXPECT_TRUE(cuda::ops::matmul_backend_available(cuda::ops::MatmulBackend::Native));
+
+    if (cuda::device_count() <= 0) {
+        EXPECT_FALSE(cuda::ops::matmul_backend_available(cuda::ops::MatmulBackend::Wmma));
+        EXPECT_FALSE(cuda::ops::matmul_backend_available(cuda::ops::MatmulBackend::Cutlass));
+        EXPECT_FALSE(cuda::ops::matmul_backend_available(cuda::ops::MatmulBackend::Native));
+        return;
+    }
+
+    cudaDeviceProp prop{};
+    ASSERT_EQ(cudaGetDeviceProperties(&prop, 0), cudaSuccess);
+    const int arch = prop.major * 100 + prop.minor * 10;
+
+    EXPECT_EQ(cuda::ops::matmul_backend_available(cuda::ops::MatmulBackend::Wmma), arch >= 700);
+    EXPECT_EQ(cuda::ops::matmul_backend_available(cuda::ops::MatmulBackend::Cutlass), cuda::has_cutlass() && arch >= 700);
+    EXPECT_EQ(cuda::ops::matmul_backend_available(cuda::ops::MatmulBackend::Native), arch >= 1200);
 }
 
 TEST(CUDAMatmulBackend, SetReturnsPrevious)
@@ -175,29 +189,56 @@ TEST(CUDAMatmulBackend, CutlassReturnsNotImplemented)
     cuda::deallocate(C, 4 * 4 * sizeof(float), 16);
 }
 
+TEST(CUDAMatmulBackend, NativeReportsUnsupportedWhenDeviceLacksRequiredCapability)
+{
+    if (cuda::device_count() == 0)
+        GTEST_SKIP() << "No CUDA device";
+    if (cuda::ops::matmul_backend_available(cuda::ops::MatmulBackend::Native))
+        GTEST_SKIP() << "Native backend is available on current device";
+
+    auto A = cuda::allocate(4 * 4 * sizeof(float), 16).value();
+    auto B = cuda::allocate(4 * 4 * sizeof(float), 16).value();
+    auto C = cuda::allocate(4 * 4 * sizeof(float), 16).value();
+
+    const auto prev = cuda::ops::set_matmul_backend(cuda::ops::MatmulBackend::Native);
+    auto       r    = cuda::ops::matmul(cuda::ScalarType::F32, A, B, C, 4, 4, 4);
+    cuda::ops::set_matmul_backend(prev);
+    ASSERT_FALSE(r);
+    EXPECT_EQ(r.error().errc, static_cast<int>(cudaErrorNotSupported));
+
+    cuda::deallocate(A, 4 * 4 * sizeof(float), 16);
+    cuda::deallocate(B, 4 * 4 * sizeof(float), 16);
+    cuda::deallocate(C, 4 * 4 * sizeof(float), 16);
+}
+
 // B10：Native 后端 = TMA + WMMA TF32 路径（要求严格对齐）
 TEST(CUDAMatmulBackend, NativeTmaWmmaProducesCorrectResult)
 {
     if (cuda::device_count() == 0)
         GTEST_SKIP() << "No CUDA device";
+    if (!cuda::ops::matmul_backend_available(cuda::ops::MatmulBackend::Native))
+        GTEST_SKIP() << "Native backend is unavailable on current device";
 
     constexpr std::size_t M = 128, K = 32, N = 128;
-    const std::size_t bytes_a = M * K * sizeof(float);
-    const std::size_t bytes_b = K * N * sizeof(float);
-    const std::size_t bytes_c = M * N * sizeof(float);
+    const std::size_t     bytes_a = M * K * sizeof(float);
+    const std::size_t     bytes_b = K * N * sizeof(float);
+    const std::size_t     bytes_c = M * N * sizeof(float);
 
     auto dA = cuda::allocate(bytes_a, 128).value();
     auto dB = cuda::allocate(bytes_b, 128).value();
     auto dC = cuda::allocate(bytes_c, 128).value();
 
     std::vector<float> hA(M * K), hB(K * N), hC(M * N), hRef(M * N, 0.0f);
-    for (std::size_t i = 0; i < hA.size(); ++i) hA[i] = static_cast<float>((i % 7) - 3) * 0.125f;
-    for (std::size_t i = 0; i < hB.size(); ++i) hB[i] = static_cast<float>((i % 5) - 2) * 0.25f;
+    for (std::size_t i = 0; i < hA.size(); ++i)
+        hA[i] = static_cast<float>((i % 7) - 3) * 0.125f;
+    for (std::size_t i = 0; i < hB.size(); ++i)
+        hB[i] = static_cast<float>((i % 5) - 2) * 0.25f;
 
     for (std::size_t m = 0; m < M; ++m)
         for (std::size_t n = 0; n < N; ++n) {
             float s = 0.0f;
-            for (std::size_t k = 0; k < K; ++k) s += hA[m * K + k] * hB[k * N + n];
+            for (std::size_t k = 0; k < K; ++k)
+                s += hA[m * K + k] * hB[k * N + n];
             hRef[m * N + n] = s;
         }
 
@@ -224,6 +265,8 @@ TEST(CUDAMatmulBackend, NativeTmaWmmaRejectsUnaligned)
 {
     if (cuda::device_count() == 0)
         GTEST_SKIP() << "No CUDA device";
+    if (!cuda::ops::matmul_backend_available(cuda::ops::MatmulBackend::Native))
+        GTEST_SKIP() << "Native backend is unavailable on current device";
     auto A = cuda::allocate(4 * 4 * sizeof(float), 16).value();
     auto B = cuda::allocate(4 * 4 * sizeof(float), 16).value();
     auto C = cuda::allocate(4 * 4 * sizeof(float), 16).value();

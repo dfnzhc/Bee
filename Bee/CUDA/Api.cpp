@@ -63,6 +63,37 @@ namespace
         );
     }
 
+    [[nodiscard]] auto current_device_arch_code() noexcept -> int
+    {
+        int count = 0;
+        if (detail::runtime_get_device_count(&count) != 0 || count <= 0)
+            return 0;
+
+        int dev = 0;
+        if (cudaGetDevice(&dev) != cudaSuccess) {
+            (void)cudaGetLastError();
+            return 0;
+        }
+
+        cudaDeviceProp prop{};
+        if (cudaGetDeviceProperties(&prop, dev) != cudaSuccess) {
+            (void)cudaGetLastError();
+            return 0;
+        }
+
+        return prop.major * 100 + prop.minor * 10;
+    }
+
+    [[nodiscard]] auto current_device_has_wmma() noexcept -> bool
+    {
+        return current_device_arch_code() >= 700;
+    }
+
+    [[nodiscard]] auto current_device_has_native_tma_wmma() noexcept -> bool
+    {
+        return current_device_arch_code() >= 1200;
+    }
+
 } // namespace
 
 auto set_device(int device_index) -> Result<void>
@@ -238,6 +269,8 @@ namespace ops
         switch (backend) {
         case MatmulBackend::Cutlass: return std::unexpected(make_error("cuda::ops::matmul: Cutlass 后端尚未暴露（Auto 已自动启用）", Severity::Recoverable));
         case MatmulBackend::Native: {
+            if (!current_device_has_native_tma_wmma())
+                return std::unexpected(make_error("cuda::ops::matmul[Native:TMA+WMMA]: 当前设备不支持该后端", Severity::Recoverable, static_cast<int>(cudaErrorNotSupported)));
             const int err = detail::ops_matmul_force_tma_wmma(static_cast<int>(dt), A, B, C, M, K, N);
             return wrap(err, "cuda::ops::matmul[Native:TMA+WMMA]");
         }
@@ -310,10 +343,10 @@ namespace ops
     auto matmul_backend_available(MatmulBackend backend) noexcept -> bool
     {
         switch (backend) {
-        case MatmulBackend::Auto: return true; // 退化到 Wmma
-        case MatmulBackend::Wmma: return true;
-        case MatmulBackend::Cutlass: return false; // 由 Auto 内部启用，不独立暴露
-        case MatmulBackend::Native: return true;   // B10：TMA + WMMA TF32 路径
+        case MatmulBackend::Auto: return true;
+        case MatmulBackend::Wmma: return current_device_has_wmma();
+        case MatmulBackend::Cutlass: return has_cutlass() && current_device_has_wmma();
+        case MatmulBackend::Native: return current_device_has_native_tma_wmma();
         }
         return false;
     }
