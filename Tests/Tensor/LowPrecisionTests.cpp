@@ -116,3 +116,84 @@ TEST(LowPrecisionTests, FullWithBF16CreatesCorrectTensor)
     const auto* p = static_cast<const float*>(f32.data_ptr());
     EXPECT_NEAR(p[0], 2.5f, 1e-2f);
 }
+
+// ── promote_types 规则 ───────────────────────────────────────────────────────
+
+TEST(LowPrecisionTests, PromoteTypesF16PlusBF16IsF32)
+{
+    // F16 与 BF16 混合 → 无论何种算子均提升到 F32
+    EXPECT_EQ(bee::promote_types(bee::DType::F16, bee::DType::BF16, bee::DTypeOpKind::ElementWise), bee::DType::F32);
+    EXPECT_EQ(bee::promote_types(bee::DType::BF16, bee::DType::F16, bee::DTypeOpKind::ElementWise), bee::DType::F32);
+    EXPECT_EQ(bee::promote_types(bee::DType::F16, bee::DType::BF16, bee::DTypeOpKind::Matmul), bee::DType::F32);
+}
+
+TEST(LowPrecisionTests, PromoteTypesSameF16ElementWiseKeepsF16)
+{
+    // 相同类型 + ElementWise → 保持原类型
+    EXPECT_EQ(bee::promote_types(bee::DType::F16, bee::DType::F16, bee::DTypeOpKind::ElementWise), bee::DType::F16);
+    EXPECT_EQ(bee::promote_types(bee::DType::BF16, bee::DType::BF16, bee::DTypeOpKind::ElementWise), bee::DType::BF16);
+}
+
+TEST(LowPrecisionTests, PromoteTypesSameF16MatmulAccumulatesToF32)
+{
+    // 相同类型 + Matmul → F16/BF16 累加到 F32
+    EXPECT_EQ(bee::promote_types(bee::DType::F16, bee::DType::F16, bee::DTypeOpKind::Matmul), bee::DType::F32);
+    EXPECT_EQ(bee::promote_types(bee::DType::BF16, bee::DType::BF16, bee::DTypeOpKind::Matmul), bee::DType::F32);
+}
+
+TEST(LowPrecisionTests, PromoteTypesF16WithF32IsF32)
+{
+    // F16/BF16 与 F32 混合 → F32
+    EXPECT_EQ(bee::promote_types(bee::DType::F16, bee::DType::F32, bee::DTypeOpKind::ElementWise), bee::DType::F32);
+    EXPECT_EQ(bee::promote_types(bee::DType::F32, bee::DType::BF16, bee::DTypeOpKind::ElementWise), bee::DType::F32);
+}
+
+TEST(LowPrecisionTests, PromoteTypesIntegerHierarchy)
+{
+    // 整型提升：I64 > I32 > U8/I8
+    EXPECT_EQ(bee::promote_types(bee::DType::I32, bee::DType::I64, bee::DTypeOpKind::ElementWise), bee::DType::I64);
+    EXPECT_EQ(bee::promote_types(bee::DType::U8, bee::DType::I32, bee::DTypeOpKind::ElementWise), bee::DType::I32);
+    EXPECT_EQ(bee::promote_types(bee::DType::I32, bee::DType::I32, bee::DTypeOpKind::ElementWise), bee::DType::I32);
+}
+
+// ── CUDA 上 F16/BF16 cast（CPU 参考过渡路径）────────────────────────────────
+
+TEST(LowPrecisionTests, CudaCastF32ToF16ViaFallback)
+{
+    // 若无 CUDA，跳过；有 CUDA 时验证 F32→F16 过渡路径
+    if (!bee::tensor::cuda::is_available())
+        GTEST_SKIP() << "CUDA 不可用，跳过 CUDA low-precision cast 测试";
+
+    auto src_cpu = bee::Tensor::full({4}, bee::DType::F32, 2.0).value();
+    auto src_gpu = src_cpu.to(bee::Device::CUDA).value();
+
+    // 在 CUDA 张量上 cast 到 F16（走 CPU 参考过渡路径）
+    auto f16_gpu = bee::cast(src_gpu, bee::DType::F16).value();
+    EXPECT_EQ(f16_gpu.dtype(), bee::DType::F16);
+    EXPECT_EQ(f16_gpu.device(), bee::Device::CUDA);
+
+    // 搬回 CPU 验证值
+    auto f16_cpu  = f16_gpu.to(bee::Device::CPU).value();
+    auto back_f32 = bee::cast(f16_cpu, bee::DType::F32).value();
+    const auto* p = static_cast<const float*>(back_f32.data_ptr());
+    EXPECT_NEAR(p[0], 2.0f, 1e-3f);
+    EXPECT_NEAR(p[3], 2.0f, 1e-3f);
+}
+
+TEST(LowPrecisionTests, CudaCastF32ToBF16ViaFallback)
+{
+    if (!bee::tensor::cuda::is_available())
+        GTEST_SKIP() << "CUDA 不可用，跳过 CUDA low-precision cast 测试";
+
+    auto src_cpu = bee::Tensor::full({4}, bee::DType::F32, 3.5).value();
+    auto src_gpu = src_cpu.to(bee::Device::CUDA).value();
+
+    auto bf16_gpu = bee::cast(src_gpu, bee::DType::BF16).value();
+    EXPECT_EQ(bf16_gpu.dtype(), bee::DType::BF16);
+    EXPECT_EQ(bf16_gpu.device(), bee::Device::CUDA);
+
+    auto bf16_cpu = bf16_gpu.to(bee::Device::CPU).value();
+    auto back_f32 = bee::cast(bf16_cpu, bee::DType::F32).value();
+    const auto* p = static_cast<const float*>(back_f32.data_ptr());
+    EXPECT_NEAR(p[0], 3.5f, 1e-2f);
+}
