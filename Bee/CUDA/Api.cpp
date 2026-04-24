@@ -16,6 +16,7 @@
 
 #include <cuda_runtime.h>
 
+#include <array>
 #include <atomic>
 #include <format>
 
@@ -431,20 +432,78 @@ auto wait_event(void* event_handle, void* stream) -> Result<void>
     return {};
 }
 
+namespace
+{
+    // 最小 workspace registry：按 device 持有单一缓存块。
+    // 所有权：runtime-owned，调用方不负责 free。
+    // 生命周期：静态对象析构时释放；进程期间可复用。
+    struct WorkspaceRegistry
+    {
+        struct Slot
+        {
+            void*       ptr      = nullptr;
+            std::size_t capacity = 0;
+        };
+
+        std::array<Slot, 16> slots{}; // 最多支持 16 个 device
+
+        ~WorkspaceRegistry()
+        {
+            for (auto& slot : slots) {
+                if (slot.ptr) {
+                    (void)cudaFree(slot.ptr);
+                    slot.ptr = nullptr;
+                }
+            }
+        }
+
+        [[nodiscard]] auto get_or_grow(int device, std::size_t nbytes) -> Result<void*>
+        {
+            if (device < 0 || device >= static_cast<int>(slots.size()))
+                return std::unexpected(make_error("workspace: device index out of range", Severity::Recoverable));
+
+            auto& slot = slots[static_cast<std::size_t>(device)];
+
+            // 容量足够，直接复用
+            if (slot.ptr && slot.capacity >= nbytes)
+                return slot.ptr;
+
+            // 容量不足或首次分配：释放旧缓存，重新分配更大块
+            if (slot.ptr) {
+                (void)cudaFree(slot.ptr);
+                slot.ptr      = nullptr;
+                slot.capacity = 0;
+            }
+
+            void* new_ptr = nullptr;
+            BEE_CUDA_CHECK(cudaMalloc(&new_ptr, nbytes));
+            slot.ptr      = new_ptr;
+            slot.capacity = nbytes;
+            return new_ptr;
+        }
+    };
+
+    WorkspaceRegistry& get_workspace_registry() noexcept
+    {
+        static WorkspaceRegistry reg;
+        return reg;
+    }
+
+} // namespace
+
 auto request_workspace(std::size_t nbytes, void* stream) -> Result<void*>
 {
-    // Task 2 最小实现：直接用 cudaMalloc 分配临时 workspace。
-    // 后续 Task 可引入池化与生命周期管理。
+    // runtime-owned workspace：返回的指针由 runtime 持有，调用方无需也不应 free。
+    // 生命周期：至少持续到进程结束；同一 device 的多次请求可能返回同一指针（当容量足够时）。
     if (nbytes == 0)
         return static_cast<void*>(nullptr);
 
     (void)stream; // 当前暂不使用 stream 参数
 
-    void* ptr = nullptr;
-    BEE_CUDA_CHECK(cudaMalloc(&ptr, nbytes));
-    // 注意：此实现未管理生命周期，调用方需自行 cudaFree 或依赖运行时清理。
-    // Task 2 暂时容忍此泄漏风险，Task 3/4 将完善生命周期管理。
-    return ptr;
+    int dev = 0;
+    BEE_CUDA_CHECK(cudaGetDevice(&dev));
+
+    return get_workspace_registry().get_or_grow(dev, nbytes);
 }
 
 } // namespace bee::cuda

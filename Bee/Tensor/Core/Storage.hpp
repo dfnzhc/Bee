@@ -35,6 +35,9 @@ public:
     // 静态工厂：委托 allocator 分配内存，返回 shared_ptr<Storage>
     [[nodiscard]] static auto allocate(std::size_t nbytes, IAllocator& allocator) -> Result<std::shared_ptr<Storage>>;
 
+    // 静态工厂（显式指定 memory kind）：支持创建 HostPinned 等特殊语义 Storage
+    [[nodiscard]] static auto allocate(std::size_t nbytes, IAllocator& allocator, MemoryKind memory_kind) -> Result<std::shared_ptr<Storage>>;
+
     [[nodiscard]] auto data() noexcept -> void*;
     [[nodiscard]] auto data() const noexcept -> const void*;
     [[nodiscard]] auto nbytes() const noexcept -> std::size_t;

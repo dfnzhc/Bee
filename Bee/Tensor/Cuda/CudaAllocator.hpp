@@ -54,10 +54,19 @@ inline auto CudaAllocator::allocate(std::size_t nbytes, std::size_t alignment) -
 
 inline auto CudaAllocator::allocate_for(CudaAllocKind kind, std::size_t nbytes, std::size_t alignment) -> Result<void*>
 {
-    // 转发至 Tensor/CUDA 桥接层，再由其决定进入真实 CUDA 后端或返回可恢复错误。
-    // 当前 workspace 与 device 统一走 tensor::cuda::allocate；后续可分流。
-    (void)kind; // suppress unused warning
-    return tensor::cuda::allocate(nbytes, alignment);
+    // 根据 kind 实现真实分支语义：
+    // - Device: 常规设备内存，经由池化分配器
+    // - Workspace: runtime-owned 工作区，不适用于常规 deallocate 生命周期
+    switch (kind) {
+    case CudaAllocKind::Device:
+        return tensor::cuda::allocate(nbytes, alignment);
+    case CudaAllocKind::Workspace:
+        // workspace 由 runtime 持有，调用方无需 free。
+        // 注意：此路径返回的指针不应传递给 CudaAllocator::deallocate。
+        return tensor::cuda::request_workspace(nbytes, nullptr);
+    default:
+        return tensor::cuda::allocate(nbytes, alignment);
+    }
 }
 
 inline auto CudaAllocator::deallocate(void* p, std::size_t nbytes, std::size_t alignment) noexcept -> void
