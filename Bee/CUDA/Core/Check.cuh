@@ -18,6 +18,7 @@
 #pragma once
 
 #include <cuda_runtime.h>
+#include "Base/Core/Defines.hpp"
 
 // Execute expr. If it returns non-cudaSuccess, return its cudaError_t (cast to int).
 // Caller function must have `int` return type (or compatible).

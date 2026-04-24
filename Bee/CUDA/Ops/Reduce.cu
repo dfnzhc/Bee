@@ -138,8 +138,9 @@ __global__ void reduce_global_kernel(const T* __restrict__ src, T* __restrict__ 
     const std::size_t stride = static_cast<std::size_t>(blockDim.x) * gridDim.x;
 
     // Grid-stride accumulate, unrolled by 4 to hide memory latency.
-    T        acc = R::identity();
-    std::size_t i = static_cast<std::size_t>(blockIdx.x) * blockDim.x + tid;
+    T           acc = R::identity();
+    std::size_t i   = static_cast<std::size_t>(blockIdx.x) * blockDim.x + tid;
+
     const std::size_t stride4 = stride * 4;
     for (; i + stride4 <= n; i += stride4) {
         acc = R::combine(acc, src[i]);

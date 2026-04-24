@@ -42,7 +42,7 @@ __global__ void matmul_tiled_kernel(const T* __restrict__ A, const T* __restrict
         Bs[threadIdx.y][threadIdx.x] = (b_row < K && col < N) ? B[b_row * N + col] : T(0);
         __syncthreads();
 
-#pragma unroll
+        BEE_UNROLL
         for (int k = 0; k < TILE; ++k) {
             acc += As[threadIdx.y][k] * Bs[k][threadIdx.x];
         }
@@ -70,26 +70,21 @@ namespace bee::cuda::detail
 
 #if BEE_HAS_CUTLASS
 // 声明：实现在 MatmulCutlass.cu
-int ops_matmul_f32_cutlass(const void* A, const void* B, void* C,
-                           std::size_t M, std::size_t K, std::size_t N,
-                           cudaStream_t stream) noexcept;
+int ops_matmul_f32_cutlass(const void* A, const void* B, void* C, std::size_t M, std::size_t K, std::size_t N, cudaStream_t stream) noexcept;
 #endif
 
 // 声明：实现在 MatmulTmaWmma.cu（B10：TMA + WMMA TF32 手写路径，sm_120 优化）
 // 仅 F32 且 M%128==N%128==K%32==0、A/B/C 16B 对齐时返回 0；否则返回 sentinel。
-int ops_matmul_f32_tma_wmma(const void* A, const void* B, void* C,
-                            std::size_t M, std::size_t K, std::size_t N,
-                            cudaStream_t stream) noexcept;
+int ops_matmul_f32_tma_wmma(const void* A, const void* B, void* C, std::size_t M, std::size_t K, std::size_t N, cudaStream_t stream) noexcept;
 
-int ops_matmul_force_tma_wmma(int dt, const void* A, const void* B, void* C,
-                              std::size_t M, std::size_t K, std::size_t N) noexcept
+int ops_matmul_force_tma_wmma(int dt, const void* A, const void* B, void* C, std::size_t M, std::size_t K, std::size_t N) noexcept
 {
     if (M == 0 || N == 0)
         return 0;
     if (dt != kDtF32)
         return static_cast<int>(cudaErrorInvalidValue);
     cudaStream_t stream = cudaStreamPerThread;
-    int rc = ops_matmul_f32_tma_wmma(A, B, C, M, K, N, stream);
+    int          rc     = ops_matmul_f32_tma_wmma(A, B, C, M, K, N, stream);
     if (rc != 0)
         return rc;
     return static_cast<int>(cudaStreamSynchronize(stream));

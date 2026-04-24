@@ -143,4 +143,3 @@ int ops_transpose_2d(int dt, const void* src, void* dst, std::size_t rows, std::
 }
 
 } // namespace bee::cuda::detail
-

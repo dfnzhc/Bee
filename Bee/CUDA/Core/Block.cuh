@@ -57,10 +57,10 @@ struct BlockReduce
     // 把 kNumWarps 向上取整到 2 的幂，用于第二阶段 shuffle reduce 的 width。
     // 这样可以在 lane >= kNumWarps 注入 identity 后安全 reduce，避免对超出部分
     // 做多余 shuffle 轮数。
-    static constexpr int kAggrWidthP2 = []() constexpr
-    {
+    static constexpr int kAggrWidthP2 = []() constexpr {
         int w = 1;
-        while (w < kNumWarps) w <<= 1;
+        while (w < kNumWarps)
+            w <<= 1;
         return w;
     }();
 

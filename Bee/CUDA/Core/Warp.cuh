@@ -198,8 +198,7 @@ __device__ __forceinline__ auto warp_reduce_min(T value, int width = kWarpSize, 
         if (width == static_cast<int>(kWarpSize) && mask == kFullMask32) {
             return static_cast<T>(__reduce_min_sync(mask, static_cast<int>(value)));
         }
-    }
-    else if constexpr (std::is_same_v<T, unsigned int>) {
+    } else if constexpr (std::is_same_v<T, unsigned int>) {
         if (width == static_cast<int>(kWarpSize) && mask == kFullMask32) {
             return static_cast<T>(__reduce_min_sync(mask, static_cast<unsigned int>(value)));
         }
@@ -214,8 +213,7 @@ __device__ __forceinline__ auto warp_reduce_max(T value, int width = kWarpSize, 
         if (width == static_cast<int>(kWarpSize) && mask == kFullMask32) {
             return static_cast<T>(__reduce_max_sync(mask, static_cast<int>(value)));
         }
-    }
-    else if constexpr (std::is_same_v<T, unsigned int>) {
+    } else if constexpr (std::is_same_v<T, unsigned int>) {
         if (width == static_cast<int>(kWarpSize) && mask == kFullMask32) {
             return static_cast<T>(__reduce_max_sync(mask, static_cast<unsigned int>(value)));
         }

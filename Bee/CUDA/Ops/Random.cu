@@ -73,7 +73,7 @@ __device__ __forceinline__ U32x4 philox4x32_10(U32x4 ctr, U32x2 key)
 {
     U32x4 c = ctr;
     U32x2 k = key;
-#pragma unroll
+    BEE_UNROLL
     for (int i = 0; i < 10; ++i) {
         c   = philox4x32_round(c, k);
         k.x = k.x + kPhiloxW0;
@@ -138,100 +138,112 @@ __device__ __forceinline__ void box_muller_f64(double u1, double u2, double& z0,
 
 __global__ void rand_uniform_f32_kernel(float* __restrict__ out, std::size_t n, std::uint64_t seed)
 {
-    const std::uint32_t tid = blockIdx.x * blockDim.x + threadIdx.x;
+    const std::uint32_t tid    = blockIdx.x * blockDim.x + threadIdx.x;
     const std::uint32_t stride = gridDim.x * blockDim.x;
     for (std::uint32_t base = tid; base * 4u < n; base += stride) {
-        const auto v = philox_gen(seed, base, 0u);
+        const auto        v   = philox_gen(seed, base, 0u);
         const std::size_t idx = static_cast<std::size_t>(base) * 4u;
-        if (idx + 0 < n) out[idx + 0] = u32_to_f32(v.x);
-        if (idx + 1 < n) out[idx + 1] = u32_to_f32(v.y);
-        if (idx + 2 < n) out[idx + 2] = u32_to_f32(v.z);
-        if (idx + 3 < n) out[idx + 3] = u32_to_f32(v.w);
+        if (idx + 0 < n)
+            out[idx + 0] = u32_to_f32(v.x);
+        if (idx + 1 < n)
+            out[idx + 1] = u32_to_f32(v.y);
+        if (idx + 2 < n)
+            out[idx + 2] = u32_to_f32(v.z);
+        if (idx + 3 < n)
+            out[idx + 3] = u32_to_f32(v.w);
     }
 }
 
 __global__ void rand_uniform_f64_kernel(double* __restrict__ out, std::size_t n, std::uint64_t seed)
 {
-    const std::uint32_t tid = blockIdx.x * blockDim.x + threadIdx.x;
+    const std::uint32_t tid    = blockIdx.x * blockDim.x + threadIdx.x;
     const std::uint32_t stride = gridDim.x * blockDim.x;
     for (std::uint32_t base = tid; base * 2u < n; base += stride) {
-        const auto v = philox_gen(seed, base, 0u);
-        const std::uint64_t lo = (static_cast<std::uint64_t>(v.y) << 32) | v.x;
-        const std::uint64_t hi = (static_cast<std::uint64_t>(v.w) << 32) | v.z;
-        const std::size_t idx = static_cast<std::size_t>(base) * 2u;
-        if (idx + 0 < n) out[idx + 0] = u64_to_f64(lo);
-        if (idx + 1 < n) out[idx + 1] = u64_to_f64(hi);
+        const auto          v   = philox_gen(seed, base, 0u);
+        const std::uint64_t lo  = (static_cast<std::uint64_t>(v.y) << 32) | v.x;
+        const std::uint64_t hi  = (static_cast<std::uint64_t>(v.w) << 32) | v.z;
+        const std::size_t   idx = static_cast<std::size_t>(base) * 2u;
+        if (idx + 0 < n)
+            out[idx + 0] = u64_to_f64(lo);
+        if (idx + 1 < n)
+            out[idx + 1] = u64_to_f64(hi);
     }
 }
 
 __global__ void rand_normal_f32_kernel(float* __restrict__ out, std::size_t n, std::uint64_t seed)
 {
-    const std::uint32_t tid = blockIdx.x * blockDim.x + threadIdx.x;
+    const std::uint32_t tid    = blockIdx.x * blockDim.x + threadIdx.x;
     const std::uint32_t stride = gridDim.x * blockDim.x;
     for (std::uint32_t base = tid; base * 4u < n; base += stride) {
-        const auto v = philox_gen(seed, base, 1u); // subseq=1 与 uniform 分流
+        const auto  v  = philox_gen(seed, base, 1u); // subseq=1 与 uniform 分流
         const float u0 = u32_to_f32(v.x);
         const float u1 = u32_to_f32(v.y);
         const float u2 = u32_to_f32(v.z);
         const float u3 = u32_to_f32(v.w);
-        float z0, z1, z2, z3;
+        float       z0, z1, z2, z3;
         box_muller_f32(u0, u1, z0, z1);
         box_muller_f32(u2, u3, z2, z3);
         const std::size_t idx = static_cast<std::size_t>(base) * 4u;
-        if (idx + 0 < n) out[idx + 0] = z0;
-        if (idx + 1 < n) out[idx + 1] = z1;
-        if (idx + 2 < n) out[idx + 2] = z2;
-        if (idx + 3 < n) out[idx + 3] = z3;
+        if (idx + 0 < n)
+            out[idx + 0] = z0;
+        if (idx + 1 < n)
+            out[idx + 1] = z1;
+        if (idx + 2 < n)
+            out[idx + 2] = z2;
+        if (idx + 3 < n)
+            out[idx + 3] = z3;
     }
 }
 
 __global__ void rand_normal_f64_kernel(double* __restrict__ out, std::size_t n, std::uint64_t seed)
 {
-    const std::uint32_t tid = blockIdx.x * blockDim.x + threadIdx.x;
+    const std::uint32_t tid    = blockIdx.x * blockDim.x + threadIdx.x;
     const std::uint32_t stride = gridDim.x * blockDim.x;
     for (std::uint32_t base = tid; base * 2u < n; base += stride) {
-        const auto v  = philox_gen(seed, base, 1u);
+        const auto          v  = philox_gen(seed, base, 1u);
         const std::uint64_t lo = (static_cast<std::uint64_t>(v.y) << 32) | v.x;
         const std::uint64_t hi = (static_cast<std::uint64_t>(v.w) << 32) | v.z;
-        const double u0 = u64_to_f64(lo);
-        const double u1 = u64_to_f64(hi);
-        double z0, z1;
+        const double        u0 = u64_to_f64(lo);
+        const double        u1 = u64_to_f64(hi);
+        double              z0, z1;
         box_muller_f64(u0, u1, z0, z1);
         const std::size_t idx = static_cast<std::size_t>(base) * 2u;
-        if (idx + 0 < n) out[idx + 0] = z0;
-        if (idx + 1 < n) out[idx + 1] = z1;
+        if (idx + 0 < n)
+            out[idx + 0] = z0;
+        if (idx + 1 < n)
+            out[idx + 1] = z1;
     }
 }
 
 template <typename T>
 __global__ void rand_int_kernel(T* __restrict__ out, std::size_t n, std::uint64_t seed, std::int64_t low, std::uint64_t range)
 {
-    const std::uint32_t tid = blockIdx.x * blockDim.x + threadIdx.x;
+    const std::uint32_t tid    = blockIdx.x * blockDim.x + threadIdx.x;
     const std::uint32_t stride = gridDim.x * blockDim.x;
     for (std::uint32_t base = tid; base * 4u < n; base += stride) {
-        const auto v = philox_gen(seed, base, 2u);
+        const auto          v      = philox_gen(seed, base, 2u);
         const std::uint32_t arr[4] = {v.x, v.y, v.z, v.w};
-        const std::size_t idx = static_cast<std::size_t>(base) * 4u;
-#pragma unroll
+        const std::size_t   idx    = static_cast<std::size_t>(base) * 4u;
+        BEE_UNROLL
         for (int k = 0; k < 4; ++k) {
             if (idx + k < n) {
                 // 对 I64 / 大 range 也用 32-bit → modulo 收敛（MVP，够用）。
                 const std::uint32_t u = arr[k];
                 const std::uint64_t r = static_cast<std::uint64_t>(u) % range;
-                out[idx + k] = static_cast<T>(static_cast<std::int64_t>(r) + low);
+                out[idx + k]          = static_cast<T>(static_cast<std::int64_t>(r) + low);
             }
         }
     }
 }
 
 // ── Launcher helpers ────────────────────────────────────────────────────
-constexpr unsigned int kRandBlock = 256;
+constexpr unsigned int kRandBlock   = 256;
 constexpr unsigned int kRandMaxGrid = 1024; // 饱和 SM 的合理上限
 
 unsigned int compute_grid(std::size_t elems_per_thread, std::size_t n)
 {
     const std::size_t threads = (n + elems_per_thread - 1) / elems_per_thread;
-    const std::size_t grid = (threads + kRandBlock - 1) / kRandBlock;
+    const std::size_t grid    = (threads + kRandBlock - 1) / kRandBlock;
     return static_cast<unsigned int>(grid < kRandMaxGrid ? grid : kRandMaxGrid);
 }
 
@@ -286,7 +298,7 @@ int ops_random_int(int dt, void* dst, std::size_t n, std::int64_t low, std::int6
         return 0;
     if (low >= high)
         return static_cast<int>(cudaErrorInvalidValue);
-    const std::uint64_t range = static_cast<std::uint64_t>(high - low);
+    const std::uint64_t range  = static_cast<std::uint64_t>(high - low);
     cudaStream_t        stream = cudaStreamPerThread;
     const unsigned int  grid   = compute_grid(4, n);
     if (dt == kDtU8) {

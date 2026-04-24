@@ -83,3 +83,11 @@
 #else
     #define BEE_FORCE_INLINE inline
 #endif
+
+// --- Unroll ---
+
+#if defined(__CUDACC__) || defined(__NVCC__) || defined(__clang__)
+    #define BEE_UNROLL _Pragma("unroll")
+#else
+    #define BEE_UNROLL
+#endif

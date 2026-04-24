@@ -3,7 +3,7 @@
  * @Author dfnzhc (https://github.com/dfnzhc)
  * @Brief ASCII-only int-returning bridges for element-wise / cast kernels.
  *
- * Consumed by both Api.cpp (MSVC, Result-wrapping) and Ops/*.cu (nvcc).
+ * Consumed by both Api.cpp (MSVC, Result-wrapping) and Ops/xx.cu (nvcc).
  * All parameters are raw pointers to device-contiguous buffers; n is the
  * number of elements.
  */
