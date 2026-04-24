@@ -34,9 +34,15 @@ inline void simd_stream(T* p, typename SimdBackend<T, ISA>::reg v) noexcept
 // ── SSE2 ─────────────────────────────────────────────────────────────────────
 #ifdef BEE_SIMD_ENABLE_SSE2
 template <>
-inline void simd_stream<float, IsaSse2>(float* p, __m128 v) noexcept { _mm_stream_ps(p, v); }
+inline void simd_stream<float, IsaSse2>(float* p, __m128 v) noexcept
+{
+    _mm_stream_ps(p, v);
+}
 template <>
-inline void simd_stream<double, IsaSse2>(double* p, __m128d v) noexcept { _mm_stream_pd(p, v); }
+inline void simd_stream<double, IsaSse2>(double* p, __m128d v) noexcept
+{
+    _mm_stream_pd(p, v);
+}
 template <>
 inline void simd_stream<int32_t, IsaSse2>(int32_t* p, __m128i v) noexcept
 {
@@ -57,9 +63,15 @@ inline void simd_stream<uint8_t, IsaSse2>(uint8_t* p, __m128i v) noexcept
 // ── AVX2 ─────────────────────────────────────────────────────────────────────
 #ifdef BEE_SIMD_ENABLE_AVX2
 template <>
-inline void simd_stream<float, IsaAvx2>(float* p, __m256 v) noexcept { _mm256_stream_ps(p, v); }
+inline void simd_stream<float, IsaAvx2>(float* p, __m256 v) noexcept
+{
+    _mm256_stream_ps(p, v);
+}
 template <>
-inline void simd_stream<double, IsaAvx2>(double* p, __m256d v) noexcept { _mm256_stream_pd(p, v); }
+inline void simd_stream<double, IsaAvx2>(double* p, __m256d v) noexcept
+{
+    _mm256_stream_pd(p, v);
+}
 template <>
 inline void simd_stream<int32_t, IsaAvx2>(int32_t* p, __m256i v) noexcept
 {
@@ -80,9 +92,15 @@ inline void simd_stream<uint8_t, IsaAvx2>(uint8_t* p, __m256i v) noexcept
 // ── AVX512 ───────────────────────────────────────────────────────────────────
 #ifdef BEE_SIMD_ENABLE_AVX512
 template <>
-inline void simd_stream<float, IsaAvx512>(float* p, __m512 v) noexcept { _mm512_stream_ps(p, v); }
+inline void simd_stream<float, IsaAvx512>(float* p, __m512 v) noexcept
+{
+    _mm512_stream_ps(p, v);
+}
 template <>
-inline void simd_stream<double, IsaAvx512>(double* p, __m512d v) noexcept { _mm512_stream_pd(p, v); }
+inline void simd_stream<double, IsaAvx512>(double* p, __m512d v) noexcept
+{
+    _mm512_stream_pd(p, v);
+}
 template <>
 inline void simd_stream<int32_t, IsaAvx512>(int32_t* p, __m512i v) noexcept
 {

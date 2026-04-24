@@ -612,20 +612,14 @@ auto cpu_binary_linear_parallel(int64_t n, const T* a, const T* b, T* out) -> vo
     }
     const std::size_t grain = static_cast<std::size_t>(std::max<int64_t>(1, kEWiseGrainBytes / static_cast<int64_t>(sizeof(T))));
     if (use_stream) {
-        parallel::parallel_for(
-            std::size_t{0}, static_cast<std::size_t>(n), grain,
-            [&](std::size_t lo, std::size_t hi) {
-                cpu_binary_linear_chunk<T, ISA, Op, true>(
-                    static_cast<int64_t>(hi - lo), a + lo, b + lo, out + lo);
-            });
+        parallel::parallel_for(std::size_t{0}, static_cast<std::size_t>(n), grain, [&](std::size_t lo, std::size_t hi) {
+            cpu_binary_linear_chunk<T, ISA, Op, true>(static_cast<int64_t>(hi - lo), a + lo, b + lo, out + lo);
+        });
         simd::sfence();
     } else {
-        parallel::parallel_for(
-            std::size_t{0}, static_cast<std::size_t>(n), grain,
-            [&](std::size_t lo, std::size_t hi) {
-                cpu_binary_linear_chunk<T, ISA, Op, false>(
-                    static_cast<int64_t>(hi - lo), a + lo, b + lo, out + lo);
-            });
+        parallel::parallel_for(std::size_t{0}, static_cast<std::size_t>(n), grain, [&](std::size_t lo, std::size_t hi) {
+            cpu_binary_linear_chunk<T, ISA, Op, false>(static_cast<int64_t>(hi - lo), a + lo, b + lo, out + lo);
+        });
     }
 }
 
@@ -644,20 +638,14 @@ auto cpu_unary_linear_parallel(int64_t n, const T* a, T* out) -> void
     }
     const std::size_t grain = static_cast<std::size_t>(std::max<int64_t>(1, kEWiseGrainBytes / static_cast<int64_t>(sizeof(T))));
     if (use_stream) {
-        parallel::parallel_for(
-            std::size_t{0}, static_cast<std::size_t>(n), grain,
-            [&](std::size_t lo, std::size_t hi) {
-                cpu_unary_linear_chunk<T, ISA, Op, true>(
-                    static_cast<int64_t>(hi - lo), a + lo, out + lo);
-            });
+        parallel::parallel_for(std::size_t{0}, static_cast<std::size_t>(n), grain, [&](std::size_t lo, std::size_t hi) {
+            cpu_unary_linear_chunk<T, ISA, Op, true>(static_cast<int64_t>(hi - lo), a + lo, out + lo);
+        });
         simd::sfence();
     } else {
-        parallel::parallel_for(
-            std::size_t{0}, static_cast<std::size_t>(n), grain,
-            [&](std::size_t lo, std::size_t hi) {
-                cpu_unary_linear_chunk<T, ISA, Op, false>(
-                    static_cast<int64_t>(hi - lo), a + lo, out + lo);
-            });
+        parallel::parallel_for(std::size_t{0}, static_cast<std::size_t>(n), grain, [&](std::size_t lo, std::size_t hi) {
+            cpu_unary_linear_chunk<T, ISA, Op, false>(static_cast<int64_t>(hi - lo), a + lo, out + lo);
+        });
     }
 }
 

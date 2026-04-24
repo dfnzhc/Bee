@@ -8,6 +8,11 @@
 //   sum/prod  ： F32/F64/I32/I64（Bool/U8 → Err）
 //   min/max   ： F32/F64/I32/I64/U8（Bool → Err）
 //   mean      ： F32→F32, F64→F64, I32/I64→F64（Bool/U8 → Err）
+//
+// CUDA 侧说明：
+// - 全局 reduce 已接入设备端规约；
+// - axis reduce 也支持 CUDA，但实现仍比全局 reduce 更朴素；
+// - mean 的 I32/I64 → F64 目前只在 CPU 路径实现。
 
 #include "Base/Diagnostics/Error.hpp"
 #include "Tensor/Core/Tensor.hpp"

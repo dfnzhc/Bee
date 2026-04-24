@@ -1,7 +1,11 @@
 #pragma once
 
 // 元素级算子自由函数声明：二元（add/sub/mul/div）、一元（neg/abs/sqrt/exp/log）
-// 及对应的 in-place 变体（add_inplace 等）
+// 及对应的 in-place 变体（add_inplace 等）。
+//
+// 当前实现要点：
+// - CPU 路径支持连续 fast-path，也支持广播/stride slow-path；
+// - CUDA 路径要求输入连续，二元算子还要求两侧 shape 完全一致。
 
 #include "Base/Diagnostics/Error.hpp"
 #include "Tensor/Core/Tensor.hpp"

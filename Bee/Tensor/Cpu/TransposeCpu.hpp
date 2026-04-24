@@ -21,9 +21,9 @@
 namespace bee::cpu
 {
 
-inline constexpr std::int64_t kTrTile            = 32; // 字节通用分块
-inline constexpr std::int64_t kTrParallelRows    = 64; // 行数小于该阈值单线程
-inline constexpr std::int64_t kTrGrainTileRows   = 2;  // 每任务多少 tile-row
+inline constexpr std::int64_t kTrTile          = 32; // 字节通用分块
+inline constexpr std::int64_t kTrParallelRows  = 64; // 行数小于该阈值单线程
+inline constexpr std::int64_t kTrGrainTileRows = 2;  // 每任务多少 tile-row
 
 // ── 通用：按字节拷贝 tile（任意 elem_sz）────────────────────────────────────
 // src 按 (rows, cols) 逻辑，src[r,c] 的字节偏移 = r*src_row_bytes + c*src_col_bytes
@@ -35,7 +35,8 @@ inline void transpose_2d_generic(
     std::uint8_t*       dst,
     std::int64_t        rows, // 输出行数
     std::int64_t        cols, // 输出列数
-    std::size_t         elem_sz)
+    std::size_t         elem_sz
+)
 {
     const std::int64_t dst_row_bytes = cols * static_cast<std::int64_t>(elem_sz);
     const std::int64_t tile          = kTrTile;
@@ -47,9 +48,7 @@ inline void transpose_2d_generic(
                 const std::uint8_t* src_row_ptr_base = src_base + r * src_row_bytes;
                 std::uint8_t*       dst_row_ptr      = dst + r * dst_row_bytes;
                 for (std::int64_t c = c0; c < c1; ++c) {
-                    std::memcpy(dst_row_ptr + c * static_cast<std::int64_t>(elem_sz),
-                                src_row_ptr_base + c * src_col_bytes,
-                                elem_sz);
+                    std::memcpy(dst_row_ptr + c * static_cast<std::int64_t>(elem_sz), src_row_ptr_base + c * src_col_bytes, elem_sz);
                 }
             }
         }
@@ -61,11 +60,9 @@ inline void transpose_2d_generic(
     }
 
     const std::size_t row_grain = static_cast<std::size_t>(tile) * static_cast<std::size_t>(kTrGrainTileRows);
-    parallel::parallel_for(
-        std::size_t{0}, static_cast<std::size_t>(rows), row_grain,
-        [&](std::size_t lo, std::size_t hi) {
-            run_tile_row(static_cast<std::int64_t>(lo), static_cast<std::int64_t>(hi));
-        });
+    parallel::parallel_for(std::size_t{0}, static_cast<std::size_t>(rows), row_grain, [&](std::size_t lo, std::size_t hi) {
+        run_tile_row(static_cast<std::int64_t>(lo), static_cast<std::int64_t>(hi));
+    });
 }
 
 // ── F32 AVX2 特化：8×8 寄存器转置 ────────────────────────────────────────────
@@ -124,16 +121,17 @@ inline void transpose_8x8_ps_avx2(const float* src, std::int64_t src_stride, flo
 // src_col_elems = 1（F32 元素相邻）。
 // 该函数专门服务 2D transpose：输出 [rows, cols] 来自原 [cols, rows] contiguous。
 inline void transpose_2d_f32_avx2(
-    const float* src,          // 原连续矩阵（shape [cols, rows]）
-    std::int64_t src_lead,     // src 每行 F32 个数 = rows_out 方向 = "rows"
-    float*       dst,          // 输出矩阵（shape [rows, cols] contiguous）
-    std::int64_t rows_out,     // 输出行数
-    std::int64_t cols_out,     // 输出列数
-    std::int64_t dst_lead)     // dst 每行 F32 个数 = cols_out
+    const float* src,      // 原连续矩阵（shape [cols, rows]）
+    std::int64_t src_lead, // src 每行 F32 个数 = rows_out 方向 = "rows"
+    float*       dst,      // 输出矩阵（shape [rows, cols] contiguous）
+    std::int64_t rows_out, // 输出行数
+    std::int64_t cols_out, // 输出列数
+    std::int64_t dst_lead
+) // dst 每行 F32 个数 = cols_out
 {
-    constexpr std::int64_t T = 8;
-    const std::int64_t tiles_r = rows_out / T * T;
-    const std::int64_t tiles_c = cols_out / T * T;
+    constexpr std::int64_t T       = 8;
+    const std::int64_t     tiles_r = rows_out / T * T;
+    const std::int64_t     tiles_c = cols_out / T * T;
 
     auto run_rows = [&](std::int64_t r0, std::int64_t r1) {
         std::int64_t r = r0;
@@ -158,18 +156,17 @@ inline void transpose_2d_f32_avx2(
                 dst[r * dst_lead + c] = src[c * src_lead + r];
         }
     };
-    (void)tiles_r; (void)tiles_c;
+    (void)tiles_r;
+    (void)tiles_c;
 
     if (rows_out < kTrParallelRows) {
         run_rows(0, rows_out);
         return;
     }
     const std::size_t grain = static_cast<std::size_t>(T * kTrGrainTileRows);
-    parallel::parallel_for(
-        std::size_t{0}, static_cast<std::size_t>(rows_out), grain,
-        [&](std::size_t lo, std::size_t hi) {
-            run_rows(static_cast<std::int64_t>(lo), static_cast<std::int64_t>(hi));
-        });
+    parallel::parallel_for(std::size_t{0}, static_cast<std::size_t>(rows_out), grain, [&](std::size_t lo, std::size_t hi) {
+        run_rows(static_cast<std::int64_t>(lo), static_cast<std::int64_t>(hi));
+    });
 }
 
 #endif // BEE_SIMD_ENABLE_AVX2
@@ -185,9 +182,11 @@ inline void cpu_transpose_2d_dispatch(
     std::int64_t cols,
     std::int64_t src_row_stride_elems, // 输出行 → src 偏移
     std::int64_t src_col_stride_elems, // 输出列 → src 偏移
-    std::size_t  elem_sz)
+    std::size_t  elem_sz
+)
 {
-    if (rows <= 0 || cols <= 0) return;
+    if (rows <= 0 || cols <= 0)
+        return;
 
 #if defined(BEE_SIMD_ENABLE_AVX2)
     // F32 专用 fast-path：src_row_stride_elems == 1（输出行方向在 src 中单位步进）
@@ -195,9 +194,7 @@ inline void cpu_transpose_2d_dispatch(
     //   src[r, c] = src_base[c * src_col_stride_elems + r]
     if constexpr (std::is_same_v<ISA, simd::IsaAvx2>) {
         if (elem_sz == sizeof(float) && src_row_stride_elems == 1) {
-            transpose_2d_f32_avx2(
-                static_cast<const float*>(src), src_col_stride_elems,
-                static_cast<float*>(dst), rows, cols, cols);
+            transpose_2d_f32_avx2(static_cast<const float*>(src), src_col_stride_elems, static_cast<float*>(dst), rows, cols, cols);
             return;
         }
     }
@@ -206,9 +203,7 @@ inline void cpu_transpose_2d_dispatch(
     // 通用 blocked-tile 拷贝
     const std::int64_t src_row_bytes = src_row_stride_elems * static_cast<std::int64_t>(elem_sz);
     const std::int64_t src_col_bytes = src_col_stride_elems * static_cast<std::int64_t>(elem_sz);
-    transpose_2d_generic(
-        static_cast<const std::uint8_t*>(src), src_row_bytes, src_col_bytes,
-        static_cast<std::uint8_t*>(dst), rows, cols, elem_sz);
+    transpose_2d_generic(static_cast<const std::uint8_t*>(src), src_row_bytes, src_col_bytes, static_cast<std::uint8_t*>(dst), rows, cols, elem_sz);
 }
 
 } // namespace bee::cpu

@@ -316,8 +316,7 @@ auto cpu_global_reduce_linear(int64_t n, const T* ptr) -> T
                 a3 = Op::template simd_acc<T, ISA>(a3, B::loadu(ptr + i + 3 * W));
             }
             // 处理余下 [0..3] 个 SIMD 宽度块
-            auto acc = Op::template simd_acc<T, ISA>(Op::template simd_acc<T, ISA>(a0, a1),
-                                                    Op::template simd_acc<T, ISA>(a2, a3));
+            auto acc = Op::template simd_acc<T, ISA>(Op::template simd_acc<T, ISA>(a0, a1), Op::template simd_acc<T, ISA>(a2, a3));
             for (; i + W <= n; i += W)
                 acc = Op::template simd_acc<T, ISA>(acc, B::loadu(ptr + i));
             T result = Op::template simd_reduce<T, ISA>(acc);
@@ -389,18 +388,18 @@ auto cpu_global_reduce_strided(const Tensor& a) -> T
 
 // B3 阈值：按输出字节量判断是否并行（小于 L2 的数据保留单线程，避免派发开销）。
 // 13700k：P-core L2=2MB；single-thread reduce 在 1MB 数据上就能接近 LLC 带宽峰值。
-inline constexpr int64_t kReduceParallelBytes  = 4 * 1024 * 1024;
+inline constexpr int64_t kReduceParallelBytes = 4 * 1024 * 1024;
 // 每 worker 分块字节数（64 KB ~ L2 命中 + 并行收益的平衡点）。
-inline constexpr int64_t kReduceChunkBytes     = 64 * 1024;
+inline constexpr int64_t kReduceChunkBytes = 64 * 1024;
 
 // 将 reduce 结果写入 0-rank 输出张量
 template <typename T, typename ISA, typename Op>
 auto cpu_reduce_global_dispatch(const Tensor& a, Tensor& out) -> void
 {
-    const auto* in_ptr  = static_cast<const T*>(a.data_ptr());
-    auto*       out_ptr = static_cast<T*>(out.data_ptr());
-    const int64_t n     = a.numel();
-    const int64_t bytes = n * static_cast<int64_t>(sizeof(T));
+    const auto*   in_ptr  = static_cast<const T*>(a.data_ptr());
+    auto*         out_ptr = static_cast<T*>(out.data_ptr());
+    const int64_t n       = a.numel();
+    const int64_t bytes   = n * static_cast<int64_t>(sizeof(T));
 
     T result;
     if (!a.is_contiguous()) {
@@ -412,14 +411,11 @@ auto cpu_reduce_global_dispatch(const Tensor& a, Tensor& out) -> void
         // 工人局部 partial，最终主线程做 N 路合并。
         std::vector<T> partials;
         std::mutex     mu;
-        parallel::parallel_for(
-            std::size_t{0}, static_cast<std::size_t>(n), grain,
-            [&](std::size_t lo, std::size_t hi) {
-                T p = cpu_global_reduce_linear<T, ISA, Op>(
-                    static_cast<int64_t>(hi - lo), in_ptr + lo);
-                std::lock_guard lk(mu);
-                partials.push_back(p);
-            });
+        parallel::parallel_for(std::size_t{0}, static_cast<std::size_t>(n), grain, [&](std::size_t lo, std::size_t hi) {
+            T               p = cpu_global_reduce_linear<T, ISA, Op>(static_cast<int64_t>(hi - lo), in_ptr + lo);
+            std::lock_guard lk(mu);
+            partials.push_back(p);
+        });
         result = Op::template identity<T>();
         for (const T& p : partials)
             result = Op::template scalar<T>(result, p);

@@ -267,10 +267,13 @@ namespace ops
         //  - Auto/Wmma：内部启发式（CUTLASS 或 native tile）
         const auto backend = get_matmul_backend();
         switch (backend) {
-        case MatmulBackend::Cutlass: return std::unexpected(make_error("cuda::ops::matmul: Cutlass 后端尚未暴露（Auto 已自动启用）", Severity::Recoverable));
+        case MatmulBackend::Cutlass:
+            return std::unexpected(make_error("cuda::ops::matmul: Cutlass 后端尚未暴露（Auto 已自动启用）", Severity::Recoverable));
         case MatmulBackend::Native: {
             if (!current_device_has_native_tma_wmma())
-                return std::unexpected(make_error("cuda::ops::matmul[Native:TMA+WMMA]: 当前设备不支持该后端", Severity::Recoverable, static_cast<int>(cudaErrorNotSupported)));
+                return std::unexpected(make_error(
+                    "cuda::ops::matmul[Native:TMA+WMMA]: 当前设备不支持该后端", Severity::Recoverable, static_cast<int>(cudaErrorNotSupported)
+                ));
             const int err = detail::ops_matmul_force_tma_wmma(static_cast<int>(dt), A, B, C, M, K, N);
             return wrap(err, "cuda::ops::matmul[Native:TMA+WMMA]");
         }

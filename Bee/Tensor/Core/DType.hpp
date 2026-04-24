@@ -53,26 +53,6 @@ enum class DType : uint8_t
     }
 }
 
-// 返回数据类型名称字符串
-[[nodiscard]] constexpr auto dtype_name(DType dt) noexcept -> std::string_view
-{
-    switch (dt) {
-    case DType::Bool: return "Bool";
-    case DType::U8: return "U8";
-    case DType::I8: return "I8";
-    case DType::I32: return "I32";
-    case DType::I64: return "I64";
-    case DType::F32: return "F32";
-    case DType::F64: return "F64";
-    case DType::F16: return "F16";
-    case DType::BF16: return "BF16";
-    case DType::FP8E4M3: return "FP8E4M3";
-    case DType::FP8E5M2: return "FP8E5M2";
-    case DType::FP4: return "FP4";
-    default: return "Unknown";
-    }
-}
-
 // 判断 DType 是否为 CPU 可计算类型（Bool/U8/I32/I64/F32/F64）。
 [[nodiscard]] constexpr auto dtype_is_cpu_computable(DType dt) noexcept -> bool
 {

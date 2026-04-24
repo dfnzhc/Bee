@@ -18,7 +18,7 @@ namespace
     auto check_dtype_sum_prod(DType dt, std::string_view op) -> Result<void>
     {
         if (dt == DType::Bool || dt == DType::U8)
-            return std::unexpected(make_error(std::format("{} 不支持 DType::{}", op, dtype_name(dt)), Severity::Recoverable));
+            return std::unexpected(make_error(std::format("{} 不支持 DType::{}", op, enum_to_name(dt)), Severity::Recoverable));
         return {};
     }
 
@@ -32,7 +32,7 @@ namespace
     auto check_dtype_mean(DType dt, std::string_view op) -> Result<void>
     {
         if (dt == DType::Bool || dt == DType::U8)
-            return std::unexpected(make_error(std::format("{} 不支持 DType::{}", op, dtype_name(dt)), Severity::Recoverable));
+            return std::unexpected(make_error(std::format("{} 不支持 DType::{}", op, enum_to_name(dt)), Severity::Recoverable));
         return {};
     }
 

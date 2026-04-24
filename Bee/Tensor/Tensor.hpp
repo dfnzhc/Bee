@@ -1,6 +1,6 @@
 #pragma once
 
-// Tensor 组件门面头文件：聚合所有 Core 元数据类型
+// Tensor 组件门面头文件：聚合 Core 元数据、公开算子与 CUDA 桥接接口
 
 #include "Base/Memory/Device.hpp"
 #include "Tensor/Core/DType.hpp"

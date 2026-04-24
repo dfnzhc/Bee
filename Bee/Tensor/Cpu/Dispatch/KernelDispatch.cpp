@@ -190,13 +190,17 @@ namespace BEE_CURRENT_NS
     }
 
     // ─── 2D strided→contiguous 拷贝（B11）────────────────────────────────────────
-    auto tr_copy_2d(const void* src, void* dst,
-                    int64_t rows, int64_t cols,
-                    int64_t src_row_stride_elems, int64_t src_col_stride_elems,
-                    std::size_t elem_sz) -> void
+    auto tr_copy_2d(
+        const void* src,
+        void*       dst,
+        int64_t     rows,
+        int64_t     cols,
+        int64_t     src_row_stride_elems,
+        int64_t     src_col_stride_elems,
+        std::size_t elem_sz
+    ) -> void
     {
-        cpu_transpose_2d_dispatch<_ISA>(src, dst, rows, cols,
-                                        src_row_stride_elems, src_col_stride_elems, elem_sz);
+        cpu_transpose_2d_dispatch<_ISA>(src, dst, rows, cols, src_row_stride_elems, src_col_stride_elems, elem_sz);
     }
 
 } // namespace BEE_CURRENT_NS

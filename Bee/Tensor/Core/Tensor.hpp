@@ -71,10 +71,11 @@ public:
     // 返回新形状的视图；要求当前张量 contiguous；支持一个 -1 占位推断
     [[nodiscard]] auto view(Shape new_shape) const -> Result<Tensor>;
 
-    // 重塑形状；非 contiguous 时先 clone 再 view（存储独立）
+    // 重塑形状；非 contiguous 时先物化为 contiguous，再返回新的连续视图
     [[nodiscard]] auto reshape(Shape new_shape) const -> Result<Tensor>;
 
-    // 返回 contiguous 副本；若已连续则共享 storage，否则重新排列数据
+    // 返回连续布局张量；若已连续则共享 storage，否则重新排列数据。
+    // 当前 CPU 有 2D 专用快路径；CUDA 仅对部分 2D transpose 形态做设备端物化。
     [[nodiscard]] auto contiguous() const -> Result<Tensor>;
 
     // 维度排列；dims 为 {0..ndim-1} 的一个排列

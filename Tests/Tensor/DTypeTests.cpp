@@ -38,16 +38,16 @@ TEST(DTypeTests, SizeOfF64)
     EXPECT_EQ(dtype_size(DType::F64), 8u);
 }
 
-// ── dtype_name 测试 ─────────────────────────────────────────────────────────
+// ── enum_to_name 测试 ─────────────────────────────────────────────────────────
 
 TEST(DTypeTests, NamesAreCorrect)
 {
-    EXPECT_EQ(dtype_name(DType::Bool), "Bool");
-    EXPECT_EQ(dtype_name(DType::U8), "U8");
-    EXPECT_EQ(dtype_name(DType::I32), "I32");
-    EXPECT_EQ(dtype_name(DType::I64), "I64");
-    EXPECT_EQ(dtype_name(DType::F32), "F32");
-    EXPECT_EQ(dtype_name(DType::F64), "F64");
+    EXPECT_EQ(enum_to_name(DType::Bool), "Bool");
+    EXPECT_EQ(enum_to_name(DType::U8), "U8");
+    EXPECT_EQ(enum_to_name(DType::I32), "I32");
+    EXPECT_EQ(enum_to_name(DType::I64), "I64");
+    EXPECT_EQ(enum_to_name(DType::F32), "F32");
+    EXPECT_EQ(enum_to_name(DType::F64), "F64");
 }
 
 // ── 编译期双向映射测试 ──────────────────────────────────────────────────────
@@ -113,11 +113,11 @@ TEST(DTypeTests, ExtendedDtypeSizes)
 
 TEST(DTypeTests, ExtendedDtypeNames)
 {
-    EXPECT_EQ(dtype_name(DType::F16), "F16");
-    EXPECT_EQ(dtype_name(DType::BF16), "BF16");
-    EXPECT_EQ(dtype_name(DType::FP8E4M3), "FP8E4M3");
-    EXPECT_EQ(dtype_name(DType::FP8E5M2), "FP8E5M2");
-    EXPECT_EQ(dtype_name(DType::FP4), "FP4");
+    EXPECT_EQ(enum_to_name(DType::F16), "F16");
+    EXPECT_EQ(enum_to_name(DType::BF16), "BF16");
+    EXPECT_EQ(enum_to_name(DType::FP8E4M3), "FP8E4M3");
+    EXPECT_EQ(enum_to_name(DType::FP8E5M2), "FP8E5M2");
+    EXPECT_EQ(enum_to_name(DType::FP4), "FP4");
 }
 
 TEST(DTypeTests, ExtendedDtypeNotCpuComputable)

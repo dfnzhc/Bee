@@ -39,7 +39,7 @@ namespace
 auto rand(Shape shape, DType dtype, uint64_t seed, Device device) -> Result<Tensor>
 {
     if (dtype != DType::F32 && dtype != DType::F64)
-        return std::unexpected(make_error(std::format("rand: 不支持 DType::{}，仅允许 F32/F64", dtype_name(dtype)), Severity::Recoverable));
+        return std::unexpected(make_error(std::format("rand: 不支持 DType::{}，仅允许 F32/F64", enum_to_name(dtype)), Severity::Recoverable));
 
     auto out_r = Tensor::empty(shape, dtype, device);
     if (!out_r)
@@ -52,7 +52,7 @@ auto rand(Shape shape, DType dtype, uint64_t seed, Device device) -> Result<Tens
 
     if (device == Device::CUDA) {
         const uint64_t s = resolve_cuda_seed(seed);
-        auto r = tensor::cuda::random_uniform(static_cast<int>(dtype), out.data_ptr(), static_cast<std::size_t>(n), s);
+        auto           r = tensor::cuda::random_uniform(static_cast<int>(dtype), out.data_ptr(), static_cast<std::size_t>(n), s);
         if (!r)
             return std::unexpected(std::move(r.error()));
         return out;
@@ -78,7 +78,7 @@ auto rand(Shape shape, DType dtype, uint64_t seed, Device device) -> Result<Tens
 auto randn(Shape shape, DType dtype, uint64_t seed, Device device) -> Result<Tensor>
 {
     if (dtype != DType::F32 && dtype != DType::F64)
-        return std::unexpected(make_error(std::format("randn: 不支持 DType::{}，仅允许 F32/F64", dtype_name(dtype)), Severity::Recoverable));
+        return std::unexpected(make_error(std::format("randn: 不支持 DType::{}，仅允许 F32/F64", enum_to_name(dtype)), Severity::Recoverable));
 
     auto out_r = Tensor::empty(shape, dtype, device);
     if (!out_r)
@@ -91,7 +91,7 @@ auto randn(Shape shape, DType dtype, uint64_t seed, Device device) -> Result<Ten
 
     if (device == Device::CUDA) {
         const uint64_t s = resolve_cuda_seed(seed);
-        auto r = tensor::cuda::random_normal(static_cast<int>(dtype), out.data_ptr(), static_cast<std::size_t>(n), s);
+        auto           r = tensor::cuda::random_normal(static_cast<int>(dtype), out.data_ptr(), static_cast<std::size_t>(n), s);
         if (!r)
             return std::unexpected(std::move(r.error()));
         return out;
@@ -120,7 +120,7 @@ auto randint(int64_t low, int64_t high, Shape shape, DType dtype, uint64_t seed,
         return std::unexpected(make_error(std::format("randint: low({}) >= high({})，区间为空", low, high), Severity::Recoverable));
 
     if (dtype != DType::I32 && dtype != DType::I64 && dtype != DType::U8)
-        return std::unexpected(make_error(std::format("randint: 不支持 DType::{}，仅允许 I32/I64/U8", dtype_name(dtype)), Severity::Recoverable));
+        return std::unexpected(make_error(std::format("randint: 不支持 DType::{}，仅允许 I32/I64/U8", enum_to_name(dtype)), Severity::Recoverable));
 
     if (dtype == DType::U8 && low < 0)
         return std::unexpected(make_error(std::format("randint: dtype=U8 时要求 low >= 0，但 low={}", low), Severity::Recoverable));
@@ -152,7 +152,7 @@ auto randint(int64_t low, int64_t high, Shape shape, DType dtype, uint64_t seed,
 
     if (device == Device::CUDA) {
         const uint64_t s = resolve_cuda_seed(seed);
-        auto r = tensor::cuda::random_int(static_cast<int>(dtype), out.data_ptr(), static_cast<std::size_t>(n), low, high, s);
+        auto           r = tensor::cuda::random_int(static_cast<int>(dtype), out.data_ptr(), static_cast<std::size_t>(n), low, high, s);
         if (!r)
             return std::unexpected(std::move(r.error()));
         return out;

@@ -1,6 +1,8 @@
 #pragma once
 
-// Cast 算子自由函数声明：支持全 6 种 dtype 两两互转（36 组合）
+// Cast 算子自由函数声明：
+// 当前主路径面向 Bool/U8/I32/I64/F32/F64 这些已接通的计算类型；
+// 其余扩展 dtype 是否可用取决于下层后端能力。
 
 #include "Base/Diagnostics/Error.hpp"
 #include "Tensor/Core/Tensor.hpp"

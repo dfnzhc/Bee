@@ -143,8 +143,7 @@ inline auto gemm_driver(std::int64_t M, std::int64_t K, std::int64_t N, const TA
 
             // 并行 ic 循环：grain=1（1 chunk/worker），num_ic_chunks 通常 6-16
             ::bee::parallel::parallel_for(
-                std::size_t{0}, static_cast<std::size_t>(num_ic_chunks), std::size_t{1},
-                [&](std::size_t lo, std::size_t hi) {
+                std::size_t{0}, static_cast<std::size_t>(num_ic_chunks), std::size_t{1}, [&](std::size_t lo, std::size_t hi) {
                     TA* A_pack = static_cast<TA*>(thread_local_a_pack_buffer());
                     for (std::size_t ci = lo; ci < hi; ++ci) {
                         const std::int64_t ic = static_cast<std::int64_t>(ci) * MC;

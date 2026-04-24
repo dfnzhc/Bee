@@ -29,7 +29,7 @@ namespace
     {
         if (a.dtype() != b.dtype())
             return std::unexpected(
-                make_error(std::format("{}: dtype 不匹配（{} vs {}）", op, dtype_name(a.dtype()), dtype_name(b.dtype())), Severity::Recoverable)
+                make_error(std::format("{}: dtype 不匹配（{} vs {}）", op, enum_to_name(a.dtype()), enum_to_name(b.dtype())), Severity::Recoverable)
             );
         return {};
     }
@@ -53,7 +53,7 @@ namespace
     auto check_dtype_negabs(DType dt, std::string_view op) -> Result<void>
     {
         if (dt == DType::Bool || dt == DType::U8)
-            return std::unexpected(make_error(std::format("{} 不支持 DType::{}", op, dtype_name(dt)), Severity::Recoverable));
+            return std::unexpected(make_error(std::format("{} 不支持 DType::{}", op, enum_to_name(dt)), Severity::Recoverable));
         return {};
     }
 
@@ -61,7 +61,7 @@ namespace
     {
         if (dt != DType::F32 && dt != DType::F64)
             return std::unexpected(
-                make_error(std::format("{} 仅支持 DType::F32 / DType::F64，当前 dtype 为 {}", op, dtype_name(dt)), Severity::Recoverable)
+                make_error(std::format("{} 仅支持 DType::F32 / DType::F64，当前 dtype 为 {}", op, enum_to_name(dt)), Severity::Recoverable)
             );
         return {};
     }

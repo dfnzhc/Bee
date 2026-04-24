@@ -26,9 +26,8 @@ namespace
         case DType::F64: BEE_RT_DISPATCH(mm_f64, M, K, N, static_cast<const double*>(A), static_cast<const double*>(B), static_cast<double*>(C));
         case DType::I32: BEE_RT_DISPATCH(mm_i32, M, K, N, static_cast<const int32_t*>(A), static_cast<const int32_t*>(B), static_cast<int32_t*>(C));
         case DType::I64: BEE_RT_DISPATCH(mm_i64, M, K, N, static_cast<const int64_t*>(A), static_cast<const int64_t*>(B), static_cast<int64_t*>(C));
-        case DType::I8:  BEE_RT_DISPATCH(mm_i8,  M, K, N, static_cast<const int8_t*>(A),  static_cast<const int8_t*>(B),  static_cast<int32_t*>(C));
-        default:
-            break;
+        case DType::I8: BEE_RT_DISPATCH(mm_i8, M, K, N, static_cast<const int8_t*>(A), static_cast<const int8_t*>(B), static_cast<int32_t*>(C));
+        default: break;
         }
     }
 
@@ -50,15 +49,16 @@ auto matmul(const Tensor& a, const Tensor& b) -> Result<Tensor>
         ));
 
     if (a.device() == Device::CUDA) {
-        // CUDA 路径：dtype 检查后直接走 tiled-shared kernel。
+        // CUDA 路径：前置校验完成后转发给 Bee::CUDA 的 matmul 后端选择层。
+        // 当前默认会在 CUTLASS / baseline tile / Native(TMA+WMMA) 之间选择或回退。
         if (a.dtype() != b.dtype())
             return std::unexpected(
-                make_error(std::format("matmul: dtype 不匹配（{} vs {}）", dtype_name(a.dtype()), dtype_name(b.dtype())), Severity::Recoverable)
+                make_error(std::format("matmul: dtype 不匹配（{} vs {}）", enum_to_name(a.dtype()), enum_to_name(b.dtype())), Severity::Recoverable)
             );
 
         const DType dt_cu = a.dtype();
         if (dt_cu == DType::Bool || dt_cu == DType::U8)
-            return std::unexpected(make_error(std::format("matmul: CUDA 不支持 DType::{}", dtype_name(dt_cu)), Severity::Recoverable));
+            return std::unexpected(make_error(std::format("matmul: CUDA 不支持 DType::{}", enum_to_name(dt_cu)), Severity::Recoverable));
 
         if (a.ndim() != 2 || b.ndim() != 2)
             return std::unexpected(make_error("matmul: 仅支持 2D × 2D", Severity::Recoverable));
@@ -108,12 +108,12 @@ auto matmul(const Tensor& a, const Tensor& b) -> Result<Tensor>
     // ── dtype 检查 ────────────────────────────────────────────────────────────
     if (a.dtype() != b.dtype())
         return std::unexpected(
-            make_error(std::format("matmul: dtype 不匹配（{} vs {}）", dtype_name(a.dtype()), dtype_name(b.dtype())), Severity::Recoverable)
+            make_error(std::format("matmul: dtype 不匹配（{} vs {}）", enum_to_name(a.dtype()), enum_to_name(b.dtype())), Severity::Recoverable)
         );
 
     const DType dt = a.dtype();
     if (dt == DType::Bool || dt == DType::U8)
-        return std::unexpected(make_error(std::format("matmul: 不支持 DType::{}", dtype_name(dt)), Severity::Recoverable));
+        return std::unexpected(make_error(std::format("matmul: 不支持 DType::{}", enum_to_name(dt)), Severity::Recoverable));
 
     // I8 输入 → I32 输出（累加到更宽类型避免溢出）
     const DType out_dt = (dt == DType::I8) ? DType::I32 : dt;
@@ -171,6 +171,8 @@ auto matmul(const Tensor& a, const Tensor& b) -> Result<Tensor>
     }
 
     // ── 调用 CPU 内核 ─────────────────────────────────────────────────────────
+    // 这里继续下沉到运行期 ISA 分派；F32/F64/I32 走 GEMM driver，I64 走模板核，
+    // I8 则提升到 I32 输出。
     dispatch_matmul_cpu(M, K, N, dt, out_dt, ca.data_ptr(), cb.data_ptr(), out->data_ptr());
 
     return *out;

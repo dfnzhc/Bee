@@ -2,7 +2,7 @@
 
 ## 概述
 
-`Bee::Tensor` 是 Bee 框架中的通用张量组件，提供 CPU（+可选 CUDA stub）上的多维数组运算能力，定位为 **MVP 阶段**。
+`Bee::Tensor` 是 Bee 框架中的通用张量组件，提供 **CPU 主路径 + 可选 CUDA 后端** 的多维数组运算能力，当前仍处于 **MVP 向可用实现演进** 的阶段。
 
 核心设计原则：
 
@@ -36,10 +36,12 @@ cmake --build . --config Debug
 | 选项                        | 默认值   | 说明 |
 |-----------------------------|----------|------|
 | `BEE_BUILD_TESTS`           | `OFF`    | 打开后构建 `Tests/Tensor` 下的 GTest 测试套件（需要 GTest） |
-| `BEE_TENSOR_SIMD`           | `AUTO`   | SIMD 后端：`AUTO`（自动探测）/ `SCALAR` / `SSE2` / `AVX2` / `AVX512` |
-| `BEE_TENSOR_WITH_CUDA`      | `OFF`    | 打开后链接 CUDA 后端（当前为 stub，所有调用返回 `NotImplemented`） |
+| `BEE_TENSOR_SIMD`           | `AUTO`   | CPU 运行期 ISA 分发目标集合：`AUTO`（自动探测）/ `SCALAR` / `SSE2` / `AVX2` / `AVX512` |
+| `BEE_TENSOR_WITH_CUDA`      | `OFF`    | 打开后接入 `Bee::CUDA` 后端桥接；关闭时保留 CPU 路径，CUDA 调用返回可恢复错误 |
 
-> **注意**：当前 Tensor CPU 内核支持按已启用 ISA 进行运行期分派（`Scalar/SSE2/AVX2/AVX512`）。具体可用集合取决于构建期探测与本机 CPU 能力。
+> **注意**：
+> 1. CPU 主路径已经接入运行期 ISA 分发，具体可用集合取决于构建期探测与当前机器能力。
+> 2. CUDA 后端不是“纯 stub”：启用 `BEE_TENSOR_WITH_CUDA` 且 `Bee::CUDA` 可用时，元素级算子、cast、reduce、matmul、random 与部分 `contiguous()` 路径会直接进入设备端实现。
 
 ### 运行测试
 
@@ -101,7 +103,7 @@ auto ri = randint(0, 10, {16}, DType::I32, 42);
 ### 视图与形状变换
 
 ```cpp
-auto flat  = t.reshape({12});           // 非连续时内部 clone
+auto flat  = t.reshape({12});           // 非连续时会先物化为 contiguous
 auto view  = t.view({2, 6});            // 要求 contiguous
 auto tr    = t.transpose(0, 1);         // 交换维度，返回视图
 auto perm  = t.permute({1, 0, 2});      // 任意维度排列
@@ -122,8 +124,8 @@ auto f = div(*a, *b);   // a / b
 auto g = neg(*a);        // -a
 auto h = abs(*a);        // |a|
 auto i = sqrt(*a);       // √a
-auto j = exp_(*a);       // e^a
-auto k = log_(*a);       // ln(a)
+auto j = exp(*a);        // e^a
+auto k = log(*a);        // ln(a)
 
 // in-place（修改 a 本身，返回 Result<void> 或 Result<Tensor>）
 add_inplace(*a, *b);
@@ -166,11 +168,13 @@ if (!result.has_value()) {
     // result.error() 返回 bee::Error
 }
 
-// 推荐：用 BEE_TRY 宏在 Result 函数中传播错误
+// 推荐：用 BEE_TRY_ASSIGN 宏在 Result 函数中传播错误
 Result<Tensor> my_func(const Tensor& a, const Tensor& b)
 {
-    BEE_TRY(auto c, matmul(a, b));
-    BEE_TRY(auto d, sum(c));
+    Tensor c;
+    Tensor d;
+    BEE_TRY_ASSIGN(c, matmul(a, b));
+    BEE_TRY_ASSIGN(d, sum(c));
     return d;
 }
 ```
@@ -196,18 +200,23 @@ Result<Tensor> my_func(const Tensor& a, const Tensor& b)
 | randint      | ✗    | ✓  | ✓   | ✓   | ✗   | ✗   |
 
 > `→F64` 表示整数输入时输出 dtype 提升为 F64。
+>
+> 额外说明：
+> 1. `DType::I8` 已进入当前实现，但主要接通在 **CPU matmul 的 `I8 x I8 -> I32`** 等局部路径，尚未在 README 中整理成完整的统一矩阵。
+> 2. `F16/BF16/FP8E4M3/FP8E5M2/FP4` 目前仍作为扩展占位 dtype，不纳入本表。
 
 ---
 
 ## 已知限制（MVP）
 
 1. **无 autograd**：不追踪计算图，不支持反向传播。
-2. **CUDA 后端为 stub**：`BEE_TENSOR_WITH_CUDA=ON` 可编译，但所有 CUDA 路径均返回 `NotImplemented` 错误。
-3. **matmul 仅支持 2D**：不支持 batch matmul 或广播矩阵乘。
-4. **无 dtype 自动提升**：二元运算（add/mul/matmul 等）要求两侧 dtype 完全相同，否则返回错误。
-5. **无 pinned memory**：CPU 分配均为普通堆内存。
-6. **并发模型为同步 API**：内部 `parallel_for` 框架存在但尚未集成到 ops，当前为单线程执行。
-7. **SIMD 覆盖有限**：当前实现提供 Scalar 与 AVX2 两个后端；SSE2/AVX512 会自动回退到 Scalar。
+2. **CUDA 语义仍偏保守**：CUDA 路径通常要求输入连续；二元 elementwise 目前不支持广播，`mean(I32/I64)` 也尚未接通。
+3. **`contiguous()` 的 CUDA 通用路径仍不完整**：除 2D transpose 特化外，很多非连续 CUDA 物化最终仍会回退到 `D2H -> CPU 重排 -> H2D`。
+4. **matmul 仅支持 2D**：不支持 batch matmul 或广播矩阵乘。
+5. **无 dtype 自动提升**：二元运算（add/mul/matmul 等）要求两侧 dtype 完全相同，否则返回错误。
+6. **无 pinned memory**：CPU 分配均为普通堆内存。
+7. **API 语义保持同步**：CPU 路径虽然已经接入 `parallel_for` 与 ISA 分发，CUDA 桥接层也会在返回前同步，因此对上层仍表现为同步调用。
+8. **不同算子的 ISA 覆盖度并不完全一致**：例如部分 reduce 能力按 dtype/ISA 细分，CPU matmul 的 AVX512 当前也复用 AVX2 GEMM 实现。
 
 ---
 
@@ -218,8 +227,8 @@ Bee/Tensor/
 ├── Tensor.hpp          # 门面头文件（聚合所有子模块）
 ├── Tensor.cpp          # 组件入口实现
 ├── Core/               # 基础元数据（DType、Shape、Storage、TensorImpl、Tensor）
-├── Cpu/                # CPU 后端：SIMD 分发、Scalar/AVX2 内核
-├── Cuda/               # CUDA 后端（当前为 stub）
+├── Cpu/                # CPU 后端：运行期 ISA 分发、SIMD / GEMM / transpose 等内核
+├── Cuda/               # Tensor 到 Bee::CUDA 的桥接层
 └── Ops/                # 运算实现（Broadcast、Cast、ElementWise、Matmul、Random、Reduce）
 ```
 

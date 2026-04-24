@@ -42,10 +42,15 @@ namespace bee::cpu
         /* Cast（B11）*/                                                                                                                    \
         auto ct_cast(::bee::DType src_dt, ::bee::DType dst_dt, const void* src, void* dst, std::int64_t n) -> void;                         \
         /* 2D strided→contiguous 拷贝（B11 transpose 物化）*/                                                                               \
-        auto tr_copy_2d(const void* src, void* dst,                                                                                         \
-                        std::int64_t rows, std::int64_t cols,                                                                               \
-                        std::int64_t src_row_stride_elems, std::int64_t src_col_stride_elems,                                               \
-                        std::size_t elem_sz) -> void;                                                                                       \
+        auto tr_copy_2d(                                                                                                                    \
+            const void*  src,                                                                                                               \
+            void*        dst,                                                                                                               \
+            std::int64_t rows,                                                                                                              \
+            std::int64_t cols,                                                                                                              \
+            std::int64_t src_row_stride_elems,                                                                                              \
+            std::int64_t src_col_stride_elems,                                                                                              \
+            std::size_t  elem_sz                                                                                                            \
+        ) -> void;                                                                                                                          \
     }
 
 BEE_DECL_DISPATCH_NS(scalar)
@@ -95,34 +100,32 @@ BEE_DECL_DISPATCH_NS(avx512)
 
 // 语句级分派（不使用 return）：供嵌在非 void 函数中的调用方使用
 #if defined(BEE_TENSOR_HAVE_AVX512)
-    #define BEE_RT_STMT_CASE_AVX512(FN, ...)                                 \
+    #define BEE_RT_STMT_CASE_AVX512(FN, ...)                                   \
     case ::bee::simd::Isa::Avx512: ::bee::cpu::avx512::FN(__VA_ARGS__); break;
 #else
     #define BEE_RT_STMT_CASE_AVX512(FN, ...)
 #endif
 #if defined(BEE_TENSOR_HAVE_AVX2)
-    #define BEE_RT_STMT_CASE_AVX2(FN, ...)                               \
+    #define BEE_RT_STMT_CASE_AVX2(FN, ...)                                 \
     case ::bee::simd::Isa::Avx2: ::bee::cpu::avx2::FN(__VA_ARGS__); break;
 #else
     #define BEE_RT_STMT_CASE_AVX2(FN, ...)
 #endif
 #if defined(BEE_TENSOR_HAVE_SSE2)
-    #define BEE_RT_STMT_CASE_SSE2(FN, ...)                               \
+    #define BEE_RT_STMT_CASE_SSE2(FN, ...)                                 \
     case ::bee::simd::Isa::Sse2: ::bee::cpu::sse2::FN(__VA_ARGS__); break;
 #else
     #define BEE_RT_STMT_CASE_SSE2(FN, ...)
 #endif
 
-#define BEE_RT_DISPATCH_STMT(FN, ...)                          \
-    do {                                                       \
-        switch (::bee::simd::current_isa()) {                  \
-            BEE_RT_STMT_CASE_AVX512(FN, __VA_ARGS__)           \
-            BEE_RT_STMT_CASE_AVX2(FN, __VA_ARGS__)             \
-            BEE_RT_STMT_CASE_SSE2(FN, __VA_ARGS__)             \
-        default:                                               \
-            ::bee::cpu::scalar::FN(__VA_ARGS__);               \
-            break;                                             \
-        }                                                      \
+#define BEE_RT_DISPATCH_STMT(FN, ...)                        \
+    do {                                                     \
+        switch (::bee::simd::current_isa()) {                \
+            BEE_RT_STMT_CASE_AVX512(FN, __VA_ARGS__)         \
+            BEE_RT_STMT_CASE_AVX2(FN, __VA_ARGS__)           \
+            BEE_RT_STMT_CASE_SSE2(FN, __VA_ARGS__)           \
+        default: ::bee::cpu::scalar::FN(__VA_ARGS__); break; \
+        }                                                    \
     } while (0)
 
 } // namespace bee::cpu
