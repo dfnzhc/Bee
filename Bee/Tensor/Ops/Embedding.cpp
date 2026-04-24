@@ -61,9 +61,9 @@ auto embedding(const Tensor& weight, const Tensor& token_ids, const tensor::cuda
     if (!token_ids.defined())
         return std::unexpected(make_error("embedding: token_ids 未定义", Severity::Recoverable));
 
-    if (weight.ndim() < 2)
+    if (weight.ndim() != 2)
         return std::unexpected(make_error(
-            std::format("embedding: weight 须至少为 2-D，当前 ndim={}", weight.ndim()),
+            std::format("embedding: weight 须为 2-D [vocab, hidden]，当前 ndim={}", weight.ndim()),
             Severity::Recoverable
         ));
 
@@ -79,12 +79,21 @@ auto embedding(const Tensor& weight, const Tensor& token_ids, const tensor::cuda
             Severity::Recoverable
         ));
 
+    // ── 设备一致性检查 ────────────────────────────────────────────────────────
+    if (weight.device() != token_ids.device())
+        return std::unexpected(make_error(
+            std::format("embedding: weight 与 token_ids 须在同一设备（{} vs {}）",
+                        weight.device() == Device::CPU ? "CPU" : "CUDA",
+                        token_ids.device() == Device::CPU ? "CPU" : "CUDA"),
+            Severity::Recoverable
+        ));
+
     // ── CUDA 过渡路径：迁移至 CPU 计算 ───────────────────────────────────────
     const Device orig_device = weight.device();
     Tensor       w_cpu       = weight;
     Tensor       ids_cpu     = token_ids;
 
-    if (orig_device == Device::CUDA || token_ids.device() == Device::CUDA) {
+    if (orig_device == Device::CUDA) {
         auto wr = weight.to(Device::CPU);
         if (!wr)
             return std::unexpected(std::move(wr.error()));

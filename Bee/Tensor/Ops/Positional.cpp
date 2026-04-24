@@ -92,6 +92,12 @@ auto apply_rope(const Tensor& x, double base, int64_t position_offset, const ten
             Severity::Recoverable
         ));
 
+    if (base <= 0.0)
+        return std::unexpected(make_error(
+            std::format("apply_rope: base 须 > 0，当前 {}", base),
+            Severity::Recoverable
+        ));
+
     // ── CUDA 过渡路径 ─────────────────────────────────────────────────────────
     const Device orig_device = x.device();
     Tensor       x_cpu       = x;

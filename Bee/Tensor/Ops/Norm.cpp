@@ -91,12 +91,27 @@ auto rms_norm(const Tensor& x, const Tensor& weight, double eps, const tensor::c
             Severity::Recoverable
         ));
 
+    if (eps <= 0.0)
+        return std::unexpected(make_error(
+            std::format("rms_norm: eps 须 > 0，当前 {}", eps),
+            Severity::Recoverable
+        ));
+
+    // ── 设备一致性检查 ────────────────────────────────────────────────────────
+    if (x.device() != weight.device())
+        return std::unexpected(make_error(
+            std::format("rms_norm: x 与 weight 须在同一设备（{} vs {}）",
+                        x.device() == Device::CPU ? "CPU" : "CUDA",
+                        weight.device() == Device::CPU ? "CPU" : "CUDA"),
+            Severity::Recoverable
+        ));
+
     // ── CUDA 过渡路径 ─────────────────────────────────────────────────────────
     const Device orig_device = x.device();
     Tensor       x_cpu       = x;
     Tensor       w_cpu       = weight;
 
-    if (orig_device == Device::CUDA || weight.device() == Device::CUDA) {
+    if (orig_device == Device::CUDA) {
         auto xr = x.to(Device::CPU);
         if (!xr)
             return std::unexpected(std::move(xr.error()));

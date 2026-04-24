@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
+#include <cmath>
 
 #include "Tensor/Tensor.hpp"
+#include "Tensor/Cuda/Backend.hpp"
 
 using namespace bee;
 
@@ -125,4 +127,100 @@ TEST(AiPrimitiveTests, RopePosition0OutputCorrect)
     const auto* p = static_cast<const float*>(out.data_ptr());
     EXPECT_NEAR(p[0], 1.0f, 1e-5f);
     EXPECT_NEAR(p[1], 1.0f, 1e-5f);
+}
+
+// ─── 以下为修复 Task6 复审问题新增的测试 ───────────────────────────────────────
+
+// 1. embedding 拒绝非 2-D weight
+TEST(AiPrimitiveTests, EmbeddingRejectsNon2DWeight)
+{
+    // 3-D weight：原实现允许（ndim >= 2），修复后须拒绝
+    auto weight3d = Tensor::arange(0, 24, 1, DType::F32).value().reshape({2, 3, 4}).value();
+    auto ids      = Tensor::full({2}, DType::I64, 0.0).value();
+    auto out      = bee::embedding(weight3d, ids);
+    EXPECT_FALSE(out.has_value());
+}
+
+// 2. embedding 在 CUDA 可用时拒绝跨设备输入（cpu weight + cuda ids）
+TEST(AiPrimitiveTests, EmbeddingRejectsMixedDeviceInputs)
+{
+    if (!bee::tensor::cuda::is_available())
+        GTEST_SKIP() << "CUDA 不可用，跳过混合设备测试";
+
+    auto weight  = Tensor::arange(0, 12, 1, DType::F32).value().reshape({3, 4}).value(); // CPU
+    auto ids_gpu = Tensor::full({2}, DType::I64, 0.0, Device::CUDA).value();             // CUDA
+
+    auto out = bee::embedding(weight, ids_gpu);
+    EXPECT_FALSE(out.has_value());
+}
+
+// 3. rms_norm 在 CUDA 可用时拒绝跨设备输入（cuda x + cpu weight）
+TEST(AiPrimitiveTests, RmsNormRejectsMixedDeviceInputs)
+{
+    if (!bee::tensor::cuda::is_available())
+        GTEST_SKIP() << "CUDA 不可用，跳过混合设备测试";
+
+    auto x_gpu = Tensor::ones({2, 4}, DType::F32, Device::CUDA).value(); // CUDA
+    auto w_cpu = Tensor::ones({4}, DType::F32).value();                  // CPU
+
+    auto y = bee::rms_norm(x_gpu, w_cpu, 1e-5);
+    EXPECT_FALSE(y.has_value());
+}
+
+// 4. rms_norm 拒绝 eps=0
+TEST(AiPrimitiveTests, RmsNormRejectsZeroEps)
+{
+    auto x = Tensor::ones({2, 4}, DType::F32).value();
+    auto w = Tensor::ones({4}, DType::F32).value();
+    auto y = bee::rms_norm(x, w, 0.0);
+    EXPECT_FALSE(y.has_value());
+}
+
+// 5. rms_norm 拒绝 eps < 0
+TEST(AiPrimitiveTests, RmsNormRejectsNegativeEps)
+{
+    auto x = Tensor::ones({2, 4}, DType::F32).value();
+    auto w = Tensor::ones({4}, DType::F32).value();
+    auto y = bee::rms_norm(x, w, -1e-5);
+    EXPECT_FALSE(y.has_value());
+}
+
+// 6. apply_rope 拒绝 base <= 0
+TEST(AiPrimitiveTests, RopeRejectsNonPositiveBase)
+{
+    auto q = Tensor::ones({1, 2, 4}, DType::F32).value();
+    EXPECT_FALSE(bee::apply_rope(q, 0.0, 0).has_value());
+    EXPECT_FALSE(bee::apply_rope(q, -1.0, 0).has_value());
+}
+
+// 7. position_offset != 0 的数值验证（锁定 split-half 配对约定）
+//
+// 约定：split-half，即 (x[i], x[i + dim/2]) 为一对。
+// 参数：shape={1,1,4}，全 1 输入，position_offset=1，base=10000
+//
+// pos = 1，dim=4，half_dim=2
+//   i=0: theta = 1 / 10000^(0/4) = 1.0
+//         x0=x[0]=1, x1=x[2]=1
+//         out[0] = cos(1)-sin(1)，out[2] = sin(1)+cos(1)
+//   i=1: theta = 1 / 10000^(2/4) = 0.01
+//         x0=x[1]=1, x1=x[3]=1
+//         out[1] = cos(0.01)-sin(0.01)，out[3] = sin(0.01)+cos(0.01)
+TEST(AiPrimitiveTests, RopePositionOffsetProducesExpectedRotation)
+{
+    auto q   = Tensor::ones({1, 1, 4}, DType::F32).value();
+    auto out = bee::apply_rope(q, 10000.0, 1).value();
+
+    const auto* p = static_cast<const float*>(out.data_ptr());
+
+    // i=0 对：theta=1.0
+    const double c0 = std::cos(1.0);
+    const double s0 = std::sin(1.0);
+    EXPECT_NEAR(p[0], static_cast<float>(c0 - s0), 1e-5f); // out[0]
+    EXPECT_NEAR(p[2], static_cast<float>(s0 + c0), 1e-5f); // out[2]
+
+    // i=1 对：theta=0.01
+    const double c1 = std::cos(0.01);
+    const double s1 = std::sin(0.01);
+    EXPECT_NEAR(p[1], static_cast<float>(c1 - s1), 1e-5f); // out[1]
+    EXPECT_NEAR(p[3], static_cast<float>(s1 + c1), 1e-5f); // out[3]
 }
