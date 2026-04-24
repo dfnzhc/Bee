@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstring>
+#include <limits>
+
 #include "Tensor/Tensor.hpp"
 #include "Tensor/Core/LowPrecision.hpp"
 
@@ -196,4 +199,177 @@ TEST(LowPrecisionTests, CudaCastF32ToBF16ViaFallback)
     auto back_f32 = bee::cast(bf16_cpu, bee::DType::F32).value();
     const auto* p = static_cast<const float*>(back_f32.data_ptr());
     EXPECT_NEAR(p[0], 3.5f, 1e-2f);
+}
+
+// ── F16 次规格数舍入边界测试 ────────────────────────────────────────────────
+
+TEST(LowPrecisionTests, F16SubnormalMinPositive)
+{
+    // 最小正 F16 次规格数 = 2^(-24)；F32 bits = 0x33800000（exp=103, mant=0）
+    std::uint32_t bits_f32 = 0x33800000u;
+    float         val;
+    std::memcpy(&val, &bits_f32, sizeof(val));
+    EXPECT_EQ(bee::float_to_f16_bits(val), std::uint16_t{0x0001u});
+}
+
+TEST(LowPrecisionTests, F16SubnormalMidpointTieRoundsToEven)
+{
+    // 0 与最小次规格数之间的中点 tie = 2^(-25)；F32 bits = 0x33000000
+    // round-to-even → 0（偶数）
+    std::uint32_t bits_f32 = 0x33000000u;
+    float         val;
+    std::memcpy(&val, &bits_f32, sizeof(val));
+    EXPECT_EQ(bee::float_to_f16_bits(val), std::uint16_t{0x0000u});
+}
+
+TEST(LowPrecisionTests, F16SubnormalTieN1N2RoundsToEven)
+{
+    // 1.5 × min_subnormal = 1.5 × 2^(-24) = midpoint 介于 n=1 与 n=2 之间
+    // F32 bits = 0x33C00000（exp=103, mant=0x400000）
+    // round-to-even → n=2（偶数），即 0x0002
+    std::uint32_t bits_f32 = 0x33C00000u;
+    float         val;
+    std::memcpy(&val, &bits_f32, sizeof(val));
+    EXPECT_EQ(bee::float_to_f16_bits(val), std::uint16_t{0x0002u});
+}
+
+TEST(LowPrecisionTests, F16SubnormalAboveMidpointRoundsUp)
+{
+    // 1.5 × 2^(-25) 位于 0 与 min_subnormal 中点之上（sticky ≠ 0）→ 向上舍入至 0x0001
+    // F32 bits = 0x33400000（exp=102, mant=0x400000）
+    std::uint32_t bits_f32 = 0x33400000u;
+    float         val;
+    std::memcpy(&val, &bits_f32, sizeof(val));
+    EXPECT_EQ(bee::float_to_f16_bits(val), std::uint16_t{0x0001u});
+}
+
+TEST(LowPrecisionTests, F16NegativeZeroPreserved)
+{
+    // -0.0f 在 F16 中应编码为 0x8000
+    EXPECT_EQ(bee::float_to_f16_bits(-0.0f), std::uint16_t{0x8000u});
+}
+
+TEST(LowPrecisionTests, F16PositiveInfinity)
+{
+    // +Inf 应编码为 0x7C00
+    EXPECT_EQ(bee::float_to_f16_bits(std::numeric_limits<float>::infinity()), std::uint16_t{0x7C00u});
+}
+
+// ── promote_types 对称性测试 ─────────────────────────────────────────────────
+
+TEST(LowPrecisionTests, PromoteTypesSymmetry_BoolI8)
+{
+    // Bool + I8 与 I8 + Bool 结果必须相同（对称性）
+    const auto op = bee::DTypeOpKind::ElementWise;
+    EXPECT_EQ(bee::promote_types(bee::DType::Bool, bee::DType::I8, op),
+              bee::promote_types(bee::DType::I8, bee::DType::Bool, op));
+}
+
+TEST(LowPrecisionTests, PromoteTypesSymmetry_U8I8)
+{
+    // U8 + I8 与 I8 + U8 结果必须相同
+    const auto op = bee::DTypeOpKind::ElementWise;
+    EXPECT_EQ(bee::promote_types(bee::DType::U8, bee::DType::I8, op),
+              bee::promote_types(bee::DType::I8, bee::DType::U8, op));
+}
+
+TEST(LowPrecisionTests, PromoteTypesBoolI8ResultIsI8)
+{
+    // Bool 与 I8 混合 → I8（最宽有符号小整型）
+    const auto op = bee::DTypeOpKind::ElementWise;
+    EXPECT_EQ(bee::promote_types(bee::DType::Bool, bee::DType::I8, op), bee::DType::I8);
+    EXPECT_EQ(bee::promote_types(bee::DType::I8, bee::DType::Bool, op), bee::DType::I8);
+}
+
+TEST(LowPrecisionTests, PromoteTypesU8I8ResultIsI8)
+{
+    // U8 与 I8 混合 → I8
+    const auto op = bee::DTypeOpKind::ElementWise;
+    EXPECT_EQ(bee::promote_types(bee::DType::U8, bee::DType::I8, op), bee::DType::I8);
+    EXPECT_EQ(bee::promote_types(bee::DType::I8, bee::DType::U8, op), bee::DType::I8);
+}
+
+TEST(LowPrecisionTests, PromoteTypesBoolU8ResultIsU8)
+{
+    // Bool 与 U8 混合 → U8
+    const auto op = bee::DTypeOpKind::ElementWise;
+    EXPECT_EQ(bee::promote_types(bee::DType::Bool, bee::DType::U8, op), bee::DType::U8);
+    EXPECT_EQ(bee::promote_types(bee::DType::U8, bee::DType::Bool, op), bee::DType::U8);
+}
+
+// ── 低精度组合 cast 测试（F32 桥接路线）────────────────────────────────────
+
+TEST(LowPrecisionTests, CastF16ToBF16Bridge)
+{
+    // F16 → BF16（经 F32 桥接）：值应基本保留
+    auto src  = bee::Tensor::full({4}, bee::DType::F32, 1.5).value();
+    auto f16  = bee::cast(src, bee::DType::F16).value();
+    auto bf16 = bee::cast(f16, bee::DType::BF16).value();
+    EXPECT_EQ(bf16.dtype(), bee::DType::BF16);
+    auto back = bee::cast(bf16, bee::DType::F32).value();
+    const auto* p = static_cast<const float*>(back.data_ptr());
+    EXPECT_NEAR(p[0], 1.5f, 0.01f);
+    EXPECT_NEAR(p[3], 1.5f, 0.01f);
+}
+
+TEST(LowPrecisionTests, CastBF16ToF16Bridge)
+{
+    // BF16 → F16（经 F32 桥接）：值应基本保留
+    auto src = bee::Tensor::full({4}, bee::DType::F32, 2.5).value();
+    auto bf16 = bee::cast(src, bee::DType::BF16).value();
+    auto f16  = bee::cast(bf16, bee::DType::F16).value();
+    EXPECT_EQ(f16.dtype(), bee::DType::F16);
+    auto back = bee::cast(f16, bee::DType::F32).value();
+    const auto* p = static_cast<const float*>(back.data_ptr());
+    EXPECT_NEAR(p[0], 2.5f, 0.02f);
+    EXPECT_NEAR(p[3], 2.5f, 0.02f);
+}
+
+TEST(LowPrecisionTests, CastF16ToI32Bridge)
+{
+    // F16 → I32（经 F32 桥接）：整数值应精确
+    auto src = bee::Tensor::full({2}, bee::DType::F32, 5.0).value();
+    auto f16  = bee::cast(src, bee::DType::F16).value();
+    auto i32  = bee::cast(f16, bee::DType::I32).value();
+    EXPECT_EQ(i32.dtype(), bee::DType::I32);
+    const auto* p = static_cast<const int32_t*>(i32.data_ptr());
+    EXPECT_EQ(p[0], 5);
+    EXPECT_EQ(p[1], 5);
+}
+
+TEST(LowPrecisionTests, CastI32ToBF16Bridge)
+{
+    // I32 → BF16（经 F32 桥接）：值应基本保留
+    auto src = bee::Tensor::zeros({2}, bee::DType::I32).value();
+    auto* ip  = static_cast<int32_t*>(src.data_ptr());
+    ip[0] = 3;
+    ip[1] = 7;
+    auto bf16 = bee::cast(src, bee::DType::BF16).value();
+    EXPECT_EQ(bf16.dtype(), bee::DType::BF16);
+    auto back = bee::cast(bf16, bee::DType::F32).value();
+    const auto* fp = static_cast<const float*>(back.data_ptr());
+    EXPECT_NEAR(fp[0], 3.0f, 0.1f);
+    EXPECT_NEAR(fp[1], 7.0f, 0.1f);
+}
+
+TEST(LowPrecisionTests, CudaCastF16ToBF16ViaFallback)
+{
+    // CUDA F16 → BF16 经 CPU 过渡，不应产生未定义结果
+    if (!bee::tensor::cuda::is_available())
+        GTEST_SKIP() << "CUDA 不可用，跳过";
+
+    auto cpu_f32 = bee::Tensor::full({4}, bee::DType::F32, 1.5).value();
+    auto cpu_f16 = bee::cast(cpu_f32, bee::DType::F16).value();
+    auto gpu_f16 = cpu_f16.to(bee::Device::CUDA).value();
+
+    // CUDA F16 → BF16（走 CPU 参考路径）
+    auto gpu_bf16 = bee::cast(gpu_f16, bee::DType::BF16).value();
+    EXPECT_EQ(gpu_bf16.dtype(), bee::DType::BF16);
+    EXPECT_EQ(gpu_bf16.device(), bee::Device::CUDA);
+
+    // 搬回 CPU 验证值
+    auto cpu_bf16 = gpu_bf16.to(bee::Device::CPU).value();
+    auto back     = bee::cast(cpu_bf16, bee::DType::F32).value();
+    const auto* p = static_cast<const float*>(back.data_ptr());
+    EXPECT_NEAR(p[0], 1.5f, 0.02f);
 }

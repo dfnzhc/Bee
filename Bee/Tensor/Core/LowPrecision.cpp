@@ -33,11 +33,14 @@ auto float_to_f16_bits(float value) noexcept -> std::uint16_t
         if (biased_exp < -10)
             return static_cast<std::uint16_t>(sign); // 绝对值太小 → ±0
         // 次规格数：将隐含的 leading 1 加入尾数后右移
-        const uint32_t shifted = (mant | 0x800000u) >> (1 - biased_exp);
-        // 最近偶数舍入
-        const uint32_t round_bit = (mant | 0x800000u) >> (-biased_exp) & 1u;
-        const uint32_t sticky    = ((mant | 0x800000u) << (14 + biased_exp)) & 0x1FFFu;
-        uint32_t       result    = (shifted >> 13);
+        // 总右移量 = 14 - biased_exp（范围 [14, 24]）
+        const uint32_t M     = mant | 0x800000u;
+        const uint32_t shift = static_cast<uint32_t>(14 - biased_exp);
+        // 最近偶数舍入：round_bit 是最低保留位的下一位，sticky 是其余低位的或
+        const uint32_t result_bits = M >> shift;
+        const uint32_t round_bit   = (M >> (shift - 1u)) & 1u;
+        const uint32_t sticky      = M & ((1u << (shift - 1u)) - 1u);
+        uint32_t       result      = result_bits;
         if (round_bit && (sticky || (result & 1u)))
             ++result;
         return static_cast<std::uint16_t>(sign | result);

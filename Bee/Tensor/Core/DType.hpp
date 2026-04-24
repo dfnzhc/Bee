@@ -227,7 +227,12 @@ enum class DTypeOpKind : uint8_t
         return DType::I64;
     if (lhs == DType::I32 || rhs == DType::I32)
         return DType::I32;
-    return lhs;
+    // 次级整型对称提升：I8 > U8 > Bool
+    if (lhs == DType::I8 || rhs == DType::I8)
+        return DType::I8;
+    if (lhs == DType::U8 || rhs == DType::U8)
+        return DType::U8;
+    return DType::Bool;
 }
 
 } // namespace bee

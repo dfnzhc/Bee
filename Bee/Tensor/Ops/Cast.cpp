@@ -103,6 +103,21 @@ auto cast(const Tensor& src, DType dst_dtype, const tensor::cuda::ExecContext* c
         return out;
     }
 
+    // 低精度桥接路径：其余涉及 F16/BF16 的组合经 F32 中间步骤完成，
+    // 避免落入 cpu_cast_dispatch 的静默未定义行为。
+    // 此时 src_dt 或 dst_dtype 为 F16/BF16，且不是以上已直接处理的 4 个组合。
+    {
+        const bool src_low = (src_dt == DType::F16 || src_dt == DType::BF16);
+        const bool dst_low = (dst_dtype == DType::F16 || dst_dtype == DType::BF16);
+        if (src_low || dst_low) {
+            // 两步桥接：src → F32 → dst
+            auto mid_r = cast(cont, DType::F32, nullptr);
+            if (!mid_r)
+                return std::unexpected(std::move(mid_r.error()));
+            return cast(*mid_r, dst_dtype, nullptr);
+        }
+    }
+
     // CPU 路径：通过运行期 ISA 分派进入 B11 的 SIMD + parallel_for cast 内核。
     BEE_RT_DISPATCH_STMT(ct_cast, cont.dtype(), dst_dtype, cont.data_ptr(), out.data_ptr(), cont.numel());
 
