@@ -181,7 +181,7 @@ TEST(MatmulTests, ErrDtypeMismatch)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 错误路径：非 2D（1D / 3D）
+// 错误路径：1D 输入不支持
 // ─────────────────────────────────────────────────────────────────────────────
 
 TEST(MatmulTests, ErrNonTwoD_1D)
@@ -194,14 +194,20 @@ TEST(MatmulTests, ErrNonTwoD_1D)
     ASSERT_ERR(matmul(*a, *b));
 }
 
-TEST(MatmulTests, ErrNonTwoD_3D)
+// ─────────────────────────────────────────────────────────────────────────────
+// 3D 输入（batched matmul）：(2,3,4) × (4,2) → (2,3,2)
+// ─────────────────────────────────────────────────────────────────────────────
+
+TEST(MatmulTests, BatchedWith2DRhsIsValid)
 {
     auto a = Tensor::zeros({2, 3, 4}, DType::F32);
     auto b = Tensor::zeros({4, 2}, DType::F32);
     ASSERT_OK(a);
     ASSERT_OK(b);
 
-    ASSERT_ERR(matmul(*a, *b));
+    auto c = matmul(*a, *b);
+    ASSERT_OK(c);
+    EXPECT_EQ(c->shape(), (Shape{2, 3, 2}));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

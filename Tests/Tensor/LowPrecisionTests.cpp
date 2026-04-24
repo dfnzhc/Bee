@@ -373,3 +373,27 @@ TEST(LowPrecisionTests, CudaCastF16ToBF16ViaFallback)
     const auto* p = static_cast<const float*>(back.data_ptr());
     EXPECT_NEAR(p[0], 1.5f, 0.02f);
 }
+
+// ── F16/BF16 sum 累加类型 ────────────────────────────────────────────────────
+
+TEST(LowPrecisionTests, SumOfF16ReturnsF32Scalar)
+{
+    // F16 全局 sum 应提升到 F32 累加，返回 F32 标量
+    auto src = bee::cast(bee::Tensor::ones({8}, bee::DType::F32).value(), bee::DType::F16).value();
+    auto result = bee::sum(src).value();
+
+    EXPECT_EQ(result.dtype(), bee::DType::F32);
+    const auto* p = static_cast<const float*>(result.data_ptr());
+    EXPECT_NEAR(p[0], 8.0f, 0.1f);
+}
+
+TEST(LowPrecisionTests, SumOfBF16ReturnsF32Scalar)
+{
+    // BF16 全局 sum 同样提升到 F32 累加
+    auto src = bee::cast(bee::Tensor::ones({4}, bee::DType::F32).value(), bee::DType::BF16).value();
+    auto result = bee::sum(src).value();
+
+    EXPECT_EQ(result.dtype(), bee::DType::F32);
+    const auto* p = static_cast<const float*>(result.data_ptr());
+    EXPECT_NEAR(p[0], 4.0f, 0.1f);
+}

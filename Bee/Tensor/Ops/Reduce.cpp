@@ -1,4 +1,5 @@
 #include "Tensor/Ops/Reduce.hpp"
+#include "Tensor/Ops/Cast.hpp"
 #include "Tensor/Cpu/ReduceCpu.hpp"
 #include "Tensor/Cpu/Dispatch/Dispatch.hpp"
 #include "Tensor/Cuda/Backend.hpp"
@@ -169,6 +170,14 @@ auto sum(const Tensor& a) -> Result<Tensor>
 {
     if (auto r = check_global_precond(a, "sum", check_dtype_sum_prod); !r)
         return std::unexpected(std::move(r.error()));
+
+    // 低精度 F16/BF16：提升到 F32 后再 reduce，输出为 F32
+    if (a.dtype() == DType::F16 || a.dtype() == DType::BF16) {
+        auto f32 = cast(a, DType::F32);
+        if (!f32)
+            return std::unexpected(std::move(f32.error()));
+        return sum(*f32);
+    }
 
     auto out = Tensor::empty({}, a.dtype(), a.device());
     if (!out)
