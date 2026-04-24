@@ -397,3 +397,35 @@ TEST(LowPrecisionTests, SumOfBF16ReturnsF32Scalar)
     const auto* p = static_cast<const float*>(result.data_ptr());
     EXPECT_NEAR(p[0], 4.0f, 0.1f);
 }
+
+// ── 按轴 sum 低精度累加类型 ──────────────────────────────────────────────────
+
+TEST(LowPrecisionTests, AxisSumOfF16ReturnsF32)
+{
+    // F16 按轴 sum 应提升到 F32，输出 dtype 为 F32，值正确
+    // 构造 [2, 3] 全 1 的 F16 张量，沿 dim=1 求和，期望输出 shape=[2]，值均为 3.0f
+    auto src_f32 = bee::Tensor::ones({2, 3}, bee::DType::F32).value();
+    auto src = bee::cast(src_f32, bee::DType::F16).value();
+    auto result = bee::sum(src, 1, false).value();
+
+    EXPECT_EQ(result.dtype(), bee::DType::F32);
+    EXPECT_EQ(result.shape(), (bee::Shape{2}));
+    const auto* p = static_cast<const float*>(result.data_ptr());
+    EXPECT_NEAR(p[0], 3.0f, 0.05f);
+    EXPECT_NEAR(p[1], 3.0f, 0.05f);
+}
+
+TEST(LowPrecisionTests, AxisSumOfBF16ReturnsF32WithKeepdim)
+{
+    // BF16 按轴 sum（keepdim=true）应提升到 F32，shape 保留被 reduce 的维度为 1
+    // 构造 [3, 4] 全 1 的 BF16 张量，沿 dim=0 求和（keepdim），期望 shape=[1,4]，值均为 3.0f
+    auto src_f32 = bee::Tensor::ones({3, 4}, bee::DType::F32).value();
+    auto src = bee::cast(src_f32, bee::DType::BF16).value();
+    auto result = bee::sum(src, 0, true).value();
+
+    EXPECT_EQ(result.dtype(), bee::DType::F32);
+    EXPECT_EQ(result.shape(), (bee::Shape{1, 4}));
+    const auto* p = static_cast<const float*>(result.data_ptr());
+    for (int i = 0; i < 4; ++i)
+        EXPECT_NEAR(p[i], 3.0f, 0.05f);
+}

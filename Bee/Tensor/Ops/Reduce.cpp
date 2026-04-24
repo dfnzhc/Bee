@@ -300,6 +300,14 @@ auto sum(const Tensor& a, int dim, bool keepdim) -> Result<Tensor>
         return std::unexpected(std::move(dim_r.error()));
     const int64_t d = *dim_r;
 
+    // 低精度 F16/BF16：提升到 F32 后再按轴 reduce，输出为 F32
+    if (a.dtype() == DType::F16 || a.dtype() == DType::BF16) {
+        auto f32 = cast(a, DType::F32);
+        if (!f32)
+            return std::unexpected(std::move(f32.error()));
+        return sum(*f32, dim, keepdim);
+    }
+
     auto out = make_axis_out(a, d, keepdim, a.dtype());
     if (!out)
         return std::unexpected(std::move(out.error()));
