@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <cmath>
+#include <limits>
 
 #include "Tensor/Tensor.hpp"
 #include "Tensor/Cuda/Backend.hpp"
@@ -223,4 +224,128 @@ TEST(AiPrimitiveTests, RopePositionOffsetProducesExpectedRotation)
     const double s1 = std::sin(0.01);
     EXPECT_NEAR(p[1], static_cast<float>(c1 - s1), 1e-5f); // out[1]
     EXPECT_NEAR(p[3], static_cast<float>(s1 + c1), 1e-5f); // out[3]
+}
+
+// ─── 第二轮修复：零维 / NaN / CUDA 正向路径 ───────────────────────────────────
+
+// rms_norm 拒绝最后维为 0（若不显式检查则 n_rows = 0/0 会除零崩溃）
+TEST(AiPrimitiveTests, RmsNormRejectsZeroLastDim)
+{
+    auto x = Tensor::empty({2, 0}, DType::F32).value();
+    auto w = Tensor::empty({0}, DType::F32).value();
+    auto y = bee::rms_norm(x, w, 1e-5);
+    EXPECT_FALSE(y.has_value());
+}
+
+// apply_rope 拒绝 seq_len 为 0
+TEST(AiPrimitiveTests, RopeRejectsZeroSeqLen)
+{
+    auto q = Tensor::empty({1, 0, 4}, DType::F32).value();
+    auto r = bee::apply_rope(q, 10000.0, 0);
+    EXPECT_FALSE(r.has_value());
+}
+
+// apply_rope 拒绝最后维为 0（dim=0 为偶数，不会被 dim%2 检查拦截）
+TEST(AiPrimitiveTests, RopeRejectsZeroLastDim)
+{
+    auto q = Tensor::empty({1, 2, 0}, DType::F32).value();
+    auto r = bee::apply_rope(q, 10000.0, 0);
+    EXPECT_FALSE(r.has_value());
+}
+
+// rms_norm 拒绝 NaN eps（NaN <= 0 为 false，须额外判断 isfinite）
+TEST(AiPrimitiveTests, RmsNormRejectsNaNEps)
+{
+    auto x = Tensor::ones({2, 4}, DType::F32).value();
+    auto w = Tensor::ones({4}, DType::F32).value();
+    auto y = bee::rms_norm(x, w, std::numeric_limits<double>::quiet_NaN());
+    EXPECT_FALSE(y.has_value());
+}
+
+// apply_rope 拒绝 NaN base
+TEST(AiPrimitiveTests, RopeRejectsNaNBase)
+{
+    auto q = Tensor::ones({1, 1, 4}, DType::F32).value();
+    auto r = bee::apply_rope(q, std::numeric_limits<double>::quiet_NaN(), 0);
+    EXPECT_FALSE(r.has_value());
+}
+
+// embedding CUDA 正向路径：两端都在 CUDA，结果设备为 CUDA，值与 CPU 一致
+TEST(AiPrimitiveTests, EmbeddingCudaInputsReturnCudaAndMatchCpu)
+{
+    if (!bee::tensor::cuda::is_available())
+        GTEST_SKIP() << "CUDA 不可用，跳过 CUDA 正向测试";
+
+    // 构造 CPU 参考
+    auto w_cpu   = Tensor::arange(0, 12, 1, DType::F32).value().reshape({3, 4}).value();
+    auto ids_cpu = Tensor::zeros({2}, DType::I64).value();
+    auto* p_ids  = static_cast<int64_t*>(ids_cpu.data_ptr());
+    p_ids[0]     = 0;
+    p_ids[1]     = 2;
+    auto ref = bee::embedding(w_cpu, ids_cpu).value();
+
+    // CUDA 路径
+    auto w_cuda   = w_cpu.to(Device::CUDA).value();
+    auto ids_cuda = ids_cpu.to(Device::CUDA).value();
+    auto out_cuda = bee::embedding(w_cuda, ids_cuda).value();
+
+    ASSERT_EQ(out_cuda.device(), Device::CUDA);
+    ASSERT_EQ(out_cuda.shape(), ref.shape());
+
+    // 搬回 CPU 对比数值
+    auto        out_back = out_cuda.to(Device::CPU).value();
+    const auto* pa       = static_cast<const float*>(ref.data_ptr());
+    const auto* pb       = static_cast<const float*>(out_back.data_ptr());
+    for (int64_t i = 0; i < ref.numel(); ++i)
+        EXPECT_FLOAT_EQ(pb[i], pa[i]) << "index=" << i;
+}
+
+// rms_norm CUDA 正向路径：两端都在 CUDA，结果设备为 CUDA，值与 CPU 一致
+TEST(AiPrimitiveTests, RmsNormCudaInputsReturnCudaAndMatchCpu)
+{
+    if (!bee::tensor::cuda::is_available())
+        GTEST_SKIP() << "CUDA 不可用，跳过 CUDA 正向测试";
+
+    // 构造 CPU 参考（非平凡输入，便于验证数值不全为 1）
+    auto x_cpu = Tensor::arange(1, 9, 1, DType::F32).value().reshape({2, 4}).value();
+    auto w_cpu = Tensor::ones({4}, DType::F32).value();
+    auto ref   = bee::rms_norm(x_cpu, w_cpu, 1e-5).value();
+
+    // CUDA 路径
+    auto x_cuda   = x_cpu.to(Device::CUDA).value();
+    auto w_cuda   = w_cpu.to(Device::CUDA).value();
+    auto out_cuda = bee::rms_norm(x_cuda, w_cuda, 1e-5).value();
+
+    ASSERT_EQ(out_cuda.device(), Device::CUDA);
+    ASSERT_EQ(out_cuda.shape(), ref.shape());
+
+    auto        out_back = out_cuda.to(Device::CPU).value();
+    const auto* pa       = static_cast<const float*>(ref.data_ptr());
+    const auto* pb       = static_cast<const float*>(out_back.data_ptr());
+    for (int64_t i = 0; i < ref.numel(); ++i)
+        EXPECT_NEAR(pb[i], pa[i], 1e-5f) << "index=" << i;
+}
+
+// apply_rope CUDA 正向路径：输入在 CUDA，结果设备为 CUDA，值与 CPU 一致
+TEST(AiPrimitiveTests, RopeCudaInputReturnsCudaAndMatchesCpu)
+{
+    if (!bee::tensor::cuda::is_available())
+        GTEST_SKIP() << "CUDA 不可用，跳过 CUDA 正向测试";
+
+    // 构造 CPU 参考
+    auto q_cpu = Tensor::ones({1, 2, 4}, DType::F32).value();
+    auto ref   = bee::apply_rope(q_cpu, 10000.0, 0).value();
+
+    // CUDA 路径
+    auto q_cuda   = q_cpu.to(Device::CUDA).value();
+    auto out_cuda = bee::apply_rope(q_cuda, 10000.0, 0).value();
+
+    ASSERT_EQ(out_cuda.device(), Device::CUDA);
+    ASSERT_EQ(out_cuda.shape(), ref.shape());
+
+    auto        out_back = out_cuda.to(Device::CPU).value();
+    const auto* pa       = static_cast<const float*>(ref.data_ptr());
+    const auto* pb       = static_cast<const float*>(out_back.data_ptr());
+    for (int64_t i = 0; i < ref.numel(); ++i)
+        EXPECT_NEAR(pb[i], pa[i], 1e-5f) << "index=" << i;
 }

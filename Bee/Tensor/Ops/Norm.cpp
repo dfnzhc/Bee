@@ -84,6 +84,12 @@ auto rms_norm(const Tensor& x, const Tensor& weight, double eps, const tensor::c
         ));
 
     const int64_t d = x.shape().back();
+    if (d <= 0)
+        return std::unexpected(make_error(
+            std::format("rms_norm: x 最后维须 > 0，当前 d={}", d),
+            Severity::Recoverable
+        ));
+
     if (weight.numel() != d)
         return std::unexpected(make_error(
             std::format("rms_norm: weight 大小（{}）须与 x 最后维（{}）一致",
@@ -91,9 +97,9 @@ auto rms_norm(const Tensor& x, const Tensor& weight, double eps, const tensor::c
             Severity::Recoverable
         ));
 
-    if (eps <= 0.0)
+    if (!std::isfinite(eps) || eps <= 0.0)
         return std::unexpected(make_error(
-            std::format("rms_norm: eps 须 > 0，当前 {}", eps),
+            std::format("rms_norm: eps 须为有限正数，当前 {}", eps),
             Severity::Recoverable
         ));
 

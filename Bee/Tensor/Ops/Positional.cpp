@@ -85,16 +85,31 @@ auto apply_rope(const Tensor& x, double base, int64_t position_offset, const ten
             Severity::Recoverable
         ));
 
-    const int64_t dim = x.shape().back();
+    // 提前提取维度，用于前置校验（shape 在设备迁移后不变）
+    const int64_t seq_len = x.shape()[static_cast<std::size_t>(x.ndim() - 2)];
+    const int64_t dim     = x.shape().back();
+
+    if (seq_len <= 0)
+        return std::unexpected(make_error(
+            std::format("apply_rope: 倒数第二维（seq_len）须 > 0，当前 {}", seq_len),
+            Severity::Recoverable
+        ));
+
+    if (dim <= 0)
+        return std::unexpected(make_error(
+            std::format("apply_rope: 最后维须 > 0，当前 dim={}", dim),
+            Severity::Recoverable
+        ));
+
     if (dim % 2 != 0)
         return std::unexpected(make_error(
             std::format("apply_rope: 最后维须为偶数，当前 dim={}", dim),
             Severity::Recoverable
         ));
 
-    if (base <= 0.0)
+    if (!std::isfinite(base) || base <= 0.0)
         return std::unexpected(make_error(
-            std::format("apply_rope: base 须 > 0，当前 {}", base),
+            std::format("apply_rope: base 须为有限正数，当前 {}", base),
             Severity::Recoverable
         ));
 
@@ -118,8 +133,7 @@ auto apply_rope(const Tensor& x, double base, int64_t position_offset, const ten
     }
 
     // ── 计算维度参数 ──────────────────────────────────────────────────────────
-    const int64_t seq_len = x_cpu.shape()[static_cast<std::size_t>(x_cpu.ndim() - 2)];
-    // n_batch = numel / (seq_len * dim)
+    // seq_len / dim 已在前置校验中提取，此处直接复用
     const int64_t n_batch = x_cpu.numel() / (seq_len * dim);
 
     auto out = Tensor::empty(x_cpu.shape(), x_cpu.dtype());

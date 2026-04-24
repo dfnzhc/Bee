@@ -12,7 +12,7 @@
 //
 // 接口约束：
 //   x               ：任意 ndim >= 2，dtype 为 F32 或 F64，最后维须为偶数；
-//   base            ：基数（默认 10000.0），须 > 0；
+//   base            ：基数（默认 10000.0），须为有限正数（std::isfinite(base) && base > 0）；
 //   position_offset ：序列偏移（整数，通常为 0 或 KV cache 长度）；
 //
 // CUDA 过渡路径：
