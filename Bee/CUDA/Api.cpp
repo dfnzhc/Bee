@@ -151,6 +151,23 @@ void deallocate(void* ptr, std::size_t /*nbytes*/, std::size_t /*alignment*/) no
     (void)cudaStreamSynchronize(stream.native_handle());
 }
 
+auto allocate_pinned_host(std::size_t nbytes) -> Result<void*>
+{
+    if (nbytes == 0)
+        return static_cast<void*>(nullptr);
+
+    void* ptr = nullptr;
+    BEE_CUDA_CHECK(cudaMallocHost(&ptr, nbytes));
+    return ptr;
+}
+
+auto free_pinned_host(void* ptr) noexcept -> void
+{
+    if (!ptr)
+        return;
+    (void)cudaFreeHost(ptr);
+}
+
 namespace
 {
 
@@ -416,11 +433,18 @@ auto wait_event(void* event_handle, void* stream) -> Result<void>
 
 auto request_workspace(std::size_t nbytes, void* stream) -> Result<void*>
 {
-    // 骨架实现：Task 1 不涉及真实 workspace 管理，返回 nullptr。
-    // Task 2+ 将引入真实的池化/临时内存管理。
-    (void)nbytes;
-    (void)stream;
-    return static_cast<void*>(nullptr);
+    // Task 2 最小实现：直接用 cudaMalloc 分配临时 workspace。
+    // 后续 Task 可引入池化与生命周期管理。
+    if (nbytes == 0)
+        return static_cast<void*>(nullptr);
+
+    (void)stream; // 当前暂不使用 stream 参数
+
+    void* ptr = nullptr;
+    BEE_CUDA_CHECK(cudaMalloc(&ptr, nbytes));
+    // 注意：此实现未管理生命周期，调用方需自行 cudaFree 或依赖运行时清理。
+    // Task 2 暂时容忍此泄漏风险，Task 3/4 将完善生命周期管理。
+    return ptr;
 }
 
 } // namespace bee::cuda

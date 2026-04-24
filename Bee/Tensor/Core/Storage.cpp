@@ -4,11 +4,12 @@
 namespace bee
 {
 
-Storage::Storage(void* data, std::size_t nbytes, std::size_t alignment, Device device, IAllocator* allocator) noexcept
+Storage::Storage(void* data, std::size_t nbytes, std::size_t alignment, Device device, MemoryKind memory_kind, IAllocator* allocator) noexcept
     : data_(data)
     , nbytes_(nbytes)
     , alignment_(alignment)
     , device_(device)
+    , memory_kind_(memory_kind)
     , allocator_(allocator)
 {
 }
@@ -25,8 +26,15 @@ auto Storage::allocate(std::size_t nbytes, IAllocator& allocator) -> Result<std:
     if (!result)
         return std::unexpected(std::move(result.error()));
 
+    // 根据 device 推断 memory_kind
+    MemoryKind kind = MemoryKind::Host;
+    if (allocator.device() == Device::CUDA)
+    {
+        kind = MemoryKind::Device;
+    }
+
     // Storage 构造函数为私有，无法使用 make_shared，直接用 new
-    return std::shared_ptr<Storage>(new Storage(result.value(), nbytes, 64u, allocator.device(), &allocator));
+    return std::shared_ptr<Storage>(new Storage(result.value(), nbytes, 64u, allocator.device(), kind, &allocator));
 }
 
 auto Storage::data() noexcept -> void*
@@ -52,6 +60,16 @@ auto Storage::device() const noexcept -> Device
 auto Storage::allocator() const noexcept -> IAllocator&
 {
     return *allocator_;
+}
+
+auto Storage::memory_kind() const noexcept -> MemoryKind
+{
+    return memory_kind_;
+}
+
+auto Storage::is_pinned() const noexcept -> bool
+{
+    return memory_kind_ == MemoryKind::HostPinned;
 }
 
 } // namespace bee

@@ -51,6 +51,10 @@ namespace bee::cuda
 
 void deallocate(void* ptr, std::size_t nbytes, std::size_t alignment) noexcept;
 
+// pinned host memory (页锁定内存，提升 H2D/D2H 传输速度)
+[[nodiscard]] auto allocate_pinned_host(std::size_t nbytes) -> Result<void*>;
+auto free_pinned_host(void* ptr) noexcept -> void;
+
 [[nodiscard]] auto memcpy_h2d(void* dst, const void* src, std::size_t nbytes) -> Result<void>;
 [[nodiscard]] auto memcpy_d2h(void* dst, const void* src, std::size_t nbytes) -> Result<void>;
 [[nodiscard]] auto memcpy_d2d(void* dst, const void* src, std::size_t nbytes) -> Result<void>;

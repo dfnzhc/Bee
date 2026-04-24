@@ -26,3 +26,18 @@ TEST(CudaRuntimeTests, AsyncCopyApiExistsAndRoundTripsShape)
     EXPECT_EQ(back.shape(), src.shape());
     EXPECT_EQ(back.dtype(), src.dtype());
 }
+
+TEST(CudaRuntimeTests, StorageTracksMemoryKind)
+{
+    auto cpu = bee::Tensor::zeros({4}, bee::DType::F32, bee::Device::CPU).value();
+    EXPECT_EQ(cpu.storage()->memory_kind(), bee::MemoryKind::Host);
+}
+
+TEST(CudaRuntimeTests, WorkspaceCanBeRequestedFromBackend)
+{
+    if (!bee::tensor::cuda::is_available())
+        GTEST_SKIP() << "CUDA unavailable";
+
+    void* workspace = bee::tensor::cuda::request_workspace(4096, nullptr).value();
+    EXPECT_NE(workspace, nullptr);
+}
