@@ -19,6 +19,7 @@
 #include <array>
 #include <atomic>
 #include <format>
+#include <mutex>
 
 namespace bee::cuda
 {
@@ -437,6 +438,7 @@ namespace
     // 最小 workspace registry：按 device 持有单一缓存块。
     // 所有权：runtime-owned，调用方不负责 free。
     // 生命周期：静态对象析构时释放；进程期间可复用。
+    // 线程安全：mtx 保护所有 slot 的并发读写，防止双重 free / 丢失更新。
     struct WorkspaceRegistry
     {
         struct Slot
@@ -446,9 +448,11 @@ namespace
         };
 
         std::array<Slot, 16> slots{}; // 最多支持 16 个 device
+        std::mutex           mtx;     // 保护 slots 并发访问
 
         ~WorkspaceRegistry()
         {
+            // 析构在进程退出时调用，无需加锁（此时不再有并发访问）
             for (auto& slot : slots) {
                 if (slot.ptr) {
                     (void)cudaFree(slot.ptr);
@@ -462,6 +466,7 @@ namespace
             if (device < 0 || device >= static_cast<int>(slots.size()))
                 return std::unexpected(make_error("workspace: device index out of range", Severity::Recoverable));
 
+            std::lock_guard lock{mtx};
             auto& slot = slots[static_cast<std::size_t>(device)];
 
             // 容量足够，直接复用
@@ -469,6 +474,7 @@ namespace
                 return slot.ptr;
 
             // 容量不足或首次分配：释放旧缓存，重新分配更大块
+            // 注意：旧指针在此处失效，调用方不得跨增长边界缓存旧 workspace 指针
             if (slot.ptr) {
                 (void)cudaFree(slot.ptr);
                 slot.ptr      = nullptr;
@@ -494,7 +500,10 @@ namespace
 auto request_workspace(std::size_t nbytes, void* stream) -> Result<void*>
 {
     // runtime-owned workspace：返回的指针由 runtime 持有，调用方无需也不应 free。
-    // 生命周期：至少持续到进程结束；同一 device 的多次请求可能返回同一指针（当容量足够时）。
+    // 生命周期契约：
+    // - 同一 device 上容量足够时，直接复用已有块，返回相同指针。
+    // - 当后续请求的 nbytes 超过已有容量时，runtime 会释放旧块并重新分配更大块；
+    //   旧指针随即失效，调用方不得跨增长边界缓存旧 workspace 指针。
     if (nbytes == 0)
         return static_cast<void*>(nullptr);
 

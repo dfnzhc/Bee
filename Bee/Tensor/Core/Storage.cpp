@@ -2,7 +2,7 @@
 #include "Base/Memory/Allocator.hpp"
 #include "Base/Diagnostics/Error.hpp"
 
-#if BEE_ENABLE_CUDA
+#if defined(BEE_TENSOR_WITH_CUDA)
 #    include <cuda_runtime.h>
 #endif
 
@@ -24,7 +24,7 @@ namespace
 
         [[nodiscard]] auto allocate(std::size_t nbytes, std::size_t /*alignment*/) -> Result<void*> override
         {
-#if BEE_ENABLE_CUDA
+#if defined(BEE_TENSOR_WITH_CUDA)
             if (nbytes == 0)
                 return static_cast<void*>(nullptr);
             void* ptr = nullptr;
@@ -43,7 +43,7 @@ namespace
 
         auto deallocate(void* p, std::size_t /*nbytes*/, std::size_t /*alignment*/) noexcept -> void override
         {
-#if BEE_ENABLE_CUDA
+#if defined(BEE_TENSOR_WITH_CUDA)
             if (p)
                 (void)cudaFreeHost(p);
 #else
@@ -97,10 +97,18 @@ auto Storage::allocate(std::size_t nbytes, IAllocator& allocator) -> Result<std:
 
 auto Storage::allocate(std::size_t nbytes, IAllocator& allocator, MemoryKind memory_kind) -> Result<std::shared_ptr<Storage>>
 {
-    // 显式 memory kind 路径：为 HostPinned 等特殊语义提供真实代码路径。
-    IAllocator* actual_allocator = &allocator;
+    // Workspace 属于 runtime-owned 语义，生命周期不由 Storage 析构管控。
+    // 调用方应直接使用 tensor::cuda::request_workspace() 获取 workspace 指针，
+    // 不可通过 Storage::allocate 创建 Workspace 类型 Storage。
+    if (memory_kind == MemoryKind::Workspace)
+        return std::unexpected(make_error(
+            "Storage::allocate: MemoryKind::Workspace 不允许通过 Storage 创建，"
+            "请使用 tensor::cuda::request_workspace()",
+            Severity::Recoverable
+        ));
 
-    // 如果要求 HostPinned，使用专用 pinned host allocator
+    // HostPinned 路径使用专用 pinned host allocator
+    IAllocator* actual_allocator = &allocator;
     if (memory_kind == MemoryKind::HostPinned) {
         actual_allocator = &PinnedHostAllocator::instance();
     }

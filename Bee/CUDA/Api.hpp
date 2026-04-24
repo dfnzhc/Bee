@@ -184,6 +184,9 @@ namespace ops
 [[nodiscard]] auto wait_event(void* event_handle, void* stream) -> Result<void>;
 
 // workspace 管理。
+// runtime-owned：返回的指针由 runtime 持有，调用方无需也不应 free。
+// 容量足够时复用已有块（返回相同指针）；触发扩容时旧指针失效，
+// 调用方不得跨增长边界缓存旧 workspace 指针。
 [[nodiscard]] auto request_workspace(std::size_t nbytes, void* stream) -> Result<void*>;
 
 } // namespace bee::cuda

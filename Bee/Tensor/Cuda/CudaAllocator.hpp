@@ -71,7 +71,9 @@ inline auto CudaAllocator::allocate_for(CudaAllocKind kind, std::size_t nbytes, 
 
 inline auto CudaAllocator::deallocate(void* p, std::size_t nbytes, std::size_t alignment) noexcept -> void
 {
-    // 转发至 Tensor/CUDA 桥接层；在无 CUDA 后端时保持 no-op。
+    // 注意：通过 allocate_for(CudaAllocKind::Workspace, ...) 获取的指针由 runtime 持有，
+    // 不应传入此函数释放，否则会导致 double-free。
+    // Storage::allocate 会对 MemoryKind::Workspace 显式拒绝，以阻断该误用路径。
     tensor::cuda::deallocate(p, nbytes, alignment);
 }
 
