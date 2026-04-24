@@ -15,6 +15,7 @@ namespace bee
 //   - 输入非 contiguous：先整理为连续再转换
 //   - 转换语义：任意类型 → Bool 时 v != 0；Bool → 其它时 true=1/false=0；
 //     浮点/整型互转均用 static_cast（截断，无范围检查）
-[[nodiscard]] auto cast(const Tensor& src, DType dst_dtype) -> Result<Tensor>;
+//   - F16/BF16 ↔ F32：CPU 上通过位编码辅助函数实现（参考精度）
+[[nodiscard]] auto cast(const Tensor& src, DType dst_dtype, const tensor::cuda::ExecContext* ctx = nullptr) -> Result<Tensor>;
 
 } // namespace bee

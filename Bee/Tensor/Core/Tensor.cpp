@@ -2,6 +2,7 @@
 #include "Base/Memory/Allocator.hpp"
 #include "Base/Diagnostics/Check.hpp"
 #include "Tensor/Core/Storage.hpp"
+#include "Tensor/Core/LowPrecision.hpp"
 #include "Tensor/Cuda/CudaAllocator.hpp"
 #include "Tensor/Cuda/Backend.hpp"
 #include "Tensor/Cuda/ExecContext.hpp"
@@ -223,6 +224,27 @@ auto Tensor::ones(Shape shape, DType dtype, Device device) -> Result<Tensor>
 
 auto Tensor::full(Shape shape, DType dtype, double value, Device device) -> Result<Tensor>
 {
+    // F16/BF16：CPU 参考实现——用位编码填充 uint16_t 缓冲区
+    if (dtype == DType::F16 || dtype == DType::BF16) {
+        if (device == Device::CUDA) {
+            Tensor cpu_t;
+            BEE_TRY_ASSIGN(cpu_t, full(shape, dtype, value, Device::CPU));
+            return cpu_t.to(Device::CUDA);
+        }
+        Tensor t;
+        BEE_TRY_ASSIGN(t, empty(shape, dtype, device));
+        const int64_t n = t.numel();
+        if (n > 0) {
+            auto*                ptr  = static_cast<std::uint16_t*>(t.data_ptr());
+            const std::uint16_t  bits = (dtype == DType::F16)
+                                            ? float_to_f16_bits(static_cast<float>(value))
+                                            : float_to_bf16_bits(static_cast<float>(value));
+            for (int64_t i = 0; i < n; ++i)
+                ptr[i] = bits;
+        }
+        return t;
+    }
+
     if (!dtype_is_cpu_computable(dtype))
         return std::unexpected(
             make_error(std::format("Tensor::full: 扩展 dtype::{} 暂不支持 CPU 端填充（NotImplemented）", enum_to_name(dtype)), Severity::Recoverable)

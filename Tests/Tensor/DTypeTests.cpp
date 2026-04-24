@@ -142,7 +142,12 @@ TEST(DTypeTests, ExtendedDtypeEmptyAllocOk)
 
 TEST(DTypeTests, ExtendedDtypeFullReturnsNotImpl)
 {
-    // full/ones 依赖标量填充：扩展 dtype 应返回 NotImplemented。
-    auto r = Tensor::full({4}, DType::BF16, 1.0, Device::CPU);
-    ASSERT_FALSE(r);
+    // F16/BF16 已通过 Task 4 接入 CPU 端填充，FP8/FP4 仍返回 NotImplemented。
+    auto bf16_r = Tensor::full({4}, DType::BF16, 1.0, Device::CPU);
+    ASSERT_TRUE(bf16_r); // BF16 现在可用
+    auto f16_r = Tensor::full({4}, DType::F16, 1.0, Device::CPU);
+    ASSERT_TRUE(f16_r); // F16 现在可用
+    // FP8/FP4 仍不支持
+    auto fp8_r = Tensor::full({4}, DType::FP8E4M3, 1.0, Device::CPU);
+    ASSERT_FALSE(fp8_r);
 }

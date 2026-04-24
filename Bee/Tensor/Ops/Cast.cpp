@@ -1,4 +1,5 @@
 #include "Tensor/Ops/Cast.hpp"
+#include "Tensor/Core/LowPrecision.hpp"
 #include "Tensor/Cpu/Dispatch/Dispatch.hpp"
 #include "Tensor/Cuda/Backend.hpp"
 
@@ -8,7 +9,7 @@
 namespace bee
 {
 
-auto cast(const Tensor& src, DType dst_dtype) -> Result<Tensor>
+auto cast(const Tensor& src, DType dst_dtype, const tensor::cuda::ExecContext* /*ctx*/) -> Result<Tensor>
 {
     // 前置校验
     if (!src.defined())
@@ -41,6 +42,41 @@ auto cast(const Tensor& src, DType dst_dtype) -> Result<Tensor>
         );
         if (!r)
             return std::unexpected(std::move(r.error()));
+        return out;
+    }
+
+    // CPU F16/BF16 互转路径（不走 ISA 分派，直接用位编码辅助函数）
+    const int64_t     n       = cont.numel();
+    const DType       src_dt  = cont.dtype();
+    const void*       src_ptr = cont.data_ptr();
+    void*             dst_ptr = out.data_ptr();
+
+    if (src_dt == DType::F32 && dst_dtype == DType::F16) {
+        const auto* s = static_cast<const float*>(src_ptr);
+        auto*       d = static_cast<std::uint16_t*>(dst_ptr);
+        for (int64_t i = 0; i < n; ++i)
+            d[i] = float_to_f16_bits(s[i]);
+        return out;
+    }
+    if (src_dt == DType::F16 && dst_dtype == DType::F32) {
+        const auto* s = static_cast<const std::uint16_t*>(src_ptr);
+        auto*       d = static_cast<float*>(dst_ptr);
+        for (int64_t i = 0; i < n; ++i)
+            d[i] = f16_bits_to_float(s[i]);
+        return out;
+    }
+    if (src_dt == DType::F32 && dst_dtype == DType::BF16) {
+        const auto* s = static_cast<const float*>(src_ptr);
+        auto*       d = static_cast<std::uint16_t*>(dst_ptr);
+        for (int64_t i = 0; i < n; ++i)
+            d[i] = float_to_bf16_bits(s[i]);
+        return out;
+    }
+    if (src_dt == DType::BF16 && dst_dtype == DType::F32) {
+        const auto* s = static_cast<const std::uint16_t*>(src_ptr);
+        auto*       d = static_cast<float*>(dst_ptr);
+        for (int64_t i = 0; i < n; ++i)
+            d[i] = bf16_bits_to_float(s[i]);
         return out;
     }
 
