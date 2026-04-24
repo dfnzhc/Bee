@@ -383,9 +383,12 @@ auto Tensor::clone() const -> Result<Tensor>
     const std::size_t nbytes  = static_cast<std::size_t>(numel()) * elem_sz;
 
     if (device() == Device::CUDA) {
-        // CUDA：非连续 clone 尚未实现（M3+ 会补 transpose/slice kernel）
-        if (!is_contiguous())
-            return std::unexpected(make_error("CUDA 非连续 clone 尚未实现", Severity::Recoverable));
+        // 非连续时先在设备端物化为 contiguous，再深拷贝，复用 Task 3 的 strided_copy 路径
+        if (!is_contiguous()) {
+            Tensor cont;
+            BEE_TRY_ASSIGN(cont, contiguous());
+            return cont.clone();
+        }
 
         auto storage_result = Storage::allocate(nbytes, impl_->storage->allocator());
         if (!storage_result)

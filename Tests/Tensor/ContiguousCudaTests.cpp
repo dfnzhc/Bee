@@ -93,6 +93,69 @@ TEST(ContiguousCudaTests, Permuted3DDataMatchesCpuReference)
     }
 }
 
+// ── slice 回归：非零 offset + 非单位 stride ──────────────────────────────────
+
+TEST(ContiguousCudaTests, SlicedCudaTensorContiguousMatchesCpuReference)
+{
+    if (!bee::tensor::cuda::is_available())
+        GTEST_SKIP() << "CUDA unavailable";
+
+    // CPU 参考：arange(0,10) → slice(0, 2, 8, 2) → 期望值 {2,4,6}
+    auto cpu_a = bee::Tensor::arange(0, 10, 1, bee::DType::I64, bee::Device::CPU).value();
+    auto cpu_b = cpu_a.slice(0, 2, 8, 2).value(); // offset=2, stride=2, shape={3}
+    auto cpu_c = cpu_b.contiguous().value();
+
+    // CUDA 路径
+    auto cuda_a = bee::Tensor::arange(0, 10, 1, bee::DType::I64, bee::Device::CUDA).value();
+    auto cuda_b = cuda_a.slice(0, 2, 8, 2).value();
+    EXPECT_FALSE(cuda_b.is_contiguous());
+
+    auto cuda_c = cuda_b.contiguous().value();
+    EXPECT_TRUE(cuda_c.is_contiguous());
+    EXPECT_EQ(cuda_c.shape(), cpu_c.shape());
+
+    auto result = cuda_c.to(bee::Device::CPU).value();
+    const auto* expected = static_cast<const int64_t*>(cpu_c.data_ptr());
+    const auto* actual   = static_cast<const int64_t*>(result.data_ptr());
+    for (int64_t i = 0; i < result.numel(); ++i) {
+        EXPECT_EQ(actual[i], expected[i]) << "index=" << i << " 元素不匹配";
+    }
+}
+
+// ── clone：CUDA 非连续张量应返回 contiguous 独立副本 ─────────────────────────
+
+TEST(ContiguousCudaTests, CloneNonContiguousCudaTensorReturnsContiguousCopy)
+{
+    if (!bee::tensor::cuda::is_available())
+        GTEST_SKIP() << "CUDA unavailable";
+
+    auto a = bee::Tensor::arange(0, 12, 1, bee::DType::F32, bee::Device::CUDA).value();
+    auto b = a.reshape({3, 4}).value().transpose(0, 1).value(); // 非连续
+    EXPECT_FALSE(b.is_contiguous());
+
+    // clone() 不应返回错误
+    auto c = b.clone();
+    ASSERT_TRUE(c.has_value()) << "clone() 失败: " << c.error().format();
+    EXPECT_TRUE(c->is_contiguous());
+    EXPECT_EQ(c->device(), bee::Device::CUDA);
+    EXPECT_EQ(c->shape(), (bee::Shape{4, 3}));
+
+    // 独立 storage
+    EXPECT_NE(c->storage().get(), b.storage().get());
+
+    // 数据正确性：与 CPU 参考对比
+    auto cpu_a = bee::Tensor::arange(0, 12, 1, bee::DType::F32, bee::Device::CPU).value();
+    auto cpu_b = cpu_a.reshape({3, 4}).value().transpose(0, 1).value();
+    auto cpu_c = cpu_b.contiguous().value();
+
+    auto result = c->to(bee::Device::CPU).value();
+    const auto* expected = static_cast<const float*>(cpu_c.data_ptr());
+    const auto* actual   = static_cast<const float*>(result.data_ptr());
+    for (int64_t i = 0; i < result.numel(); ++i) {
+        EXPECT_FLOAT_EQ(actual[i], expected[i]) << "index=" << i << " 元素不匹配";
+    }
+}
+
 // ── 已连续的 CUDA 张量 contiguous() 应原样返回（共享 storage）────────────────
 
 TEST(ContiguousCudaTests, AlreadyContiguousTensorReturnsSelf)

@@ -72,7 +72,10 @@ public:
     // 若已在目标设备上则直接返回浅拷贝；非连续张量会先 contiguous() 再搬运。
     [[nodiscard]] auto to(Device target) const -> Result<Tensor>;
     
-    // 异步设备迁移（接受执行上下文）。
+    // 带执行上下文的设备迁移。
+    // 注意：当前实现仍保持同步可观察语义（内部调用 synchronize()）。
+    // ExecContext 目前主要用于传递 stream，为后续真正异步 overlap 扩展预留，
+    // 调用方不应假定该 API 已提供异步 overlap 语义。
     [[nodiscard]] auto to(Device target, const bee::tensor::cuda::ExecContext* exec_context) const -> Result<Tensor>;
 
     // ── 视图与形状变换（零拷贝，除非另行说明）──────────────────────────────
