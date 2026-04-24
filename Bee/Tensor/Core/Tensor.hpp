@@ -16,6 +16,12 @@ namespace bee
 
 class Storage;
 
+namespace tensor::cuda
+{
+struct ExecContext;
+}
+
+
 // 用户面向的 Tensor 外壳：值语义，内部通过 shared_ptr<TensorImpl> 共享数据
 class Tensor
 {
@@ -67,7 +73,7 @@ public:
     [[nodiscard]] auto to(Device target) const -> Result<Tensor>;
     
     // 异步设备迁移（接受执行上下文）。
-    [[nodiscard]] auto to(Device target, const void* exec_context) const -> Result<Tensor>;
+    [[nodiscard]] auto to(Device target, const bee::tensor::cuda::ExecContext* exec_context) const -> Result<Tensor>;
 
     // ── 视图与形状变换（零拷贝，除非另行说明）──────────────────────────────
 

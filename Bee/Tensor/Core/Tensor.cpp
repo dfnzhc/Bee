@@ -4,6 +4,7 @@
 #include "Tensor/Core/Storage.hpp"
 #include "Tensor/Cuda/CudaAllocator.hpp"
 #include "Tensor/Cuda/Backend.hpp"
+#include "Tensor/Cuda/ExecContext.hpp"
 #include "Tensor/Cpu/Dispatch/Dispatch.hpp"
 
 #include <algorithm>
@@ -463,10 +464,49 @@ auto Tensor::to(Device target) const -> Result<Tensor>
     return dst;
 }
 
-auto Tensor::to(Device target, const void* /*exec_context*/) const -> Result<Tensor>
+auto Tensor::to(Device target, const tensor::cuda::ExecContext* exec_context) const -> Result<Tensor>
 {
-    // 骨架实现：暂时忽略 exec_context，使用默认同步路径。
-    return to(target);
+    // ctx == nullptr 时委托旧版同步 to()
+    if (!exec_context)
+        return to(target);
+
+    if (!defined())
+        return std::unexpected(make_error("不能在未定义 Tensor 上调用 to()", Severity::Recoverable));
+
+    // 同设备：返回浅拷贝（共享 storage，零拷贝）
+    if (device() == target)
+        return *this;
+
+    // 非连续源先 contiguous 化
+    Tensor src = *this;
+    if (!is_contiguous()) {
+        BEE_TRY_ASSIGN(src, contiguous());
+    }
+
+    Tensor dst;
+    BEE_TRY_ASSIGN(dst, empty(src.shape(), src.dtype(), target));
+
+    const std::size_t nbytes = static_cast<std::size_t>(src.numel()) * dtype_size(src.dtype());
+    if (nbytes > 0) {
+        const Device from = src.device();
+        const Device to   = target;
+        
+        // 使用异步 memcpy bridge，传入 stream 参数
+        if (from == Device::CPU && to == Device::CUDA) {
+            BEE_TRY(tensor::cuda::memcpy_h2d_async(dst.data_ptr(), src.data_ptr(), nbytes, exec_context->stream));
+        } else if (from == Device::CUDA && to == Device::CPU) {
+            BEE_TRY(tensor::cuda::memcpy_d2h_async(dst.data_ptr(), src.data_ptr(), nbytes, exec_context->stream));
+        } else if (from == Device::CUDA && to == Device::CUDA) {
+            BEE_TRY(tensor::cuda::memcpy_d2d_async(dst.data_ptr(), src.data_ptr(), nbytes, exec_context->stream));
+        } else {
+            return std::unexpected(make_error("Tensor::to 遇到未支持的设备组合", Severity::Recoverable));
+        }
+        
+        // 骨架阶段：保留同步可观察语义，确保测试稳定通过
+        BEE_TRY(tensor::cuda::synchronize());
+    }
+
+    return dst;
 }
 
 // ── contiguous ───────────────────────────────────────────────────────────────

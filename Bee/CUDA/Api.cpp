@@ -416,8 +416,11 @@ auto wait_event(void* event_handle, void* stream) -> Result<void>
 
 auto request_workspace(std::size_t nbytes, void* stream) -> Result<void*>
 {
-    // 骨架实现：使用临时分配（后续可优化为池化管理）。
-    return allocate(nbytes, 256);
+    // 骨架实现：Task 1 不涉及真实 workspace 管理，返回 nullptr。
+    // Task 2+ 将引入真实的池化/临时内存管理。
+    (void)nbytes;
+    (void)stream;
+    return static_cast<void*>(nullptr);
 }
 
 } // namespace bee::cuda
