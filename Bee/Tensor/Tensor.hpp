@@ -15,6 +15,9 @@
 #include "Tensor/Ops/Matmul.hpp"
 #include "Tensor/Ops/Random.hpp"
 #include "Tensor/Ops/Reduce.hpp"
+#include "Tensor/Ops/Embedding.hpp"
+#include "Tensor/Ops/Norm.hpp"
+#include "Tensor/Ops/Positional.hpp"
 #include "Tensor/Cuda/Backend.hpp"
 
 #include <string_view>
