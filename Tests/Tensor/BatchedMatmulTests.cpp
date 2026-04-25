@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "Tensor/Tensor.hpp"
+#include <cstdint>
 
 using namespace bee;
 
@@ -247,4 +248,19 @@ TEST(BatchedMatmulTests, BroadcastBatchUsesCorrectSliceValues)
     EXPECT_FLOAT_EQ(cp[1], 10.0f);
     EXPECT_FLOAT_EQ(cp[2], 15.0f);
     EXPECT_FLOAT_EQ(cp[3], 22.0f);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// I8 matmul：输入 I8，输出 I32
+// ─────────────────────────────────────────────────────────────────────────────
+
+TEST(BatchedMatmulTests, I8MatmulOutputsI32)
+{
+    auto a = Tensor::full({2, 3}, DType::I8, 2.0).value();
+    auto b = Tensor::full({3, 2}, DType::I8, 3.0).value();
+    auto c = matmul(a, b).value();
+    ASSERT_EQ(c.dtype(), DType::I32);
+    const auto* p = static_cast<const int32_t*>(c.data_ptr());
+    for (int i = 0; i < 4; ++i)
+        EXPECT_EQ(p[i], 18);
 }

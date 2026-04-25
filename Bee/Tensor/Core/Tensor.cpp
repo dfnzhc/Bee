@@ -41,6 +41,7 @@ auto dispatch_fill(DType dt, void* data, std::size_t n, double value) -> void
     switch (dt) {
     case DType::Bool: fill_typed<DType::Bool>(data, n, value); break;
     case DType::U8: fill_typed<DType::U8>(data, n, value); break;
+    case DType::I8: fill_typed<DType::I8>(data, n, value); break;
     case DType::I32: fill_typed<DType::I32>(data, n, value); break;
     case DType::I64: fill_typed<DType::I64>(data, n, value); break;
     case DType::F32: fill_typed<DType::F32>(data, n, value); break;

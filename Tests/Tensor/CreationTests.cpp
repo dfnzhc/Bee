@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "Tensor/Tensor.hpp"
+#include <cstdint>
 
 using namespace bee;
 
@@ -147,6 +148,16 @@ TEST(CreationTests, FullBool_NonZero_IsTrue)
     const auto* ptr = static_cast<const bool*>(result->data_ptr());
     for (int64_t i = 0; i < result->numel(); ++i)
         EXPECT_EQ(ptr[i], true);
+}
+
+TEST(CreationTests, FullI8_Negative)
+{
+    auto result = Tensor::full({4}, DType::I8, -2.0);
+    ASSERT_TRUE(result.has_value());
+
+    const auto* ptr = static_cast<const int8_t*>(result->data_ptr());
+    for (int64_t i = 0; i < result->numel(); ++i)
+        EXPECT_EQ(ptr[i], int8_t{-2});
 }
 
 // ── arange ────────────────────────────────────────────────────────────────────
