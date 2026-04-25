@@ -1,7 +1,8 @@
 #pragma once
 
 // Random 初始化算子自由函数声明：rand / randn / randint
-// 基于 std::mt19937_64；seed==0 时使用 std::random_device 生成随机种子
+// CPU 路径基于 std::mt19937_64；CUDA 路径使用设备侧 Philox。
+// seed==0 时使用 std::random_device 生成随机种子。
 
 #include "Base/Diagnostics/Error.hpp"
 #include "Base/Memory/Device.hpp"

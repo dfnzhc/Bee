@@ -437,18 +437,22 @@ TEST(CudaOps, RandFloatOnCudaShapeAndDevice)
     }
 }
 
-TEST(CudaOps, RandIntOnCudaSameSeedMatchesCpu)
+TEST(CudaOps, RandIntOnCudaSameSeedIsDeterministic)
 {
     if (!cuda_available())
         GTEST_SKIP() << "No CUDA device";
-    auto cpu  = randint(-5, 5, {64}, DType::I32, 123, Device::CPU).value();
-    auto cu   = randint(-5, 5, {64}, DType::I32, 123, Device::CUDA).value();
-    auto back = cu.to(Device::CPU).value();
+    auto cu1   = randint(-5, 5, {64}, DType::I32, 123, Device::CUDA).value();
+    auto cu2   = randint(-5, 5, {64}, DType::I32, 123, Device::CUDA).value();
+    auto back1 = cu1.to(Device::CPU).value();
+    auto back2 = cu2.to(Device::CPU).value();
 
-    const auto* g = static_cast<const std::int32_t*>(back.data_ptr());
-    const auto* r = static_cast<const std::int32_t*>(cpu.data_ptr());
-    for (int i = 0; i < 64; ++i)
+    const auto* g = static_cast<const std::int32_t*>(back1.data_ptr());
+    const auto* r = static_cast<const std::int32_t*>(back2.data_ptr());
+    for (int i = 0; i < 64; ++i) {
         EXPECT_EQ(g[i], r[i]);
+        EXPECT_GE(g[i], -5);
+        EXPECT_LT(g[i], 5);
+    }
 }
 
 // ── M5 Matmul ───────────────────────────────────────────────────────────────
