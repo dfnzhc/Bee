@@ -51,30 +51,45 @@ auto run_matmul_f32(std::size_t m, std::size_t k, std::size_t n,
     };
 
     // 分配 A
-    EXPECT_EQ(cudaMalloc(&da, a.size() * sizeof(T)), cudaSuccess);
-    if (!da) {
+    cudaError_t cu_err = cudaMalloc(&da, a.size() * sizeof(T));
+    EXPECT_EQ(cu_err, cudaSuccess);
+    if (cu_err != cudaSuccess) {
         cleanup();
         return result;
     }
 
     // 分配 B
-    EXPECT_EQ(cudaMalloc(&db, b.size() * sizeof(T)), cudaSuccess);
-    if (!db) {
+    cu_err = cudaMalloc(&db, b.size() * sizeof(T));
+    EXPECT_EQ(cu_err, cudaSuccess);
+    if (cu_err != cudaSuccess) {
         cleanup();
         return result;
     }
 
     // 分配 C
     const std::size_t c_size = m * n;
-    EXPECT_EQ(cudaMalloc(&dc, c_size * sizeof(T)), cudaSuccess);
-    if (!dc) {
+    cu_err = cudaMalloc(&dc, c_size * sizeof(T));
+    EXPECT_EQ(cu_err, cudaSuccess);
+    if (cu_err != cudaSuccess) {
         cleanup();
         return result;
     }
 
-    // 拷贝输入
-    EXPECT_EQ(cudaMemcpy(da, a.data(), a.size() * sizeof(T), cudaMemcpyHostToDevice), cudaSuccess);
-    EXPECT_EQ(cudaMemcpy(db, b.data(), b.size() * sizeof(T), cudaMemcpyHostToDevice), cudaSuccess);
+    // 拷贝输入 A
+    cu_err = cudaMemcpy(da, a.data(), a.size() * sizeof(T), cudaMemcpyHostToDevice);
+    EXPECT_EQ(cu_err, cudaSuccess);
+    if (cu_err != cudaSuccess) {
+        cleanup();
+        return result;
+    }
+
+    // 拷贝输入 B
+    cu_err = cudaMemcpy(db, b.data(), b.size() * sizeof(T), cudaMemcpyHostToDevice);
+    EXPECT_EQ(cu_err, cudaSuccess);
+    if (cu_err != cudaSuccess) {
+        cleanup();
+        return result;
+    }
 
     // 调用 matmul
     const int err = bee::cuda::detail::ops_matmul(kDtF32, da, db, dc, m, k, n);
@@ -92,7 +107,12 @@ auto run_matmul_f32(std::size_t m, std::size_t k, std::size_t n,
 
     // 拷贝结果
     result.value.resize(c_size);
-    EXPECT_EQ(cudaMemcpy(result.value.data(), dc, c_size * sizeof(T), cudaMemcpyDeviceToHost), cudaSuccess);
+    cu_err = cudaMemcpy(result.value.data(), dc, c_size * sizeof(T), cudaMemcpyDeviceToHost);
+    EXPECT_EQ(cu_err, cudaSuccess);
+    if (cu_err != cudaSuccess) {
+        cleanup();
+        return result;
+    }
 
     cleanup();
     result.ok = true;

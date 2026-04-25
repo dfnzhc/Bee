@@ -54,21 +54,28 @@ auto run_strided_copy_f32(const std::vector<T>& src,
     };
 
     // 分配源
-    EXPECT_EQ(cudaMalloc(&dsrc, src.size() * sizeof(T)), cudaSuccess);
-    if (!dsrc) {
+    cudaError_t cu_err = cudaMalloc(&dsrc, src.size() * sizeof(T));
+    EXPECT_EQ(cu_err, cudaSuccess);
+    if (cu_err != cudaSuccess) {
         cleanup();
         return result;
     }
 
     // 分配目标
-    EXPECT_EQ(cudaMalloc(&ddst, numel * sizeof(T)), cudaSuccess);
-    if (!ddst) {
+    cu_err = cudaMalloc(&ddst, numel * sizeof(T));
+    EXPECT_EQ(cu_err, cudaSuccess);
+    if (cu_err != cudaSuccess) {
         cleanup();
         return result;
     }
 
     // 拷贝输入
-    EXPECT_EQ(cudaMemcpy(dsrc, src.data(), src.size() * sizeof(T), cudaMemcpyHostToDevice), cudaSuccess);
+    cu_err = cudaMemcpy(dsrc, src.data(), src.size() * sizeof(T), cudaMemcpyHostToDevice);
+    EXPECT_EQ(cu_err, cudaSuccess);
+    if (cu_err != cudaSuccess) {
+        cleanup();
+        return result;
+    }
 
     // 调用 strided_copy
     const int err = bee::cuda::detail::ops_strided_copy(kDtF32, dsrc, ddst, shape, strides, ndim, offset, numel);
@@ -87,7 +94,12 @@ auto run_strided_copy_f32(const std::vector<T>& src,
 
     // 拷贝结果
     result.value.resize(numel);
-    EXPECT_EQ(cudaMemcpy(result.value.data(), ddst, numel * sizeof(T), cudaMemcpyDeviceToHost), cudaSuccess);
+    cu_err = cudaMemcpy(result.value.data(), ddst, numel * sizeof(T), cudaMemcpyDeviceToHost);
+    EXPECT_EQ(cu_err, cudaSuccess);
+    if (cu_err != cudaSuccess) {
+        cleanup();
+        return result;
+    }
 
     cleanup();
     result.ok = true;
