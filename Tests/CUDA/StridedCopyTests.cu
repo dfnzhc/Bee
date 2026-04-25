@@ -24,6 +24,76 @@ auto is_kernel_image_missing(int err) -> bool
         || err == static_cast<int>(cudaErrorInvalidDeviceFunction);
 }
 
+// strided_copy 测试结果封装
+template <typename T>
+struct StridedCopyResult
+{
+    bool             skipped = false; // kernel image 缺失时跳过
+    bool             ok      = false; // 计算成功
+    std::vector<T>   value{};         // 输出数据
+    int              err     = 0;     // 错误码（用于检查维度限制等）
+};
+
+// 集中资源管理的 strided_copy 执行辅助函数
+template <typename T>
+auto run_strided_copy_f32(const std::vector<T>& src,
+                          const std::int64_t* shape,
+                          const std::int64_t* strides,
+                          int ndim,
+                          std::int64_t offset,
+                          std::int64_t numel) -> StridedCopyResult<T>
+{
+    T* dsrc = nullptr;
+    T* ddst = nullptr;
+    StridedCopyResult<T> result{};
+
+    // 清理资源的 lambda，确保所有返回路径都释放
+    auto cleanup = [&]() {
+        if (ddst) (void)cudaFree(ddst);
+        if (dsrc) (void)cudaFree(dsrc);
+    };
+
+    // 分配源
+    EXPECT_EQ(cudaMalloc(&dsrc, src.size() * sizeof(T)), cudaSuccess);
+    if (!dsrc) {
+        cleanup();
+        return result;
+    }
+
+    // 分配目标
+    EXPECT_EQ(cudaMalloc(&ddst, numel * sizeof(T)), cudaSuccess);
+    if (!ddst) {
+        cleanup();
+        return result;
+    }
+
+    // 拷贝输入
+    EXPECT_EQ(cudaMemcpy(dsrc, src.data(), src.size() * sizeof(T), cudaMemcpyHostToDevice), cudaSuccess);
+
+    // 调用 strided_copy
+    const int err = bee::cuda::detail::ops_strided_copy(kDtF32, dsrc, ddst, shape, strides, ndim, offset, numel);
+    result.err = err;
+
+    if (is_kernel_image_missing(err)) {
+        cleanup();
+        result.skipped = true;
+        return result;
+    }
+
+    if (err != 0) {
+        cleanup();
+        return result;
+    }
+
+    // 拷贝结果
+    result.value.resize(numel);
+    EXPECT_EQ(cudaMemcpy(result.value.data(), ddst, numel * sizeof(T), cudaMemcpyDeviceToHost), cudaSuccess);
+
+    cleanup();
+    result.ok = true;
+    return result;
+}
+
 } // namespace
 
 // 拷贝转置视图：src 为列主序，shape {3,2}, 拷贝为行主序
@@ -33,81 +103,40 @@ TEST(CudaStridedCopyTests, CopiesTransposedView)
     // 列主序 strides {1, 3}：shape {3, 2}，numel=6
     // 期望输出行主序：[1, 4, 2, 5, 3, 6]（转置后）
     std::vector<float> src{1, 2, 3, 4, 5, 6};
-    std::vector<float> dst(6, 0.0f);
 
     const std::int64_t shape[2]   = {3, 2};
     const std::int64_t strides[2] = {1, 3}; // 列主序
 
-    float* dsrc = nullptr;
-    float* ddst = nullptr;
-
-    EXPECT_EQ(cudaMalloc(&dsrc, src.size() * sizeof(float)), cudaSuccess);
-    if (!dsrc)
-        return;
-    EXPECT_EQ(cudaMalloc(&ddst, dst.size() * sizeof(float)), cudaSuccess);
-    if (!ddst) {
-        (void)cudaFree(dsrc);
-        return;
-    }
-
-    EXPECT_EQ(cudaMemcpy(dsrc, src.data(), src.size() * sizeof(float), cudaMemcpyHostToDevice), cudaSuccess);
-
     // strided_copy：从 src storage 按 shape/strides 拷贝到连续 dst
-    const int err = bee::cuda::detail::ops_strided_copy(kDtF32, dsrc, ddst, shape, strides, 2, 0, 6);
-    if (is_kernel_image_missing(err)) {
-        (void)cudaFree(dsrc);
-        (void)cudaFree(ddst);
+    const auto result = run_strided_copy_f32<float>(src, shape, strides, 2, 0, 6);
+    if (result.skipped)
         GTEST_SKIP() << "No kernel image for current GPU";
-    }
-    EXPECT_EQ(err, 0) << "ops_strided_copy err=" << err;
-    if (err != 0) {
-        (void)cudaFree(dsrc);
-        (void)cudaFree(ddst);
-        return;
-    }
 
-    EXPECT_EQ(cudaMemcpy(dst.data(), ddst, dst.size() * sizeof(float), cudaMemcpyDeviceToHost), cudaSuccess);
+    ASSERT_TRUE(result.ok);
+    ASSERT_EQ(result.value.size(), 6u);
 
     // 验证转置结果
-    EXPECT_FLOAT_EQ(dst[0], 1.0f);
-    EXPECT_FLOAT_EQ(dst[1], 4.0f);
-    EXPECT_FLOAT_EQ(dst[2], 2.0f);
-    EXPECT_FLOAT_EQ(dst[3], 5.0f);
-    EXPECT_FLOAT_EQ(dst[4], 3.0f);
-    EXPECT_FLOAT_EQ(dst[5], 6.0f);
-
-    (void)cudaFree(ddst);
-    (void)cudaFree(dsrc);
+    EXPECT_FLOAT_EQ(result.value[0], 1.0f);
+    EXPECT_FLOAT_EQ(result.value[1], 4.0f);
+    EXPECT_FLOAT_EQ(result.value[2], 2.0f);
+    EXPECT_FLOAT_EQ(result.value[3], 5.0f);
+    EXPECT_FLOAT_EQ(result.value[4], 3.0f);
+    EXPECT_FLOAT_EQ(result.value[5], 6.0f);
 }
 
 // 拒绝超过 8 维的 strided_copy
 TEST(CudaStridedCopyTests, RejectsMoreThanEightDimensions)
 {
     std::vector<float> src(8, 1.0f);
-    std::vector<float> dst(8, 0.0f);
 
     // 构造 9 维 shape/strides（虽然 numel 只有 8）
     const std::int64_t shape[9]   = {2, 1, 1, 1, 1, 1, 1, 1, 4};
     const std::int64_t strides[9] = {4, 4, 4, 4, 4, 4, 4, 4, 1};
 
-    float* dsrc = nullptr;
-    float* ddst = nullptr;
-
-    EXPECT_EQ(cudaMalloc(&dsrc, src.size() * sizeof(float)), cudaSuccess);
-    if (!dsrc)
-        return;
-    EXPECT_EQ(cudaMalloc(&ddst, dst.size() * sizeof(float)), cudaSuccess);
-    if (!ddst) {
-        (void)cudaFree(dsrc);
-        return;
-    }
-
-    EXPECT_EQ(cudaMemcpy(dsrc, src.data(), src.size() * sizeof(float), cudaMemcpyHostToDevice), cudaSuccess);
-
     // ndim=9 应返回错误
-    const int err = bee::cuda::detail::ops_strided_copy(kDtF32, dsrc, ddst, shape, strides, 9, 0, 8);
-    EXPECT_NE(err, 0) << "strided_copy 应拒绝 ndim=9";
+    const auto result = run_strided_copy_f32<float>(src, shape, strides, 9, 0, 8);
+    if (result.skipped)
+        GTEST_SKIP() << "No kernel image for current GPU";
 
-    (void)cudaFree(ddst);
-    (void)cudaFree(dsrc);
+    EXPECT_NE(result.err, 0) << "strided_copy 应拒绝 ndim=9";
 }
