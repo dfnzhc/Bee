@@ -12,6 +12,7 @@
 #include "Tensor/Ops/Broadcast.hpp"
 #include "Tensor/Ops/Cast.hpp"
 #include "Tensor/Ops/ElementWise.hpp"
+#include "Tensor/Ops/Softmax.hpp"
 #include "Tensor/Ops/Matmul.hpp"
 #include "Tensor/Ops/Random.hpp"
 #include "Tensor/Ops/Reduce.hpp"
