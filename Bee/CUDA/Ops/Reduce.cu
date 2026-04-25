@@ -123,7 +123,8 @@ struct OpTrait<kRdMax>
 // BlockReduce (warp-shuffle based), (2) host launches the same kernel on
 // the partial array until it collapses to 1.
 
-constexpr int kReduceBlockSize = 256;
+constexpr int          kReduceBlockSize       = 256;
+constexpr unsigned int kReduceMaxPartialBlocks = 1024u;
 
 template <typename T, int OP>
 __global__ void reduce_global_kernel(const T* __restrict__ src, T* __restrict__ partial, std::size_t n)
@@ -200,8 +201,9 @@ int launch_global(const void* src, void* dst, std::size_t n, cudaStream_t stream
 
     constexpr unsigned int block = static_cast<unsigned int>(kReduceBlockSize);
     unsigned int           grid  = static_cast<unsigned int>((n + block - 1) / block);
-    if (grid > 1024u)
-        grid = 1024u;
+    // 这里只限制 partial 数量；kernel 内部使用 grid-stride loop，输入元素仍会全部覆盖。
+    if (grid > kReduceMaxPartialBlocks)
+        grid = kReduceMaxPartialBlocks;
 
     // Stage 1: reduce to `grid` partials
     T*          partial = nullptr;

@@ -167,3 +167,14 @@ TEST(CudaReduceWarp, ProdI64)
     ASSERT_TRUE(got.ok);
     ASSERT_EQ(got.value, ref);
 }
+
+TEST(CudaReduceWarp, SumF32MoreThanCappedPartialBlocks)
+{
+    constexpr std::size_t n = 1024u * 256u + 123u;
+    std::vector<float> a(n, 1.0f);
+    const auto got = run_reduce<float>(kRdSum, kDtF32, a);
+    if (got.skipped)
+        GTEST_SKIP() << "No kernel image for current GPU";
+    ASSERT_TRUE(got.ok);
+    ASSERT_NEAR(got.value, static_cast<float>(n), 0.5f) << "n=" << n;
+}
