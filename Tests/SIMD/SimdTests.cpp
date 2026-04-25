@@ -396,6 +396,50 @@ TEST(SimdAvx2, U8_ReduceSum)
     EXPECT_EQ(B::reduce_sum(B::load(src)), uint8_t(32));
 }
 
+TEST(SimdAvx2, I32_Mul)
+{
+    using B = SimdBackend<int32_t, IsaAvx2>;
+    alignas(32) int32_t buf[8];
+    B::store(buf, B::mul(B::set1(6), B::set1(7)));
+    for (int i = 0; i < 8; ++i)
+        EXPECT_EQ(buf[i], 42);
+}
+
+TEST(SimdAvx2, U8_ReduceSumOverflowWrapsToU8)
+{
+    using B = SimdBackend<uint8_t, IsaAvx2>;
+    alignas(32) uint8_t src[32];
+    for (int i = 0; i < 32; ++i)
+        src[i] = 255;
+    EXPECT_EQ(B::reduce_sum(B::load(src)), static_cast<uint8_t>(32u * 255u));
+}
+
+TEST(SimdAvx2, Float_MinMaxNaNMatchesHardwareSecondOperandRule)
+{
+    using B = SimdBackend<float, IsaAvx2>;
+    alignas(32) float lhs[8];
+    alignas(32) float rhs[8];
+    for (int i = 0; i < 8; ++i) {
+        lhs[i] = std::nanf("");
+        rhs[i] = 1.0f;
+    }
+    alignas(32) float out[8];
+    B::store(out, B::min(B::load(lhs), B::load(rhs)));
+    EXPECT_FLOAT_EQ(out[0], 1.0f);
+    B::store(out, B::max(B::load(lhs), B::load(rhs)));
+    EXPECT_FLOAT_EQ(out[0], 1.0f);
+}
+
+TEST(SimdAvx2, Float_ExpLog)
+{
+    using B = SimdBackend<float, IsaAvx2>;
+    alignas(32) float out[8];
+    B::store(out, B::exp(B::set1(0.0f)));
+    EXPECT_NEAR(out[0], 1.0f, 1e-6f);
+    B::store(out, B::log(B::set1(1.0f)));
+    EXPECT_NEAR(out[0], 0.0f, 1e-6f);
+}
+
 #endif // BEE_SIMD_ENABLE_AVX2
 
 // =====================================================================

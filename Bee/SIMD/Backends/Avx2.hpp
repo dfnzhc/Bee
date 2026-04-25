@@ -199,7 +199,7 @@ struct SimdBackend<double, IsaAvx2>
 
 // -----------------------------------------------------------------------
 // int32_t × AVX2：__m256i，宽度 = 8
-// 不提供 mul/div（256-bit i32 mul 细节繁琐，后续按需补充）
+// 提供 add/sub/mul/min/max/neg/abs/reduce；div 无整数向量原语，保持不提供。
 // -----------------------------------------------------------------------
 template <>
 struct SimdBackend<int32_t, IsaAvx2>
@@ -235,6 +235,10 @@ struct SimdBackend<int32_t, IsaAvx2>
     static auto sub(reg a, reg b) -> reg
     {
         return _mm256_sub_epi32(a, b);
+    }
+    static auto mul(reg a, reg b) -> reg
+    {
+        return _mm256_mullo_epi32(a, b);
     }
 
     static auto min(reg a, reg b) -> reg
