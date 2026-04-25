@@ -27,6 +27,8 @@ if(TARGET Bee::CUDA)
             ReduceAxisTests.cu
             RandomTests.cu
             TransposeTests.cu
+            MatmulTests.cu
+            StridedCopyTests.cu
         )
 
         set_target_properties(CUDA.Tests PROPERTIES
