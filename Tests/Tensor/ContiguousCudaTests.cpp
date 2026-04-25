@@ -172,3 +172,23 @@ TEST(ContiguousCudaTests, AlreadyContiguousTensorReturnsSelf)
     // 共享同一 storage
     EXPECT_EQ(a.storage().get(), b.storage().get());
 }
+
+// ── slice + offset：验证非连续切片物化时正确读取偏移数据 ───────────────────
+
+TEST(ContiguousCudaTests, SliceWithOffsetMaterializesCorrectValues)
+{
+    if (!bee::tensor::cuda::is_available())
+        GTEST_SKIP() << "CUDA 不可用，跳过";
+
+    // CPU 参考：arange(0,12) → reshape(3,4) → slice(0, 1, 3) → shape={2,4}, 数据=[4,5,6,7,8,9,10,11]
+    auto cpu = bee::Tensor::arange(0, 12, 1, bee::DType::F32).value().reshape({3, 4}).value();
+    auto gpu = cpu.to(bee::Device::CUDA).value();
+    auto sliced = gpu.slice(0, 1, 3).value(); // 取第 1-2 行
+    auto cont = sliced.contiguous().value();
+    auto back = cont.to(bee::Device::CPU).value();
+
+    ASSERT_EQ(back.shape(), (bee::Shape{2, 4}));
+    const auto* p = static_cast<const float*>(back.data_ptr());
+    for (int i = 0; i < 8; ++i)
+        EXPECT_FLOAT_EQ(p[i], static_cast<float>(i + 4)) << "index=" << i << " 元素不匹配";
+}

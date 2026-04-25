@@ -218,3 +218,33 @@ TEST(BatchedMatmulTests, F16MatmulOnCudaUpcastsToF32)
     for (int i = 0; i < 2 * 4; ++i)
         EXPECT_NEAR(p[i], 3.0f, 0.1f) << "i=" << i;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 广播批次：验证不同批次切片使用正确的源数据
+// ─────────────────────────────────────────────────────────────────────────────
+
+TEST(BatchedMatmulTests, BroadcastBatchUsesCorrectSliceValues)
+{
+    auto a = bee::Tensor::zeros({2, 1, 2, 2}, bee::DType::F32).value();
+    auto b = bee::Tensor::zeros({1, 3, 2, 2}, bee::DType::F32).value();
+    auto* ap = static_cast<float*>(a.data_ptr());
+    auto* bp = static_cast<float*>(b.data_ptr());
+
+    // a: [[1,2],[3,4]] x2 批次
+    for (int i = 0; i < 8; ++i)
+        ap[i] = static_cast<float>(i + 1);
+    // b: [[1,2],[3,4]], [[5,6],[7,8]], [[9,10],[11,12]]
+    for (int i = 0; i < 12; ++i)
+        bp[i] = static_cast<float>(i + 1);
+
+    auto c = bee::matmul(a, b).value();
+    ASSERT_EQ(c.shape(), (bee::Shape{2, 3, 2, 2}));
+    const auto* cp = static_cast<const float*>(c.data_ptr());
+
+    // 验证第一个输出批次 [0,0] 的矩阵乘结果
+    // a[0,0] @ b[0,0] = [[1,2],[3,4]] @ [[1,2],[3,4]] = [[7,10],[15,22]]
+    EXPECT_FLOAT_EQ(cp[0], 7.0f);
+    EXPECT_FLOAT_EQ(cp[1], 10.0f);
+    EXPECT_FLOAT_EQ(cp[2], 15.0f);
+    EXPECT_FLOAT_EQ(cp[3], 22.0f);
+}
