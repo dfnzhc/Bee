@@ -48,9 +48,9 @@ TEST(LowPrecisionTests, F32AccumulatesAsF32)
 TEST(LowPrecisionTests, F16BitsRoundTripFloat)
 {
     // 2.0f 在 F16 中可精确表示
-    float          orig = 2.0f;
-    std::uint16_t  bits = bee::float_to_f16_bits(orig);
-    float          back = bee::f16_bits_to_float(bits);
+    float         orig = 2.0f;
+    std::uint16_t bits = bee::float_to_f16_bits(orig);
+    float         back = bee::f16_bits_to_float(bits);
     EXPECT_NEAR(back, orig, 1e-4f);
 }
 
@@ -72,20 +72,20 @@ TEST(LowPrecisionTests, F16ZeroPreserved)
 
 TEST(LowPrecisionTests, CastRoundTripBetweenF32AndF16)
 {
-    auto src  = bee::Tensor::full({4}, bee::DType::F32, 2.0).value();
-    auto f16  = bee::cast(src, bee::DType::F16).value();
-    auto back = bee::cast(f16, bee::DType::F32).value();
-    const auto* p = static_cast<const float*>(back.data_ptr());
+    auto        src  = bee::Tensor::full({4}, bee::DType::F32, 2.0).value();
+    auto        f16  = bee::cast(src, bee::DType::F16).value();
+    auto        back = bee::cast(f16, bee::DType::F32).value();
+    const auto* p    = static_cast<const float*>(back.data_ptr());
     EXPECT_NEAR(p[0], 2.0f, 1e-3f);
     EXPECT_NEAR(p[3], 2.0f, 1e-3f);
 }
 
 TEST(LowPrecisionTests, CastRoundTripBetweenF32AndBF16)
 {
-    auto src  = bee::Tensor::full({4}, bee::DType::F32, 3.5).value();
-    auto bf16 = bee::cast(src, bee::DType::BF16).value();
-    auto back = bee::cast(bf16, bee::DType::F32).value();
-    const auto* p = static_cast<const float*>(back.data_ptr());
+    auto        src  = bee::Tensor::full({4}, bee::DType::F32, 3.5).value();
+    auto        bf16 = bee::cast(src, bee::DType::BF16).value();
+    auto        back = bee::cast(bf16, bee::DType::F32).value();
+    const auto* p    = static_cast<const float*>(back.data_ptr());
     EXPECT_NEAR(p[0], 3.5f, 1e-2f);
     EXPECT_NEAR(p[3], 3.5f, 1e-2f);
 }
@@ -106,8 +106,8 @@ TEST(LowPrecisionTests, FullWithF16CreatesCorrectTensor)
     EXPECT_EQ(t.dtype(), bee::DType::F16);
     EXPECT_EQ(t.numel(), 4);
     // 通过 cast 回 F32 验证值
-    auto f32 = bee::cast(t, bee::DType::F32).value();
-    const auto* p = static_cast<const float*>(f32.data_ptr());
+    auto        f32 = bee::cast(t, bee::DType::F32).value();
+    const auto* p   = static_cast<const float*>(f32.data_ptr());
     EXPECT_NEAR(p[0], 1.5f, 1e-3f);
 }
 
@@ -115,8 +115,8 @@ TEST(LowPrecisionTests, FullWithBF16CreatesCorrectTensor)
 {
     auto t = bee::Tensor::full({4}, bee::DType::BF16, 2.5).value();
     EXPECT_EQ(t.dtype(), bee::DType::BF16);
-    auto f32 = bee::cast(t, bee::DType::F32).value();
-    const auto* p = static_cast<const float*>(f32.data_ptr());
+    auto        f32 = bee::cast(t, bee::DType::F32).value();
+    const auto* p   = static_cast<const float*>(f32.data_ptr());
     EXPECT_NEAR(p[0], 2.5f, 1e-2f);
 }
 
@@ -176,9 +176,9 @@ TEST(LowPrecisionTests, CudaCastF32ToF16ViaFallback)
     EXPECT_EQ(f16_gpu.device(), bee::Device::CUDA);
 
     // 搬回 CPU 验证值
-    auto f16_cpu  = f16_gpu.to(bee::Device::CPU).value();
-    auto back_f32 = bee::cast(f16_cpu, bee::DType::F32).value();
-    const auto* p = static_cast<const float*>(back_f32.data_ptr());
+    auto        f16_cpu  = f16_gpu.to(bee::Device::CPU).value();
+    auto        back_f32 = bee::cast(f16_cpu, bee::DType::F32).value();
+    const auto* p        = static_cast<const float*>(back_f32.data_ptr());
     EXPECT_NEAR(p[0], 2.0f, 1e-3f);
     EXPECT_NEAR(p[3], 2.0f, 1e-3f);
 }
@@ -195,9 +195,9 @@ TEST(LowPrecisionTests, CudaCastF32ToBF16ViaFallback)
     EXPECT_EQ(bf16_gpu.dtype(), bee::DType::BF16);
     EXPECT_EQ(bf16_gpu.device(), bee::Device::CUDA);
 
-    auto bf16_cpu = bf16_gpu.to(bee::Device::CPU).value();
-    auto back_f32 = bee::cast(bf16_cpu, bee::DType::F32).value();
-    const auto* p = static_cast<const float*>(back_f32.data_ptr());
+    auto        bf16_cpu = bf16_gpu.to(bee::Device::CPU).value();
+    auto        back_f32 = bee::cast(bf16_cpu, bee::DType::F32).value();
+    const auto* p        = static_cast<const float*>(back_f32.data_ptr());
     EXPECT_NEAR(p[0], 3.5f, 1e-2f);
 }
 
@@ -261,16 +261,14 @@ TEST(LowPrecisionTests, PromoteTypesSymmetry_BoolI8)
 {
     // Bool + I8 与 I8 + Bool 结果必须相同（对称性）
     const auto op = bee::DTypeOpKind::ElementWise;
-    EXPECT_EQ(bee::promote_types(bee::DType::Bool, bee::DType::I8, op),
-              bee::promote_types(bee::DType::I8, bee::DType::Bool, op));
+    EXPECT_EQ(bee::promote_types(bee::DType::Bool, bee::DType::I8, op), bee::promote_types(bee::DType::I8, bee::DType::Bool, op));
 }
 
 TEST(LowPrecisionTests, PromoteTypesSymmetry_U8I8)
 {
     // U8 + I8 与 I8 + U8 结果必须相同
     const auto op = bee::DTypeOpKind::ElementWise;
-    EXPECT_EQ(bee::promote_types(bee::DType::U8, bee::DType::I8, op),
-              bee::promote_types(bee::DType::I8, bee::DType::U8, op));
+    EXPECT_EQ(bee::promote_types(bee::DType::U8, bee::DType::I8, op), bee::promote_types(bee::DType::I8, bee::DType::U8, op));
 }
 
 TEST(LowPrecisionTests, PromoteTypesBoolI8ResultIsI8)
@@ -306,8 +304,8 @@ TEST(LowPrecisionTests, CastF16ToBF16Bridge)
     auto f16  = bee::cast(src, bee::DType::F16).value();
     auto bf16 = bee::cast(f16, bee::DType::BF16).value();
     EXPECT_EQ(bf16.dtype(), bee::DType::BF16);
-    auto back = bee::cast(bf16, bee::DType::F32).value();
-    const auto* p = static_cast<const float*>(back.data_ptr());
+    auto        back = bee::cast(bf16, bee::DType::F32).value();
+    const auto* p    = static_cast<const float*>(back.data_ptr());
     EXPECT_NEAR(p[0], 1.5f, 0.01f);
     EXPECT_NEAR(p[3], 1.5f, 0.01f);
 }
@@ -315,12 +313,12 @@ TEST(LowPrecisionTests, CastF16ToBF16Bridge)
 TEST(LowPrecisionTests, CastBF16ToF16Bridge)
 {
     // BF16 → F16（经 F32 桥接）：值应基本保留
-    auto src = bee::Tensor::full({4}, bee::DType::F32, 2.5).value();
+    auto src  = bee::Tensor::full({4}, bee::DType::F32, 2.5).value();
     auto bf16 = bee::cast(src, bee::DType::BF16).value();
     auto f16  = bee::cast(bf16, bee::DType::F16).value();
     EXPECT_EQ(f16.dtype(), bee::DType::F16);
-    auto back = bee::cast(f16, bee::DType::F32).value();
-    const auto* p = static_cast<const float*>(back.data_ptr());
+    auto        back = bee::cast(f16, bee::DType::F32).value();
+    const auto* p    = static_cast<const float*>(back.data_ptr());
     EXPECT_NEAR(p[0], 2.5f, 0.02f);
     EXPECT_NEAR(p[3], 2.5f, 0.02f);
 }
@@ -329,8 +327,8 @@ TEST(LowPrecisionTests, CastF16ToI32Bridge)
 {
     // F16 → I32（经 F32 桥接）：整数值应精确
     auto src = bee::Tensor::full({2}, bee::DType::F32, 5.0).value();
-    auto f16  = bee::cast(src, bee::DType::F16).value();
-    auto i32  = bee::cast(f16, bee::DType::I32).value();
+    auto f16 = bee::cast(src, bee::DType::F16).value();
+    auto i32 = bee::cast(f16, bee::DType::I32).value();
     EXPECT_EQ(i32.dtype(), bee::DType::I32);
     const auto* p = static_cast<const int32_t*>(i32.data_ptr());
     EXPECT_EQ(p[0], 5);
@@ -340,14 +338,14 @@ TEST(LowPrecisionTests, CastF16ToI32Bridge)
 TEST(LowPrecisionTests, CastI32ToBF16Bridge)
 {
     // I32 → BF16（经 F32 桥接）：值应基本保留
-    auto src = bee::Tensor::zeros({2}, bee::DType::I32).value();
+    auto  src = bee::Tensor::zeros({2}, bee::DType::I32).value();
     auto* ip  = static_cast<int32_t*>(src.data_ptr());
-    ip[0] = 3;
-    ip[1] = 7;
+    ip[0]     = 3;
+    ip[1]     = 7;
     auto bf16 = bee::cast(src, bee::DType::BF16).value();
     EXPECT_EQ(bf16.dtype(), bee::DType::BF16);
-    auto back = bee::cast(bf16, bee::DType::F32).value();
-    const auto* fp = static_cast<const float*>(back.data_ptr());
+    auto        back = bee::cast(bf16, bee::DType::F32).value();
+    const auto* fp   = static_cast<const float*>(back.data_ptr());
     EXPECT_NEAR(fp[0], 3.0f, 0.1f);
     EXPECT_NEAR(fp[1], 7.0f, 0.1f);
 }
@@ -368,9 +366,9 @@ TEST(LowPrecisionTests, CudaCastF16ToBF16ViaFallback)
     EXPECT_EQ(gpu_bf16.device(), bee::Device::CUDA);
 
     // 搬回 CPU 验证值
-    auto cpu_bf16 = gpu_bf16.to(bee::Device::CPU).value();
-    auto back     = bee::cast(cpu_bf16, bee::DType::F32).value();
-    const auto* p = static_cast<const float*>(back.data_ptr());
+    auto        cpu_bf16 = gpu_bf16.to(bee::Device::CPU).value();
+    auto        back     = bee::cast(cpu_bf16, bee::DType::F32).value();
+    const auto* p        = static_cast<const float*>(back.data_ptr());
     EXPECT_NEAR(p[0], 1.5f, 0.02f);
 }
 
@@ -379,7 +377,7 @@ TEST(LowPrecisionTests, CudaCastF16ToBF16ViaFallback)
 TEST(LowPrecisionTests, SumOfF16ReturnsF32Scalar)
 {
     // F16 全局 sum 应提升到 F32 累加，返回 F32 标量
-    auto src = bee::cast(bee::Tensor::ones({8}, bee::DType::F32).value(), bee::DType::F16).value();
+    auto src    = bee::cast(bee::Tensor::ones({8}, bee::DType::F32).value(), bee::DType::F16).value();
     auto result = bee::sum(src).value();
 
     EXPECT_EQ(result.dtype(), bee::DType::F32);
@@ -390,7 +388,7 @@ TEST(LowPrecisionTests, SumOfF16ReturnsF32Scalar)
 TEST(LowPrecisionTests, SumOfBF16ReturnsF32Scalar)
 {
     // BF16 全局 sum 同样提升到 F32 累加
-    auto src = bee::cast(bee::Tensor::ones({4}, bee::DType::F32).value(), bee::DType::BF16).value();
+    auto src    = bee::cast(bee::Tensor::ones({4}, bee::DType::F32).value(), bee::DType::BF16).value();
     auto result = bee::sum(src).value();
 
     EXPECT_EQ(result.dtype(), bee::DType::F32);
@@ -405,8 +403,8 @@ TEST(LowPrecisionTests, AxisSumOfF16ReturnsF32)
     // F16 按轴 sum 应提升到 F32，输出 dtype 为 F32，值正确
     // 构造 [2, 3] 全 1 的 F16 张量，沿 dim=1 求和，期望输出 shape=[2]，值均为 3.0f
     auto src_f32 = bee::Tensor::ones({2, 3}, bee::DType::F32).value();
-    auto src = bee::cast(src_f32, bee::DType::F16).value();
-    auto result = bee::sum(src, 1, false).value();
+    auto src     = bee::cast(src_f32, bee::DType::F16).value();
+    auto result  = bee::sum(src, 1, false).value();
 
     EXPECT_EQ(result.dtype(), bee::DType::F32);
     EXPECT_EQ(result.shape(), (bee::Shape{2}));
@@ -420,8 +418,8 @@ TEST(LowPrecisionTests, AxisSumOfBF16ReturnsF32WithKeepdim)
     // BF16 按轴 sum（keepdim=true）应提升到 F32，shape 保留被 reduce 的维度为 1
     // 构造 [3, 4] 全 1 的 BF16 张量，沿 dim=0 求和（keepdim），期望 shape=[1,4]，值均为 3.0f
     auto src_f32 = bee::Tensor::ones({3, 4}, bee::DType::F32).value();
-    auto src = bee::cast(src_f32, bee::DType::BF16).value();
-    auto result = bee::sum(src, 0, true).value();
+    auto src     = bee::cast(src_f32, bee::DType::BF16).value();
+    auto result  = bee::sum(src, 0, true).value();
 
     EXPECT_EQ(result.dtype(), bee::DType::F32);
     EXPECT_EQ(result.shape(), (bee::Shape{1, 4}));

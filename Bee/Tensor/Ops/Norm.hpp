@@ -22,11 +22,6 @@
 namespace bee
 {
 
-[[nodiscard]] auto rms_norm(
-    const Tensor&                        x,
-    const Tensor&                        weight,
-    double                               eps,
-    const tensor::cuda::ExecContext*     ctx = nullptr
-) -> Result<Tensor>;
+[[nodiscard]] auto rms_norm(const Tensor& x, const Tensor& weight, double eps, const tensor::cuda::ExecContext* ctx = nullptr) -> Result<Tensor>;
 
 } // namespace bee

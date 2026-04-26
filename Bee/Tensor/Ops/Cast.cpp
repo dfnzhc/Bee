@@ -69,10 +69,10 @@ auto cast(const Tensor& src, DType dst_dtype, const tensor::cuda::ExecContext* c
     }
 
     // CPU F16/BF16 互转路径（不走 ISA 分派，直接用位编码辅助函数）
-    const int64_t     n       = cont.numel();
-    const DType       src_dt  = cont.dtype();
-    const void*       src_ptr = cont.data_ptr();
-    void*             dst_ptr = out.data_ptr();
+    const int64_t n       = cont.numel();
+    const DType   src_dt  = cont.dtype();
+    const void*   src_ptr = cont.data_ptr();
+    void*         dst_ptr = out.data_ptr();
 
     if (src_dt == DType::F32 && dst_dtype == DType::F16) {
         const auto* s = static_cast<const float*>(src_ptr);

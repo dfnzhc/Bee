@@ -29,13 +29,17 @@ auto gemm_f64(std::int64_t M, std::int64_t K, std::int64_t N, const double* A, c
 auto gemm_i32(std::int64_t M, std::int64_t K, std::int64_t N, const std::int32_t* A, const std::int32_t* B, std::int32_t* C) -> void
 {
     using BS = Sse2BlockSize;
-    ::bee::cpu::gemm::detail::gemm_driver<std::int32_t, std::int32_t, BS::MR, BS::NR_F, BS::MC, BS::KC, BS::NC>(M, K, N, A, B, C, &micro_kernel_i32_4x4);
+    ::bee::cpu::gemm::detail::gemm_driver<std::int32_t, std::int32_t, BS::MR, BS::NR_F, BS::MC, BS::KC, BS::NC>(
+        M, K, N, A, B, C, &micro_kernel_i32_4x4
+    );
 }
 
 auto gemm_i8_i32(std::int64_t M, std::int64_t K, std::int64_t N, const std::int8_t* A, const std::int8_t* B, std::int32_t* C) -> void
 {
     using BS = Sse2BlockSize;
-    ::bee::cpu::gemm::detail::gemm_driver<std::int8_t, std::int32_t, BS::MR, BS::NR_I8, BS::MC, BS::KC, BS::NC>(M, K, N, A, B, C, &micro_kernel_i8_i32_4x4);
+    ::bee::cpu::gemm::detail::gemm_driver<std::int8_t, std::int32_t, BS::MR, BS::NR_I8, BS::MC, BS::KC, BS::NC>(
+        M, K, N, A, B, C, &micro_kernel_i8_i32_4x4
+    );
 }
 
 } // namespace bee::cpu::gemm::sse2

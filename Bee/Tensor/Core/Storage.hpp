@@ -14,10 +14,10 @@ class IAllocator;
 // Storage 内存类型归属
 enum class MemoryKind : std::uint8_t
 {
-    Host,        // CPU 堆内存
-    HostPinned,  // CUDA pinned host memory（页锁定内存）
-    Device,      // CUDA 设备内存
-    Workspace,   // 临时工作区（通常为设备内存，生命周期受运行时管理）
+    Host,       // CPU 堆内存
+    HostPinned, // CUDA pinned host memory（页锁定内存）
+    Device,     // CUDA 设备内存
+    Workspace,  // 临时工作区（通常为设备内存，生命周期受运行时管理）
 };
 
 // Storage 持有一块裸内存及其分配器，通过 shared_ptr 共享所有权

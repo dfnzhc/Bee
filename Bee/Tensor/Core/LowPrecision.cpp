@@ -95,14 +95,14 @@ auto f16_bits_to_float(std::uint16_t bits) noexcept -> float
             f32 = sign;
         } else {
             // 次规格数：规格化为 F32 规格数
-            std::uint32_t m  = mant;
-            std::uint32_t e  = 1u;
+            std::uint32_t m = mant;
+            std::uint32_t e = 1u;
             while (!(m & 0x400u)) {
                 m <<= 1;
                 --e;
             }
-            m &= 0x3FFu;
-            f32 = sign | ((e + 127u - 15u) << 23) | (m << 13);
+            m   &= 0x3FFu;
+            f32  = sign | ((e + 127u - 15u) << 23) | (m << 13);
         }
     } else if (exp == 31u) {
         // 无穷大或 NaN

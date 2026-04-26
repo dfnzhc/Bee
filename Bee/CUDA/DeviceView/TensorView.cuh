@@ -35,7 +35,7 @@ struct TensorView
     __host__ __device__ [[nodiscard]] Idx numel() const noexcept
     {
         Idx n = 1;
-#pragma unroll
+        BEE_UNROLL
         for (int i = 0; i < Rank; ++i)
             n *= shape[i];
         return n;
@@ -45,7 +45,7 @@ struct TensorView
     __host__ __device__ [[nodiscard]] Idx offset_linear(Idx idx) const noexcept
     {
         Idx off = 0;
-#pragma unroll
+        BEE_UNROLL
         for (int i = Rank - 1; i >= 0; --i) {
             const Idx d  = shape[i];
             const Idx q  = idx / d;

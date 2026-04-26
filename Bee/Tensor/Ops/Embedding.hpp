@@ -20,10 +20,6 @@
 namespace bee
 {
 
-[[nodiscard]] auto embedding(
-    const Tensor&                        weight,
-    const Tensor&                        token_ids,
-    const tensor::cuda::ExecContext*     ctx = nullptr
-) -> Result<Tensor>;
+[[nodiscard]] auto embedding(const Tensor& weight, const Tensor& token_ids, const tensor::cuda::ExecContext* ctx = nullptr) -> Result<Tensor>;
 
 } // namespace bee

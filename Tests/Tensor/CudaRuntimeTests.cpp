@@ -18,9 +18,9 @@ TEST(CudaRuntimeTests, AsyncCopyApiExistsAndRoundTripsShape)
     if (!bee::tensor::cuda::is_available())
         GTEST_SKIP() << "CUDA unavailable";
 
-    auto src = bee::Tensor::ones({2, 3}, bee::DType::F32, bee::Device::CPU).value();
-    auto ctx = bee::tensor::cuda::make_default_exec_context();
-    auto dst = src.to(bee::Device::CUDA, &ctx).value();
+    auto src  = bee::Tensor::ones({2, 3}, bee::DType::F32, bee::Device::CPU).value();
+    auto ctx  = bee::tensor::cuda::make_default_exec_context();
+    auto dst  = src.to(bee::Device::CUDA, &ctx).value();
     auto back = dst.to(bee::Device::CPU, &ctx).value();
 
     EXPECT_EQ(back.shape(), src.shape());
@@ -40,7 +40,7 @@ TEST(CudaRuntimeTests, StorageTracksMemoryKind)
 
     // 有 CUDA 时 HostPinned 分配必须成功，并正确标记 memory_kind / is_pinned
     auto& cpu_allocator = bee::CpuAllocator::instance();
-    auto pinned = bee::Storage::allocate(256, cpu_allocator, bee::MemoryKind::HostPinned);
+    auto  pinned        = bee::Storage::allocate(256, cpu_allocator, bee::MemoryKind::HostPinned);
     ASSERT_TRUE(pinned.has_value()) << "HostPinned 分配应成功";
     EXPECT_EQ(pinned.value()->memory_kind(), bee::MemoryKind::HostPinned);
     EXPECT_TRUE(pinned.value()->is_pinned());
@@ -52,7 +52,7 @@ TEST(CudaRuntimeTests, StorageAllocateWorkspaceIsRejected)
     // Workspace 属于 runtime-owned 语义，不允许通过 Storage::allocate 创建；
     // 调用方应直接使用 tensor::cuda::request_workspace()。
     auto& allocator = bee::CpuAllocator::instance();
-    auto result     = bee::Storage::allocate(256, allocator, bee::MemoryKind::Workspace);
+    auto  result    = bee::Storage::allocate(256, allocator, bee::MemoryKind::Workspace);
     EXPECT_FALSE(result.has_value()) << "Storage::allocate(Workspace) 应返回错误";
 }
 

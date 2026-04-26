@@ -123,7 +123,7 @@ struct OpTrait<kRdMax>
 // BlockReduce (warp-shuffle based), (2) host launches the same kernel on
 // the partial array until it collapses to 1.
 
-constexpr int          kReduceBlockSize       = 256;
+constexpr int          kReduceBlockSize        = 256;
 constexpr unsigned int kReduceMaxPartialBlocks = 1024u;
 
 template <typename T, int OP>

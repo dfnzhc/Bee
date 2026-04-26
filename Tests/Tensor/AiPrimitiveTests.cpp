@@ -277,12 +277,12 @@ TEST(AiPrimitiveTests, EmbeddingCudaInputsReturnCudaAndMatchCpu)
         GTEST_SKIP() << "CUDA 不可用，跳过 CUDA 正向测试";
 
     // 构造 CPU 参考
-    auto w_cpu   = Tensor::arange(0, 12, 1, DType::F32).value().reshape({3, 4}).value();
-    auto ids_cpu = Tensor::zeros({2}, DType::I64).value();
-    auto* p_ids  = static_cast<int64_t*>(ids_cpu.data_ptr());
-    p_ids[0]     = 0;
-    p_ids[1]     = 2;
-    auto ref = bee::embedding(w_cpu, ids_cpu).value();
+    auto  w_cpu   = Tensor::arange(0, 12, 1, DType::F32).value().reshape({3, 4}).value();
+    auto  ids_cpu = Tensor::zeros({2}, DType::I64).value();
+    auto* p_ids   = static_cast<int64_t*>(ids_cpu.data_ptr());
+    p_ids[0]      = 0;
+    p_ids[1]      = 2;
+    auto ref      = bee::embedding(w_cpu, ids_cpu).value();
 
     // CUDA 路径
     auto w_cuda   = w_cpu.to(Device::CUDA).value();

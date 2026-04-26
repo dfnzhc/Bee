@@ -76,8 +76,8 @@ TEST(SoftmaxTests, CudaInputReturnsCudaWhenAvailable)
     auto y_gpu = softmax(x_gpu, 1).value();
     EXPECT_EQ(y_gpu.device(), Device::CUDA);
 
-    auto y_cpu = y_gpu.to(Device::CPU).value();
-    const auto* p = static_cast<const float*>(y_cpu.data_ptr());
+    auto        y_cpu = y_gpu.to(Device::CPU).value();
+    const auto* p     = static_cast<const float*>(y_cpu.data_ptr());
     for (int i = 0; i < 8; ++i)
         EXPECT_NEAR(p[i], 0.25f, 1e-6f);
 }

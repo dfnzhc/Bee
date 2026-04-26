@@ -39,9 +39,9 @@ __global__ void strided_copy_kernel(const T* __restrict__ src, T* __restrict__ d
     int64_t src_off = args.offset;
 
     for (int d = args.ndim - 1; d >= 0; --d) {
-        int64_t idx = linear % args.shape[d];
-        src_off += idx * args.strides[d];
-        linear /= args.shape[d];
+        int64_t idx  = linear % args.shape[d];
+        src_off     += idx * args.strides[d];
+        linear      /= args.shape[d];
     }
 
     dst[i] = src[src_off];
@@ -63,8 +63,16 @@ int launch_strided_copy(const void* src, void* dst, StridedCopyParams args, std:
 namespace bee::cuda::detail
 {
 
-int ops_strided_copy(int dt, const void* src, void* dst, const int64_t* shape, const int64_t* strides, int ndim, int64_t offset_elements,
-                     std::size_t numel) noexcept
+int ops_strided_copy(
+    int            dt,
+    const void*    src,
+    void*          dst,
+    const int64_t* shape,
+    const int64_t* strides,
+    int            ndim,
+    int64_t        offset_elements,
+    std::size_t    numel
+) noexcept
 {
     if (numel == 0)
         return 0;
@@ -101,8 +109,7 @@ int ops_strided_copy(int dt, const void* src, void* dst, const int64_t* shape, c
     case 5: // F64
         err = launch_strided_copy<double>(src, dst, args, numel, stream);
         break;
-    default:
-        return static_cast<int>(cudaErrorInvalidValue);
+    default: return static_cast<int>(cudaErrorInvalidValue);
     }
 
     if (err != 0)

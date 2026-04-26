@@ -78,7 +78,7 @@ namespace
         for (int64_t d = 0; d < batch_ndim; ++d) {
             const int64_t size = cur.shape()[0]; // 始终处理 dim=0
             const int64_t idx  = (size == 1) ? 0 : multi_idx[static_cast<std::size_t>(d)];
-            auto r1 = cur.slice(0, idx, idx + 1);
+            auto          r1   = cur.slice(0, idx, idx + 1);
             if (!r1)
                 return std::unexpected(std::move(r1.error()));
             auto r2 = r1->squeeze(0);
@@ -96,7 +96,7 @@ namespace
         const int64_t N = out_shape[out_shape.size() - 1];
         const int64_t K = a.shape()[a.shape().size() - 1];
 
-        const int64_t batch_ndim = static_cast<int64_t>(out_shape.size()) - 2;
+        const int64_t batch_ndim  = static_cast<int64_t>(out_shape.size()) - 2;
         int64_t       total_batch = 1;
         for (int64_t d = 0; d < batch_ndim; ++d)
             total_batch *= out_shape[static_cast<std::size_t>(d)];
@@ -109,8 +109,8 @@ namespace
         if (K == 0)
             return *out;
 
-        auto*             out_data   = static_cast<char*>(out->data_ptr());
-        const std::size_t elem_size  = dtype_size(out_dt);
+        auto*             out_data    = static_cast<char*>(out->data_ptr());
+        const std::size_t elem_size   = dtype_size(out_dt);
         const std::size_t slice_bytes = static_cast<std::size_t>(M * N) * elem_size;
 
         std::vector<int64_t> multi_idx(static_cast<std::size_t>(batch_ndim));
@@ -119,8 +119,8 @@ namespace
             // 将线性批次索引转换为多维索引
             int64_t rem = flat;
             for (int64_t d = batch_ndim - 1; d >= 0; --d) {
-                multi_idx[static_cast<std::size_t>(d)] = rem % out_shape[static_cast<std::size_t>(d)];
-                rem /= out_shape[static_cast<std::size_t>(d)];
+                multi_idx[static_cast<std::size_t>(d)]  = rem % out_shape[static_cast<std::size_t>(d)];
+                rem                                    /= out_shape[static_cast<std::size_t>(d)];
             }
 
             // 提取 2D 切片
@@ -168,8 +168,8 @@ namespace
             const int64_t out_d   = batch_ndim - t_batch_ndim + j;
             const int64_t t_size  = tensor_shape[static_cast<std::size_t>(j)];
             const int64_t idx     = (t_size == 1) ? 0 : multi_idx[static_cast<std::size_t>(out_d)];
-            flat   += static_cast<std::size_t>(idx) * stride;
-            stride *= static_cast<std::size_t>(t_size);
+            flat                 += static_cast<std::size_t>(idx) * stride;
+            stride               *= static_cast<std::size_t>(t_size);
         }
         return flat;
     }
@@ -181,7 +181,7 @@ namespace
         const int64_t N = out_shape[out_shape.size() - 1];
         const int64_t K = a_cont.shape()[a_cont.shape().size() - 1];
 
-        const int64_t batch_ndim = static_cast<int64_t>(out_shape.size()) - 2;
+        const int64_t batch_ndim  = static_cast<int64_t>(out_shape.size()) - 2;
         int64_t       total_batch = 1;
         for (int64_t d = 0; d < batch_ndim; ++d)
             total_batch *= out_shape[static_cast<std::size_t>(d)];
@@ -192,13 +192,13 @@ namespace
         if (M == 0 || N == 0 || total_batch == 0 || K == 0)
             return *out;
 
-        const std::size_t elem_size    = dtype_size(dt);
+        const std::size_t elem_size     = dtype_size(dt);
         const std::size_t a_slice_elems = static_cast<std::size_t>(M * K);
         const std::size_t b_slice_elems = static_cast<std::size_t>(K * N);
         const std::size_t o_slice_elems = static_cast<std::size_t>(M * N);
 
-        const auto* a_ptr  = static_cast<const char*>(a_cont.data_ptr());
-        const auto* b_ptr  = static_cast<const char*>(b_cont.data_ptr());
+        const auto* a_ptr   = static_cast<const char*>(a_cont.data_ptr());
+        const auto* b_ptr   = static_cast<const char*>(b_cont.data_ptr());
         auto*       out_ptr = static_cast<char*>(out->data_ptr());
 
         std::vector<int64_t> multi_idx(static_cast<std::size_t>(batch_ndim));
@@ -207,8 +207,8 @@ namespace
             // 将线性批次索引转换为多维索引
             int64_t rem = flat;
             for (int64_t d = batch_ndim - 1; d >= 0; --d) {
-                multi_idx[static_cast<std::size_t>(d)] = rem % out_shape[static_cast<std::size_t>(d)];
-                rem /= out_shape[static_cast<std::size_t>(d)];
+                multi_idx[static_cast<std::size_t>(d)]  = rem % out_shape[static_cast<std::size_t>(d)];
+                rem                                    /= out_shape[static_cast<std::size_t>(d)];
             }
 
             const std::size_t a_flat = compute_batch_flat(a_cont.shape(), multi_idx, batch_ndim);

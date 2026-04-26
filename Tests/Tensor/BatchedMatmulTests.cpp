@@ -198,8 +198,8 @@ TEST(BatchedMatmulTests, F16MatmulOnCudaUpcastsToF32)
     if (!bee::tensor::cuda::is_available())
         GTEST_SKIP() << "CUDA 不可用，跳过";
 
-    auto af32 = bee::Tensor::ones({2, 3}, bee::DType::F32).value();
-    auto bf32 = bee::Tensor::ones({3, 4}, bee::DType::F32).value();
+    auto af32  = bee::Tensor::ones({2, 3}, bee::DType::F32).value();
+    auto bf32  = bee::Tensor::ones({3, 4}, bee::DType::F32).value();
     auto a_cpu = bee::cast(af32, bee::DType::F16).value();
     auto b_cpu = bee::cast(bf32, bee::DType::F16).value();
     auto a     = a_cpu.to(bee::Device::CUDA).value();
@@ -214,8 +214,8 @@ TEST(BatchedMatmulTests, F16MatmulOnCudaUpcastsToF32)
     EXPECT_EQ(c->shape(), (bee::Shape{2, 4}));
 
     // 搬回 CPU 验证数值
-    auto c_cpu = c->to(bee::Device::CPU).value();
-    const auto* p = static_cast<const float*>(c_cpu.data_ptr());
+    auto        c_cpu = c->to(bee::Device::CPU).value();
+    const auto* p     = static_cast<const float*>(c_cpu.data_ptr());
     for (int i = 0; i < 2 * 4; ++i)
         EXPECT_NEAR(p[i], 3.0f, 0.1f) << "i=" << i;
 }
@@ -226,8 +226,8 @@ TEST(BatchedMatmulTests, F16MatmulOnCudaUpcastsToF32)
 
 TEST(BatchedMatmulTests, BroadcastBatchUsesCorrectSliceValues)
 {
-    auto a = bee::Tensor::zeros({2, 1, 2, 2}, bee::DType::F32).value();
-    auto b = bee::Tensor::zeros({1, 3, 2, 2}, bee::DType::F32).value();
+    auto  a  = bee::Tensor::zeros({2, 1, 2, 2}, bee::DType::F32).value();
+    auto  b  = bee::Tensor::zeros({1, 3, 2, 2}, bee::DType::F32).value();
     auto* ap = static_cast<float*>(a.data_ptr());
     auto* bp = static_cast<float*>(b.data_ptr());
 

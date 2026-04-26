@@ -25,23 +25,13 @@ namespace
 
     // CPU 端 embedding 核心：将 ids 对应的 weight 行拷贝到 out
     template <typename T>
-    auto embedding_cpu_impl(
-        const T*    w_ptr,
-        const void* ids_ptr,
-        DType       ids_dtype,
-        T*          out_ptr,
-        int64_t     n_ids,
-        int64_t     hidden,
-        int64_t     vocab
-    ) -> Result<void>
+    auto embedding_cpu_impl(const T* w_ptr, const void* ids_ptr, DType ids_dtype, T* out_ptr, int64_t n_ids, int64_t hidden, int64_t vocab)
+        -> Result<void>
     {
         for (int64_t i = 0; i < n_ids; ++i) {
             const int64_t id = read_id(ids_ptr, i, ids_dtype);
             if (id < 0 || id >= vocab)
-                return std::unexpected(make_error(
-                    std::format("embedding: id={} 越界（vocab={}）", id, vocab),
-                    Severity::Recoverable
-                ));
+                return std::unexpected(make_error(std::format("embedding: id={} 越界（vocab={}）", id, vocab), Severity::Recoverable));
             std::memcpy(out_ptr + i * hidden, w_ptr + id * hidden, static_cast<std::size_t>(hidden) * sizeof(T));
         }
         return {};
@@ -62,29 +52,28 @@ auto embedding(const Tensor& weight, const Tensor& token_ids, const tensor::cuda
         return std::unexpected(make_error("embedding: token_ids 未定义", Severity::Recoverable));
 
     if (weight.ndim() != 2)
-        return std::unexpected(make_error(
-            std::format("embedding: weight 须为 2-D [vocab, hidden]，当前 ndim={}", weight.ndim()),
-            Severity::Recoverable
-        ));
+        return std::unexpected(
+            make_error(std::format("embedding: weight 须为 2-D [vocab, hidden]，当前 ndim={}", weight.ndim()), Severity::Recoverable)
+        );
 
     if (weight.dtype() != DType::F32 && weight.dtype() != DType::F64)
-        return std::unexpected(make_error(
-            std::format("embedding: weight dtype 须为 F32 或 F64，当前 {}", enum_to_name(weight.dtype())),
-            Severity::Recoverable
-        ));
+        return std::unexpected(
+            make_error(std::format("embedding: weight dtype 须为 F32 或 F64，当前 {}", enum_to_name(weight.dtype())), Severity::Recoverable)
+        );
 
     if (token_ids.dtype() != DType::I32 && token_ids.dtype() != DType::I64)
-        return std::unexpected(make_error(
-            std::format("embedding: token_ids dtype 须为 I32 或 I64，当前 {}", enum_to_name(token_ids.dtype())),
-            Severity::Recoverable
-        ));
+        return std::unexpected(
+            make_error(std::format("embedding: token_ids dtype 须为 I32 或 I64，当前 {}", enum_to_name(token_ids.dtype())), Severity::Recoverable)
+        );
 
     // ── 设备一致性检查 ────────────────────────────────────────────────────────
     if (weight.device() != token_ids.device())
         return std::unexpected(make_error(
-            std::format("embedding: weight 与 token_ids 须在同一设备（{} vs {}）",
-                        weight.device() == Device::CPU ? "CPU" : "CUDA",
-                        token_ids.device() == Device::CPU ? "CPU" : "CUDA"),
+            std::format(
+                "embedding: weight 与 token_ids 须在同一设备（{} vs {}）",
+                weight.device() == Device::CPU ? "CPU" : "CUDA",
+                token_ids.device() == Device::CPU ? "CPU" : "CUDA"
+            ),
             Severity::Recoverable
         ));
 
@@ -139,7 +128,9 @@ auto embedding(const Tensor& weight, const Tensor& token_ids, const tensor::cuda
             ids_cpu.data_ptr(),
             ids_cpu.dtype(),
             static_cast<float*>(out->data_ptr()),
-            n_ids, hidden, vocab
+            n_ids,
+            hidden,
+            vocab
         );
     } else {
         r = embedding_cpu_impl<double>(
@@ -147,7 +138,9 @@ auto embedding(const Tensor& weight, const Tensor& token_ids, const tensor::cuda
             ids_cpu.data_ptr(),
             ids_cpu.dtype(),
             static_cast<double*>(out->data_ptr()),
-            n_ids, hidden, vocab
+            n_ids,
+            hidden,
+            vocab
         );
     }
 

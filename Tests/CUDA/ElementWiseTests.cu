@@ -31,8 +31,7 @@ constexpr int kUnAbs  = 1;
 // 若 GPU 无 sm_120 image（调试卡等），跳过。
 bool is_kernel_image_missing(int err)
 {
-    return err == static_cast<int>(cudaErrorNoKernelImageForDevice)
-        || err == static_cast<int>(cudaErrorInvalidDeviceFunction);
+    return err == static_cast<int>(cudaErrorNoKernelImageForDevice) || err == static_cast<int>(cudaErrorInvalidDeviceFunction);
 }
 
 template <typename T>
@@ -57,14 +56,20 @@ auto run_binary(int op, std::size_t n, const std::vector<T>& a, const std::vecto
     EXPECT_EQ(cudaMemcpy(db, b.data(), n * sizeof(T), cudaMemcpyHostToDevice), cudaSuccess);
 
     int dt = 0;
-    if constexpr (std::is_same_v<T, std::uint8_t>)     dt = kDtU8;
-    else if constexpr (std::is_same_v<T, std::int32_t>)dt = kDtI32;
-    else if constexpr (std::is_same_v<T, float>)       dt = kDtF32;
-    else if constexpr (std::is_same_v<T, double>)      dt = kDtF64;
+    if constexpr (std::is_same_v<T, std::uint8_t>)
+        dt = kDtU8;
+    else if constexpr (std::is_same_v<T, std::int32_t>)
+        dt = kDtI32;
+    else if constexpr (std::is_same_v<T, float>)
+        dt = kDtF32;
+    else if constexpr (std::is_same_v<T, double>)
+        dt = kDtF64;
 
     const int err = bee::cuda::detail::ops_binary(op, dt, da, db, dc, n);
     if (is_kernel_image_missing(err)) {
-        (void)cudaFree(da); (void)cudaFree(db); (void)cudaFree(dc);
+        (void)cudaFree(da);
+        (void)cudaFree(db);
+        (void)cudaFree(dc);
         return std::nullopt;
     }
     EXPECT_EQ(err, 0) << "ops_binary err=" << err;
@@ -76,7 +81,9 @@ auto run_binary(int op, std::size_t n, const std::vector<T>& a, const std::vecto
     }
     std::vector<T> out_host(n);
     EXPECT_EQ(cudaMemcpy(out_host.data(), dc, n * sizeof(T), cudaMemcpyDeviceToHost), cudaSuccess);
-    (void)cudaFree(da); (void)cudaFree(db); (void)cudaFree(dc);
+    (void)cudaFree(da);
+    (void)cudaFree(db);
+    (void)cudaFree(dc);
     return out_host;
 }
 
@@ -95,13 +102,17 @@ auto run_unary(int op, std::size_t n, const std::vector<T>& a) -> std::optional<
     EXPECT_EQ(cudaMemcpy(da, a.data(), n * sizeof(T), cudaMemcpyHostToDevice), cudaSuccess);
 
     int dt = 0;
-    if constexpr (std::is_same_v<T, std::int32_t>)dt = kDtI32;
-    else if constexpr (std::is_same_v<T, float>)  dt = kDtF32;
-    else if constexpr (std::is_same_v<T, double>) dt = kDtF64;
+    if constexpr (std::is_same_v<T, std::int32_t>)
+        dt = kDtI32;
+    else if constexpr (std::is_same_v<T, float>)
+        dt = kDtF32;
+    else if constexpr (std::is_same_v<T, double>)
+        dt = kDtF64;
 
     const int err = bee::cuda::detail::ops_unary(op, dt, da, dc, n);
     if (is_kernel_image_missing(err)) {
-        (void)cudaFree(da); (void)cudaFree(dc);
+        (void)cudaFree(da);
+        (void)cudaFree(dc);
         return std::nullopt;
     }
     EXPECT_EQ(err, 0) << "ops_unary err=" << err;
@@ -112,7 +123,8 @@ auto run_unary(int op, std::size_t n, const std::vector<T>& a) -> std::optional<
     }
     std::vector<T> out_host(n);
     EXPECT_EQ(cudaMemcpy(out_host.data(), dc, n * sizeof(T), cudaMemcpyDeviceToHost), cudaSuccess);
-    (void)cudaFree(da); (void)cudaFree(dc);
+    (void)cudaFree(da);
+    (void)cudaFree(dc);
     return out_host;
 }
 
@@ -121,11 +133,20 @@ auto run_unary(int op, std::size_t n, const std::vector<T>& a) -> std::optional<
 // ─── Binary Add：覆盖 vec 主体 + tail ──────────────────────────────────────
 TEST(CudaElementWiseVec, BinaryAddF32_Tail)
 {
-    for (std::size_t n : {std::size_t{1}, std::size_t{3}, std::size_t{4}, std::size_t{5},
-                          std::size_t{100}, std::size_t{1024}, std::size_t{1027}, std::size_t{1 << 16}})
-    {
+    for (std::size_t n :
+         {std::size_t{1},
+          std::size_t{3},
+          std::size_t{4},
+          std::size_t{5},
+          std::size_t{100},
+          std::size_t{1024},
+          std::size_t{1027},
+          std::size_t{1 << 16}}) {
         std::vector<float> a(n), b(n);
-        for (std::size_t i = 0; i < n; ++i) { a[i] = static_cast<float>(i); b[i] = static_cast<float>(2 * i); }
+        for (std::size_t i = 0; i < n; ++i) {
+            a[i] = static_cast<float>(i);
+            b[i] = static_cast<float>(2 * i);
+        }
         auto c = run_binary<float>(kBinAdd, n, a, b);
         if (!c)
             GTEST_SKIP() << "No kernel image for current GPU";
@@ -139,7 +160,10 @@ TEST(CudaElementWiseVec, BinaryMulF64_Tail)
 {
     for (std::size_t n : {std::size_t{1}, std::size_t{2}, std::size_t{3}, std::size_t{100}, std::size_t{1025}}) {
         std::vector<double> a(n), b(n);
-        for (std::size_t i = 0; i < n; ++i) { a[i] = 1.5 + i; b[i] = 2.0 - 0.1 * i; }
+        for (std::size_t i = 0; i < n; ++i) {
+            a[i] = 1.5 + i;
+            b[i] = 2.0 - 0.1 * i;
+        }
         auto c = run_binary<double>(kBinMul, n, a, b);
         if (!c)
             GTEST_SKIP() << "No kernel image for current GPU";
@@ -153,7 +177,10 @@ TEST(CudaElementWiseVec, BinaryAddI32_Tail)
 {
     for (std::size_t n : {std::size_t{1}, std::size_t{3}, std::size_t{5}, std::size_t{1024}, std::size_t{1030}}) {
         std::vector<std::int32_t> a(n), b(n);
-        for (std::size_t i = 0; i < n; ++i) { a[i] = static_cast<std::int32_t>(i); b[i] = static_cast<std::int32_t>(-3 * i); }
+        for (std::size_t i = 0; i < n; ++i) {
+            a[i] = static_cast<std::int32_t>(i);
+            b[i] = static_cast<std::int32_t>(-3 * i);
+        }
         auto c = run_binary<std::int32_t>(kBinAdd, n, a, b);
         if (!c)
             GTEST_SKIP() << "No kernel image for current GPU";
@@ -167,7 +194,10 @@ TEST(CudaElementWiseVec, BinaryAddU8_Tail)
 {
     for (std::size_t n : {std::size_t{1}, std::size_t{15}, std::size_t{16}, std::size_t{17}, std::size_t{1024}, std::size_t{1031}}) {
         std::vector<std::uint8_t> a(n), b(n);
-        for (std::size_t i = 0; i < n; ++i) { a[i] = static_cast<std::uint8_t>(i & 0x7F); b[i] = static_cast<std::uint8_t>((i * 3) & 0x7F); }
+        for (std::size_t i = 0; i < n; ++i) {
+            a[i] = static_cast<std::uint8_t>(i & 0x7F);
+            b[i] = static_cast<std::uint8_t>((i * 3) & 0x7F);
+        }
         auto c = run_binary<std::uint8_t>(kBinAdd, n, a, b);
         if (!c)
             GTEST_SKIP() << "No kernel image for current GPU";
@@ -182,7 +212,8 @@ TEST(CudaElementWiseVec, UnaryNegF32_Tail)
 {
     for (std::size_t n : {std::size_t{1}, std::size_t{3}, std::size_t{100}, std::size_t{1025}}) {
         std::vector<float> a(n);
-        for (std::size_t i = 0; i < n; ++i) a[i] = static_cast<float>(i) - 50.f;
+        for (std::size_t i = 0; i < n; ++i)
+            a[i] = static_cast<float>(i) - 50.f;
         auto c = run_unary<float>(kUnNeg, n, a);
         if (!c)
             GTEST_SKIP() << "No kernel image for current GPU";
@@ -196,7 +227,8 @@ TEST(CudaElementWiseVec, UnaryAbsI32_Tail)
 {
     for (std::size_t n : {std::size_t{1}, std::size_t{5}, std::size_t{1024}, std::size_t{1027}}) {
         std::vector<std::int32_t> a(n);
-        for (std::size_t i = 0; i < n; ++i) a[i] = static_cast<std::int32_t>(i) - 100;
+        for (std::size_t i = 0; i < n; ++i)
+            a[i] = static_cast<std::int32_t>(i) - 100;
         auto c = run_unary<std::int32_t>(kUnAbs, n, a);
         if (!c)
             GTEST_SKIP() << "No kernel image for current GPU";

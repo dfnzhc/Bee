@@ -39,8 +39,16 @@ int ops_transpose_2d(int dt, const void* src, void* dst, std::size_t rows, std::
 
 // 通用 strided copy：将任意步长布局的 src（base + offset）物化到连续 dst。
 // shape/strides 为 host 侧指针，ndim 最多 8；offset_elements 为 storage 基地址起的元素偏移。
-int ops_strided_copy(int dt, const void* src, void* dst, const int64_t* shape, const int64_t* strides, int ndim,
-                     int64_t offset_elements, std::size_t numel) noexcept;
+int ops_strided_copy(
+    int            dt,
+    const void*    src,
+    void*          dst,
+    const int64_t* shape,
+    const int64_t* strides,
+    int            ndim,
+    int64_t        offset_elements,
+    std::size_t    numel
+) noexcept;
 
 // 设备侧 Philox4x32-10 随机数（B7）。
 int ops_random_uniform(int dt, void* dst, std::size_t n, std::uint64_t seed) noexcept;

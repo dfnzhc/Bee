@@ -23,16 +23,15 @@ constexpr int kDtF64 = 5;
 
 auto is_kernel_image_missing(int err) -> bool
 {
-    return err == static_cast<int>(cudaErrorNoKernelImageForDevice)
-        || err == static_cast<int>(cudaErrorInvalidDeviceFunction);
+    return err == static_cast<int>(cudaErrorNoKernelImageForDevice) || err == static_cast<int>(cudaErrorInvalidDeviceFunction);
 }
 
 template <typename T>
 auto run_transpose(int dt, std::size_t rows, std::size_t cols, const std::vector<T>& input) -> std::optional<std::vector<T>>
 {
-    T* dsrc = nullptr;
-    T* ddst = nullptr;
-    const auto n = rows * cols;
+    T*         dsrc = nullptr;
+    T*         ddst = nullptr;
+    const auto n    = rows * cols;
 
     EXPECT_EQ(cudaMalloc(&dsrc, n * sizeof(T)), cudaSuccess);
     if (!dsrc)
@@ -80,7 +79,7 @@ TEST(CudaTranspose, F64RectangularFallbackPath)
 {
     constexpr std::size_t rows = 3;
     constexpr std::size_t cols = 5;
-    std::vector<double> input(rows * cols);
+    std::vector<double>   input(rows * cols);
     for (std::size_t i = 0; i < input.size(); ++i)
         input[i] = static_cast<double>(i) * 0.5;
 
@@ -95,7 +94,7 @@ TEST(CudaTranspose, F32VectorizedPathOnAlignedTile)
 {
     constexpr std::size_t rows = 32;
     constexpr std::size_t cols = 64;
-    std::vector<float> input(rows * cols);
+    std::vector<float>    input(rows * cols);
     for (std::size_t i = 0; i < input.size(); ++i)
         input[i] = static_cast<float>((i % 17) - 8) * 0.25f;
 

@@ -114,7 +114,7 @@ TEST(ContiguousCudaTests, SlicedCudaTensorContiguousMatchesCpuReference)
     EXPECT_TRUE(cuda_c.is_contiguous());
     EXPECT_EQ(cuda_c.shape(), cpu_c.shape());
 
-    auto result = cuda_c.to(bee::Device::CPU).value();
+    auto        result   = cuda_c.to(bee::Device::CPU).value();
     const auto* expected = static_cast<const int64_t*>(cpu_c.data_ptr());
     const auto* actual   = static_cast<const int64_t*>(result.data_ptr());
     for (int64_t i = 0; i < result.numel(); ++i) {
@@ -148,7 +148,7 @@ TEST(ContiguousCudaTests, CloneNonContiguousCudaTensorReturnsContiguousCopy)
     auto cpu_b = cpu_a.reshape({3, 4}).value().transpose(0, 1).value();
     auto cpu_c = cpu_b.contiguous().value();
 
-    auto result = c->to(bee::Device::CPU).value();
+    auto        result   = c->to(bee::Device::CPU).value();
     const auto* expected = static_cast<const float*>(cpu_c.data_ptr());
     const auto* actual   = static_cast<const float*>(result.data_ptr());
     for (int64_t i = 0; i < result.numel(); ++i) {
@@ -181,11 +181,11 @@ TEST(ContiguousCudaTests, SliceWithOffsetMaterializesCorrectValues)
         GTEST_SKIP() << "CUDA 不可用，跳过";
 
     // CPU 参考：arange(0,12) → reshape(3,4) → slice(0, 1, 3) → shape={2,4}, 数据=[4,5,6,7,8,9,10,11]
-    auto cpu = bee::Tensor::arange(0, 12, 1, bee::DType::F32).value().reshape({3, 4}).value();
-    auto gpu = cpu.to(bee::Device::CUDA).value();
+    auto cpu    = bee::Tensor::arange(0, 12, 1, bee::DType::F32).value().reshape({3, 4}).value();
+    auto gpu    = cpu.to(bee::Device::CUDA).value();
     auto sliced = gpu.slice(0, 1, 3).value(); // 取第 1-2 行
-    auto cont = sliced.contiguous().value();
-    auto back = cont.to(bee::Device::CPU).value();
+    auto cont   = sliced.contiguous().value();
+    auto back   = cont.to(bee::Device::CPU).value();
 
     ASSERT_EQ(back.shape(), (bee::Shape{2, 4}));
     const auto* p = static_cast<const float*>(back.data_ptr());

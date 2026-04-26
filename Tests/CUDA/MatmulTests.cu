@@ -20,34 +20,36 @@ constexpr int kDtF32 = 4;
 
 auto is_kernel_image_missing(int err) -> bool
 {
-    return err == static_cast<int>(cudaErrorNoKernelImageForDevice)
-        || err == static_cast<int>(cudaErrorInvalidDeviceFunction);
+    return err == static_cast<int>(cudaErrorNoKernelImageForDevice) || err == static_cast<int>(cudaErrorInvalidDeviceFunction);
 }
 
 // matmul 测试结果封装
 template <typename T>
 struct MatmulResult
 {
-    bool             skipped = false; // kernel image 缺失时跳过
-    bool             ok      = false; // 计算成功
-    std::vector<T>   value{};         // 输出数据
+    bool           skipped = false; // kernel image 缺失时跳过
+    bool           ok      = false; // 计算成功
+    std::vector<T> value{};         // 输出数据
 };
 
 // 集中资源管理的 matmul 执行辅助函数
 template <typename T>
-auto run_matmul_f32(std::size_t m, std::size_t k, std::size_t n,
-                    const std::vector<T>& a, const std::vector<T>& b) -> MatmulResult<T>
+auto run_matmul_f32(std::size_t m, std::size_t k, std::size_t n, const std::vector<T>& a, const std::vector<T>& b) -> MatmulResult<T>
 {
     T* da = nullptr;
     T* db = nullptr;
     T* dc = nullptr;
+
     MatmulResult<T> result{};
 
     // 清理资源的 lambda，确保所有返回路径都释放
     auto cleanup = [&]() {
-        if (dc) (void)cudaFree(dc);
-        if (db) (void)cudaFree(db);
-        if (da) (void)cudaFree(da);
+        if (dc)
+            (void)cudaFree(dc);
+        if (db)
+            (void)cudaFree(db);
+        if (da)
+            (void)cudaFree(da);
     };
 
     // 分配 A
@@ -68,7 +70,7 @@ auto run_matmul_f32(std::size_t m, std::size_t k, std::size_t n,
 
     // 分配 C
     const std::size_t c_size = m * n;
-    cu_err = cudaMalloc(&dc, c_size * sizeof(T));
+    cu_err                   = cudaMalloc(&dc, c_size * sizeof(T));
     EXPECT_EQ(cu_err, cudaSuccess);
     if (cu_err != cudaSuccess) {
         cleanup();
@@ -148,8 +150,8 @@ TEST(CudaMatmulTests, F32SmallMatrix)
 TEST(CudaMatmulTests, F32NonMultipleOfFourFallsBackAndComputes)
 {
     constexpr std::size_t m = 5, k = 3, n = 7;
-    std::vector<float> a(m * k, 1.0f); // A 全 1
-    std::vector<float> b(k * n, 2.0f); // B 全 2
+    std::vector<float>    a(m * k, 1.0f); // A 全 1
+    std::vector<float>    b(k * n, 2.0f); // B 全 2
 
     // 每个输出元素 = sum(1 * 2 for 3 次) = 6
     const auto result = run_matmul_f32<float>(m, k, n, a, b);

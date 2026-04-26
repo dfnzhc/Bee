@@ -3,7 +3,7 @@
 #include "Base/Diagnostics/Error.hpp"
 
 #if defined(BEE_TENSOR_WITH_CUDA)
-#    include <cuda_runtime.h>
+    #include <cuda_runtime.h>
 #endif
 
 namespace bee
@@ -27,12 +27,10 @@ namespace
 #if defined(BEE_TENSOR_WITH_CUDA)
             if (nbytes == 0)
                 return static_cast<void*>(nullptr);
-            void* ptr = nullptr;
+            void*      ptr = nullptr;
             const auto err = cudaMallocHost(&ptr, nbytes);
             if (err != cudaSuccess) {
-                return std::unexpected(make_error(
-                    "cudaMallocHost failed", Severity::Recoverable, static_cast<int>(err)
-                ));
+                return std::unexpected(make_error("cudaMallocHost failed", Severity::Recoverable, static_cast<int>(err)));
             }
             return ptr;
 #else
@@ -86,8 +84,7 @@ auto Storage::allocate(std::size_t nbytes, IAllocator& allocator) -> Result<std:
 
     // 根据 device 推断 memory_kind
     MemoryKind kind = MemoryKind::Host;
-    if (allocator.device() == Device::CUDA)
-    {
+    if (allocator.device() == Device::CUDA) {
         kind = MemoryKind::Device;
     }
 

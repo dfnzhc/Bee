@@ -86,8 +86,16 @@ auto transpose_2d(int dt, const void* src, void* dst, std::size_t rows, std::siz
     return ::bee::cuda::ops::transpose_2d(static_cast<::bee::cuda::ScalarType>(dt), src, dst, rows, cols);
 }
 
-auto strided_copy(int dt, const void* src, void* dst, const int64_t* shape, const int64_t* strides, int ndim, int64_t offset_elements,
-                  std::size_t numel) -> Result<void>
+auto strided_copy(
+    int            dt,
+    const void*    src,
+    void*          dst,
+    const int64_t* shape,
+    const int64_t* strides,
+    int            ndim,
+    int64_t        offset_elements,
+    std::size_t    numel
+) -> Result<void>
 {
     return ::bee::cuda::ops::strided_copy(static_cast<::bee::cuda::ScalarType>(dt), src, dst, shape, strides, ndim, offset_elements, numel);
 }

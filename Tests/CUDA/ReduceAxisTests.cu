@@ -30,15 +30,15 @@ constexpr int kRdProd = 3;
 
 auto is_kernel_image_missing(int err) -> bool
 {
-    return err == static_cast<int>(cudaErrorNoKernelImageForDevice)
-        || err == static_cast<int>(cudaErrorInvalidDeviceFunction);
+    return err == static_cast<int>(cudaErrorNoKernelImageForDevice) || err == static_cast<int>(cudaErrorInvalidDeviceFunction);
 }
 
 template <typename T>
-auto run_reduce_axis(int op, int dt, std::size_t outer, std::size_t axis, std::size_t inner, const std::vector<T>& input) -> std::optional<std::vector<T>>
+auto run_reduce_axis(int op, int dt, std::size_t outer, std::size_t axis, std::size_t inner, const std::vector<T>& input)
+    -> std::optional<std::vector<T>>
 {
-    T* dsrc = nullptr;
-    T* ddst = nullptr;
+    T*         dsrc      = nullptr;
+    T*         ddst      = nullptr;
     const auto src_elems = outer * axis * inner;
     const auto dst_elems = outer * inner;
 
@@ -102,7 +102,7 @@ TEST(CudaReduceAxis, SumF32NonAlignedShape)
     constexpr std::size_t outer = 2;
     constexpr std::size_t axis  = 3;
     constexpr std::size_t inner = 5;
-    std::vector<float> input(outer * axis * inner);
+    std::vector<float>    input(outer * axis * inner);
     for (std::size_t i = 0; i < input.size(); ++i)
         input[i] = static_cast<float>((i % 11) - 5) * 0.25f;
 
@@ -118,9 +118,9 @@ TEST(CudaReduceAxis, SumF32NonAlignedShape)
 
 TEST(CudaReduceAxis, MinI32NonAlignedShape)
 {
-    constexpr std::size_t outer = 3;
-    constexpr std::size_t axis  = 4;
-    constexpr std::size_t inner = 2;
+    constexpr std::size_t     outer = 3;
+    constexpr std::size_t     axis  = 4;
+    constexpr std::size_t     inner = 2;
     std::vector<std::int32_t> input(outer * axis * inner);
     for (std::size_t i = 0; i < input.size(); ++i)
         input[i] = static_cast<std::int32_t>((i * 7) % 19) - 9;
@@ -134,9 +134,9 @@ TEST(CudaReduceAxis, MinI32NonAlignedShape)
 
 TEST(CudaReduceAxis, MaxI64NonAlignedShape)
 {
-    constexpr std::size_t outer = 1;
-    constexpr std::size_t axis  = 5;
-    constexpr std::size_t inner = 3;
+    constexpr std::size_t     outer = 1;
+    constexpr std::size_t     axis  = 5;
+    constexpr std::size_t     inner = 3;
     std::vector<std::int64_t> input(outer * axis * inner);
     for (std::size_t i = 0; i < input.size(); ++i)
         input[i] = static_cast<std::int64_t>(i) * 13 - 17;
@@ -153,7 +153,7 @@ TEST(CudaReduceAxis, ProdF64NonAlignedShape)
     constexpr std::size_t outer = 2;
     constexpr std::size_t axis  = 3;
     constexpr std::size_t inner = 2;
-    std::vector<double> input(outer * axis * inner);
+    std::vector<double>   input(outer * axis * inner);
     for (std::size_t i = 0; i < input.size(); ++i)
         input[i] = 1.0 + static_cast<double>((i % 5) + 1) * 0.1;
 

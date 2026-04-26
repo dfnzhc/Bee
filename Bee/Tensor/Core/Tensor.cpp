@@ -236,10 +236,9 @@ auto Tensor::full(Shape shape, DType dtype, double value, Device device) -> Resu
         BEE_TRY_ASSIGN(t, empty(shape, dtype, device));
         const int64_t n = t.numel();
         if (n > 0) {
-            auto*                ptr  = static_cast<std::uint16_t*>(t.data_ptr());
-            const std::uint16_t  bits = (dtype == DType::F16)
-                                            ? float_to_f16_bits(static_cast<float>(value))
-                                            : float_to_bf16_bits(static_cast<float>(value));
+            auto*               ptr = static_cast<std::uint16_t*>(t.data_ptr());
+            const std::uint16_t bits =
+                (dtype == DType::F16) ? float_to_f16_bits(static_cast<float>(value)) : float_to_bf16_bits(static_cast<float>(value));
             for (int64_t i = 0; i < n; ++i)
                 ptr[i] = bits;
         }
@@ -555,12 +554,12 @@ auto Tensor::contiguous(const tensor::cuda::ExecContext* /*ctx*/) const -> Resul
 
         auto rc = tensor::cuda::strided_copy(
             static_cast<int>(impl_->dtype),
-            impl_->storage->data(),        // storage 基地址
-            (*storage_result)->data(),     // 连续目标缓冲
+            impl_->storage->data(),    // storage 基地址
+            (*storage_result)->data(), // 连续目标缓冲
             impl_->shape.data(),
             impl_->strides.data(),
             static_cast<int>(impl_->shape.size()),
-            impl_->offset,                 // 元素单位的 storage 偏移
+            impl_->offset, // 元素单位的 storage 偏移
             static_cast<std::size_t>(n)
         );
         if (!rc)

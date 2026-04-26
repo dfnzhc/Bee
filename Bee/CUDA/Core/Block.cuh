@@ -99,7 +99,7 @@ struct BlockReduce
 
             // 只在 next_pow2(kNumWarps) 宽度内折半 —— 对 kNumWarps=8 从 5 轮减到 3 轮
             if constexpr (kAggrWidthP2 > 1) {
-#pragma unroll
+                BEE_UNROLL
                 for (int offset = kAggrWidthP2 / 2; offset > 0; offset >>= 1) {
                     T other = warp_shfl_xor(acc, offset, kWarpSize);
                     acc     = op(acc, other);

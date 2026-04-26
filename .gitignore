@@ -390,3 +390,7 @@ docs/*
 
 # Benchmark baseline JSON snapshots (not versioned)
 Benchmarks/baseline/
+.trellis
+.codex
+.agents
+AGENTS.md

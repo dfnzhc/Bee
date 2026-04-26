@@ -26,11 +26,7 @@
 namespace bee
 {
 
-[[nodiscard]] auto apply_rope(
-    const Tensor&                        x,
-    double                               base,
-    int64_t                              position_offset,
-    const tensor::cuda::ExecContext*     ctx = nullptr
-) -> Result<Tensor>;
+[[nodiscard]] auto apply_rope(const Tensor& x, double base, int64_t position_offset, const tensor::cuda::ExecContext* ctx = nullptr)
+    -> Result<Tensor>;
 
 } // namespace bee

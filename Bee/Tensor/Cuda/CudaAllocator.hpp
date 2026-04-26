@@ -58,14 +58,12 @@ inline auto CudaAllocator::allocate_for(CudaAllocKind kind, std::size_t nbytes, 
     // - Device: 常规设备内存，经由池化分配器
     // - Workspace: runtime-owned 工作区，不适用于常规 deallocate 生命周期
     switch (kind) {
-    case CudaAllocKind::Device:
-        return tensor::cuda::allocate(nbytes, alignment);
+    case CudaAllocKind::Device: return tensor::cuda::allocate(nbytes, alignment);
     case CudaAllocKind::Workspace:
         // workspace 由 runtime 持有，调用方无需 free。
         // 注意：此路径返回的指针不应传递给 CudaAllocator::deallocate。
         return tensor::cuda::request_workspace(nbytes, nullptr);
-    default:
-        return tensor::cuda::allocate(nbytes, alignment);
+    default: return tensor::cuda::allocate(nbytes, alignment);
     }
 }
 

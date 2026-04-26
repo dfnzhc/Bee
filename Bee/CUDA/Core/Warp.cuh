@@ -15,6 +15,7 @@
 
 #pragma once
 
+#include "CUDA/Core/Check.cuh"
 #include <cuda_runtime.h>
 
 #include <cstdint>
@@ -48,7 +49,7 @@ namespace detail
             int words[num_words];
         } src{value}, dst{};
 
-#pragma unroll
+        BEE_UNROLL
         for (int i = 0; i < num_words; ++i) {
             dst.words[i] = op(src.words[i]);
         }
@@ -162,7 +163,7 @@ struct WarpOpMax
 template <typename T, typename Op>
 __device__ __forceinline__ auto warp_reduce(T value, Op op, int width = kWarpSize, unsigned int mask = kFullMask32) -> T
 {
-#pragma unroll
+    BEE_UNROLL
     for (int offset = width / 2; offset > 0; offset >>= 1) {
         T other = warp_shfl_xor(value, offset, width, mask);
         value   = op(value, other);
@@ -231,7 +232,7 @@ template <typename T, typename Op>
 __device__ __forceinline__ auto warp_scan_inclusive(T value, Op op, int width = kWarpSize, unsigned int mask = kFullMask32) -> T
 {
     const unsigned int lane = threadIdx.x & (kWarpSize - 1);
-#pragma unroll
+    BEE_UNROLL
     for (int offset = 1; offset < width; offset <<= 1) {
         T up = warp_shfl_up(value, static_cast<unsigned int>(offset), width, mask);
         if (static_cast<int>(lane) >= offset) {

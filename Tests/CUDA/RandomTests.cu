@@ -26,8 +26,7 @@ constexpr int kDtF64 = 5;
 
 bool is_kernel_image_missing(int err)
 {
-    return err == static_cast<int>(cudaErrorNoKernelImageForDevice)
-        || err == static_cast<int>(cudaErrorInvalidDeviceFunction);
+    return err == static_cast<int>(cudaErrorNoKernelImageForDevice) || err == static_cast<int>(cudaErrorInvalidDeviceFunction);
 }
 
 template <typename T>
@@ -37,7 +36,7 @@ auto run_uniform(std::size_t n, std::uint64_t seed) -> std::optional<std::vector
     EXPECT_EQ(cudaMalloc(&dptr, n * sizeof(T)), cudaSuccess);
     if (!dptr)
         return std::vector<T>{};
-    int dt = std::is_same_v<T, float> ? kDtF32 : kDtF64;
+    int       dt  = std::is_same_v<T, float> ? kDtF32 : kDtF64;
     const int err = bee::cuda::detail::ops_random_uniform(dt, dptr, n, seed);
     if (is_kernel_image_missing(err)) {
         (void)cudaFree(dptr);
@@ -61,7 +60,7 @@ auto run_normal(std::size_t n, std::uint64_t seed) -> std::optional<std::vector<
     EXPECT_EQ(cudaMalloc(&dptr, n * sizeof(T)), cudaSuccess);
     if (!dptr)
         return std::vector<T>{};
-    int dt = std::is_same_v<T, float> ? kDtF32 : kDtF64;
+    int       dt  = std::is_same_v<T, float> ? kDtF32 : kDtF64;
     const int err = bee::cuda::detail::ops_random_normal(dt, dptr, n, seed);
     if (is_kernel_image_missing(err)) {
         (void)cudaFree(dptr);
@@ -86,9 +85,12 @@ auto run_int(std::size_t n, std::int64_t low, std::int64_t high, std::uint64_t s
     if (!dptr)
         return std::vector<T>{};
     int dt = 0;
-    if constexpr (std::is_same_v<T, std::uint8_t>)       dt = kDtU8;
-    else if constexpr (std::is_same_v<T, std::int32_t>)  dt = kDtI32;
-    else if constexpr (std::is_same_v<T, std::int64_t>)  dt = kDtI64;
+    if constexpr (std::is_same_v<T, std::uint8_t>)
+        dt = kDtU8;
+    else if constexpr (std::is_same_v<T, std::int32_t>)
+        dt = kDtI32;
+    else if constexpr (std::is_same_v<T, std::int64_t>)
+        dt = kDtI64;
     const int err = bee::cuda::detail::ops_random_int(dt, dptr, n, low, high, seed);
     if (is_kernel_image_missing(err)) {
         (void)cudaFree(dptr);
@@ -110,7 +112,7 @@ auto run_int(std::size_t n, std::int64_t low, std::int64_t high, std::uint64_t s
 TEST(CudaRandom, UniformF32_Range)
 {
     const std::size_t n = 1 << 16;
-    auto h = run_uniform<float>(n, 0xC0FFEEull);
+    auto              h = run_uniform<float>(n, 0xC0FFEEull);
     if (!h)
         GTEST_SKIP() << "No kernel image for current GPU";
     ASSERT_EQ(h->size(), n);
@@ -120,7 +122,8 @@ TEST(CudaRandom, UniformF32_Range)
     }
     // Mean ≈ 0.5
     double mean = 0.0;
-    for (float v : *h) mean += v;
+    for (float v : *h)
+        mean += v;
     mean /= n;
     EXPECT_NEAR(mean, 0.5, 0.02);
 }
@@ -128,7 +131,7 @@ TEST(CudaRandom, UniformF32_Range)
 TEST(CudaRandom, UniformF64_Range)
 {
     const std::size_t n = 1 << 15;
-    auto h = run_uniform<double>(n, 42);
+    auto              h = run_uniform<double>(n, 42);
     if (!h)
         GTEST_SKIP() << "No kernel image for current GPU";
     ASSERT_EQ(h->size(), n);
@@ -137,7 +140,8 @@ TEST(CudaRandom, UniformF64_Range)
         ASSERT_LT(v, 1.0);
     }
     double mean = 0.0;
-    for (double v : *h) mean += v;
+    for (double v : *h)
+        mean += v;
     mean /= n;
     EXPECT_NEAR(mean, 0.5, 0.02);
 }
@@ -145,12 +149,13 @@ TEST(CudaRandom, UniformF64_Range)
 TEST(CudaRandom, UniformF32_Deterministic)
 {
     const std::size_t n = 4096;
-    auto a = run_uniform<float>(n, 123);
-    auto b = run_uniform<float>(n, 123);
+    auto              a = run_uniform<float>(n, 123);
+    auto              b = run_uniform<float>(n, 123);
     if (!a || !b)
         GTEST_SKIP() << "No kernel image for current GPU";
     ASSERT_EQ(a->size(), b->size());
-    for (std::size_t i = 0; i < n; ++i) ASSERT_EQ((*a)[i], (*b)[i]);
+    for (std::size_t i = 0; i < n; ++i)
+        ASSERT_EQ((*a)[i], (*b)[i]);
 }
 
 TEST(CudaRandom, UniformF32_NonPow2Size)
@@ -171,16 +176,17 @@ TEST(CudaRandom, UniformF32_NonPow2Size)
 TEST(CudaRandom, NormalF32_Moments)
 {
     const std::size_t n = 1 << 18;
-    auto h = run_normal<float>(n, 0xBEEFull);
+    auto              h = run_normal<float>(n, 0xBEEFull);
     if (!h)
         GTEST_SKIP() << "No kernel image for current GPU";
     ASSERT_EQ(h->size(), n);
     double mean = 0.0, m2 = 0.0;
-    for (float v : *h) mean += v;
+    for (float v : *h)
+        mean += v;
     mean /= n;
     for (float v : *h) {
-        const double d = v - mean;
-        m2 += d * d;
+        const double d  = v - mean;
+        m2             += d * d;
     }
     const double stddev = std::sqrt(m2 / n);
     EXPECT_NEAR(mean, 0.0, 0.02);
@@ -190,16 +196,17 @@ TEST(CudaRandom, NormalF32_Moments)
 TEST(CudaRandom, NormalF64_Moments)
 {
     const std::size_t n = 1 << 17;
-    auto h = run_normal<double>(n, 0xD00Dull);
+    auto              h = run_normal<double>(n, 0xD00Dull);
     if (!h)
         GTEST_SKIP() << "No kernel image for current GPU";
     ASSERT_EQ(h->size(), n);
     double mean = 0.0, m2 = 0.0;
-    for (double v : *h) mean += v;
+    for (double v : *h)
+        mean += v;
     mean /= n;
     for (double v : *h) {
-        const double d = v - mean;
-        m2 += d * d;
+        const double d  = v - mean;
+        m2             += d * d;
     }
     const double stddev = std::sqrt(m2 / n);
     EXPECT_NEAR(mean, 0.0, 0.03);
@@ -208,9 +215,9 @@ TEST(CudaRandom, NormalF64_Moments)
 
 TEST(CudaRandom, IntI32_Range)
 {
-    const std::size_t n    = 1 << 14;
+    const std::size_t  n   = 1 << 14;
     const std::int64_t low = -100, high = 100;
-    auto h = run_int<std::int32_t>(n, low, high, 0xABCDull);
+    auto               h = run_int<std::int32_t>(n, low, high, 0xABCDull);
     if (!h)
         GTEST_SKIP() << "No kernel image for current GPU";
     ASSERT_EQ(h->size(), n);
@@ -223,7 +230,7 @@ TEST(CudaRandom, IntI32_Range)
 TEST(CudaRandom, IntU8_Range)
 {
     const std::size_t n = 1 << 14;
-    auto h = run_int<std::uint8_t>(n, 10, 200, 1);
+    auto              h = run_int<std::uint8_t>(n, 10, 200, 1);
     if (!h)
         GTEST_SKIP() << "No kernel image for current GPU";
     ASSERT_EQ(h->size(), n);
@@ -236,7 +243,7 @@ TEST(CudaRandom, IntU8_Range)
 TEST(CudaRandom, IntI64_Range)
 {
     const std::size_t n = 8192;
-    auto h = run_int<std::int64_t>(n, -10000, 10000, 999);
+    auto              h = run_int<std::int64_t>(n, -10000, 10000, 999);
     if (!h)
         GTEST_SKIP() << "No kernel image for current GPU";
     ASSERT_EQ(h->size(), n);
@@ -251,7 +258,7 @@ TEST(CudaRandom, IntI64_LargeRangeUsesHighBits)
     const std::size_t  n    = 8192;
     const std::int64_t low  = 0;
     const std::int64_t high = 1ll << 40;
-    auto h = run_int<std::int64_t>(n, low, high, 20260424ull);
+    auto               h    = run_int<std::int64_t>(n, low, high, 20260424ull);
     if (!h)
         GTEST_SKIP() << "No kernel image for current GPU";
     ASSERT_EQ(h->size(), n);

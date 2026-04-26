@@ -313,8 +313,16 @@ namespace ops
         return wrap(err, "cuda::ops::transpose_2d");
     }
 
-    auto strided_copy(ScalarType dt, const void* src, void* dst, const int64_t* shape, const int64_t* strides, int ndim,
-                      int64_t offset_elements, std::size_t numel) -> Result<void>
+    auto strided_copy(
+        ScalarType     dt,
+        const void*    src,
+        void*          dst,
+        const int64_t* shape,
+        const int64_t* strides,
+        int            ndim,
+        int64_t        offset_elements,
+        std::size_t    numel
+    ) -> Result<void>
     {
         if (numel == 0)
             return {};
@@ -476,7 +484,7 @@ namespace
                 return std::unexpected(make_error("workspace: device index out of range", Severity::Recoverable));
 
             std::lock_guard lock{mtx};
-            auto& slot = slots[static_cast<std::size_t>(device)];
+            auto&           slot = slots[static_cast<std::size_t>(device)];
 
             // 容量足够，直接复用
             if (slot.ptr && slot.capacity >= nbytes)

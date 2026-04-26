@@ -41,9 +41,10 @@ namespace
     constexpr int NUM_THREADS = NUM_WARPS * 32;    // 128
     constexpr int STAGES      = 3;
 
-    constexpr int FRAG_M   = 16;
-    constexpr int FRAG_N   = 16;
-    constexpr int FRAG_K   = 8;
+    constexpr int FRAG_M = 16;
+    constexpr int FRAG_N = 16;
+    constexpr int FRAG_K = 8;
+
     [[maybe_unused]] constexpr int FM_TILES = WM / FRAG_M; // 4
     [[maybe_unused]] constexpr int FN_TILES = WN / FRAG_N; // 4
     [[maybe_unused]] constexpr int FK_TILES = BK / FRAG_K; // 4

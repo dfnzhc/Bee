@@ -41,7 +41,7 @@ int bee_m1_touch_launch(int* d_out, int n)
 TEST(CudaM1Infra, LaunchKernelWritesExpectedValues)
 {
     constexpr int N = 1024;
-    int* d = nullptr;
+    int*          d = nullptr;
     ASSERT_EQ(cudaMalloc(&d, N * sizeof(int)), cudaSuccess);
 
     const int launch_err = bee_m1_touch_launch(d, N);
@@ -59,7 +59,8 @@ TEST(CudaM1Infra, LaunchKernelWritesExpectedValues)
     ASSERT_EQ(cudaMemcpy(h, d, N * sizeof(int), cudaMemcpyDeviceToHost), cudaSuccess);
     (void)cudaFree(d);
 
-    for (int i = 0; i < N; ++i) ASSERT_EQ(h[i], i);
+    for (int i = 0; i < N; ++i)
+        ASSERT_EQ(h[i], i);
 }
 
 TEST(CudaM1Infra, GridSizeHelpers)
@@ -73,8 +74,10 @@ TEST(CudaM1Infra, GridSizeHelpers)
 TEST(CudaM1Infra, TensorViewOffsetOnHost)
 {
     bee::cuda::TensorView<float, 2> v{};
-    v.shape[0] = 3; v.shape[1] = 4;
-    v.stride[0] = 4; v.stride[1] = 1;
+    v.shape[0]  = 3;
+    v.shape[1]  = 4;
+    v.stride[0] = 4;
+    v.stride[1] = 1;
     // (row=2, col=1) in row-major: linear idx = 2*4 + 1 = 9, offset = 2*4 + 1*1 = 9
     EXPECT_EQ(v.offset_linear(9), 9);
     EXPECT_EQ(v.numel(), 12);

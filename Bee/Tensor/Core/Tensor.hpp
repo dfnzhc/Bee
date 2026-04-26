@@ -18,9 +18,8 @@ class Storage;
 
 namespace tensor::cuda
 {
-struct ExecContext;
+    struct ExecContext;
 }
-
 
 // 用户面向的 Tensor 外壳：值语义，内部通过 shared_ptr<TensorImpl> 共享数据
 class Tensor
@@ -71,7 +70,7 @@ public:
     // 设备迁移：在目标设备上分配等形状张量并搬运数据。
     // 若已在目标设备上则直接返回浅拷贝；非连续张量会先 contiguous() 再搬运。
     [[nodiscard]] auto to(Device target) const -> Result<Tensor>;
-    
+
     // 带执行上下文的设备迁移。
     // 注意：当前实现仍保持同步可观察语义（内部调用 synchronize()）。
     // ExecContext 目前主要用于传递 stream，为后续真正异步 overlap 扩展预留，

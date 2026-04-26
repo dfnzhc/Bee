@@ -34,8 +34,7 @@ constexpr int kRdProd = 3;
 
 bool is_kernel_image_missing(int err)
 {
-    return err == static_cast<int>(cudaErrorNoKernelImageForDevice)
-        || err == static_cast<int>(cudaErrorInvalidDeviceFunction);
+    return err == static_cast<int>(cudaErrorNoKernelImageForDevice) || err == static_cast<int>(cudaErrorInvalidDeviceFunction);
 }
 
 template <typename T>
@@ -49,9 +48,9 @@ struct ReduceResult
 template <typename T>
 auto run_reduce(int op, int dt, const std::vector<T>& a) -> ReduceResult<T>
 {
-    T *da = nullptr, *dc = nullptr;
+    T *               da = nullptr, *dc = nullptr;
     const std::size_t n = a.size();
-    ReduceResult<T> result{};
+    ReduceResult<T>   result{};
     EXPECT_EQ(cudaMalloc(&da, n * sizeof(T)), cudaSuccess);
     if (!da)
         return result;
@@ -64,7 +63,8 @@ auto run_reduce(int op, int dt, const std::vector<T>& a) -> ReduceResult<T>
 
     const int err = bee::cuda::detail::ops_reduce_global(op, dt, da, dc, n);
     if (is_kernel_image_missing(err)) {
-        (void)cudaFree(da); (void)cudaFree(dc);
+        (void)cudaFree(da);
+        (void)cudaFree(dc);
         result.skipped = true;
         return result;
     }
@@ -77,7 +77,8 @@ auto run_reduce(int op, int dt, const std::vector<T>& a) -> ReduceResult<T>
 
     T h{};
     EXPECT_EQ(cudaMemcpy(&h, dc, sizeof(T), cudaMemcpyDeviceToHost), cudaSuccess);
-    (void)cudaFree(da); (void)cudaFree(dc);
+    (void)cudaFree(da);
+    (void)cudaFree(dc);
     result.ok    = true;
     result.value = h;
     return result;
@@ -87,11 +88,14 @@ auto run_reduce(int op, int dt, const std::vector<T>& a) -> ReduceResult<T>
 
 TEST(CudaReduceWarp, SumI32)
 {
-    for (std::size_t n : {std::size_t{1}, std::size_t{31}, std::size_t{32}, std::size_t{256},
-                          std::size_t{257}, std::size_t{1 << 12}, std::size_t{1 << 20}}) {
+    for (std::size_t n :
+         {std::size_t{1}, std::size_t{31}, std::size_t{32}, std::size_t{256}, std::size_t{257}, std::size_t{1 << 12}, std::size_t{1 << 20}}) {
         std::vector<std::int32_t> a(n);
-        std::int64_t ref = 0;
-        for (std::size_t i = 0; i < n; ++i) { a[i] = static_cast<std::int32_t>((i % 7) - 3); ref += a[i]; }
+        std::int64_t              ref = 0;
+        for (std::size_t i = 0; i < n; ++i) {
+            a[i]  = static_cast<std::int32_t>((i % 7) - 3);
+            ref  += a[i];
+        }
         const auto got = run_reduce<std::int32_t>(kRdSum, kDtI32, a);
         if (got.skipped)
             GTEST_SKIP() << "No kernel image for current GPU";
@@ -104,8 +108,11 @@ TEST(CudaReduceWarp, SumF32)
 {
     for (std::size_t n : {std::size_t{1}, std::size_t{256}, std::size_t{1025}, std::size_t{1 << 18}}) {
         std::vector<float> a(n);
-        double ref = 0;
-        for (std::size_t i = 0; i < n; ++i) { a[i] = 1.0f / static_cast<float>(i + 1); ref += a[i]; }
+        double             ref = 0;
+        for (std::size_t i = 0; i < n; ++i) {
+            a[i]  = 1.0f / static_cast<float>(i + 1);
+            ref  += a[i];
+        }
         const auto got = run_reduce<float>(kRdSum, kDtF32, a);
         if (got.skipped)
             GTEST_SKIP() << "No kernel image for current GPU";
@@ -116,9 +123,10 @@ TEST(CudaReduceWarp, SumF32)
 
 TEST(CudaReduceWarp, MinMaxF64)
 {
-    const std::size_t n = 10000;
+    const std::size_t   n = 10000;
     std::vector<double> a(n);
-    for (std::size_t i = 0; i < n; ++i) a[i] = std::sin(static_cast<double>(i));
+    for (std::size_t i = 0; i < n; ++i)
+        a[i] = std::sin(static_cast<double>(i));
     const auto ref_min = *std::min_element(a.begin(), a.end());
     const auto ref_max = *std::max_element(a.begin(), a.end());
     const auto got_min = run_reduce<double>(kRdMin, kDtF64, a);
@@ -136,12 +144,13 @@ TEST(CudaReduceWarp, MinMaxF64)
 
 TEST(CudaReduceWarp, MinMaxU8)
 {
-    const std::size_t n = 5000;
+    const std::size_t         n = 5000;
     std::vector<std::uint8_t> a(n);
-    for (std::size_t i = 0; i < n; ++i) a[i] = static_cast<std::uint8_t>((i * 13 + 7) & 0xFF);
+    for (std::size_t i = 0; i < n; ++i)
+        a[i] = static_cast<std::uint8_t>((i * 13 + 7) & 0xFF);
     const std::uint8_t ref_min = *std::min_element(a.begin(), a.end());
     const std::uint8_t ref_max = *std::max_element(a.begin(), a.end());
-    const auto got_min = run_reduce<std::uint8_t>(kRdMin, kDtU8, a);
+    const auto         got_min = run_reduce<std::uint8_t>(kRdMin, kDtU8, a);
     if (got_min.skipped)
         GTEST_SKIP() << "No kernel image for current GPU";
     ASSERT_TRUE(got_min.ok);
@@ -156,11 +165,12 @@ TEST(CudaReduceWarp, MinMaxU8)
 
 TEST(CudaReduceWarp, ProdI64)
 {
-    const std::size_t n = 40;
+    const std::size_t         n = 40;
     std::vector<std::int64_t> a(n, 2);
-    a[0] = -1;
+    a[0]             = -1;
     std::int64_t ref = 1;
-    for (auto v : a) ref *= v;
+    for (auto v : a)
+        ref *= v;
     const auto got = run_reduce<std::int64_t>(kRdProd, kDtI64, a);
     if (got.skipped)
         GTEST_SKIP() << "No kernel image for current GPU";
@@ -171,8 +181,8 @@ TEST(CudaReduceWarp, ProdI64)
 TEST(CudaReduceWarp, SumF32MoreThanCappedPartialBlocks)
 {
     constexpr std::size_t n = 1024u * 256u + 123u;
-    std::vector<float> a(n, 1.0f);
-    const auto got = run_reduce<float>(kRdSum, kDtF32, a);
+    std::vector<float>    a(n, 1.0f);
+    const auto            got = run_reduce<float>(kRdSum, kDtF32, a);
     if (got.skipped)
         GTEST_SKIP() << "No kernel image for current GPU";
     ASSERT_TRUE(got.ok);
