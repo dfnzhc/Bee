@@ -37,6 +37,12 @@ int ops_matmul(int dt, const void* A, const void* B, void* C, std::size_t M, std
 // B10：手写 TMA + WMMA TF32 GEMM 显式入口（仅 F32，要求 M%128==N%128==K%32==0、16B 对齐）。
 int ops_matmul_force_tma_wmma(int dt, const void* A, const void* B, void* C, std::size_t M, std::size_t K, std::size_t N) noexcept;
 
+// 低精度 GEMM（Task 5）：读取 F16（dt=7）或 BF16（dt=8）输入，以 float 累加，输出 float。
+// C 指向 float 设备缓冲（M×N 个 float）；A/B 指向对应低精度存储缓冲。
+// 不支持的 dt 或有效尺寸下的空指针返回 cudaErrorInvalidValue。
+// K==0 时函数直接返回成功且不写 C；调用方须保证 C 已预清零。
+int ops_matmul_lowp(int dt, const void* A, const void* B, float* C, std::size_t M, std::size_t K, std::size_t N) noexcept;
+
 // 2D tiled-shared transpose：dst[i,j] = src[j,i]，src 为 [rows, cols] 连续。
 int ops_transpose_2d(int dt, const void* src, void* dst, std::size_t rows, std::size_t cols) noexcept;
 

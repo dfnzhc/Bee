@@ -44,6 +44,8 @@ constexpr int kUnAbs  = 1;
 constexpr int kUnSqrt = 2;
 constexpr int kUnExp  = 3;
 constexpr int kUnLog  = 4;
+constexpr int kUnRelu    = 5;
+constexpr int kUnSigmoid = 6;
 
 // ─── 向量化 traits：每个 dtype 选择最合适的 128-bit 载入向量 ──────────────────
 // clang-format off
@@ -155,11 +157,14 @@ __device__ __forceinline__ T apply_un(T v)
                 return fabs(v);
         } else
             return v < T(0) ? T(-v) : v;
+    } else if constexpr (OP == kUnRelu) {
+        return v < T(0) ? T(0) : v;
     }
     return v;
 }
 
-// 向量化 unary kernel（只覆盖 neg/abs 这类 memory-bound op；sqrt/exp/log 仍走标量）
+// 向量化 unary kernel 只覆盖 neg/abs/relu 等 memory-bound op；
+// sqrt/exp/log/sigmoid 等 compute-bound op 走标量路径，避免无收益的向量打包。
 template <typename T, int OP>
 __global__ void unary_kernel_vec(const T* __restrict__ a, T* __restrict__ out, std::size_t n_vec)
 {
@@ -201,8 +206,19 @@ __global__ void unary_kernel(const T* __restrict__ a, T* __restrict__ out, std::
         out[i] = static_cast<T>(::sqrt(static_cast<double>(av)));
     else if constexpr (OP == kUnExp)
         out[i] = static_cast<T>(::exp(static_cast<double>(av)));
-    else /* Log */
+    else if constexpr (OP == kUnLog)
         out[i] = static_cast<T>(::log(static_cast<double>(av)));
+    else if constexpr (OP == kUnRelu)
+        out[i] = av < T(0) ? T(0) : av;
+    else { /* Sigmoid */
+        const double x = static_cast<double>(av);
+        if (x >= 0.0)
+            out[i] = static_cast<T>(1.0 / (1.0 + ::exp(-x)));
+        else {
+            const double e = ::exp(x);
+            out[i]         = static_cast<T>(e / (1.0 + e));
+        }
+    }
 }
 
 // Specialization: float path uses 32-bit math intrinsics.
@@ -221,8 +237,18 @@ __global__ void unary_kernel_f32(const float* __restrict__ a, float* __restrict_
         out[i] = sqrtf(av);
     else if constexpr (OP == kUnExp)
         out[i] = expf(av);
-    else /* Log */
+    else if constexpr (OP == kUnLog)
         out[i] = logf(av);
+    else if constexpr (OP == kUnRelu)
+        out[i] = av < 0.0f ? 0.0f : av;
+    else { /* Sigmoid */
+        if (av >= 0.0f)
+            out[i] = 1.0f / (1.0f + expf(-av));
+        else {
+            const float e = expf(av);
+            out[i]        = e / (1.0f + e);
+        }
+    }
 }
 
 template <typename T, int OP>
@@ -255,8 +281,8 @@ inline int launch_unary(const void* a, void* out, std::size_t n, cudaStream_t st
     if (n == 0)
         return 0;
     const unsigned int block = bee::cuda::kDefaultBlockSize;
-    // Neg/Abs 走向量化路径（memory-bound，128-bit 读写收益最高）
-    if constexpr (OP == kUnNeg || OP == kUnAbs) {
+    // Neg/Abs/Relu 走向量化路径（memory-bound，128-bit 读写收益最高）
+    if constexpr (OP == kUnNeg || OP == kUnAbs || OP == kUnRelu) {
         constexpr int     N     = VecTraits<T>::kVecN;
         const std::size_t n_vec = n / N;
         const std::size_t tail  = n_vec * N;
@@ -282,7 +308,7 @@ inline int launch_unary_f32(const void* a, void* out, std::size_t n, cudaStream_
     if (n == 0)
         return 0;
     const unsigned int block = bee::cuda::kDefaultBlockSize;
-    if constexpr (OP == kUnNeg || OP == kUnAbs) {
+    if constexpr (OP == kUnNeg || OP == kUnAbs || OP == kUnRelu) {
         constexpr int     N     = VecTraits<float>::kVecN;
         const std::size_t n_vec = n / N;
         const std::size_t tail  = n_vec * N;
@@ -348,6 +374,8 @@ int ops_unary(int op, int dt, const void* a, void* out, std::size_t n) noexcept
         case kUnSqrt: err = launch_unary_f32<kUnSqrt>(a, out, n, stream); break;
         case kUnExp: err = launch_unary_f32<kUnExp>(a, out, n, stream); break;
         case kUnLog: err = launch_unary_f32<kUnLog>(a, out, n, stream); break;
+        case kUnRelu: err = launch_unary_f32<kUnRelu>(a, out, n, stream); break;
+        case kUnSigmoid: err = launch_unary_f32<kUnSigmoid>(a, out, n, stream); break;
         default: return static_cast<int>(cudaErrorInvalidValue);
         }
     } else if (dt == kDtF64) {
@@ -357,16 +385,28 @@ int ops_unary(int op, int dt, const void* a, void* out, std::size_t n) noexcept
         case kUnSqrt: err = launch_unary<double, kUnSqrt>(a, out, n, stream); break;
         case kUnExp: err = launch_unary<double, kUnExp>(a, out, n, stream); break;
         case kUnLog: err = launch_unary<double, kUnLog>(a, out, n, stream); break;
+        case kUnRelu: err = launch_unary<double, kUnRelu>(a, out, n, stream); break;
+        case kUnSigmoid: err = launch_unary<double, kUnSigmoid>(a, out, n, stream); break;
         default: return static_cast<int>(cudaErrorInvalidValue);
         }
-    } else if (op == kUnNeg || op == kUnAbs) {
-        // Integer neg/abs paths.
+    } else if (op == kUnNeg || op == kUnAbs || op == kUnRelu) {
+        // Integer neg/abs/relu paths.
         switch (dt) {
         case kDtI32:
-            err = (op == kUnNeg) ? launch_unary<std::int32_t, kUnNeg>(a, out, n, stream) : launch_unary<std::int32_t, kUnAbs>(a, out, n, stream);
+            if (op == kUnNeg)
+                err = launch_unary<std::int32_t, kUnNeg>(a, out, n, stream);
+            else if (op == kUnAbs)
+                err = launch_unary<std::int32_t, kUnAbs>(a, out, n, stream);
+            else
+                err = launch_unary<std::int32_t, kUnRelu>(a, out, n, stream);
             break;
         case kDtI64:
-            err = (op == kUnNeg) ? launch_unary<std::int64_t, kUnNeg>(a, out, n, stream) : launch_unary<std::int64_t, kUnAbs>(a, out, n, stream);
+            if (op == kUnNeg)
+                err = launch_unary<std::int64_t, kUnNeg>(a, out, n, stream);
+            else if (op == kUnAbs)
+                err = launch_unary<std::int64_t, kUnAbs>(a, out, n, stream);
+            else
+                err = launch_unary<std::int64_t, kUnRelu>(a, out, n, stream);
             break;
         default: return static_cast<int>(cudaErrorInvalidValue);
         }

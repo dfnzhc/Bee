@@ -72,6 +72,10 @@ auto deallocate(void* p, std::size_t nbytes, std::size_t alignment) -> void;
 // 具体使用 CUTLASS、baseline tile 还是 Native(TMA+WMMA) 由 Bee::CUDA 后端决定。
 [[nodiscard]] auto matmul(int dt, const void* A, const void* B, void* C, std::size_t M, std::size_t K, std::size_t N) -> Result<void>;
 
+// 低精度 GEMM（Task 5）：dt 仅接受 F16=7 或 BF16=8；输出为 float（F32）。
+// C 指向 float 设备缓冲；调用方确保在 K==0 时 C 已清零。
+[[nodiscard]] auto matmul_lowp(int dt, const void* A, const void* B, float* C, std::size_t M, std::size_t K, std::size_t N) -> Result<void>;
+
 // 2D tiled-shared transpose：dst[i,j] = src[j,i]。
 [[nodiscard]] auto transpose_2d(int dt, const void* src, void* dst, std::size_t rows, std::size_t cols) -> Result<void>;
 

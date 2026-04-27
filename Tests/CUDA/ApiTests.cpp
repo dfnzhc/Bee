@@ -126,6 +126,32 @@ TEST(CUDAComponent, MemcpyD2DWorks)
     cuda::deallocate(*b, N * sizeof(float), 16);
 }
 
+TEST(CUDAAiPrimitiveApi, RmsNormRejectsInvalidDimensionsBeforeBridge)
+{
+    float value = 0.0f;
+    auto  r     = cuda::ops::rms_norm(cuda::ScalarType::F32, &value, &value, &value, 0, 4, 1e-5);
+    ASSERT_FALSE(r);
+    EXPECT_NE(r.error().message.view().find("维度含 0"), std::string_view::npos);
+}
+
+TEST(CUDAAiPrimitiveApi, RopeRejectsInvalidDimensionsBeforeBridge)
+{
+    float value = 0.0f;
+    auto  r     = cuda::ops::rope(cuda::ScalarType::F32, &value, &value, 1, 0, 4, 10000.0, 0);
+    ASSERT_FALSE(r);
+    EXPECT_NE(r.error().message.view().find("维度含 0"), std::string_view::npos);
+}
+
+TEST(CUDAAiPrimitiveApi, EmbeddingRejectsZeroVocabBeforeBridge)
+{
+    float        weight = 0.0f;
+    std::int64_t id     = 0;
+    float        out    = 0.0f;
+    auto         r      = cuda::ops::embedding(cuda::ScalarType::F32, cuda::ScalarType::I64, &weight, &id, &out, 1, 1, 0);
+    ASSERT_FALSE(r);
+    EXPECT_NE(r.error().message.view().find("vocab"), std::string_view::npos);
+}
+
 // ── M6/M7 Matmul 后端切换脚手架 ─────────────────────────────────────────────
 
 TEST(CUDAMatmulBackend, DefaultIsAuto)

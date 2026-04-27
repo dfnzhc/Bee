@@ -1,5 +1,6 @@
 #include "Tensor/Ops/Softmax.hpp"
 #include "Tensor/Ops/Cast.hpp"
+#include "Tensor/Cuda/Backend.hpp"
 
 #include <format>
 #include <algorithm>
@@ -24,9 +25,9 @@ namespace
 
     auto check_softmax_dtype(DType dt) -> Result<void>
     {
-        if (dt == DType::Bool || dt == DType::U8 || dt == DType::I32 || dt == DType::I64)
-            return std::unexpected(make_error(std::format("softmax 不支持 DType::{}", enum_to_name(dt)), Severity::Recoverable));
-        return {};
+        if (dt == DType::F32 || dt == DType::F64 || dt == DType::F16 || dt == DType::BF16)
+            return {};
+        return std::unexpected(make_error(std::format("softmax 不支持 DType::{}", enum_to_name(dt)), Severity::Recoverable));
     }
 
     template <typename T>
@@ -124,28 +125,37 @@ auto softmax(const Tensor& x, int dim, const tensor::cuda::ExecContext* ctx) -> 
         return softmax(*f32_r, dim, ctx);
     }
 
-    // CUDA 输入走 CPU bridge
-    if (x.device() == Device::CUDA) {
-        auto cpu_r = x.to(Device::CPU, ctx);
-        if (!cpu_r)
-            return std::unexpected(std::move(cpu_r.error()));
-
-        auto result_r = softmax(*cpu_r, dim, nullptr);
-        if (!result_r)
-            return std::unexpected(std::move(result_r.error()));
-
-        return result_r->to(Device::CUDA, ctx);
-    }
-
     // 非连续输入先整理为连续
     Tensor cont;
     if (!x.is_contiguous()) {
-        auto r = x.contiguous();
+        auto r = x.contiguous(ctx);
         if (!r)
             return std::unexpected(std::move(r.error()));
         cont = std::move(*r);
     } else {
         cont = x;
+    }
+
+    if (cont.device() == Device::CUDA) {
+        auto out_r = Tensor::empty(cont.shape(), cont.dtype(), Device::CUDA);
+        if (!out_r)
+            return std::unexpected(std::move(out_r.error()));
+        Tensor out = std::move(*out_r);
+
+        std::size_t outer = 1;
+        for (int64_t i = 0; i < normalized_dim; ++i)
+            outer *= static_cast<std::size_t>(cont.shape()[static_cast<std::size_t>(i)]);
+
+        const std::size_t axis = static_cast<std::size_t>(axis_size);
+
+        std::size_t inner = 1;
+        for (int64_t i = normalized_dim + 1; i < ndim; ++i)
+            inner *= static_cast<std::size_t>(cont.shape()[static_cast<std::size_t>(i)]);
+
+        auto r = tensor::cuda::softmax(static_cast<int>(cont.dtype()), cont.data_ptr(), out.data_ptr(), outer, axis, inner);
+        if (!r)
+            return std::unexpected(std::move(r.error()));
+        return out;
     }
 
     // CPU 实现：F32/F64

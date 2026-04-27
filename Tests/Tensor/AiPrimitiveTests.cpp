@@ -349,3 +349,73 @@ TEST(AiPrimitiveTests, RopeCudaInputReturnsCudaAndMatchesCpu)
     for (int64_t i = 0; i < ref.numel(); ++i)
         EXPECT_NEAR(pb[i], pa[i], 1e-5f) << "index=" << i;
 }
+
+TEST(AiPrimitiveTests, EmbeddingCudaF64InputsReturnCudaAndMatchCpu)
+{
+    if (!bee::tensor::cuda::is_available())
+        GTEST_SKIP() << "CUDA 不可用，跳过 CUDA 正向测试";
+
+    auto  w_cpu   = Tensor::arange(0, 12, 1, DType::F64).value().reshape({3, 4}).value();
+    auto  ids_cpu = Tensor::zeros({2}, DType::I32).value();
+    auto* p_ids   = static_cast<int32_t*>(ids_cpu.data_ptr());
+    p_ids[0]      = 1;
+    p_ids[1]      = 0;
+    auto ref      = bee::embedding(w_cpu, ids_cpu).value();
+
+    auto w_cuda   = w_cpu.to(Device::CUDA).value();
+    auto ids_cuda = ids_cpu.to(Device::CUDA).value();
+    auto out_cuda = bee::embedding(w_cuda, ids_cuda).value();
+
+    ASSERT_EQ(out_cuda.device(), Device::CUDA);
+    ASSERT_EQ(out_cuda.shape(), ref.shape());
+
+    auto        out_back = out_cuda.to(Device::CPU).value();
+    const auto* pa       = static_cast<const double*>(ref.data_ptr());
+    const auto* pb       = static_cast<const double*>(out_back.data_ptr());
+    for (int64_t i = 0; i < ref.numel(); ++i)
+        EXPECT_DOUBLE_EQ(pb[i], pa[i]) << "index=" << i;
+}
+
+TEST(AiPrimitiveTests, RmsNormCudaF64InputsReturnCudaAndMatchCpu)
+{
+    if (!bee::tensor::cuda::is_available())
+        GTEST_SKIP() << "CUDA 不可用，跳过 CUDA 正向测试";
+
+    auto x_cpu = Tensor::arange(1, 9, 1, DType::F64).value().reshape({2, 4}).value();
+    auto w_cpu = Tensor::ones({4}, DType::F64).value();
+    auto ref   = bee::rms_norm(x_cpu, w_cpu, 1e-5).value();
+
+    auto x_cuda   = x_cpu.to(Device::CUDA).value();
+    auto w_cuda   = w_cpu.to(Device::CUDA).value();
+    auto out_cuda = bee::rms_norm(x_cuda, w_cuda, 1e-5).value();
+
+    ASSERT_EQ(out_cuda.device(), Device::CUDA);
+    ASSERT_EQ(out_cuda.shape(), ref.shape());
+
+    auto        out_back = out_cuda.to(Device::CPU).value();
+    const auto* pa       = static_cast<const double*>(ref.data_ptr());
+    const auto* pb       = static_cast<const double*>(out_back.data_ptr());
+    for (int64_t i = 0; i < ref.numel(); ++i)
+        EXPECT_NEAR(pb[i], pa[i], 1e-10) << "index=" << i;
+}
+
+TEST(AiPrimitiveTests, RopeCudaF64InputReturnsCudaAndMatchesCpu)
+{
+    if (!bee::tensor::cuda::is_available())
+        GTEST_SKIP() << "CUDA 不可用，跳过 CUDA 正向测试";
+
+    auto q_cpu = Tensor::ones({1, 2, 4}, DType::F64).value();
+    auto ref   = bee::apply_rope(q_cpu, 10000.0, 1).value();
+
+    auto q_cuda   = q_cpu.to(Device::CUDA).value();
+    auto out_cuda = bee::apply_rope(q_cuda, 10000.0, 1).value();
+
+    ASSERT_EQ(out_cuda.device(), Device::CUDA);
+    ASSERT_EQ(out_cuda.shape(), ref.shape());
+
+    auto        out_back = out_cuda.to(Device::CPU).value();
+    const auto* pa       = static_cast<const double*>(ref.data_ptr());
+    const auto* pb       = static_cast<const double*>(out_back.data_ptr());
+    for (int64_t i = 0; i < ref.numel(); ++i)
+        EXPECT_NEAR(pb[i], pa[i], 1e-10) << "index=" << i;
+}

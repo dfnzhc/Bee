@@ -3,6 +3,7 @@
 #include "Tensor/Tensor.hpp"
 
 #include <cmath>
+#include <string_view>
 
 using namespace bee;
 
@@ -67,17 +68,31 @@ TEST(SoftmaxTests, F16InputPromotesToF32)
 
 TEST(SoftmaxTests, CudaInputReturnsCudaWhenAvailable)
 {
-    // CUDA 输入返回 CUDA 张量
+    // CUDA 输入返回 CUDA 张量，并在非末尾维度上与 CPU 参考一致
     if (!tensor::cuda::is_available())
         GTEST_SKIP() << "CUDA 不可用，跳过";
 
-    auto x_cpu = Tensor::ones({2, 4}, DType::F32).value();
+    auto x_cpu = Tensor::arange(0, 12, 1, DType::F32).value().reshape({2, 3, 2}).value();
+    auto ref   = softmax(x_cpu, 1).value();
     auto x_gpu = x_cpu.to(Device::CUDA).value();
     auto y_gpu = softmax(x_gpu, 1).value();
     EXPECT_EQ(y_gpu.device(), Device::CUDA);
 
     auto        y_cpu = y_gpu.to(Device::CPU).value();
     const auto* p     = static_cast<const float*>(y_cpu.data_ptr());
-    for (int i = 0; i < 8; ++i)
-        EXPECT_NEAR(p[i], 0.25f, 1e-6f);
+    const auto* r     = static_cast<const float*>(ref.data_ptr());
+    for (int i = 0; i < 12; ++i)
+        EXPECT_NEAR(p[i], r[i], 1e-6f) << "i=" << i;
+}
+
+TEST(SoftmaxTests, CudaRejectsI8BeforeBackendDispatch)
+{
+    // CUDA 路径也应在 Tensor 层拒绝不支持的 dtype，避免泄漏底层 CUDA 错误。
+    if (!tensor::cuda::is_available())
+        GTEST_SKIP() << "CUDA 不可用，跳过";
+
+    auto x = Tensor::empty({2, 3}, DType::I8, Device::CUDA).value();
+    auto y = softmax(x, 1);
+    ASSERT_FALSE(y.has_value());
+    EXPECT_NE(y.error().message.view().find("softmax 不支持"), std::string_view::npos);
 }

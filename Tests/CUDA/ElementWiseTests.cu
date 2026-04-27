@@ -8,6 +8,7 @@
 
 #include <cuda_runtime.h>
 
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <optional>
@@ -18,15 +19,18 @@
 namespace
 {
 
-constexpr int kDtU8  = 1;
-constexpr int kDtI32 = 2;
-constexpr int kDtF32 = 4;
-constexpr int kDtF64 = 5;
+constexpr int kDtBool = 0;
+constexpr int kDtU8   = 1;
+constexpr int kDtI32  = 2;
+constexpr int kDtF32  = 4;
+constexpr int kDtF64  = 5;
 
 constexpr int kBinAdd = 0;
 constexpr int kBinMul = 2;
-constexpr int kUnNeg  = 0;
-constexpr int kUnAbs  = 1;
+constexpr int kUnNeg     = 0;
+constexpr int kUnAbs     = 1;
+constexpr int kUnRelu    = 5;
+constexpr int kUnSigmoid = 6;
 
 // 若 GPU 无 sm_120 image（调试卡等），跳过。
 bool is_kernel_image_missing(int err)
@@ -236,6 +240,99 @@ TEST(CudaElementWiseVec, UnaryAbsI32_Tail)
         for (std::size_t i = 0; i < n; ++i) {
             const std::int32_t expected = a[i] < 0 ? -a[i] : a[i];
             ASSERT_EQ((*c)[i], expected) << "n=" << n << " i=" << i;
+        }
+    }
+}
+
+TEST(CudaElementWiseVec, UnaryReluF32_Tail)
+{
+    for (std::size_t n : {std::size_t{1}, std::size_t{3}, std::size_t{100}, std::size_t{1025}}) {
+        std::vector<float> a(n);
+        for (std::size_t i = 0; i < n; ++i)
+            a[i] = static_cast<float>(static_cast<int>(i % 17) - 8);
+        auto c = run_unary<float>(kUnRelu, n, a);
+        if (!c)
+            GTEST_SKIP() << "No kernel image for current GPU";
+        ASSERT_EQ(c->size(), n);
+        for (std::size_t i = 0; i < n; ++i) {
+            const float expected = a[i] < 0.0f ? 0.0f : a[i];
+            ASSERT_FLOAT_EQ((*c)[i], expected) << "n=" << n << " i=" << i;
+        }
+    }
+}
+
+TEST(CudaElementWiseVec, UnaryReluI32_Tail)
+{
+    for (std::size_t n : {std::size_t{1}, std::size_t{5}, std::size_t{1024}, std::size_t{1027}}) {
+        std::vector<std::int32_t> a(n);
+        for (std::size_t i = 0; i < n; ++i)
+            a[i] = static_cast<std::int32_t>(i % 23) - 11;
+        auto c = run_unary<std::int32_t>(kUnRelu, n, a);
+        if (!c)
+            GTEST_SKIP() << "No kernel image for current GPU";
+        ASSERT_EQ(c->size(), n);
+        for (std::size_t i = 0; i < n; ++i) {
+            const std::int32_t expected = a[i] < 0 ? 0 : a[i];
+            ASSERT_EQ((*c)[i], expected) << "n=" << n << " i=" << i;
+        }
+    }
+}
+
+TEST(CudaElementWiseVec, UnaryReluRejectsBoolAndU8)
+{
+    EXPECT_EQ(bee::cuda::detail::ops_unary(kUnRelu, kDtBool, nullptr, nullptr, 1), static_cast<int>(cudaErrorInvalidValue));
+    EXPECT_EQ(bee::cuda::detail::ops_unary(kUnRelu, kDtU8, nullptr, nullptr, 1), static_cast<int>(cudaErrorInvalidValue));
+}
+
+TEST(CudaElementWiseVec, UnarySigmoidF32_Tail)
+{
+    for (std::size_t n : {std::size_t{1}, std::size_t{3}, std::size_t{100}, std::size_t{1025}}) {
+        std::vector<float> a(n);
+        for (std::size_t i = 0; i < n; ++i)
+            a[i] = static_cast<float>(static_cast<int>(i % 11) - 5);
+        auto c = run_unary<float>(kUnSigmoid, n, a);
+        if (!c)
+            GTEST_SKIP() << "No kernel image for current GPU";
+        ASSERT_EQ(c->size(), n);
+        for (std::size_t i = 0; i < n; ++i) {
+            const float expected = 1.0f / (1.0f + std::exp(-a[i]));
+            ASSERT_NEAR((*c)[i], expected, 1e-6f) << "n=" << n << " i=" << i;
+        }
+    }
+}
+
+TEST(CudaElementWiseVec, UnarySigmoidF32_ExtremeInputs)
+{
+    const std::vector<float> a = {-100.0f, 0.0f, 100.0f};
+    auto                     c = run_unary<float>(kUnSigmoid, a.size(), a);
+    if (!c)
+        GTEST_SKIP() << "No kernel image for current GPU";
+
+    ASSERT_EQ(c->size(), a.size());
+    EXPECT_NEAR((*c)[0], 0.0f, 1e-6f);
+    EXPECT_NEAR((*c)[1], 0.5f, 1e-6f);
+    EXPECT_NEAR((*c)[2], 1.0f, 1e-6f);
+}
+
+TEST(CudaElementWiseVec, UnarySigmoidRejectsNonFloatDTypes)
+{
+    EXPECT_EQ(bee::cuda::detail::ops_unary(kUnSigmoid, kDtU8, nullptr, nullptr, 1), static_cast<int>(cudaErrorInvalidValue));
+    EXPECT_EQ(bee::cuda::detail::ops_unary(kUnSigmoid, kDtI32, nullptr, nullptr, 1), static_cast<int>(cudaErrorInvalidValue));
+}
+
+TEST(CudaElementWiseVec, UnarySigmoidF64_Tail)
+{
+    for (std::size_t n : {std::size_t{1}, std::size_t{2}, std::size_t{100}, std::size_t{1025}}) {
+        std::vector<double> a(n);
+        for (std::size_t i = 0; i < n; ++i)
+            a[i] = static_cast<double>(static_cast<int>(i % 13) - 6);
+        auto c = run_unary<double>(kUnSigmoid, n, a);
+        if (!c)
+            GTEST_SKIP() << "No kernel image for current GPU";
+        ASSERT_EQ(c->size(), n);
+        for (std::size_t i = 0; i < n; ++i) {
+            const double expected = 1.0 / (1.0 + std::exp(-a[i]));
+            ASSERT_NEAR((*c)[i], expected, 1e-12) << "n=" << n << " i=" << i;
         }
     }
 }

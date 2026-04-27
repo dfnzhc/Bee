@@ -31,6 +31,7 @@ if(TARGET Bee::CUDA)
             MatmulTests.cu
             StridedCopyTests.cu
             AiPrimitiveTests.cu
+            LowPrecisionGemmTests.cu
         )
 
         set_target_properties(CUDA.Tests PROPERTIES

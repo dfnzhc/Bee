@@ -11,6 +11,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <vector>
 
@@ -154,6 +155,9 @@ TEST(CudaAiPrimitives, RmsNormRejectsInvalidArgs)
     EXPECT_NE(bee::cuda::detail::ops_rms_norm(kDtF32, d, d, d, 1, 4, -1e-5), 0);
     // 不支持的 dtype
     EXPECT_NE(bee::cuda::detail::ops_rms_norm(kDtBool, d, d, d, 1, 4, 1e-5), 0);
+    // rows 超过 CUDA grid.x 上限时必须拒绝，避免 unsigned 截断后静默少算
+    const auto too_many_rows = static_cast<std::size_t>(std::numeric_limits<unsigned>::max()) + 2u;
+    EXPECT_NE(bee::cuda::detail::ops_rms_norm(kDtF32, d, d, d, too_many_rows, 1, 1e-5), 0);
 
     (void)cudaFree(d);
 }
@@ -381,6 +385,8 @@ TEST(CudaAiPrimitives, EmbeddingRejectsInvalidArgs)
     EXPECT_NE(bee::cuda::detail::ops_embedding(kDtF32, kDtI64, dw, di, dout, 0, 4, 3), 0);
     // hidden=0
     EXPECT_NE(bee::cuda::detail::ops_embedding(kDtF32, kDtI64, dw, di, dout, 2, 0, 3), 0);
+    // vocab=0
+    EXPECT_NE(bee::cuda::detail::ops_embedding(kDtF32, kDtI64, dw, di, dout, 2, 4, 0), 0);
     // 不支持的 weight dtype
     EXPECT_NE(bee::cuda::detail::ops_embedding(kDtBool, kDtI64, dw, di, dout, 2, 4, 3), 0);
     // 不支持的 ids dtype

@@ -159,18 +159,18 @@ TEST(LowPrecisionTests, PromoteTypesIntegerHierarchy)
     EXPECT_EQ(bee::promote_types(bee::DType::I32, bee::DType::I32, bee::DTypeOpKind::ElementWise), bee::DType::I32);
 }
 
-// ── CUDA 上 F16/BF16 cast（CPU 参考过渡路径）────────────────────────────────
+// ── CUDA 上 F16/BF16 cast（原生低精度路径）──────────────────────────────────
 
-TEST(LowPrecisionTests, CudaCastF32ToF16ViaFallback)
+TEST(LowPrecisionTests, CudaCastF32ToF16Native)
 {
-    // 若无 CUDA，跳过；有 CUDA 时验证 F32→F16 过渡路径
+    // 若无 CUDA，跳过；有 CUDA 时验证 F32→F16 原生路径
     if (!bee::tensor::cuda::is_available())
         GTEST_SKIP() << "CUDA 不可用，跳过 CUDA low-precision cast 测试";
 
     auto src_cpu = bee::Tensor::full({4}, bee::DType::F32, 2.0).value();
     auto src_gpu = src_cpu.to(bee::Device::CUDA).value();
 
-    // 在 CUDA 张量上 cast 到 F16（走 CPU 参考过渡路径）
+    // 在 CUDA 张量上 cast 到 F16（走原生低精度路径）
     auto f16_gpu = bee::cast(src_gpu, bee::DType::F16).value();
     EXPECT_EQ(f16_gpu.dtype(), bee::DType::F16);
     EXPECT_EQ(f16_gpu.device(), bee::Device::CUDA);
@@ -183,7 +183,7 @@ TEST(LowPrecisionTests, CudaCastF32ToF16ViaFallback)
     EXPECT_NEAR(p[3], 2.0f, 1e-3f);
 }
 
-TEST(LowPrecisionTests, CudaCastF32ToBF16ViaFallback)
+TEST(LowPrecisionTests, CudaCastF32ToBF16Native)
 {
     if (!bee::tensor::cuda::is_available())
         GTEST_SKIP() << "CUDA 不可用，跳过 CUDA low-precision cast 测试";
@@ -350,9 +350,9 @@ TEST(LowPrecisionTests, CastI32ToBF16Bridge)
     EXPECT_NEAR(fp[1], 7.0f, 0.1f);
 }
 
-TEST(LowPrecisionTests, CudaCastF16ToBF16ViaFallback)
+TEST(LowPrecisionTests, CudaCastF16ToBF16ReportsUnsupported)
 {
-    // CUDA F16 → BF16 经 CPU 过渡，不应产生未定义结果
+    // CUDA F16 → BF16 不再走 CPU 过渡；该组合等待后续原生 kernel 支持
     if (!bee::tensor::cuda::is_available())
         GTEST_SKIP() << "CUDA 不可用，跳过";
 
@@ -360,16 +360,8 @@ TEST(LowPrecisionTests, CudaCastF16ToBF16ViaFallback)
     auto cpu_f16 = bee::cast(cpu_f32, bee::DType::F16).value();
     auto gpu_f16 = cpu_f16.to(bee::Device::CUDA).value();
 
-    // CUDA F16 → BF16（走 CPU 参考路径）
-    auto gpu_bf16 = bee::cast(gpu_f16, bee::DType::BF16).value();
-    EXPECT_EQ(gpu_bf16.dtype(), bee::DType::BF16);
-    EXPECT_EQ(gpu_bf16.device(), bee::Device::CUDA);
-
-    // 搬回 CPU 验证值
-    auto        cpu_bf16 = gpu_bf16.to(bee::Device::CPU).value();
-    auto        back     = bee::cast(cpu_bf16, bee::DType::F32).value();
-    const auto* p        = static_cast<const float*>(back.data_ptr());
-    EXPECT_NEAR(p[0], 1.5f, 0.02f);
+    auto gpu_bf16 = bee::cast(gpu_f16, bee::DType::BF16);
+    EXPECT_FALSE(gpu_bf16.has_value());
 }
 
 // ── F16/BF16 sum 累加类型 ────────────────────────────────────────────────────
@@ -426,4 +418,168 @@ TEST(LowPrecisionTests, AxisSumOfBF16ReturnsF32WithKeepdim)
     const auto* p = static_cast<const float*>(result.data_ptr());
     for (int i = 0; i < 4; ++i)
         EXPECT_NEAR(p[i], 3.0f, 0.05f);
+}
+
+// ── CUDA 原生低精度 matmul：F16/BF16 输入 → F32 输出 ─────────────────────────
+
+TEST(LowPrecisionTests, CudaF16MatmulReturnsF32)
+{
+    if (!bee::tensor::cuda::is_available())
+        GTEST_SKIP() << "CUDA 不可用，跳过";
+
+    // A = [[0,1,2],[3,4,5]]（arange 0..5，reshape [2,3]）
+    auto a_cpu = bee::Tensor::zeros({2, 3}, bee::DType::F32).value();
+    {
+        auto* p = static_cast<float*>(a_cpu.data_ptr());
+        for (int i = 0; i < 6; ++i) p[i] = static_cast<float>(i);
+    }
+    // B = [[0,1],[2,3],[4,5]]（arange 0..5，reshape [3,2]）
+    auto b_cpu = bee::Tensor::zeros({3, 2}, bee::DType::F32).value();
+    {
+        auto* p = static_cast<float*>(b_cpu.data_ptr());
+        for (int i = 0; i < 6; ++i) p[i] = static_cast<float>(i);
+    }
+
+    // 上传到 CUDA 并 cast 为 F16
+    auto a_gpu_f32 = a_cpu.to(bee::Device::CUDA).value();
+    auto b_gpu_f32 = b_cpu.to(bee::Device::CUDA).value();
+    auto a_gpu     = bee::cast(a_gpu_f32, bee::DType::F16).value();
+    auto b_gpu     = bee::cast(b_gpu_f32, bee::DType::F16).value();
+
+    // 调用 matmul（应走原生 CUDA lowp 路径）
+    auto result = bee::matmul(a_gpu, b_gpu).value();
+
+    // 输出 dtype 应为 F32，device 应为 CUDA
+    EXPECT_EQ(result.dtype(), bee::DType::F32);
+    EXPECT_EQ(result.device(), bee::Device::CUDA);
+    EXPECT_EQ(result.shape(), (bee::Shape{2, 2}));
+
+    // 搬回 CPU 验证值：C = [[10,13],[28,40]]
+    auto result_cpu = result.to(bee::Device::CPU).value();
+    const auto* p = static_cast<const float*>(result_cpu.data_ptr());
+    EXPECT_NEAR(p[0], 10.0f, 1e-2f);
+    EXPECT_NEAR(p[1], 13.0f, 1e-2f);
+    EXPECT_NEAR(p[2], 28.0f, 1e-2f);
+    EXPECT_NEAR(p[3], 40.0f, 1e-2f);
+}
+
+TEST(LowPrecisionTests, CudaBF16MatmulReturnsF32)
+{
+    if (!bee::tensor::cuda::is_available())
+        GTEST_SKIP() << "CUDA 不可用，跳过";
+
+    // 同 CudaF16MatmulReturnsF32，但使用 BF16 精度
+    auto a_cpu = bee::Tensor::zeros({2, 3}, bee::DType::F32).value();
+    {
+        auto* p = static_cast<float*>(a_cpu.data_ptr());
+        for (int i = 0; i < 6; ++i) p[i] = static_cast<float>(i);
+    }
+    auto b_cpu = bee::Tensor::zeros({3, 2}, bee::DType::F32).value();
+    {
+        auto* p = static_cast<float*>(b_cpu.data_ptr());
+        for (int i = 0; i < 6; ++i) p[i] = static_cast<float>(i);
+    }
+
+    auto a_gpu_f32 = a_cpu.to(bee::Device::CUDA).value();
+    auto b_gpu_f32 = b_cpu.to(bee::Device::CUDA).value();
+    auto a_gpu     = bee::cast(a_gpu_f32, bee::DType::BF16).value();
+    auto b_gpu     = bee::cast(b_gpu_f32, bee::DType::BF16).value();
+
+    auto result = bee::matmul(a_gpu, b_gpu).value();
+
+    EXPECT_EQ(result.dtype(), bee::DType::F32);
+    EXPECT_EQ(result.device(), bee::Device::CUDA);
+    EXPECT_EQ(result.shape(), (bee::Shape{2, 2}));
+
+    // BF16 精度容忍更大（5e-2）
+    auto result_cpu = result.to(bee::Device::CPU).value();
+    const auto* p = static_cast<const float*>(result_cpu.data_ptr());
+    EXPECT_NEAR(p[0], 10.0f, 5e-2f);
+    EXPECT_NEAR(p[1], 13.0f, 5e-2f);
+    EXPECT_NEAR(p[2], 28.0f, 5e-2f);
+    EXPECT_NEAR(p[3], 40.0f, 5e-2f);
+}
+
+// ── CUDA 批次低精度 matmul 应返回 Recoverable 错误（第一阶段限制）───────────
+
+TEST(LowPrecisionTests, CudaBatchedF16MatmulReturnsRecoverableError)
+{
+    if (!bee::tensor::cuda::is_available())
+        GTEST_SKIP() << "CUDA 不可用，跳过";
+
+    // 构造批次 F16 张量 [2, 2, 2]
+    auto a_cpu = bee::Tensor::ones({2, 2, 2}, bee::DType::F32).value();
+    auto b_cpu = bee::Tensor::ones({2, 2, 2}, bee::DType::F32).value();
+
+    auto a_gpu_f32 = a_cpu.to(bee::Device::CUDA).value();
+    auto b_gpu_f32 = b_cpu.to(bee::Device::CUDA).value();
+    auto a_gpu     = bee::cast(a_gpu_f32, bee::DType::F16).value();
+    auto b_gpu     = bee::cast(b_gpu_f32, bee::DType::F16).value();
+
+    // 批次低精度 CUDA matmul 第一阶段应返回错误
+    auto result = bee::matmul(a_gpu, b_gpu);
+    EXPECT_FALSE(result.has_value()) << "CUDA 批次低精度 matmul 应返回错误";
+    if (!result.has_value()) {
+        // 验证错误消息包含预期提示
+        const std::string_view msg = result.error().message;
+        EXPECT_NE(msg.find("批次"), std::string_view::npos) << "错误消息应提及批次限制";
+    }
+}
+
+// ── CPU 低精度 matmul 仍通过 F32 cast 语义正常工作 ────────────────────────────
+
+TEST(LowPrecisionTests, CpuF16MatmulCastToF32)
+{
+    // CPU 上 F16 matmul 走 cast→F32 递归路径，输出 F32
+    auto a = bee::Tensor::zeros({2, 3}, bee::DType::F32).value();
+    {
+        auto* p = static_cast<float*>(a.data_ptr());
+        for (int i = 0; i < 6; ++i) p[i] = static_cast<float>(i);
+    }
+    auto b = bee::Tensor::zeros({3, 2}, bee::DType::F32).value();
+    {
+        auto* p = static_cast<float*>(b.data_ptr());
+        for (int i = 0; i < 6; ++i) p[i] = static_cast<float>(i);
+    }
+    auto af16 = bee::cast(a, bee::DType::F16).value();
+    auto bf16 = bee::cast(b, bee::DType::F16).value();
+
+    auto result = bee::matmul(af16, bf16).value();
+    EXPECT_EQ(result.dtype(), bee::DType::F32);
+    EXPECT_EQ(result.device(), bee::Device::CPU);
+
+    const auto* p = static_cast<const float*>(result.data_ptr());
+    EXPECT_NEAR(p[0], 10.0f, 0.05f);
+    EXPECT_NEAR(p[1], 13.0f, 0.05f);
+    EXPECT_NEAR(p[2], 28.0f, 0.05f);
+    EXPECT_NEAR(p[3], 40.0f, 0.05f);
+}
+
+TEST(LowPrecisionTests, CpuBF16MatmulCastToF32)
+{
+    // CPU 上 BF16 matmul 同样走 cast→F32 递归路径，输出 F32
+    auto a = bee::Tensor::zeros({2, 3}, bee::DType::F32).value();
+    {
+        auto* p = static_cast<float*>(a.data_ptr());
+        for (int i = 0; i < 6; ++i)
+            p[i] = static_cast<float>(i);
+    }
+    auto b = bee::Tensor::zeros({3, 2}, bee::DType::F32).value();
+    {
+        auto* p = static_cast<float*>(b.data_ptr());
+        for (int i = 0; i < 6; ++i)
+            p[i] = static_cast<float>(i);
+    }
+    auto abf16 = bee::cast(a, bee::DType::BF16).value();
+    auto bbf16 = bee::cast(b, bee::DType::BF16).value();
+
+    auto result = bee::matmul(abf16, bbf16).value();
+    EXPECT_EQ(result.dtype(), bee::DType::F32);
+    EXPECT_EQ(result.device(), bee::Device::CPU);
+
+    const auto* p = static_cast<const float*>(result.data_ptr());
+    EXPECT_NEAR(p[0], 10.0f, 0.05f);
+    EXPECT_NEAR(p[1], 13.0f, 0.05f);
+    EXPECT_NEAR(p[2], 28.0f, 0.05f);
+    EXPECT_NEAR(p[3], 40.0f, 0.05f);
 }

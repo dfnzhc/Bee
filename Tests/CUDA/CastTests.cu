@@ -23,6 +23,8 @@ constexpr int kDtBool = 0;
 constexpr int kDtI32  = 2;
 constexpr int kDtF32  = 4;
 constexpr int kDtF64  = 5;
+constexpr int kDtF16  = 7;
+constexpr int kDtBF16 = 8;
 
 auto is_kernel_image_missing(int err) -> bool
 {
@@ -90,4 +92,38 @@ TEST(CudaCast, I32ToF64PreservesNumericValue)
     ASSERT_EQ(output->size(), input.size());
     for (std::size_t i = 0; i < input.size(); ++i)
         EXPECT_DOUBLE_EQ((*output)[i], static_cast<double>(input[i])) << "i=" << i;
+}
+
+TEST(CudaCast, F32ToF16ToF32RoundTrip)
+{
+    const std::vector<float> input = {0.0f, 1.5f, -2.0f, 3.25f};
+
+    auto f16 = run_cast<float, std::uint16_t>(kDtF32, kDtF16, input);
+    if (!f16)
+        GTEST_SKIP() << "No kernel image for current GPU";
+
+    auto output = run_cast<std::uint16_t, float>(kDtF16, kDtF32, *f16);
+    if (!output)
+        GTEST_SKIP() << "No kernel image for current GPU";
+
+    ASSERT_EQ(output->size(), input.size());
+    for (std::size_t i = 0; i < input.size(); ++i)
+        EXPECT_NEAR((*output)[i], input[i], 1e-3f) << "i=" << i;
+}
+
+TEST(CudaCast, F32ToBF16ToF32RoundTrip)
+{
+    const std::vector<float> input = {0.0f, 1.5f, -2.0f, 3.25f};
+
+    auto bf16 = run_cast<float, std::uint16_t>(kDtF32, kDtBF16, input);
+    if (!bf16)
+        GTEST_SKIP() << "No kernel image for current GPU";
+
+    auto output = run_cast<std::uint16_t, float>(kDtBF16, kDtF32, *bf16);
+    if (!output)
+        GTEST_SKIP() << "No kernel image for current GPU";
+
+    ASSERT_EQ(output->size(), input.size());
+    for (std::size_t i = 0; i < input.size(); ++i)
+        EXPECT_NEAR((*output)[i], input[i], 1e-2f) << "i=" << i;
 }

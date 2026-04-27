@@ -37,29 +37,7 @@ auto cast(const Tensor& src, DType dst_dtype, const tensor::cuda::ExecContext* c
     Tensor out = std::move(*out_r);
 
     if (cont.device() == Device::CUDA) {
-        // 判断是否涉及 F16/BF16：当前 CUDA 后端 ScalarType 仅支持到 F64，
-        // 不包含 F16/BF16。若转换涉及这两种类型，走 CPU 参考过渡路径：
-        //   CUDA → CPU → CPU low-precision cast → CUDA
-        // 该路径保证语义正确，但不代表已具备原生 CUDA 低精度 cast kernel。
-        const bool src_low = (cont.dtype() == DType::F16 || cont.dtype() == DType::BF16);
-        const bool dst_low = (dst_dtype == DType::F16 || dst_dtype == DType::BF16);
-        if (src_low || dst_low) {
-            // 第一步：将 CUDA 张量搬回 CPU
-            auto cpu_r = cont.to(Device::CPU, ctx);
-            if (!cpu_r)
-                return std::unexpected(std::move(cpu_r.error()));
-            // 第二步：在 CPU 上执行 low-precision cast（递归进入 CPU 分支，不会再次命中此处）
-            auto cast_r = cast(*cpu_r, dst_dtype, nullptr);
-            if (!cast_r)
-                return std::unexpected(std::move(cast_r.error()));
-            // 第三步：将结果搬回 CUDA
-            auto gpu_r = cast_r->to(Device::CUDA, ctx);
-            if (!gpu_r)
-                return std::unexpected(std::move(gpu_r.error()));
-            return std::move(*gpu_r);
-        }
-
-        // F16/BF16 以外的 CUDA 类型：直接调用 CUDA cast kernel
+        // CUDA 路径直接调用后端 cast kernel；不再为 F16/BF16 走 CPU 过渡路径。
         auto r = tensor::cuda::ew_cast(
             static_cast<int>(cont.dtype()), cont.data_ptr(), static_cast<int>(dst_dtype), out.data_ptr(), static_cast<std::size_t>(cont.numel())
         );

@@ -263,11 +263,71 @@ auto matmul(const Tensor& a, const Tensor& b) -> Result<Tensor>
     if (dt == DType::Bool || dt == DType::U8)
         return std::unexpected(make_error(std::format("matmul: 不支持 DType::{}", enum_to_name(dt)), Severity::Recoverable));
 
-    // ── 低精度桥接：F16/BF16 → F32 → matmul → 输出 F32 ────────────────────────
-    // 依据 dtype_accumulate_type(DTypeOpKind::Matmul, F16/BF16) == F32：
-    // 后端不具备可靠的 F16/BF16 matmul 路径（CPU dispatch 无对应内核；
-    // CUDA ScalarType 也未覆盖），故在入口统一升型后调用 F32 路径。
+    // ── 低精度处理：F16/BF16 ──────────────────────────────────────────────────
+    // 三个子路径：
+    //   (1) CUDA 2D：调用原生 lowp kernel，返回 F32 输出张量
+    //   (2) CUDA 批次：第一阶段不支持，返回 Recoverable 错误
+    //   (3) CPU（含批次）：cast 到 F32 后递归调用
     if (dt == DType::F16 || dt == DType::BF16) {
+        // ── (1) CUDA 2D 原生低精度路径 ─────────────────────────────────────────
+        if (a.device() == Device::CUDA && a.ndim() == 2 && b.ndim() == 2) {
+            // 推导输出形状（含内维匹配校验）
+            const int64_t M_lp = a.shape()[0];
+            const int64_t K_lp = a.shape()[1];
+            const int64_t N_lp = b.shape()[1];
+            if (b.shape()[0] != K_lp)
+                return std::unexpected(make_error(
+                    std::format("matmul: 内维不匹配（a 列={}, b 行={}）", K_lp, b.shape()[0]),
+                    Severity::Recoverable
+                ));
+
+            // 输出为 F32 张量
+            auto out_r = Tensor::zeros({M_lp, N_lp}, DType::F32, Device::CUDA);
+            if (!out_r)
+                return std::unexpected(std::move(out_r.error()));
+            if (M_lp == 0 || N_lp == 0)
+                return *out_r;
+
+            // 确保连续
+            Tensor ca_lp = a;
+            if (!a.is_contiguous()) {
+                auto r = a.contiguous();
+                if (!r)
+                    return std::unexpected(std::move(r.error()));
+                ca_lp = *r;
+            }
+            Tensor cb_lp = b;
+            if (!b.is_contiguous()) {
+                auto r = b.contiguous();
+                if (!r)
+                    return std::unexpected(std::move(r.error()));
+                cb_lp = *r;
+            }
+
+            auto rc = tensor::cuda::matmul_lowp(
+                static_cast<int>(dt),
+                ca_lp.data_ptr(),
+                cb_lp.data_ptr(),
+                static_cast<float*>(out_r->data_ptr()),
+                static_cast<std::size_t>(M_lp),
+                static_cast<std::size_t>(K_lp),
+                static_cast<std::size_t>(N_lp)
+            );
+            if (!rc)
+                return std::unexpected(std::move(rc.error()));
+            return *out_r;
+        }
+
+        // ── (2) CUDA 批次低精度：第一阶段暂不支持 ──────────────────────────────
+        if (a.device() == Device::CUDA) {
+            return std::unexpected(make_error(
+                "matmul: CUDA 批次低精度 matmul (F16/BF16) 暂不支持，请先将输入 cast 到 F32",
+                Severity::Recoverable
+            ));
+        }
+
+        // ── (3) CPU 低精度：cast 到 F32 后递归 ──────────────────────────────────
+        // 依据 dtype_accumulate_type(DTypeOpKind::Matmul, F16/BF16) == F32
         auto af32_r = cast(a, DType::F32);
         if (!af32_r)
             return std::unexpected(std::move(af32_r.error()));

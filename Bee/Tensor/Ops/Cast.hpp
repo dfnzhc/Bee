@@ -15,9 +15,8 @@ namespace bee
 //   - 输入非 contiguous：先整理为连续再转换
 //   - 转换语义：任意类型 → Bool 时 v != 0；Bool → 其它时 true=1/false=0；
 //     浮点/整型互转均用 static_cast（截断，无范围检查）
-//   - F16/BF16 ↔ F32：CPU 上通过位编码辅助函数实现（参考精度）
-//   - CUDA 上 F16/BF16 cast：当前走 CPU 参考过渡路径（CUDA→CPU cast→CUDA），
-//     不代表已具备原生 CUDA 低精度 cast kernel；待 ScalarType 扩展后可替换。
+//   - F16/BF16 ↔ F32：CPU 上通过位编码辅助函数实现；CUDA 上通过原生低精度 cast kernel 实现
+//   - 其它涉及 F16/BF16 的组合当前仅 CPU 通过 F32 中间值桥接；CUDA 后端返回错误
 [[nodiscard]] auto cast(const Tensor& src, DType dst_dtype, const tensor::cuda::ExecContext* ctx = nullptr) -> Result<Tensor>;
 
 } // namespace bee

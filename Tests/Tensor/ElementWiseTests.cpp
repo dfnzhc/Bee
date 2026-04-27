@@ -317,6 +317,184 @@ TEST(ElementWiseTests, LogF32)
         EXPECT_NEAR(ptr[i], 1.0f, 1e-5f);
 }
 
+TEST(ElementWiseTests, ReluMapsNegativeValuesToZero)
+{
+    auto a = Tensor::empty({5}, DType::I32);
+    ASSERT_OK(a);
+    {
+        auto* p = static_cast<int32_t*>(a->data_ptr());
+        p[0]    = -3;
+        p[1]    = -1;
+        p[2]    = 0;
+        p[3]    = 2;
+        p[4]    = 7;
+    }
+
+    auto b = relu(*a);
+    ASSERT_OK(b);
+
+    const auto* p = static_cast<const int32_t*>(b->data_ptr());
+    EXPECT_EQ(p[0], 0);
+    EXPECT_EQ(p[1], 0);
+    EXPECT_EQ(p[2], 0);
+    EXPECT_EQ(p[3], 2);
+    EXPECT_EQ(p[4], 7);
+}
+
+TEST(ElementWiseTests, ReluRejectsUnsupportedDTypes)
+{
+    auto bool_tensor = Tensor::zeros({3}, DType::Bool);
+    auto u8_tensor   = Tensor::zeros({3}, DType::U8);
+    ASSERT_OK(bool_tensor);
+    ASSERT_OK(u8_tensor);
+
+    ASSERT_ERR(relu(*bool_tensor));
+    ASSERT_ERR(relu(*u8_tensor));
+}
+
+TEST(ElementWiseTests, SigmoidComputesLogistic)
+{
+    auto a = Tensor::empty({4}, DType::F32);
+    ASSERT_OK(a);
+    {
+        auto* p = static_cast<float*>(a->data_ptr());
+        p[0]    = -1.0f;
+        p[1]    = 0.0f;
+        p[2]    = 1.0f;
+        p[3]    = 2.0f;
+    }
+
+    auto b = sigmoid(*a);
+    ASSERT_OK(b);
+
+    const auto* p = static_cast<const float*>(b->data_ptr());
+    for (int64_t i = 0; i < 4; ++i) {
+        const auto* src      = static_cast<const float*>(a->data_ptr());
+        const float expected = 1.0f / (1.0f + std::exp(-src[i]));
+        EXPECT_NEAR(p[i], expected, 1e-6f) << "i=" << i;
+    }
+}
+
+TEST(ElementWiseTests, SigmoidSaturatesForExtremeInputs)
+{
+    auto a = Tensor::empty({3}, DType::F32);
+    ASSERT_OK(a);
+    {
+        auto* p = static_cast<float*>(a->data_ptr());
+        p[0]    = -100.0f;
+        p[1]    = 0.0f;
+        p[2]    = 100.0f;
+    }
+
+    auto b = sigmoid(*a);
+    ASSERT_OK(b);
+
+    const auto* p = static_cast<const float*>(b->data_ptr());
+    EXPECT_NEAR(p[0], 0.0f, 1e-6f);
+    EXPECT_NEAR(p[1], 0.5f, 1e-6f);
+    EXPECT_NEAR(p[2], 1.0f, 1e-6f);
+}
+
+TEST(ElementWiseTests, SigmoidRejectsNonFloatDTypes)
+{
+    auto i32_tensor = Tensor::zeros({3}, DType::I32);
+    auto i64_tensor = Tensor::zeros({3}, DType::I64);
+    ASSERT_OK(i32_tensor);
+    ASSERT_OK(i64_tensor);
+
+    ASSERT_ERR(sigmoid(*i32_tensor));
+    ASSERT_ERR(sigmoid(*i64_tensor));
+}
+
+TEST(ElementWiseTests, ReluInplaceUpdatesTensor)
+{
+    auto a = Tensor::empty({4}, DType::F32);
+    ASSERT_OK(a);
+    {
+        auto* p = static_cast<float*>(a->data_ptr());
+        p[0]    = -2.5f;
+        p[1]    = 0.0f;
+        p[2]    = 3.0f;
+        p[3]    = -0.5f;
+    }
+
+    auto r = relu_inplace(*a);
+    ASSERT_OK(r);
+
+    const auto* p = static_cast<const float*>(a->data_ptr());
+    EXPECT_FLOAT_EQ(p[0], 0.0f);
+    EXPECT_FLOAT_EQ(p[1], 0.0f);
+    EXPECT_FLOAT_EQ(p[2], 3.0f);
+    EXPECT_FLOAT_EQ(p[3], 0.0f);
+}
+
+TEST(ElementWiseTests, SigmoidInplaceUpdatesTensor)
+{
+    auto a = Tensor::empty({3}, DType::F64);
+    ASSERT_OK(a);
+    {
+        auto* p = static_cast<double*>(a->data_ptr());
+        p[0]    = -2.0;
+        p[1]    = 0.0;
+        p[2]    = 2.0;
+    }
+
+    auto r = sigmoid_inplace(*a);
+    ASSERT_OK(r);
+
+    const auto* p = static_cast<const double*>(a->data_ptr());
+    for (int64_t i = 0; i < 3; ++i) {
+        const double src      = i == 0 ? -2.0 : (i == 1 ? 0.0 : 2.0);
+        const double expected = 1.0 / (1.0 + std::exp(-src));
+        EXPECT_NEAR(p[i], expected, 1e-12) << "i=" << i;
+    }
+}
+
+TEST(ElementWiseTests, CudaReluAndSigmoidMatchCpuWhenAvailable)
+{
+    if (!bee::tensor::cuda::is_available())
+        GTEST_SKIP() << "CUDA 不可用，跳过 CUDA relu/sigmoid 对拍测试";
+
+    auto a_cpu = Tensor::empty({6}, DType::F32);
+    ASSERT_OK(a_cpu);
+    {
+        auto* p = static_cast<float*>(a_cpu->data_ptr());
+        p[0]    = -3.0f;
+        p[1]    = -1.0f;
+        p[2]    = 0.0f;
+        p[3]    = 0.5f;
+        p[4]    = 2.0f;
+        p[5]    = 4.0f;
+    }
+
+    auto a_cuda = a_cpu->to(Device::CUDA);
+    ASSERT_OK(a_cuda);
+
+    auto relu_cpu = relu(*a_cpu);
+    auto relu_cu  = relu(*a_cuda);
+    ASSERT_OK(relu_cpu);
+    ASSERT_OK(relu_cu);
+
+    auto sigmoid_cpu = sigmoid(*a_cpu);
+    auto sigmoid_cu  = sigmoid(*a_cuda);
+    ASSERT_OK(sigmoid_cpu);
+    ASSERT_OK(sigmoid_cu);
+
+    auto relu_back = relu_cu->to(Device::CPU);
+    auto sig_back  = sigmoid_cu->to(Device::CPU);
+    ASSERT_OK(relu_back);
+    ASSERT_OK(sig_back);
+
+    const auto* relu_ref = static_cast<const float*>(relu_cpu->data_ptr());
+    const auto* relu_got = static_cast<const float*>(relu_back->data_ptr());
+    const auto* sig_ref  = static_cast<const float*>(sigmoid_cpu->data_ptr());
+    const auto* sig_got  = static_cast<const float*>(sig_back->data_ptr());
+    for (int64_t i = 0; i < 6; ++i) {
+        EXPECT_FLOAT_EQ(relu_got[i], relu_ref[i]) << "relu i=" << i;
+        EXPECT_NEAR(sig_got[i], sig_ref[i], 1e-6f) << "sigmoid i=" << i;
+    }
+}
+
 TEST(ElementWiseTests, NegI32)
 {
     auto a = Tensor::full({8}, DType::I32, 7.0);

@@ -18,6 +18,7 @@
 
 #include <array>
 #include <atomic>
+#include <cmath>
 #include <format>
 #include <mutex>
 
@@ -313,6 +314,31 @@ namespace ops
         return wrap(err, "cuda::ops::matmul");
     }
 
+    auto matmul_lowp(ScalarType dt, const void* A, const void* B, float* C, std::size_t M, std::size_t K, std::size_t N) -> Result<void>
+    {
+        // 仅接受 F16 或 BF16
+        if (dt != ScalarType::F16 && dt != ScalarType::BF16)
+            return std::unexpected(make_error(
+                std::format("cuda::ops::matmul_lowp: 不支持的 dtype={}，仅接受 F16/BF16", static_cast<int>(dt)),
+                Severity::Recoverable
+            ));
+
+        // M==0 或 N==0：无输出，直接成功
+        if (M == 0 || N == 0)
+            return {};
+
+        // K==0：输出全零由调用方保证，API 层直接成功
+        if (K == 0)
+            return {};
+
+        // 有效尺寸下指针不得为空
+        if (!A || !B || !C)
+            return std::unexpected(make_error("cuda::ops::matmul_lowp: 空指针（A/B/C 均须有效）", Severity::Recoverable));
+
+        const int err = detail::ops_matmul_lowp(static_cast<int>(dt), A, B, C, M, K, N);
+        return wrap(err, "cuda::ops::matmul_lowp");
+    }
+
     auto transpose_2d(ScalarType dt, const void* src, void* dst, std::size_t rows, std::size_t cols) -> Result<void>
     {
         if (rows == 0 || cols == 0)
@@ -365,6 +391,14 @@ namespace ops
     auto rms_norm(ScalarType dt, const void* x, const void* w, void* out,
                   std::size_t rows, std::size_t dim, double eps) -> Result<void>
     {
+        if (!x || !w || !out)
+            return std::unexpected(make_error("cuda::ops::rms_norm: 空指针", Severity::Recoverable));
+        if (rows == 0 || dim == 0)
+            return std::unexpected(make_error("cuda::ops::rms_norm: 维度含 0", Severity::Recoverable));
+        if (rows > 2147483647ull)
+            return std::unexpected(make_error("cuda::ops::rms_norm: rows 超过 CUDA grid.x 上限", Severity::Recoverable));
+        if (!std::isfinite(eps) || eps <= 0.0)
+            return std::unexpected(make_error(std::format("cuda::ops::rms_norm: eps 须为有限正数，当前 {}", eps), Severity::Recoverable));
         const int err = detail::ops_rms_norm(static_cast<int>(dt), x, w, out, rows, dim, eps);
         return wrap(err, "cuda::ops::rms_norm");
     }
@@ -373,6 +407,14 @@ namespace ops
               std::size_t n_batch, std::size_t seq_len, std::size_t dim,
               double base, std::int64_t position_offset) -> Result<void>
     {
+        if (!x || !out)
+            return std::unexpected(make_error("cuda::ops::rope: 空指针", Severity::Recoverable));
+        if (n_batch == 0 || seq_len == 0 || dim == 0)
+            return std::unexpected(make_error("cuda::ops::rope: 维度含 0", Severity::Recoverable));
+        if (dim % 2 != 0)
+            return std::unexpected(make_error(std::format("cuda::ops::rope: dim 须为偶数，当前 {}", dim), Severity::Recoverable));
+        if (!std::isfinite(base) || base <= 0.0)
+            return std::unexpected(make_error(std::format("cuda::ops::rope: base 须为有限正数，当前 {}", base), Severity::Recoverable));
         const int err = detail::ops_rope(static_cast<int>(dt), x, out, n_batch, seq_len, dim, base, position_offset);
         return wrap(err, "cuda::ops::rope");
     }
@@ -381,6 +423,12 @@ namespace ops
                    const void* weight, const void* ids, void* out,
                    std::size_t n_ids, std::size_t hidden, std::size_t vocab) -> Result<void>
     {
+        if (!weight || !ids || !out)
+            return std::unexpected(make_error("cuda::ops::embedding: 空指针", Severity::Recoverable));
+        if (n_ids == 0 || hidden == 0)
+            return std::unexpected(make_error("cuda::ops::embedding: 维度含 0", Severity::Recoverable));
+        if (vocab == 0)
+            return std::unexpected(make_error("cuda::ops::embedding: vocab 须 > 0", Severity::Recoverable));
         const int err = detail::ops_embedding(
             static_cast<int>(weight_dt), static_cast<int>(ids_dt), weight, ids, out, n_ids, hidden, vocab
         );

@@ -138,6 +138,11 @@ namespace ops
     // 2D tiled-shared matmul：C[M,N] = A[M,K] * B[K,N]；A/B/C 同 dtype、均连续。
     [[nodiscard]] auto matmul(ScalarType dt, const void* A, const void* B, void* C, std::size_t M, std::size_t K, std::size_t N) -> Result<void>;
 
+    // 低精度 GEMM（Task 5）：A/B 为 F16（dt=F16）或 BF16（dt=BF16）连续设备缓冲，
+    // 以 float 累加写入 F32 输出 C[M,N]。
+    // 仅接受 dt == F16 或 dt == BF16；有效尺寸下空指针返回错误。
+    [[nodiscard]] auto matmul_lowp(ScalarType dt, const void* A, const void* B, float* C, std::size_t M, std::size_t K, std::size_t N) -> Result<void>;
+
     // 2D tiled-shared transpose：dst[i,j] = src[j,i]，src 为 [rows, cols] 连续。
     [[nodiscard]] auto transpose_2d(ScalarType dt, const void* src, void* dst, std::size_t rows, std::size_t cols) -> Result<void>;
 

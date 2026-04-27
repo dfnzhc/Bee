@@ -23,6 +23,8 @@ constexpr int kDtI64 = 3;
 constexpr int kDtF32 = 4;
 constexpr int kDtF64 = 5;
 
+constexpr std::size_t kMaxGridX = 2147483647ull;
+
 // ─── RMSNorm kernel ───────────────────────────────────────────────────────────
 //
 // 每个 block 负责一行数据；使用 double 精度共享内存做平方和规约。
@@ -88,9 +90,6 @@ auto launch_rms_norm(
     cudaStream_t stream
 ) -> int
 {
-    if (!x || !w || !out || rows == 0 || dim == 0 || !std::isfinite(eps) || eps <= 0.0)
-        return static_cast<int>(cudaErrorInvalidValue);
-
     // blockDim 固定为 256（2 的幂次，stride 循环覆盖任意 dim）
     constexpr unsigned block = 256u;
     const std::size_t  smem  = block * sizeof(double);
@@ -159,11 +158,6 @@ auto launch_rope(
     cudaStream_t stream
 ) -> int
 {
-    if (!x || !out || n_batch == 0 || seq_len == 0 || dim == 0 || dim % 2 != 0)
-        return static_cast<int>(cudaErrorInvalidValue);
-    if (!std::isfinite(base) || base <= 0.0)
-        return static_cast<int>(cudaErrorInvalidValue);
-
     const std::size_t half_dim    = dim / 2;
     const std::size_t total_pairs = n_batch * seq_len * half_dim;
     const unsigned    block       = bee::cuda::kDefaultBlockSize;
@@ -284,6 +278,8 @@ int ops_rms_norm(int dt, const void* x, const void* w, void* out,
                  std::size_t rows, std::size_t dim, double eps) noexcept
 {
     if (!x || !w || !out || rows == 0 || dim == 0 || !std::isfinite(eps) || eps <= 0.0)
+        return static_cast<int>(cudaErrorInvalidValue);
+    if (rows > kMaxGridX)
         return static_cast<int>(cudaErrorInvalidValue);
 
     cudaStream_t stream = cudaStreamPerThread;

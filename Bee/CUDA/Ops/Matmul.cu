@@ -7,21 +7,26 @@
  * - 支持 F32/F64/I32/I64；
  * - 正确处理非 TILE 整倍数的边界；
  * - 更高阶的 CUTLASS / Native(TMA) 路径放在独立 TU 中，由上层显式选择或自动回退。
+ * - Task 5：ops_matmul_lowp 实现 F16/BF16 输入、F32 累加、F32 输出的低精度 GEMM。
  */
 
 #include "CUDA/Ops/OpsBridge.hpp"
 #include "CUDA/Core/Launch.cuh"
 
+#include <cuda_bf16.h>
+#include <cuda_fp16.h>
 #include <cuda_runtime.h>
 #include <cstdint>
 
 namespace
 {
 
-constexpr int kDtI32 = 2;
-constexpr int kDtI64 = 3;
-constexpr int kDtF32 = 4;
-constexpr int kDtF64 = 5;
+constexpr int kDtI32  = 2;
+constexpr int kDtI64  = 3;
+constexpr int kDtF32  = 4;
+constexpr int kDtF64  = 5;
+constexpr int kDtF16  = 7;
+constexpr int kDtBF16 = 8;
 
 constexpr int TILE = 16;
 
@@ -61,6 +66,65 @@ int launch_matmul(const void* A, const void* B, void* C, std::size_t M, std::siz
     dim3 block(TILE, TILE);
     dim3 grid(static_cast<unsigned int>((N + TILE - 1) / TILE), static_cast<unsigned int>((M + TILE - 1) / TILE));
     matmul_tiled_kernel<T><<<grid, block, 0, stream>>>(static_cast<const T*>(A), static_cast<const T*>(B), static_cast<T*>(C), M, K, N);
+    return static_cast<int>(cudaGetLastError());
+}
+
+// ── 低精度 GEMM 辅助 ──────────────────────────────────────────────────────────
+
+// 设备侧类型转换辅助：将低精度存储类型转为 float
+template <typename T>
+__device__ __forceinline__ float lowp_to_float(T v);
+
+template <>
+__device__ __forceinline__ float lowp_to_float<__half>(__half v)
+{
+    return __half2float(v);
+}
+
+template <>
+__device__ __forceinline__ float lowp_to_float<__nv_bfloat16>(__nv_bfloat16 v)
+{
+    return __bfloat162float(v);
+}
+
+// 低精度矩阵乘核函数：读取 F16/BF16 输入，以 float 累加，写入 float 输出
+// 每个线程负责一个输出元素，边界保护防止越界读写
+template <typename LowP>
+__global__ void matmul_lowp_kernel(
+    const LowP* __restrict__ A,
+    const LowP* __restrict__ B,
+    float* __restrict__      C,
+    std::size_t              M,
+    std::size_t              K,
+    std::size_t              N
+)
+{
+    const std::size_t row = static_cast<std::size_t>(blockIdx.y) * blockDim.y + threadIdx.y;
+    const std::size_t col = static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+
+    if (row >= M || col >= N)
+        return;
+
+    float acc = 0.0f;
+    for (std::size_t k = 0; k < K; ++k) {
+        acc += lowp_to_float(A[row * K + k]) * lowp_to_float(B[k * N + col]);
+    }
+    C[row * N + col] = acc;
+}
+
+template <typename LowP>
+int launch_matmul_lowp(const void* A, const void* B, float* C, std::size_t M, std::size_t K, std::size_t N, cudaStream_t stream)
+{
+    dim3 block(TILE, TILE);
+    dim3 grid(
+        static_cast<unsigned int>((N + TILE - 1) / TILE),
+        static_cast<unsigned int>((M + TILE - 1) / TILE)
+    );
+    matmul_lowp_kernel<LowP><<<grid, block, 0, stream>>>(
+        static_cast<const LowP*>(A),
+        static_cast<const LowP*>(B),
+        C, M, K, N
+    );
     return static_cast<int>(cudaGetLastError());
 }
 
@@ -116,6 +180,40 @@ int ops_matmul(int dt, const void* A, const void* B, void* C, std::size_t M, std
     case kDtF64: err = launch_matmul<double>(A, B, C, M, K, N, stream); break;
     default: return static_cast<int>(cudaErrorInvalidValue);
     }
+    if (err != 0)
+        return err;
+    return static_cast<int>(cudaStreamSynchronize(stream));
+}
+
+// 低精度 GEMM 入口（Task 5）：F16/BF16 输入，float 累加，float 输出
+int ops_matmul_lowp(int dt, const void* A, const void* B, float* C, std::size_t M, std::size_t K, std::size_t N) noexcept
+{
+    // 验证 dtype：仅接受 F16 或 BF16
+    if (dt != kDtF16 && dt != kDtBF16)
+        return static_cast<int>(cudaErrorInvalidValue);
+
+    // M==0 或 N==0 时无输出元素，直接成功
+    if (M == 0 || N == 0)
+        return 0;
+
+    // K==0 时内积为 0，调用方负责预清零输出；直接返回成功
+    if (K == 0)
+        return 0;
+
+    // 有效尺寸下指针不得为空
+    if (!A || !B || !C)
+        return static_cast<int>(cudaErrorInvalidValue);
+
+    cudaStream_t stream = cudaStreamPerThread;
+    int          err    = 0;
+
+    if (dt == kDtF16) {
+        err = launch_matmul_lowp<__half>(A, B, C, M, K, N, stream);
+    }
+    else {
+        err = launch_matmul_lowp<__nv_bfloat16>(A, B, C, M, K, N, stream);
+    }
+
     if (err != 0)
         return err;
     return static_cast<int>(cudaStreamSynchronize(stream));

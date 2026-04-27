@@ -86,6 +86,11 @@ auto matmul(int dt, const void* A, const void* B, void* C, std::size_t M, std::s
     return ::bee::cuda::ops::matmul(static_cast<::bee::cuda::ScalarType>(dt), A, B, C, M, K, N);
 }
 
+auto matmul_lowp(int dt, const void* A, const void* B, float* C, std::size_t M, std::size_t K, std::size_t N) -> Result<void>
+{
+    return ::bee::cuda::ops::matmul_lowp(static_cast<::bee::cuda::ScalarType>(dt), A, B, C, M, K, N);
+}
+
 auto transpose_2d(int dt, const void* src, void* dst, std::size_t rows, std::size_t cols) -> Result<void>
 {
     return ::bee::cuda::ops::transpose_2d(static_cast<::bee::cuda::ScalarType>(dt), src, dst, rows, cols);
@@ -261,6 +266,11 @@ auto scale_fp(int, void*, double, std::size_t) -> Result<void>
 auto matmul(int, const void*, const void*, void*, std::size_t, std::size_t, std::size_t) -> Result<void>
 {
     return std::unexpected(make_error("CUDA 后端不可用：matmul", Severity::Recoverable));
+}
+
+auto matmul_lowp(int, const void*, const void*, float*, std::size_t, std::size_t, std::size_t) -> Result<void>
+{
+    return std::unexpected(make_error("CUDA 后端不可用：matmul_lowp", Severity::Recoverable));
 }
 
 auto transpose_2d(int, const void*, void*, std::size_t, std::size_t) -> Result<void>

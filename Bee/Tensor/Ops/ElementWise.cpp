@@ -1,9 +1,12 @@
 #include "Tensor/Ops/ElementWise.hpp"
+#include "Base/Diagnostics/Check.hpp"
 #include "Tensor/Ops/Broadcast.hpp"
 #include "Tensor/Cpu/Dispatch/Dispatch.hpp"
 #include "Tensor/Cuda/Backend.hpp"
 
+#include <cmath>
 #include <format>
+#include <vector>
 
 namespace bee
 {
@@ -66,6 +69,15 @@ namespace
         return {};
     }
 
+    auto check_dtype_relu(DType dt, std::string_view op) -> Result<void>
+    {
+        if (dt == DType::I32 || dt == DType::I64 || dt == DType::F32 || dt == DType::F64)
+            return {};
+        return std::unexpected(
+            make_error(std::format("{} 仅支持 DType::I32 / DType::I64 / DType::F32 / DType::F64，当前 dtype 为 {}", op, enum_to_name(dt)), Severity::Recoverable)
+        );
+    }
+
     // 运行期分派到 ISA 特化 namespace
     enum class BinOp
     {
@@ -76,12 +88,97 @@ namespace
     };
     enum class UnOp
     {
-        Neg,
-        Abs,
-        Sqrt,
-        Exp,
-        Log
+        Neg     = 0,
+        Abs     = 1,
+        Sqrt    = 2,
+        Exp     = 3,
+        Log     = 4,
+        Relu    = 5,
+        Sigmoid = 6
     };
+
+    template <typename T, typename Fn>
+    auto dispatch_unary_cpu_local_typed(const Tensor& a, Tensor& out, Fn fn) -> void
+    {
+        const int64_t n    = out.numel();
+        const int64_t ndim = out.ndim();
+
+        const auto* a_ptr   = static_cast<const T*>(a.data_ptr());
+        auto*       out_ptr = static_cast<T*>(out.data_ptr());
+
+        if (a.is_contiguous() && out.is_contiguous()) {
+            for (int64_t i = 0; i < n; ++i)
+                out_ptr[i] = fn(a_ptr[i]);
+            return;
+        }
+
+        const auto& shape       = out.shape();
+        const auto& a_strides   = a.strides();
+        const auto& out_strides = out.strides();
+
+        std::vector<int64_t> idx(static_cast<std::size_t>(ndim), 0);
+        for (int64_t k = 0; k < n; ++k) {
+            int64_t off_a = 0, off_out = 0;
+            for (int64_t d = 0; d < ndim; ++d) {
+                off_a   += idx[static_cast<std::size_t>(d)] * a_strides[static_cast<std::size_t>(d)];
+                off_out += idx[static_cast<std::size_t>(d)] * out_strides[static_cast<std::size_t>(d)];
+            }
+            out_ptr[off_out] = fn(a_ptr[off_a]);
+
+            for (int64_t d = ndim - 1; d >= 0; --d) {
+                ++idx[static_cast<std::size_t>(d)];
+                if (idx[static_cast<std::size_t>(d)] < shape[static_cast<std::size_t>(d)])
+                    break;
+                idx[static_cast<std::size_t>(d)] = 0;
+            }
+        }
+    }
+
+    auto dispatch_relu_cpu(const Tensor& a, Tensor& out) -> void
+    {
+        switch (out.dtype()) {
+        case DType::I32:
+            dispatch_unary_cpu_local_typed<int32_t>(a, out, [](int32_t v) noexcept -> int32_t { return v < 0 ? 0 : v; });
+            return;
+        case DType::I64:
+            dispatch_unary_cpu_local_typed<int64_t>(a, out, [](int64_t v) noexcept -> int64_t { return v < 0 ? 0 : v; });
+            return;
+        case DType::F32:
+            dispatch_unary_cpu_local_typed<float>(a, out, [](float v) noexcept -> float { return v < 0.0f ? 0.0f : v; });
+            return;
+        case DType::F64:
+            dispatch_unary_cpu_local_typed<double>(a, out, [](double v) noexcept -> double { return v < 0.0 ? 0.0 : v; });
+            return;
+        default:
+            BEE_CHECK_MSG(false, "dispatch_relu_cpu: unexpected dtype");
+            return;
+        }
+    }
+
+    auto dispatch_sigmoid_cpu(const Tensor& a, Tensor& out) -> void
+    {
+        switch (out.dtype()) {
+        case DType::F32:
+            dispatch_unary_cpu_local_typed<float>(a, out, [](float v) noexcept -> float {
+                if (v >= 0.0f)
+                    return 1.0f / (1.0f + std::exp(-v));
+                const float ev = std::exp(v);
+                return ev / (1.0f + ev);
+            });
+            return;
+        case DType::F64:
+            dispatch_unary_cpu_local_typed<double>(a, out, [](double v) noexcept -> double {
+                if (v >= 0.0)
+                    return 1.0 / (1.0 + std::exp(-v));
+                const double ev = std::exp(v);
+                return ev / (1.0 + ev);
+            });
+            return;
+        default:
+            BEE_CHECK_MSG(false, "dispatch_sigmoid_cpu: unexpected dtype");
+            return;
+        }
+    }
 
     auto dispatch_binary_cpu(BinOp op, const Tensor& a, const Tensor& b, Tensor& out) -> void
     {
@@ -101,6 +198,8 @@ namespace
         case UnOp::Sqrt: BEE_RT_DISPATCH(ew_sqrt, a, out);
         case UnOp::Exp: BEE_RT_DISPATCH(ew_exp, a, out);
         case UnOp::Log: BEE_RT_DISPATCH(ew_log, a, out);
+        case UnOp::Relu: dispatch_relu_cpu(a, out); break;
+        case UnOp::Sigmoid: dispatch_sigmoid_cpu(a, out); break;
         }
     }
 
@@ -278,6 +377,16 @@ auto log(const Tensor& a) -> Result<Tensor>
     return unary_op_impl<UnOp::Log>(a, "log", [](DType dt, std::string_view op) { return check_dtype_float(dt, op); });
 }
 
+auto relu(const Tensor& a) -> Result<Tensor>
+{
+    return unary_op_impl<UnOp::Relu>(a, "relu", [](DType dt, std::string_view op) { return check_dtype_relu(dt, op); });
+}
+
+auto sigmoid(const Tensor& a) -> Result<Tensor>
+{
+    return unary_op_impl<UnOp::Sigmoid>(a, "sigmoid", [](DType dt, std::string_view op) { return check_dtype_float(dt, op); });
+}
+
 auto add_inplace(Tensor& dst, const Tensor& src) -> Result<void>
 {
     return inplace_binary_impl<BinOp::Add>(dst, src, "add_inplace", [](DType dt, std::string_view op) { return check_dtype_addsub(dt, op); });
@@ -312,6 +421,13 @@ namespace
         if (!dst.defined())
             return std::unexpected(make_error(std::format("{}: Tensor 未定义", op_name), Severity::Recoverable));
         return check_dtype_float(dst.dtype(), op_name);
+    }
+
+    auto inplace_unary_impl_relu(Tensor& dst, std::string_view op_name) -> Result<void>
+    {
+        if (!dst.defined())
+            return std::unexpected(make_error(std::format("{}: Tensor 未定义", op_name), Severity::Recoverable));
+        return check_dtype_relu(dst.dtype(), op_name);
     }
 
     auto run_inplace_unary(UnOp op, Tensor& dst, std::string_view op_name) -> Result<void>
@@ -361,6 +477,22 @@ auto log_inplace(Tensor& dst) -> Result<void>
     if (!r)
         return r;
     return run_inplace_unary(UnOp::Log, dst, "log_inplace");
+}
+
+auto relu_inplace(Tensor& dst) -> Result<void>
+{
+    auto r = inplace_unary_impl_relu(dst, "relu_inplace");
+    if (!r)
+        return r;
+    return run_inplace_unary(UnOp::Relu, dst, "relu_inplace");
+}
+
+auto sigmoid_inplace(Tensor& dst) -> Result<void>
+{
+    auto r = inplace_unary_impl_float(dst, "sigmoid_inplace");
+    if (!r)
+        return r;
+    return run_inplace_unary(UnOp::Sigmoid, dst, "sigmoid_inplace");
 }
 
 } // namespace bee
