@@ -76,6 +76,9 @@ enum class ScalarType : std::uint8_t
     I64  = 3,
     F32  = 4,
     F64  = 5,
+    I8   = 6,
+    F16  = 7,
+    BF16 = 8,
 };
 
 enum class BinaryOp : std::uint8_t
@@ -88,11 +91,13 @@ enum class BinaryOp : std::uint8_t
 
 enum class UnaryOp : std::uint8_t
 {
-    Neg,
-    Abs,
-    Sqrt,
-    Exp,
-    Log,
+    Neg     = 0,
+    Abs     = 1,
+    Sqrt    = 2,
+    Exp     = 3,
+    Log     = 4,
+    Relu    = 5,
+    Sigmoid = 6,
 };
 
 enum class ReduceOp : std::uint8_t
@@ -123,6 +128,10 @@ namespace ops
     [[nodiscard]] auto reduce_axis(ReduceOp op, ScalarType dt, const void* src, void* dst, std::size_t outer, std::size_t axis, std::size_t inner)
         -> Result<void>;
 
+    // 稳定 softmax：输入视为 [outer, axis, inner] 连续布局；src/dst 同 dtype、同 shape。
+    [[nodiscard]] auto softmax(ScalarType dt, const void* src, void* dst, std::size_t outer, std::size_t axis, std::size_t inner)
+        -> Result<void>;
+
     // 原地缩放（dt ∈ {F32, F64}）：供 mean 实现。
     [[nodiscard]] auto scale_fp(ScalarType dt, void* buf, double factor, std::size_t n) -> Result<void>;
 
@@ -146,6 +155,26 @@ namespace ops
 
     // 整数区间 [low, high)；dtype 支持 U8/I32/I64。
     [[nodiscard]] auto random_int(ScalarType dt, void* dst, std::size_t n, std::int64_t low, std::int64_t high, std::uint64_t seed) -> Result<void>;
+
+    // ── AI 基础原语（Task 4） ──────────────────────────────────────────────────
+    //
+    // RMSNorm：对最后一维做均方根归一化后乘以权重向量。
+    //   x/w/out  均为 rows×dim 连续设备缓冲，dtype ∈ {F32, F64}。
+    //   eps 须为有限正数。
+    [[nodiscard]] auto rms_norm(ScalarType dt, const void* x, const void* w, void* out,
+                                std::size_t rows, std::size_t dim, double eps) -> Result<void>;
+
+    // RoPE（split-half）：对 [n_batch, seq_len, dim] 布局的 token 序列施加旋转位置编码。
+    //   dim 须为正偶数；base 须为有限正数；dtype ∈ {F32, F64}。
+    [[nodiscard]] auto rope(ScalarType dt, const void* x, void* out,
+                            std::size_t n_batch, std::size_t seq_len, std::size_t dim,
+                            double base, std::int64_t position_offset) -> Result<void>;
+
+    // Embedding：按 ids 从 weight 查表，写入 out[n_ids, hidden]。
+    //   weight_dt ∈ {F32, F64}；ids_dt ∈ {I32, I64}；越界 id 返回错误。
+    [[nodiscard]] auto embedding(ScalarType weight_dt, ScalarType ids_dt,
+                                 const void* weight, const void* ids, void* out,
+                                 std::size_t n_ids, std::size_t hidden, std::size_t vocab) -> Result<void>;
 
     // ── Matmul 后端切换 ─────────────────────────────────────────────────────────
     //

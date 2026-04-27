@@ -267,6 +267,14 @@ namespace ops
         return wrap(err, "cuda::ops::reduce_axis");
     }
 
+    auto softmax(ScalarType dt, const void* src, void* dst, std::size_t outer, std::size_t axis, std::size_t inner) -> Result<void>
+    {
+        if (outer == 0 || inner == 0 || axis == 0)
+            return std::unexpected(make_error("cuda::ops::softmax: 维度含 0", Severity::Recoverable));
+        const int err = detail::ops_softmax(static_cast<int>(dt), src, dst, outer, axis, inner);
+        return wrap(err, "cuda::ops::softmax");
+    }
+
     auto scale_fp(ScalarType dt, void* buf, double factor, std::size_t n) -> Result<void>
     {
         if (n == 0)
@@ -352,6 +360,31 @@ namespace ops
             return {};
         const int err = detail::ops_random_int(static_cast<int>(dt), dst, n, low, high, seed);
         return wrap(err, "cuda::ops::random_int");
+    }
+
+    auto rms_norm(ScalarType dt, const void* x, const void* w, void* out,
+                  std::size_t rows, std::size_t dim, double eps) -> Result<void>
+    {
+        const int err = detail::ops_rms_norm(static_cast<int>(dt), x, w, out, rows, dim, eps);
+        return wrap(err, "cuda::ops::rms_norm");
+    }
+
+    auto rope(ScalarType dt, const void* x, void* out,
+              std::size_t n_batch, std::size_t seq_len, std::size_t dim,
+              double base, std::int64_t position_offset) -> Result<void>
+    {
+        const int err = detail::ops_rope(static_cast<int>(dt), x, out, n_batch, seq_len, dim, base, position_offset);
+        return wrap(err, "cuda::ops::rope");
+    }
+
+    auto embedding(ScalarType weight_dt, ScalarType ids_dt,
+                   const void* weight, const void* ids, void* out,
+                   std::size_t n_ids, std::size_t hidden, std::size_t vocab) -> Result<void>
+    {
+        const int err = detail::ops_embedding(
+            static_cast<int>(weight_dt), static_cast<int>(ids_dt), weight, ids, out, n_ids, hidden, vocab
+        );
+        return wrap(err, "cuda::ops::embedding");
     }
 
     // ── Matmul 后端切换（M6/M7 脚手架） ─────────────────────────────────────────

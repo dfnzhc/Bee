@@ -71,6 +71,11 @@ auto reduce_axis(int op, int dt, const void* src, void* dst, std::size_t outer, 
     );
 }
 
+auto softmax(int dt, const void* src, void* dst, std::size_t outer, std::size_t axis, std::size_t inner) -> Result<void>
+{
+    return ::bee::cuda::ops::softmax(static_cast<::bee::cuda::ScalarType>(dt), src, dst, outer, axis, inner);
+}
+
 auto scale_fp(int dt, void* buf, double factor, std::size_t n) -> Result<void>
 {
     return ::bee::cuda::ops::scale_fp(static_cast<::bee::cuda::ScalarType>(dt), buf, factor, n);
@@ -113,6 +118,29 @@ auto random_normal(int dt, void* dst, std::size_t n, std::uint64_t seed) -> Resu
 auto random_int(int dt, void* dst, std::size_t n, std::int64_t low, std::int64_t high, std::uint64_t seed) -> Result<void>
 {
     return ::bee::cuda::ops::random_int(static_cast<::bee::cuda::ScalarType>(dt), dst, n, low, high, seed);
+}
+
+auto rms_norm(int dt, const void* x, const void* w, void* out,
+              std::size_t rows, std::size_t dim, double eps) -> Result<void>
+{
+    return ::bee::cuda::ops::rms_norm(static_cast<::bee::cuda::ScalarType>(dt), x, w, out, rows, dim, eps);
+}
+
+auto rope(int dt, const void* x, void* out,
+          std::size_t n_batch, std::size_t seq_len, std::size_t dim,
+          double base, std::int64_t position_offset) -> Result<void>
+{
+    return ::bee::cuda::ops::rope(static_cast<::bee::cuda::ScalarType>(dt), x, out, n_batch, seq_len, dim, base, position_offset);
+}
+
+auto embedding(int weight_dt, int ids_dt,
+               const void* weight, const void* ids, void* out,
+               std::size_t n_ids, std::size_t hidden, std::size_t vocab) -> Result<void>
+{
+    return ::bee::cuda::ops::embedding(
+        static_cast<::bee::cuda::ScalarType>(weight_dt), static_cast<::bee::cuda::ScalarType>(ids_dt),
+        weight, ids, out, n_ids, hidden, vocab
+    );
 }
 
 auto synchronize() -> Result<void>
@@ -220,6 +248,11 @@ auto reduce_axis(int, int, const void*, void*, std::size_t, std::size_t, std::si
     return std::unexpected(make_error("CUDA 后端不可用：reduce_axis", Severity::Recoverable));
 }
 
+auto softmax(int, const void*, void*, std::size_t, std::size_t, std::size_t) -> Result<void>
+{
+    return std::unexpected(make_error("CUDA 后端不可用：softmax", Severity::Recoverable));
+}
+
 auto scale_fp(int, void*, double, std::size_t) -> Result<void>
 {
     return std::unexpected(make_error("CUDA 后端不可用：scale_fp", Severity::Recoverable));
@@ -253,6 +286,21 @@ auto random_normal(int, void*, std::size_t, std::uint64_t) -> Result<void>
 auto random_int(int, void*, std::size_t, std::int64_t, std::int64_t, std::uint64_t) -> Result<void>
 {
     return std::unexpected(make_error("CUDA 后端不可用：random_int", Severity::Recoverable));
+}
+
+auto rms_norm(int, const void*, const void*, void*, std::size_t, std::size_t, double) -> Result<void>
+{
+    return std::unexpected(make_error("CUDA 后端不可用：rms_norm", Severity::Recoverable));
+}
+
+auto rope(int, const void*, void*, std::size_t, std::size_t, std::size_t, double, std::int64_t) -> Result<void>
+{
+    return std::unexpected(make_error("CUDA 后端不可用：rope", Severity::Recoverable));
+}
+
+auto embedding(int, int, const void*, const void*, void*, std::size_t, std::size_t, std::size_t) -> Result<void>
+{
+    return std::unexpected(make_error("CUDA 后端不可用：embedding", Severity::Recoverable));
 }
 
 auto synchronize() -> Result<void>

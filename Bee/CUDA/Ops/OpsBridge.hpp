@@ -26,6 +26,9 @@ int ops_cast(int src_dt, const void* src, int dst_dt, void* dst, std::size_t n) 
 int ops_reduce_global(int op, int dt, const void* src, void* dst, std::size_t n) noexcept;
 int ops_reduce_axis(int op, int dt, const void* src, void* dst, std::size_t outer, std::size_t axis, std::size_t inner) noexcept;
 
+// 稳定 softmax：输入/输出均视为 [outer, axis, inner] 连续布局，dtype 仅 F32/F64。
+int ops_softmax(int dt, const void* src, void* dst, std::size_t outer, std::size_t axis, std::size_t inner) noexcept;
+
 // dt ∈ {F32, F64}；buf[i] *= factor（原地缩放，供 mean 使用）。
 int ops_scale_fp(int dt, void* buf, double factor, std::size_t n) noexcept;
 
@@ -54,5 +57,23 @@ int ops_strided_copy(
 int ops_random_uniform(int dt, void* dst, std::size_t n, std::uint64_t seed) noexcept;
 int ops_random_normal(int dt, void* dst, std::size_t n, std::uint64_t seed) noexcept;
 int ops_random_int(int dt, void* dst, std::size_t n, std::int64_t low, std::int64_t high, std::uint64_t seed) noexcept;
+
+// ── AI 基础原语（Task 4） ──────────────────────────────────────────────────────
+//
+// RMSNorm：y[r,i] = x[r,i] / sqrt(mean(x[r]^2) + eps) * w[i]
+// 输入/输出均为连续设备内存；rows × dim 布局；dt 仅支持 F32/F64。
+int ops_rms_norm(int dt, const void* x, const void* w, void* out, std::size_t rows, std::size_t dim, double eps) noexcept;
+
+// RoPE：split-half 配对旋转位置编码
+// 输入布局：[n_batch, seq_len, dim]；dt 仅支持 F32/F64；dim 须为偶数。
+int ops_rope(int dt, const void* x, void* out,
+             std::size_t n_batch, std::size_t seq_len, std::size_t dim,
+             double base, std::int64_t position_offset) noexcept;
+
+// Embedding：按 ids 行取 weight；越界 id 在设备侧检测并返回 cudaErrorInvalidValue。
+// weight_dt 仅 F32/F64；ids_dt 仅 I32/I64；vocab 须 > 0。
+int ops_embedding(int weight_dt, int ids_dt,
+                  const void* weight, const void* ids, void* out,
+                  std::size_t n_ids, std::size_t hidden, std::size_t vocab) noexcept;
 
 } // namespace bee::cuda::detail

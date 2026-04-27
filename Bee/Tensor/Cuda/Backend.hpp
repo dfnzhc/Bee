@@ -62,6 +62,9 @@ auto deallocate(void* p, std::size_t nbytes, std::size_t alignment) -> void;
 // 按轴 reduce：[outer, axis, inner] -> [outer, inner]，同 dtype、均连续。
 [[nodiscard]] auto reduce_axis(int op, int dt, const void* src, void* dst, std::size_t outer, std::size_t axis, std::size_t inner) -> Result<void>;
 
+// 稳定 softmax：输入/输出均为同 dtype 连续设备内存，逻辑布局为 [outer, axis, inner]。
+[[nodiscard]] auto softmax(int dt, const void* src, void* dst, std::size_t outer, std::size_t axis, std::size_t inner) -> Result<void>;
+
 // F32/F64 原地缩放（mean 使用）。
 [[nodiscard]] auto scale_fp(int dt, void* buf, double factor, std::size_t n) -> Result<void>;
 
@@ -90,6 +93,22 @@ auto deallocate(void* p, std::size_t nbytes, std::size_t alignment) -> void;
 
 // 整数区间 [low, high)；dtype ∈ {U8, I32, I64}。
 [[nodiscard]] auto random_int(int dt, void* dst, std::size_t n, std::int64_t low, std::int64_t high, std::uint64_t seed) -> Result<void>;
+
+// ── AI 基础原语（Task 4） ───────────────────────────────────────────────────
+//
+// RMSNorm：rows×dim 连续缓冲归一化后乘 weight；dt ∈ {F32=4, F64=5}；eps > 0。
+[[nodiscard]] auto rms_norm(int dt, const void* x, const void* w, void* out,
+                            std::size_t rows, std::size_t dim, double eps) -> Result<void>;
+
+// RoPE（split-half）：[n_batch, seq_len, dim] 布局；dim 为正偶数；base > 0。
+[[nodiscard]] auto rope(int dt, const void* x, void* out,
+                        std::size_t n_batch, std::size_t seq_len, std::size_t dim,
+                        double base, std::int64_t position_offset) -> Result<void>;
+
+// Embedding：weight_dt ∈ {F32, F64}；ids_dt ∈ {I32, I64}；越界 id 返回错误。
+[[nodiscard]] auto embedding(int weight_dt, int ids_dt,
+                             const void* weight, const void* ids, void* out,
+                             std::size_t n_ids, std::size_t hidden, std::size_t vocab) -> Result<void>;
 
 // 同步 CUDA 设备，等待所有待处理操作完成。
 // @return 成功时返回 void；失败时返回底层 CUDA 后端错误

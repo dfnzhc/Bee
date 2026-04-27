@@ -1,4 +1,5 @@
 #include "Tensor/Ops/Positional.hpp"
+#include "Tensor/Cuda/Backend.hpp"
 
 #include <format>
 #include <cmath>
@@ -113,18 +114,32 @@ auto apply_rope(const Tensor& x, double base, int64_t position_offset, const ten
             Severity::Recoverable
         ));
 
-    // ── CUDA 过渡路径 ─────────────────────────────────────────────────────────
-    const Device orig_device = x.device();
-    Tensor       x_cpu       = x;
+    // ── CUDA 原生路径 ─────────────────────────────────────────────────────────
+    if (x.device() == Device::CUDA) {
+        auto x_cont_r = x.contiguous();
+        if (!x_cont_r)
+            return std::unexpected(std::move(x_cont_r.error()));
+        const auto&   x_cont  = *x_cont_r;
+        const int64_t n_batch = x_cont.numel() / (seq_len * dim);
 
-    if (orig_device == Device::CUDA) {
-        auto r = x.to(Device::CPU);
-        if (!r)
-            return std::unexpected(std::move(r.error()));
-        x_cpu = std::move(*r);
+        auto out = Tensor::empty(x_cont.shape(), x_cont.dtype(), Device::CUDA);
+        if (!out)
+            return std::unexpected(std::move(out.error()));
+
+        BEE_TRY(tensor::cuda::rope(
+            static_cast<int>(x_cont.dtype()),
+            x_cont.data_ptr(), out->data_ptr(),
+            static_cast<std::size_t>(n_batch),
+            static_cast<std::size_t>(seq_len),
+            static_cast<std::size_t>(dim),
+            base, position_offset
+        ));
+        return *out;
     }
 
-    // ── 确保连续 ──────────────────────────────────────────────────────────────
+    // ── CPU 路径 ──────────────────────────────────────────────────────────────
+    // 确保连续
+    Tensor x_cpu = x;
     if (!x_cpu.is_contiguous()) {
         auto r = x_cpu.contiguous();
         if (!r)
@@ -153,14 +168,6 @@ auto apply_rope(const Tensor& x, double base, int64_t position_offset, const ten
             static_cast<double*>(out->data_ptr()),
             n_batch, seq_len, dim, base, position_offset
         );
-    }
-
-    // ── 若原设备为 CUDA，将结果迁回 ──────────────────────────────────────────
-    if (orig_device == Device::CUDA) {
-        auto back = out->to(Device::CUDA);
-        if (!back)
-            return std::unexpected(std::move(back.error()));
-        return *back;
     }
 
     return *out;

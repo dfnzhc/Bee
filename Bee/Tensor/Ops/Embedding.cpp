@@ -1,4 +1,5 @@
 #include "Tensor/Ops/Embedding.hpp"
+#include "Tensor/Cuda/Backend.hpp"
 
 #include <format>
 #include <cstring>
@@ -77,24 +78,44 @@ auto embedding(const Tensor& weight, const Tensor& token_ids, const tensor::cuda
             Severity::Recoverable
         ));
 
-    // ── CUDA 过渡路径：迁移至 CPU 计算 ───────────────────────────────────────
-    const Device orig_device = weight.device();
-    Tensor       w_cpu       = weight;
-    Tensor       ids_cpu     = token_ids;
+    // ── CUDA 原生路径 ─────────────────────────────────────────────────────────
+    if (weight.device() == Device::CUDA) {
+        auto w_cont_r = weight.contiguous();
+        if (!w_cont_r)
+            return std::unexpected(std::move(w_cont_r.error()));
+        auto ids_cont_r = token_ids.contiguous();
+        if (!ids_cont_r)
+            return std::unexpected(std::move(ids_cont_r.error()));
 
-    if (orig_device == Device::CUDA) {
-        auto wr = weight.to(Device::CPU);
-        if (!wr)
-            return std::unexpected(std::move(wr.error()));
-        w_cpu = std::move(*wr);
+        const auto&   w_cont  = *w_cont_r;
+        const auto&   ids_cont = *ids_cont_r;
+        const int64_t vocab    = w_cont.shape()[0];
+        const int64_t hidden   = w_cont.shape()[1];
+        const int64_t n_ids    = ids_cont.numel();
 
-        auto ir = token_ids.to(Device::CPU);
-        if (!ir)
-            return std::unexpected(std::move(ir.error()));
-        ids_cpu = std::move(*ir);
+        // 构建输出形状：token_ids.shape + [hidden]
+        Shape out_shape = ids_cont.shape();
+        out_shape.push_back(hidden);
+
+        auto out = Tensor::empty(out_shape, w_cont.dtype(), Device::CUDA);
+        if (!out)
+            return std::unexpected(std::move(out.error()));
+
+        BEE_TRY(tensor::cuda::embedding(
+            static_cast<int>(w_cont.dtype()),
+            static_cast<int>(ids_cont.dtype()),
+            w_cont.data_ptr(), ids_cont.data_ptr(), out->data_ptr(),
+            static_cast<std::size_t>(n_ids),
+            static_cast<std::size_t>(hidden),
+            static_cast<std::size_t>(vocab)
+        ));
+        return *out;
     }
 
-    // ── 确保连续 ──────────────────────────────────────────────────────────────
+    // ── CPU 路径 ──────────────────────────────────────────────────────────────
+    // 确保连续
+    Tensor w_cpu   = weight;
+    Tensor ids_cpu = token_ids;
     if (!w_cpu.is_contiguous()) {
         auto r = w_cpu.contiguous();
         if (!r)
@@ -146,14 +167,6 @@ auto embedding(const Tensor& weight, const Tensor& token_ids, const tensor::cuda
 
     if (!r)
         return std::unexpected(std::move(r.error()));
-
-    // ── 若原设备为 CUDA，将结果迁回 ──────────────────────────────────────────
-    if (orig_device == Device::CUDA) {
-        auto back = out->to(Device::CUDA);
-        if (!back)
-            return std::unexpected(std::move(back.error()));
-        return *back;
-    }
 
     return *out;
 }

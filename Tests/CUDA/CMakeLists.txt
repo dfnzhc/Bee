@@ -23,12 +23,14 @@ if(TARGET Bee::CUDA)
             WarpBlockTests.cu
             CastTests.cu
             ElementWiseTests.cu
+            SoftmaxTests.cu
             ReduceTests.cu
             ReduceAxisTests.cu
             RandomTests.cu
             TransposeTests.cu
             MatmulTests.cu
             StridedCopyTests.cu
+            AiPrimitiveTests.cu
         )
 
         set_target_properties(CUDA.Tests PROPERTIES

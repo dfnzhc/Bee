@@ -1,4 +1,5 @@
 #include "Tensor/Ops/Norm.hpp"
+#include "Tensor/Cuda/Backend.hpp"
 
 #include <format>
 #include <cmath>
@@ -90,70 +91,68 @@ auto rms_norm(const Tensor& x, const Tensor& weight, double eps, const tensor::c
             Severity::Recoverable
         ));
 
-    // ── CUDA 过渡路径 ─────────────────────────────────────────────────────────
-    const Device orig_device = x.device();
-    Tensor       x_cpu       = x;
-    Tensor       w_cpu       = weight;
+    // ── CUDA 原生路径 ─────────────────────────────────────────────────────────
+    if (x.device() == Device::CUDA) {
+        // 确保连续
+        auto x_cont_r = x.contiguous();
+        if (!x_cont_r)
+            return std::unexpected(std::move(x_cont_r.error()));
+        auto w_cont_r = weight.contiguous();
+        if (!w_cont_r)
+            return std::unexpected(std::move(w_cont_r.error()));
 
-    if (orig_device == Device::CUDA) {
-        auto xr = x.to(Device::CPU);
-        if (!xr)
-            return std::unexpected(std::move(xr.error()));
-        x_cpu = std::move(*xr);
+        const auto& x_cont  = *x_cont_r;
+        const auto& w_cont  = *w_cont_r;
+        const int64_t n_rows = x_cont.numel() / d;
 
-        auto wr = weight.to(Device::CPU);
-        if (!wr)
-            return std::unexpected(std::move(wr.error()));
-        w_cpu = std::move(*wr);
+        auto out = Tensor::empty(x_cont.shape(), x_cont.dtype(), Device::CUDA);
+        if (!out)
+            return std::unexpected(std::move(out.error()));
+
+        BEE_TRY(tensor::cuda::rms_norm(
+            static_cast<int>(x_cont.dtype()),
+            x_cont.data_ptr(), w_cont.data_ptr(), out->data_ptr(),
+            static_cast<std::size_t>(n_rows), static_cast<std::size_t>(d), eps
+        ));
+        return *out;
     }
 
-    // ── 确保连续 ──────────────────────────────────────────────────────────────
-    if (!x_cpu.is_contiguous()) {
-        auto r = x_cpu.contiguous();
+    // ── CPU 路径 ──────────────────────────────────────────────────────────────
+    // 确保连续
+    Tensor x_cont = x;
+    Tensor w_cont = weight;
+    if (!x_cont.is_contiguous()) {
+        auto r = x_cont.contiguous();
         if (!r)
             return std::unexpected(std::move(r.error()));
-        x_cpu = std::move(*r);
+        x_cont = std::move(*r);
     }
-    if (!w_cpu.is_contiguous()) {
-        auto r = w_cpu.contiguous();
+    if (!w_cont.is_contiguous()) {
+        auto r = w_cont.contiguous();
         if (!r)
             return std::unexpected(std::move(r.error()));
-        w_cpu = std::move(*r);
+        w_cont = std::move(*r);
     }
 
-    const int64_t n_rows = x_cpu.numel() / d;
-
-    auto out = Tensor::empty(x_cpu.shape(), x_cpu.dtype());
+    const int64_t n_rows = x_cont.numel() / d;
+    auto          out    = Tensor::empty(x_cont.shape(), x_cont.dtype());
     if (!out)
         return std::unexpected(std::move(out.error()));
 
-    // ── 执行 CPU 内核 ─────────────────────────────────────────────────────────
-    if (x_cpu.dtype() == DType::F32) {
+    if (x_cont.dtype() == DType::F32) {
         rms_norm_cpu_impl<float>(
-            static_cast<const float*>(x_cpu.data_ptr()),
-            static_cast<const float*>(w_cpu.data_ptr()),
+            static_cast<const float*>(x_cont.data_ptr()),
+            static_cast<const float*>(w_cont.data_ptr()),
             static_cast<float*>(out->data_ptr()),
-            n_rows,
-            d,
-            eps
+            n_rows, d, eps
         );
     } else {
         rms_norm_cpu_impl<double>(
-            static_cast<const double*>(x_cpu.data_ptr()),
-            static_cast<const double*>(w_cpu.data_ptr()),
+            static_cast<const double*>(x_cont.data_ptr()),
+            static_cast<const double*>(w_cont.data_ptr()),
             static_cast<double*>(out->data_ptr()),
-            n_rows,
-            d,
-            eps
+            n_rows, d, eps
         );
-    }
-
-    // ── 若原设备为 CUDA，将结果迁回 ──────────────────────────────────────────
-    if (orig_device == Device::CUDA) {
-        auto back = out->to(Device::CUDA);
-        if (!back)
-            return std::unexpected(std::move(back.error()));
-        return *back;
     }
 
     return *out;
