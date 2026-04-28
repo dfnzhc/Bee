@@ -405,7 +405,7 @@ auto Tensor::clone() const -> Result<Tensor>
     const std::size_t nbytes  = static_cast<std::size_t>(numel()) * elem_sz;
 
     if (device() == Device::CUDA) {
-        // 非连续时先在设备端物化为 contiguous，再深拷贝，复用 Task 3 的 strided_copy 路径
+        // 非连续 CUDA 张量先在设备端物化为 contiguous，再执行设备到设备深拷贝。
         if (!is_contiguous()) {
             Tensor cont;
             BEE_TRY_ASSIGN(cont, contiguous());
@@ -436,7 +436,7 @@ auto Tensor::clone() const -> Result<Tensor>
         // 连续：直接内存块拷贝
         std::memcpy((*storage_result)->data(), data_ptr(), nbytes);
     } else {
-        // 非连续：stride-loop 拷贝，避免中间临时 contiguous 分配
+        // 非连续 CPU 张量使用 stride-loop 直接写入目标连续 storage。
         contiguous_copy_into((*storage_result)->data(), *impl_, elem_sz);
     }
 
@@ -582,7 +582,7 @@ auto Tensor::contiguous(const tensor::cuda::ExecContext* /*ctx*/) const -> Resul
     if (!storage_result)
         return std::unexpected(std::move(storage_result.error()));
 
-    // B11 CPU fast-path：2D 情形走 blocked-tile 拷贝（F32 AVX2 还会进 8×8 寄存器转置）
+    // CPU 快路径：2D 情形走 blocked-tile 拷贝；F32 AVX2 可使用 8×8 寄存器转置。
     if (impl_->shape.size() == 2) {
         const auto*   src_base  = static_cast<const uint8_t*>(impl_->storage->data());
         const int64_t off_bytes = impl_->offset * static_cast<int64_t>(elem_sz);

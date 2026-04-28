@@ -1,8 +1,8 @@
 #pragma once
 
-// CPU Reduce 算子内核：全局 reduce（SIMD fast-path + scalar slow-path）
+// CPU Reduce 算子内核：全局 reduce（SIMD 快路径 + 标量慢路径）
 // 与按轴 reduce（连续快速路径 + 通用步长慢速路径）
-// B3：全局 reduce 支持 4 路 SIMD 累加器（打破 FP 依赖链）+ parallel_for。
+// 全局 reduce 使用 4 路 SIMD 累加器打破浮点依赖链，并在大输入上启用 parallel_for。
 
 #include "Tensor/Core/DType.hpp"
 #include "Tensor/Core/Shape.hpp"
@@ -386,7 +386,7 @@ auto cpu_global_reduce_strided(const Tensor& a) -> T
 // 全局 reduce：dispatch（连续 → parallel SIMD；非连续 → stride 迭代）
 // ─────────────────────────────────────────────────────────────────────────────
 
-// B3 阈值：按输出字节量判断是否并行（小于 L2 的数据保留单线程，避免派发开销）。
+// 并行阈值：按输入字节量判断是否并行（小于 L2 的数据保留单线程，避免派发开销）。
 // 13700k：P-core L2=2MB；single-thread reduce 在 1MB 数据上就能接近 LLC 带宽峰值。
 inline constexpr int64_t kReduceParallelBytes = 4 * 1024 * 1024;
 // 每 worker 分块字节数（64 KB ~ L2 命中 + 并行收益的平衡点）。

@@ -14,6 +14,11 @@
 namespace bee::simd
 {
 
+// SSE2 后端提供 128-bit 寄存器宽度。Bee 当前实现把“SSE2”作为最低 x86
+// SIMD 后端名，但 int32 min/max 等接口依赖 SSE4.1，因此 CMake 与运行时
+// 探测都会要求 SSE2+SSE4.1 同时可用。未提供的成员函数表示该类型/ISA
+// 组合没有稳定或高效的硬件语义，调用方会在编译期暴露错误。
+
 // -----------------------------------------------------------------------
 // float × SSE2：__m128，宽度 = 4
 // -----------------------------------------------------------------------
@@ -56,7 +61,8 @@ struct SimdBackend<float, IsaSse2>
         return _mm_sqrt_ps(a);
     }
 
-    // exp 回退标量逐元素计算
+    // exp 回退标量逐元素计算。SSE2 无标准指数向量指令，当前实现优先
+    // 保持精确库函数语义；性能敏感路径应在上层避免频繁调用该接口。
     static auto exp(reg v) -> reg
     {
         alignas(16) float buf[4];
@@ -66,7 +72,7 @@ struct SimdBackend<float, IsaSse2>
         return _mm_load_ps(buf);
     }
 
-    // log 回退标量逐元素计算
+    // log 回退标量逐元素计算，语义与 std::log 一致。
     static auto log(reg v) -> reg
     {
         alignas(16) float buf[4];
@@ -274,7 +280,9 @@ struct SimdBackend<int32_t, IsaSse2>
 
 // -----------------------------------------------------------------------
 // int64_t × SSE2：__m128i，宽度 = 2
-// 仅实装 add/sub/neg/abs/reduce_sum；min/max/reduce_min/reduce_max 缺 SSE2 原语，跳过
+// 仅实装 add/sub/neg/abs/reduce_sum。SSE2/SSE4.1 缺少有符号 64-bit
+// min/max 原语，当前不提供标量混合回退，避免调用方误以为该路径具备完整
+// 向量性能。
 // -----------------------------------------------------------------------
 template <>
 struct SimdBackend<int64_t, IsaSse2>
@@ -389,7 +397,9 @@ struct SimdBackend<uint8_t, IsaSse2>
         return _mm_max_epu8(a, b);
     }
 
-    // 水平求和：用 _mm_sad_epu8 将 16 个 uint8 分为两组 SAD 求和
+    // 水平求和：用 _mm_sad_epu8 将 16 个 uint8 分为两组 SAD 求和。
+    // 返回类型保持后端接口的 uint8_t 约定，因此总和超过 255 时会按
+    // uint8_t 截断；需要宽累加的调用方应在更高层使用专门路径。
     static auto reduce_sum(reg v) -> uint8_t
     {
         __m128i zero = _mm_setzero_si128();

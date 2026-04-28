@@ -1,7 +1,7 @@
 /**
  * @File Ops/MatmulCutlass.cu
  * @Author dfnzhc (https://github.com/dfnzhc)
- * @Brief B8：CUTLASS 2.x Ampere TF32 F32 GEMM（sm_120 向下兼容运行）。
+ * @Brief CUTLASS 2.x TF32/F32 GEMM 后端。
  *
  * 设计要点：
  * - 仅 F32（A/B/C 全 F32，累加 F32）；输入在 TF32 tensor core 上按 TF32 截断参与 WMMA，

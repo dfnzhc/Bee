@@ -87,7 +87,7 @@ auto embedding(const Tensor& weight, const Tensor& token_ids, const tensor::cuda
         if (!ids_cont_r)
             return std::unexpected(std::move(ids_cont_r.error()));
 
-        const auto&   w_cont  = *w_cont_r;
+        const auto&   w_cont   = *w_cont_r;
         const auto&   ids_cont = *ids_cont_r;
         const int64_t vocab    = w_cont.shape()[0];
         const int64_t hidden   = w_cont.shape()[1];
@@ -101,14 +101,18 @@ auto embedding(const Tensor& weight, const Tensor& token_ids, const tensor::cuda
         if (!out)
             return std::unexpected(std::move(out.error()));
 
-        BEE_TRY(tensor::cuda::embedding(
-            static_cast<int>(w_cont.dtype()),
-            static_cast<int>(ids_cont.dtype()),
-            w_cont.data_ptr(), ids_cont.data_ptr(), out->data_ptr(),
-            static_cast<std::size_t>(n_ids),
-            static_cast<std::size_t>(hidden),
-            static_cast<std::size_t>(vocab)
-        ));
+        BEE_TRY(
+            tensor::cuda::embedding(
+                static_cast<int>(w_cont.dtype()),
+                static_cast<int>(ids_cont.dtype()),
+                w_cont.data_ptr(),
+                ids_cont.data_ptr(),
+                out->data_ptr(),
+                static_cast<std::size_t>(n_ids),
+                static_cast<std::size_t>(hidden),
+                static_cast<std::size_t>(vocab)
+            )
+        );
         return *out;
     }
 

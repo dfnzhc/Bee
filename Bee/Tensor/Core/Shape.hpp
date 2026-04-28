@@ -1,6 +1,8 @@
 #pragma once
 
-// MVP 阶段使用 std::vector 实现 Shape/Strides，后续可替换为 SmallVector 优化小 rank 场景
+// Shape/Strides 使用 std::vector 存储任意 rank 的维度元数据。所有 stride
+// 均以“元素”为单位，而不是字节；字节偏移由 stride * dtype_size(dtype)
+// 在访问层统一换算。
 
 #include <cstdint>
 #include <numeric>
@@ -9,13 +11,14 @@
 namespace bee
 {
 
-// 张量维度列表（元素类型为 int64_t）
+// 张量维度列表。空 shape 表示标量；非空 shape 中每个维度表示该轴长度。
 using Shape = std::vector<int64_t>;
 
-// 步长列表（元素单位，非字节）
+// 步长列表，单位为元素。strides[i] 表示第 i 维坐标加一时 storage 中前进
+// 的元素数量。
 using Strides = std::vector<int64_t>;
 
-// 计算元素总数；空 shape 视作 scalar，返回 1
+// 计算元素总数；空 shape 视作标量，返回 1。
 [[nodiscard]] inline auto numel(const Shape& shape) noexcept -> int64_t
 {
     if (shape.empty())
@@ -26,7 +29,8 @@ using Strides = std::vector<int64_t>;
     return n;
 }
 
-// 计算行优先（C order）步长：最右维步长为 1
+// 计算行优先（C order）连续布局的步长：最右维步长为 1，向左逐维乘以
+// 右侧维度长度。
 [[nodiscard]] inline auto compute_contiguous_strides(const Shape& shape) -> Strides
 {
     if (shape.empty())
@@ -40,7 +44,8 @@ using Strides = std::vector<int64_t>;
     return strides;
 }
 
-// 判断是否 C-contiguous；size==1 的维度步长任意视为连续
+// 判断 shape/strides 是否表示 C-contiguous 布局。
+// size==1 的维度不会改变线性地址，因此其 stride 可为任意值并仍视为连续。
 [[nodiscard]] inline auto is_contiguous(const Shape& shape, const Strides& strides) noexcept -> bool
 {
     if (shape.size() != strides.size())

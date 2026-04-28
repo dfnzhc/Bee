@@ -2,7 +2,7 @@
  * @File Cpu/Gemm/KernelAvx2.hpp
  * @Author dfnzhc (https://github.com/dfnzhc)
  * @Date 2026/4/23
- * @Brief This file is part of Bee.
+ * @Brief CPU GEMM AVX2/FMA 微内核。
  *
  * AVX2/FMA 微内核：对 packed A/B panel 计算 MR×NR 的 C tile。
  * 所有 micro-kernel 写法均对齐：A_pack 按 MR 条带（每条 MR 个元素 × K 列），
@@ -211,7 +211,8 @@ inline auto micro_kernel_i32_8x8(
 // ─── I8→I32 8×8 微内核（AVX2）────────────────────────────────────────────────
 // 为简化与保正确性：用 _mm256_cvtepi8_epi16（符号扩展）把 A 的广播元素与 B 的 8 元素
 // 提升到 int16，相乘得到 int16，再符号扩展到 int32 累加。
-// 注：性能较 vpmaddubsw/vpmaddwd 级联低，但实现简单可靠，后续可优化。
+// 注：性能较 vpmaddubsw/vpmaddwd 级联低，但实现简单可靠，便于保持 I8×I8→I32
+// 路径的数值正确性。
 
 inline auto micro_kernel_i8_i32_8x8(
     const std::int8_t* __restrict A_pack,

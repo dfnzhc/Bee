@@ -7,12 +7,12 @@
 namespace bee
 {
 
-// 元素数据类型枚举
+// 元素数据类型枚举。
 //
-// MVP CPU 可计算类型：Bool/U8/I8/I32/I64/F32/F64。
+// CPU 可计算类型：Bool/U8/I8/I32/I64/F32/F64。
 // CUDA 可计算类型（额外包含）：F16/BF16。
 // 低精度存储类型（CPU 仅支持存储与 F32 互转）：F16/BF16。
-// 占位类型（暂不参与任何计算）：FP8E4M3/FP8E5M2/FP4。
+// 保留类型（暂不参与计算）：FP8E4M3/FP8E5M2/FP4。
 enum class DType : uint8_t
 {
     Bool,
@@ -30,7 +30,8 @@ enum class DType : uint8_t
     FP4,
 };
 
-// 返回数据类型对应的字节数
+// 返回单个逻辑元素对应的字节数。FP4 采用打包存储，当前仅返回占位尺寸，
+// 不应用于实际张量分配路径。
 [[nodiscard]] constexpr auto dtype_size(DType dt) noexcept -> std::size_t
 {
     switch (dt) {
@@ -52,7 +53,7 @@ enum class DType : uint8_t
     }
 }
 
-// 判断 DType 是否为 CPU 可计算类型（Bool/U8/I32/I64/F32/F64）。
+// 判断 DType 是否为 CPU 后端可直接计算的类型。
 [[nodiscard]] constexpr auto dtype_is_cpu_computable(DType dt) noexcept -> bool
 {
     switch (dt) {
@@ -195,7 +196,8 @@ enum class DTypeOpKind : uint8_t
 }
 
 // 返回给定算子类型下的累加/输出类型。
-// 规则：F16/BF16 在非 ElementWise 算子中累加至 F32；其余类型保持不变。
+// 规则：F16/BF16 在 reduce、matmul、norm、softmax 等聚合型算子中提升至
+// F32 累加，避免低精度累加导致明显数值损失；元素级算子保持输入类型。
 [[nodiscard]] constexpr auto dtype_accumulate_type(DTypeOpKind op, DType dt) noexcept -> DType
 {
     if ((dt == DType::F16 || dt == DType::BF16) && op != DTypeOpKind::ElementWise)
@@ -204,6 +206,10 @@ enum class DTypeOpKind : uint8_t
 }
 
 // 返回两操作数类型在给定算子下的提升结果。
+//
+// 提升规则是 Bee::Tensor 的内部一致性约定，不完全追随 NumPy/PyTorch。
+// 当前二元元素级算子仍要求 dtype 一致；该函数主要供需要显式推导输出
+// 类型的算子或未来混合 dtype 路径使用。
 // 规则（优先级由高到低）：
 //   1. 相同类型 → 走 accumulate 规则
 //   2. F64 一方存在 → F64

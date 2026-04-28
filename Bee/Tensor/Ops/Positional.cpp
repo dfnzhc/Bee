@@ -23,15 +23,7 @@ namespace
     //   base           ：RoPE 基数（通常 10000.0）
     //   position_offset：序列偏移
     template <typename T>
-    auto apply_rope_cpu_impl(
-        const T* x_ptr,
-        T*       out_ptr,
-        int64_t  n_batch,
-        int64_t  seq_len,
-        int64_t  dim,
-        double   base,
-        int64_t  position_offset
-    ) -> void
+    auto apply_rope_cpu_impl(const T* x_ptr, T* out_ptr, int64_t n_batch, int64_t seq_len, int64_t dim, double base, int64_t position_offset) -> void
     {
         const int64_t half_dim = dim / 2;
 
@@ -41,7 +33,7 @@ namespace
                 const double pos = static_cast<double>(position_offset + s);
 
                 // 指向当前行的指针
-                const T* in_row  = x_ptr   + (b * seq_len + s) * dim;
+                const T* in_row  = x_ptr + (b * seq_len + s) * dim;
                 T*       out_row = out_ptr + (b * seq_len + s) * dim;
 
                 for (int64_t i = 0; i < half_dim; ++i) {
@@ -75,44 +67,26 @@ auto apply_rope(const Tensor& x, double base, int64_t position_offset, const ten
         return std::unexpected(make_error("apply_rope: x 未定义", Severity::Recoverable));
 
     if (x.dtype() != DType::F32 && x.dtype() != DType::F64)
-        return std::unexpected(make_error(
-            std::format("apply_rope: dtype 须为 F32 或 F64，当前 {}", enum_to_name(x.dtype())),
-            Severity::Recoverable
-        ));
+        return std::unexpected(make_error(std::format("apply_rope: dtype 须为 F32 或 F64，当前 {}", enum_to_name(x.dtype())), Severity::Recoverable));
 
     if (x.ndim() < 2)
-        return std::unexpected(make_error(
-            std::format("apply_rope: x 须至少为 2-D，当前 ndim={}", x.ndim()),
-            Severity::Recoverable
-        ));
+        return std::unexpected(make_error(std::format("apply_rope: x 须至少为 2-D，当前 ndim={}", x.ndim()), Severity::Recoverable));
 
     // 提前提取维度，用于前置校验（shape 在设备迁移后不变）
     const int64_t seq_len = x.shape()[static_cast<std::size_t>(x.ndim() - 2)];
     const int64_t dim     = x.shape().back();
 
     if (seq_len <= 0)
-        return std::unexpected(make_error(
-            std::format("apply_rope: 倒数第二维（seq_len）须 > 0，当前 {}", seq_len),
-            Severity::Recoverable
-        ));
+        return std::unexpected(make_error(std::format("apply_rope: 倒数第二维（seq_len）须 > 0，当前 {}", seq_len), Severity::Recoverable));
 
     if (dim <= 0)
-        return std::unexpected(make_error(
-            std::format("apply_rope: 最后维须 > 0，当前 dim={}", dim),
-            Severity::Recoverable
-        ));
+        return std::unexpected(make_error(std::format("apply_rope: 最后维须 > 0，当前 dim={}", dim), Severity::Recoverable));
 
     if (dim % 2 != 0)
-        return std::unexpected(make_error(
-            std::format("apply_rope: 最后维须为偶数，当前 dim={}", dim),
-            Severity::Recoverable
-        ));
+        return std::unexpected(make_error(std::format("apply_rope: 最后维须为偶数，当前 dim={}", dim), Severity::Recoverable));
 
     if (!std::isfinite(base) || base <= 0.0)
-        return std::unexpected(make_error(
-            std::format("apply_rope: base 须为有限正数，当前 {}", base),
-            Severity::Recoverable
-        ));
+        return std::unexpected(make_error(std::format("apply_rope: base 须为有限正数，当前 {}", base), Severity::Recoverable));
 
     // ── CUDA 原生路径 ─────────────────────────────────────────────────────────
     if (x.device() == Device::CUDA) {
@@ -126,14 +100,18 @@ auto apply_rope(const Tensor& x, double base, int64_t position_offset, const ten
         if (!out)
             return std::unexpected(std::move(out.error()));
 
-        BEE_TRY(tensor::cuda::rope(
-            static_cast<int>(x_cont.dtype()),
-            x_cont.data_ptr(), out->data_ptr(),
-            static_cast<std::size_t>(n_batch),
-            static_cast<std::size_t>(seq_len),
-            static_cast<std::size_t>(dim),
-            base, position_offset
-        ));
+        BEE_TRY(
+            tensor::cuda::rope(
+                static_cast<int>(x_cont.dtype()),
+                x_cont.data_ptr(),
+                out->data_ptr(),
+                static_cast<std::size_t>(n_batch),
+                static_cast<std::size_t>(seq_len),
+                static_cast<std::size_t>(dim),
+                base,
+                position_offset
+            )
+        );
         return *out;
     }
 
@@ -158,15 +136,11 @@ auto apply_rope(const Tensor& x, double base, int64_t position_offset, const ten
     // ── 执行 CPU 内核 ─────────────────────────────────────────────────────────
     if (x_cpu.dtype() == DType::F32) {
         apply_rope_cpu_impl<float>(
-            static_cast<const float*>(x_cpu.data_ptr()),
-            static_cast<float*>(out->data_ptr()),
-            n_batch, seq_len, dim, base, position_offset
+            static_cast<const float*>(x_cpu.data_ptr()), static_cast<float*>(out->data_ptr()), n_batch, seq_len, dim, base, position_offset
         );
     } else {
         apply_rope_cpu_impl<double>(
-            static_cast<const double*>(x_cpu.data_ptr()),
-            static_cast<double*>(out->data_ptr()),
-            n_batch, seq_len, dim, base, position_offset
+            static_cast<const double*>(x_cpu.data_ptr()), static_cast<double*>(out->data_ptr()), n_batch, seq_len, dim, base, position_offset
         );
     }
 

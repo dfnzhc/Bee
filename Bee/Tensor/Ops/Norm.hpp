@@ -11,9 +11,9 @@
 //   设备约束：x 与 weight 须在同一设备；输出与输入同设备。
 //   输出形状与 x.shape 一致。
 //
-// CUDA 过渡路径：
-//   当前仅有 CPU 原生实现。若两者均在 CUDA 设备上，先迁移至 CPU 计算，
-//   再将结果迁移回 CUDA（同步语义）。
+// CUDA 路径：
+//   当 x 与 weight 均位于 CUDA 设备时，调用设备端 RMSNorm 后端；ctx 用于
+//   传递执行上下文，当前保持同步可见语义。
 
 #include "Base/Diagnostics/Error.hpp"
 #include "Tensor/Core/Tensor.hpp"
@@ -22,6 +22,7 @@
 namespace bee
 {
 
+// 返回与 x 同 shape 的 RMSNorm 结果张量。
 [[nodiscard]] auto rms_norm(const Tensor& x, const Tensor& weight, double eps, const tensor::cuda::ExecContext* ctx = nullptr) -> Result<Tensor>;
 
 } // namespace bee

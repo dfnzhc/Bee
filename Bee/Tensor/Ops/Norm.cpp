@@ -101,19 +101,25 @@ auto rms_norm(const Tensor& x, const Tensor& weight, double eps, const tensor::c
         if (!w_cont_r)
             return std::unexpected(std::move(w_cont_r.error()));
 
-        const auto& x_cont  = *x_cont_r;
-        const auto& w_cont  = *w_cont_r;
+        const auto&   x_cont = *x_cont_r;
+        const auto&   w_cont = *w_cont_r;
         const int64_t n_rows = x_cont.numel() / d;
 
         auto out = Tensor::empty(x_cont.shape(), x_cont.dtype(), Device::CUDA);
         if (!out)
             return std::unexpected(std::move(out.error()));
 
-        BEE_TRY(tensor::cuda::rms_norm(
-            static_cast<int>(x_cont.dtype()),
-            x_cont.data_ptr(), w_cont.data_ptr(), out->data_ptr(),
-            static_cast<std::size_t>(n_rows), static_cast<std::size_t>(d), eps
-        ));
+        BEE_TRY(
+            tensor::cuda::rms_norm(
+                static_cast<int>(x_cont.dtype()),
+                x_cont.data_ptr(),
+                w_cont.data_ptr(),
+                out->data_ptr(),
+                static_cast<std::size_t>(n_rows),
+                static_cast<std::size_t>(d),
+                eps
+            )
+        );
         return *out;
     }
 
@@ -144,14 +150,18 @@ auto rms_norm(const Tensor& x, const Tensor& weight, double eps, const tensor::c
             static_cast<const float*>(x_cont.data_ptr()),
             static_cast<const float*>(w_cont.data_ptr()),
             static_cast<float*>(out->data_ptr()),
-            n_rows, d, eps
+            n_rows,
+            d,
+            eps
         );
     } else {
         rms_norm_cpu_impl<double>(
             static_cast<const double*>(x_cont.data_ptr()),
             static_cast<const double*>(w_cont.data_ptr()),
             static_cast<double*>(out->data_ptr()),
-            n_rows, d, eps
+            n_rows,
+            d,
+            eps
         );
     }
 

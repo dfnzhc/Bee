@@ -14,8 +14,12 @@
 
 namespace bee::simd
 {
-// 在 NT(non-temporal) 流式写之后，保证对其它核的可见性；
-// 仅对使用了 stream_* 的路径需要调用一次。
+// 提交非时序写入的存储栅栏。
+//
+// stream_* 系列写入会绕过常规缓存路径，处理器允许其在内存系统中延迟
+// 完成。调用方在一个连续批次的非时序写入结束后调用一次 sfence()，
+// 可保证这些写入在后续依赖读取或跨线程可见性检查前完成。未启用 SIMD
+// 后端时该函数为空操作。
 inline void sfence() noexcept
 {
 #if defined(BEE_SIMD_ENABLE_SSE2) || defined(BEE_SIMD_ENABLE_AVX2) || defined(BEE_SIMD_ENABLE_AVX512)

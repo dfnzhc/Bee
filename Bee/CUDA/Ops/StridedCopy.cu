@@ -1,8 +1,6 @@
 /**
  * @File Ops/StridedCopy.cu
  * @Brief 通用 strided copy kernel：将任意步长布局的源 tensor 物化为连续目标缓冲。
- *
- * ASCII-only: nvcc on Windows does not reliably accept non-ASCII sources.
  */
 
 #include "CUDA/Ops/OpsBridge.hpp"
@@ -13,7 +11,8 @@
 namespace
 {
 
-// Kernel: 每线程处理一个输出元素，从 src 的步长视图中读取并写入连续 dst。
+// 每个线程处理一个输出元素：先把线性输出下标还原为多维坐标，再按
+// strides 和 offset_elements 定位源 storage 中的元素。
 // args.shape/strides 以末尾维度最快（C-order）解码线性索引。
 // 最多支持 BEE_STRIDED_COPY_MAX_NDIM 维。
 

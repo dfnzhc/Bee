@@ -72,7 +72,7 @@ auto deallocate(void* p, std::size_t nbytes, std::size_t alignment) -> void;
 // 具体使用 CUTLASS、baseline tile 还是 Native(TMA+WMMA) 由 Bee::CUDA 后端决定。
 [[nodiscard]] auto matmul(int dt, const void* A, const void* B, void* C, std::size_t M, std::size_t K, std::size_t N) -> Result<void>;
 
-// 低精度 GEMM（Task 5）：dt 仅接受 F16=7 或 BF16=8；输出为 float（F32）。
+// 低精度 GEMM：dt 仅接受 F16=7 或 BF16=8；输出为 float（F32）。
 // C 指向 float 设备缓冲；调用方确保在 K==0 时 C 已清零。
 [[nodiscard]] auto matmul_lowp(int dt, const void* A, const void* B, float* C, std::size_t M, std::size_t K, std::size_t N) -> Result<void>;
 
@@ -98,21 +98,34 @@ auto deallocate(void* p, std::size_t nbytes, std::size_t alignment) -> void;
 // 整数区间 [low, high)；dtype ∈ {U8, I32, I64}。
 [[nodiscard]] auto random_int(int dt, void* dst, std::size_t n, std::int64_t low, std::int64_t high, std::uint64_t seed) -> Result<void>;
 
-// ── AI 基础原语（Task 4） ───────────────────────────────────────────────────
+// ── AI 基础原语 ────────────────────────────────────────────────────────────
 //
 // RMSNorm：rows×dim 连续缓冲归一化后乘 weight；dt ∈ {F32=4, F64=5}；eps > 0。
-[[nodiscard]] auto rms_norm(int dt, const void* x, const void* w, void* out,
-                            std::size_t rows, std::size_t dim, double eps) -> Result<void>;
+[[nodiscard]] auto rms_norm(int dt, const void* x, const void* w, void* out, std::size_t rows, std::size_t dim, double eps) -> Result<void>;
 
 // RoPE（split-half）：[n_batch, seq_len, dim] 布局；dim 为正偶数；base > 0。
-[[nodiscard]] auto rope(int dt, const void* x, void* out,
-                        std::size_t n_batch, std::size_t seq_len, std::size_t dim,
-                        double base, std::int64_t position_offset) -> Result<void>;
+[[nodiscard]] auto rope(
+    int          dt,
+    const void*  x,
+    void*        out,
+    std::size_t  n_batch,
+    std::size_t  seq_len,
+    std::size_t  dim,
+    double       base,
+    std::int64_t position_offset
+) -> Result<void>;
 
 // Embedding：weight_dt ∈ {F32, F64}；ids_dt ∈ {I32, I64}；越界 id 返回错误。
-[[nodiscard]] auto embedding(int weight_dt, int ids_dt,
-                             const void* weight, const void* ids, void* out,
-                             std::size_t n_ids, std::size_t hidden, std::size_t vocab) -> Result<void>;
+[[nodiscard]] auto embedding(
+    int         weight_dt,
+    int         ids_dt,
+    const void* weight,
+    const void* ids,
+    void*       out,
+    std::size_t n_ids,
+    std::size_t hidden,
+    std::size_t vocab
+) -> Result<void>;
 
 // 同步 CUDA 设备，等待所有待处理操作完成。
 // @return 成功时返回 void；失败时返回底层 CUDA 后端错误
@@ -132,7 +145,7 @@ auto deallocate(void* p, std::size_t nbytes, std::size_t alignment) -> void;
 [[nodiscard]] auto wait_event(void* event_handle, void* stream) -> Result<void>;
 
 // workspace 管理。
-// runtime-owned：返回的指针由 runtime 持有，调用方无需也不应 free。
+// runtime-owned：返回的指针由运行时持有，调用方无需也不应 free。
 // 容量足够时复用已有块（返回相同指针）；触发扩容时旧指针失效，
 // 调用方不得跨增长边界缓存旧 workspace 指针。
 [[nodiscard]] auto request_workspace(std::size_t nbytes, void* stream) -> Result<void*>;

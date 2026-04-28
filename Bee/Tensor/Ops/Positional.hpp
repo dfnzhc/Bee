@@ -15,9 +15,9 @@
 //   base            ：基数（默认 10000.0），须为有限正数（std::isfinite(base) && base > 0）；
 //   position_offset ：序列偏移（整数，通常为 0 或 KV cache 长度）；
 //
-// CUDA 过渡路径：
-//   当前仅有 CPU 原生实现。若输入在 CUDA 设备上，先迁移至 CPU 计算，
-//   再将结果迁移回原设备（同步语义）。
+// CUDA 路径：
+//   CUDA 输入会调用设备端 RoPE 后端；ctx 用于传递执行上下文，当前保持
+//   同步可见语义。
 
 #include "Base/Diagnostics/Error.hpp"
 #include "Tensor/Core/Tensor.hpp"
@@ -26,6 +26,7 @@
 namespace bee
 {
 
+// 返回应用 RoPE 后的新张量，输出 shape 与输入完全一致。
 [[nodiscard]] auto apply_rope(const Tensor& x, double base, int64_t position_offset, const tensor::cuda::ExecContext* ctx = nullptr)
     -> Result<Tensor>;
 

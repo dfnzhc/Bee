@@ -2,7 +2,7 @@
  * @File Core/Warp.cuh
  * @Author dfnzhc (https://github.com/dfnzhc)
  * @Date 2026/4/23
- * @Brief This file is part of Bee.
+ * @Brief CUDA warp 级并行原语。
  *
  * Warp 级（32 lane）并行原语集合。
  *

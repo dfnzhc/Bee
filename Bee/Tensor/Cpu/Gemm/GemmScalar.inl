@@ -2,7 +2,7 @@
  * @File Cpu/Gemm/GemmScalar.cpp
  * @Author dfnzhc (https://github.com/dfnzhc)
  * @Date 2026/4/23
- * @Brief This file is part of Bee.
+ * @Brief CPU GEMM 标量兜底实现。
  *
  * 标量兜底 GEMM：朴素 i-k-j 三重循环 + 分块，不依赖任何 SIMD。
  * 对非 SSE2 机器以及单元测试基线提供可参考实现。

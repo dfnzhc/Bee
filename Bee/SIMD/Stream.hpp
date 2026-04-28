@@ -1,14 +1,16 @@
 /**
  * @File Stream.hpp
- * @Brief Non-temporal (streaming) store 原语。
+ * @Brief 非时序流式写入原语。
  *
- * 设计动机：当输出缓冲区明显超过 LLC（通常 ≥ L2 的若干倍）时，用 NT-store
- * 跳过读 for-ownership 与缓存占用，是 ElementWise/Copy 等带宽敏感算子的
- * 标准加速手段。NT-store 要求指针按 SIMD 寄存器宽度对齐。
+ * 设计动机：当输出缓冲区明显超过末级缓存容量时，使用非时序写入可以
+ * 避免读所有权事务和缓存污染，适合 ElementWise、Copy 等主要受内存带宽
+ * 限制的算子。该优化只改变写入路径，不改变内存内容或异常语义。
  *
  * 使用规范：
- *   1. 只在 (p % register_size == 0) 时调用；否则退化到 storeu。
- *   2. 一个批次的 NT-store 结束后需调用 simd::sfence() 一次。
+ *   1. 只在指针按寄存器宽度对齐时调用对应特化；未满足对齐要求时应使用
+ *      storeu 或默认回退实现。
+ *   2. 一个连续批次的非时序写入结束后需调用 simd::sfence() 一次，确保
+ *      后续读取或跨线程观察前写入已经提交。
  */
 
 #pragma once
@@ -24,7 +26,8 @@
 namespace bee::simd
 {
 
-// 默认回退：对无 NT 支持的 (T, ISA) 组合，使用普通 storeu 行为。
+// 默认回退：对无非时序写入特化的 (T, ISA) 组合，使用普通非对齐写入。
+// 该路径优先保证正确性，性能特征与对应后端的 storeu 相同。
 template <typename T, typename ISA>
 inline void simd_stream(T* p, typename SimdBackend<T, ISA>::reg v) noexcept
 {

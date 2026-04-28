@@ -2,7 +2,7 @@
  * @File Cpu/Gemm/GemmDispatch.hpp
  * @Author dfnzhc (https://github.com/dfnzhc)
  * @Date 2026/4/23
- * @Brief This file is part of Bee.
+ * @Brief CPU GEMM 运行时分派入口声明。
  *
  * 四个类型 × 三个 ISA 的 GEMM 入口函数声明。
  * 行主序，C += A·B（调用者负责 C 的初始化 / 清零）。

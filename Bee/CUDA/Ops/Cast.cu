@@ -1,10 +1,10 @@
 /**
  * @File Ops/Cast.cu
  * @Author dfnzhc (https://github.com/dfnzhc)
- * @Brief dtype conversion kernel with (src_dt, dst_dt) dispatch.
+ * @Brief 按 (src_dt, dst_dt) 分派的 dtype 转换内核。
  *
- * ASCII-only TU. Assumes contiguous device buffers of equal element count.
- * Bool values are normalized to 0/1 when used as destination.
+ * 输入与输出均为连续设备缓冲，元素数量相同。目标 dtype 为 Bool 时会把
+ * 任意非零输入归一化为 1。
  */
 
 #include "CUDA/Ops/OpsBridge.hpp"

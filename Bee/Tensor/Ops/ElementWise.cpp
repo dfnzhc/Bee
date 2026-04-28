@@ -73,9 +73,9 @@ namespace
     {
         if (dt == DType::I32 || dt == DType::I64 || dt == DType::F32 || dt == DType::F64)
             return {};
-        return std::unexpected(
-            make_error(std::format("{} 仅支持 DType::I32 / DType::I64 / DType::F32 / DType::F64，当前 dtype 为 {}", op, enum_to_name(dt)), Severity::Recoverable)
-        );
+        return std::unexpected(make_error(
+            std::format("{} 仅支持 DType::I32 / DType::I64 / DType::F32 / DType::F64，当前 dtype 为 {}", op, enum_to_name(dt)), Severity::Recoverable
+        ));
     }
 
     // 运行期分派到 ISA 特化 namespace
@@ -137,21 +137,11 @@ namespace
     auto dispatch_relu_cpu(const Tensor& a, Tensor& out) -> void
     {
         switch (out.dtype()) {
-        case DType::I32:
-            dispatch_unary_cpu_local_typed<int32_t>(a, out, [](int32_t v) noexcept -> int32_t { return v < 0 ? 0 : v; });
-            return;
-        case DType::I64:
-            dispatch_unary_cpu_local_typed<int64_t>(a, out, [](int64_t v) noexcept -> int64_t { return v < 0 ? 0 : v; });
-            return;
-        case DType::F32:
-            dispatch_unary_cpu_local_typed<float>(a, out, [](float v) noexcept -> float { return v < 0.0f ? 0.0f : v; });
-            return;
-        case DType::F64:
-            dispatch_unary_cpu_local_typed<double>(a, out, [](double v) noexcept -> double { return v < 0.0 ? 0.0 : v; });
-            return;
-        default:
-            BEE_CHECK_MSG(false, "dispatch_relu_cpu: unexpected dtype");
-            return;
+        case DType::I32: dispatch_unary_cpu_local_typed<int32_t>(a, out, [](int32_t v) noexcept -> int32_t { return v < 0 ? 0 : v; }); return;
+        case DType::I64: dispatch_unary_cpu_local_typed<int64_t>(a, out, [](int64_t v) noexcept -> int64_t { return v < 0 ? 0 : v; }); return;
+        case DType::F32: dispatch_unary_cpu_local_typed<float>(a, out, [](float v) noexcept -> float { return v < 0.0f ? 0.0f : v; }); return;
+        case DType::F64: dispatch_unary_cpu_local_typed<double>(a, out, [](double v) noexcept -> double { return v < 0.0 ? 0.0 : v; }); return;
+        default: BEE_CHECK_MSG(false, "dispatch_relu_cpu: unexpected dtype"); return;
         }
     }
 
@@ -174,9 +164,7 @@ namespace
                 return ev / (1.0 + ev);
             });
             return;
-        default:
-            BEE_CHECK_MSG(false, "dispatch_sigmoid_cpu: unexpected dtype");
-            return;
+        default: BEE_CHECK_MSG(false, "dispatch_sigmoid_cpu: unexpected dtype"); return;
         }
     }
 

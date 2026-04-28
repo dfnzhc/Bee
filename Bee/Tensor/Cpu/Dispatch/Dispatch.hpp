@@ -39,9 +39,9 @@ namespace bee::cpu
         auto mm_i32(std::int64_t M, std::int64_t K, std::int64_t N, const std::int32_t* A, const std::int32_t* B, std::int32_t* C) -> void; \
         auto mm_i64(std::int64_t M, std::int64_t K, std::int64_t N, const std::int64_t* A, const std::int64_t* B, std::int64_t* C) -> void; \
         auto mm_i8(std::int64_t M, std::int64_t K, std::int64_t N, const std::int8_t* A, const std::int8_t* B, std::int32_t* C) -> void;    \
-        /* Cast（B11）*/                                                                                                                    \
+        /* dtype 转换 */                                                                                                                    \
         auto ct_cast(::bee::DType src_dt, ::bee::DType dst_dt, const void* src, void* dst, std::int64_t n) -> void;                         \
-        /* 2D strided→contiguous 拷贝（B11 transpose 物化）*/                                                                               \
+        /* 2D strided→contiguous 拷贝 */                                                                                                    \
         auto tr_copy_2d(                                                                                                                    \
             const void*  src,                                                                                                               \
             void*        dst,                                                                                                               \

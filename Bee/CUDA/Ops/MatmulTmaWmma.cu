@@ -6,7 +6,8 @@
  * 本文件只负责当前 Native 后端中依赖 TensorMap/TMA 的专用路径：
  * - 设备侧使用 `ArchDispatch.cuh` 的能力宏裁剪 Blackwell 专属代码；
  * - host 侧在当前设备不满足要求时返回明确错误；
- * - 对 sm_89 等缺少 TMA 的设备暂不补实现，只保留 TODO 说明原因。
+ * - 对 sm_89 等缺少 TMA 的设备返回 cudaErrorNotSupported，由上层选择
+ *   其它 matmul 后端。
  */
 
 #include "CUDA/Core/ArchDispatch.cuh"
@@ -146,7 +147,7 @@ namespace
             }
         }
 
-        // 主循环：等待当前 stage 完成，然后执行对应 K 分块的 WMMA 累加。
+        // 主循环：等待当前流水阶段完成，然后执行对应 K 分块的 WMMA 累加。
         for (int kt = 0; kt < K_TILES; ++kt) {
             const int stage = kt % STAGES;
 
@@ -256,8 +257,8 @@ namespace
 int ops_matmul_f32_tma_wmma(const void* A, const void* B, void* C, std::size_t M, std::size_t K, std::size_t N, cudaStream_t stream) noexcept
 {
     if (!current_device_supports_native_tma_wmma()) {
-        // TODO(df): Ada(sm_89) 缺少当前实现依赖的 TensorMap/TMA 搬运能力。
-        // 后续若补 Ada 专用 Native kernel，应在此处按能力继续细分。
+        // 当前 Native 后端依赖 TensorMap/TMA 搬运能力；缺少该能力的设备
+        // 应使用 Auto/Wmma/Cutlass 等其它 matmul 后端。
         return static_cast<int>(cudaErrorNotSupported);
     }
 

@@ -1,15 +1,15 @@
 /**
  * @File Ops/ElementWise.cu
  * @Author dfnzhc (https://github.com/dfnzhc)
- * @Brief Element-wise binary / unary kernels and integer-returning dispatch.
+ * @Brief CUDA 元素级二元和一元算子内核。
  *
- * ASCII-only TU compiled by nvcc. Kernels assume contiguous inputs/outputs
- * with identical shapes; broadcasting / stride handling stays on the host
- * side (Tensor layer performs contiguous() before entering these paths).
+ * 内核假定输入与输出都是连续设备缓冲，且形状完全一致。广播与 stride
+ * 处理属于 Tensor 层职责；进入这些路径前应已经完成 contiguous() 或
+ * 形状校验。
  *
- * Default block size = 256, one thread per element. Host dispatch reads
- * the per-thread default stream and synchronizes before returning, so the
- * API is observationally synchronous (plan-cuda section 5).
+ * 默认每个 block 使用 256 个线程，每个线程处理一个或一组连续元素。
+ * Host 分派使用 per-thread default stream，并在返回前同步，因此公共 API
+ * 对调用方呈现同步可见语义。
  */
 
 #include "CUDA/Ops/OpsBridge.hpp"
@@ -24,7 +24,7 @@
 namespace
 {
 
-// ScalarType mirror of bee::cuda::ScalarType.
+// bee::cuda::ScalarType 的设备侧镜像编码。
 constexpr int kDtBool = 0;
 constexpr int kDtU8   = 1;
 constexpr int kDtI32  = 2;
@@ -32,13 +32,13 @@ constexpr int kDtI64  = 3;
 constexpr int kDtF32  = 4;
 constexpr int kDtF64  = 5;
 
-// BinaryOp values.
+// BinaryOp 的设备侧镜像编码。
 constexpr int kBinAdd = 0;
 constexpr int kBinSub = 1;
 constexpr int kBinMul = 2;
 constexpr int kBinDiv = 3;
 
-// UnaryOp values.
+// UnaryOp 的设备侧镜像编码。
 constexpr int kUnNeg  = 0;
 constexpr int kUnAbs  = 1;
 constexpr int kUnSqrt = 2;
@@ -221,7 +221,7 @@ __global__ void unary_kernel(const T* __restrict__ a, T* __restrict__ out, std::
     }
 }
 
-// Specialization: float path uses 32-bit math intrinsics.
+// float 特化路径使用 32-bit 数学 intrinsic，避免提升到 double 后再截断。
 template <int OP>
 __global__ void unary_kernel_f32(const float* __restrict__ a, float* __restrict__ out, std::size_t n)
 {

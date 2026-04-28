@@ -31,21 +31,14 @@ constexpr std::size_t kMaxGridX = 2147483647ull;
 // blockDim.x 固定为 256，通过 stride 循环处理 dim > 256 的情况。
 
 template <typename T>
-__global__ void rms_norm_kernel(
-    const T* __restrict__ x,
-    const T* __restrict__ w,
-    T* __restrict__       out,
-    std::size_t           rows,
-    std::size_t           dim,
-    double                eps
-)
+__global__ void rms_norm_kernel(const T* __restrict__ x, const T* __restrict__ w, T* __restrict__ out, std::size_t rows, std::size_t dim, double eps)
 {
     // 每个 block 处理行 blockIdx.x
     const std::size_t row = static_cast<std::size_t>(blockIdx.x);
     if (row >= rows)
         return;
 
-    const T* x_row = x   + row * dim;
+    const T* x_row = x + row * dim;
     T*       o_row = out + row * dim;
 
     // 共享内存用于块内 double 规约（调用方负责传入 blockDim.x * sizeof(double) 字节）
@@ -80,24 +73,14 @@ __global__ void rms_norm_kernel(
 }
 
 template <typename T>
-auto launch_rms_norm(
-    const void*  x,
-    const void*  w,
-    void*        out,
-    std::size_t  rows,
-    std::size_t  dim,
-    double       eps,
-    cudaStream_t stream
-) -> int
+auto launch_rms_norm(const void* x, const void* w, void* out, std::size_t rows, std::size_t dim, double eps, cudaStream_t stream) -> int
 {
     // blockDim 固定为 256（2 的幂次，stride 循环覆盖任意 dim）
     constexpr unsigned block = 256u;
     const std::size_t  smem  = block * sizeof(double);
     const unsigned     grid  = static_cast<unsigned>(rows);
 
-    rms_norm_kernel<T><<<grid, block, smem, stream>>>(
-        static_cast<const T*>(x), static_cast<const T*>(w), static_cast<T*>(out), rows, dim, eps
-    );
+    rms_norm_kernel<T><<<grid, block, smem, stream>>>(static_cast<const T*>(x), static_cast<const T*>(w), static_cast<T*>(out), rows, dim, eps);
     return static_cast<int>(cudaGetLastError());
 }
 
@@ -110,12 +93,12 @@ auto launch_rms_norm(
 template <typename T>
 __global__ void rope_kernel(
     const T* __restrict__ x,
-    T* __restrict__       out,
-    std::size_t           n_batch,
-    std::size_t           seq_len,
-    std::size_t           dim,
-    double                base,
-    std::int64_t          position_offset
+    T* __restrict__ out,
+    std::size_t  n_batch,
+    std::size_t  seq_len,
+    std::size_t  dim,
+    double       base,
+    std::int64_t position_offset
 )
 {
     const std::size_t half_dim    = dim >> 1u;
@@ -142,7 +125,7 @@ __global__ void rope_kernel(
     const double      x1         = static_cast<double>(x[row_offset + pair_i + half_dim]);
 
     // 旋转变换：(x0, x1) → (x0·cos - x1·sin, x0·sin + x1·cos)
-    out[row_offset + pair_i]           = static_cast<T>(x0 * cos_t - x1 * sin_t);
+    out[row_offset + pair_i]            = static_cast<T>(x0 * cos_t - x1 * sin_t);
     out[row_offset + pair_i + half_dim] = static_cast<T>(x0 * sin_t + x1 * cos_t);
 }
 
@@ -163,9 +146,7 @@ auto launch_rope(
     const unsigned    block       = bee::cuda::kDefaultBlockSize;
     const unsigned    grid        = bee::cuda::compute_grid_1d(total_pairs, block);
 
-    rope_kernel<T><<<grid, block, 0, stream>>>(
-        static_cast<const T*>(x), static_cast<T*>(out), n_batch, seq_len, dim, base, position_offset
-    );
+    rope_kernel<T><<<grid, block, 0, stream>>>(static_cast<const T*>(x), static_cast<T*>(out), n_batch, seq_len, dim, base, position_offset);
     return static_cast<int>(cudaGetLastError());
 }
 
@@ -176,13 +157,13 @@ auto launch_rope(
 
 template <typename T, typename IdT>
 __global__ void embedding_kernel(
-    const T* __restrict__   weight,
+    const T* __restrict__ weight,
     const IdT* __restrict__ ids,
-    T* __restrict__         out,
-    std::size_t             n_ids,
-    std::size_t             hidden,
-    std::int64_t            vocab,
-    int* __restrict__       error_flag
+    T* __restrict__ out,
+    std::size_t  n_ids,
+    std::size_t  hidden,
+    std::int64_t vocab,
+    int* __restrict__ error_flag
 )
 {
     const std::size_t tid = static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
@@ -214,7 +195,7 @@ auto launch_embedding_typed(
 ) -> int
 {
     // 分配设备侧越界标志（单个 int）
-    int*        d_flag   = nullptr;
+    int*        d_flag    = nullptr;
     cudaError_t alloc_err = cudaMalloc(&d_flag, sizeof(int));
     if (alloc_err != cudaSuccess)
         return static_cast<int>(alloc_err);
@@ -231,13 +212,7 @@ auto launch_embedding_typed(
     const unsigned    grid  = bee::cuda::compute_grid_1d(total, block);
 
     embedding_kernel<T, IdT><<<grid, block, 0, stream>>>(
-        static_cast<const T*>(weight),
-        static_cast<const IdT*>(ids),
-        static_cast<T*>(out),
-        n_ids,
-        hidden,
-        static_cast<std::int64_t>(vocab),
-        d_flag
+        static_cast<const T*>(weight), static_cast<const IdT*>(ids), static_cast<T*>(out), n_ids, hidden, static_cast<std::int64_t>(vocab), d_flag
     );
 
     // 检查启动错误
@@ -267,15 +242,14 @@ auto launch_embedding_typed(
     return 0;
 }
 
-} // 匿名命名空间
+} // namespace
 
 namespace bee::cuda::detail
 {
 
 // ─── ops_rms_norm ─────────────────────────────────────────────────────────────
 
-int ops_rms_norm(int dt, const void* x, const void* w, void* out,
-                 std::size_t rows, std::size_t dim, double eps) noexcept
+int ops_rms_norm(int dt, const void* x, const void* w, void* out, std::size_t rows, std::size_t dim, double eps) noexcept
 {
     if (!x || !w || !out || rows == 0 || dim == 0 || !std::isfinite(eps) || eps <= 0.0)
         return static_cast<int>(cudaErrorInvalidValue);
@@ -286,9 +260,9 @@ int ops_rms_norm(int dt, const void* x, const void* w, void* out,
     int          err    = 0;
 
     switch (dt) {
-    case kDtF32: err = launch_rms_norm<float> (x, w, out, rows, dim, eps, stream); break;
+    case kDtF32: err = launch_rms_norm<float>(x, w, out, rows, dim, eps, stream); break;
     case kDtF64: err = launch_rms_norm<double>(x, w, out, rows, dim, eps, stream); break;
-    default:     return static_cast<int>(cudaErrorInvalidValue);
+    default: return static_cast<int>(cudaErrorInvalidValue);
     }
 
     if (err != 0)
@@ -298,9 +272,16 @@ int ops_rms_norm(int dt, const void* x, const void* w, void* out,
 
 // ─── ops_rope ─────────────────────────────────────────────────────────────────
 
-int ops_rope(int dt, const void* x, void* out,
-             std::size_t n_batch, std::size_t seq_len, std::size_t dim,
-             double base, std::int64_t position_offset) noexcept
+int ops_rope(
+    int          dt,
+    const void*  x,
+    void*        out,
+    std::size_t  n_batch,
+    std::size_t  seq_len,
+    std::size_t  dim,
+    double       base,
+    std::int64_t position_offset
+) noexcept
 {
     if (!x || !out || n_batch == 0 || seq_len == 0 || dim == 0 || dim % 2 != 0)
         return static_cast<int>(cudaErrorInvalidValue);
@@ -311,9 +292,9 @@ int ops_rope(int dt, const void* x, void* out,
     int          err    = 0;
 
     switch (dt) {
-    case kDtF32: err = launch_rope<float> (x, out, n_batch, seq_len, dim, base, position_offset, stream); break;
+    case kDtF32: err = launch_rope<float>(x, out, n_batch, seq_len, dim, base, position_offset, stream); break;
     case kDtF64: err = launch_rope<double>(x, out, n_batch, seq_len, dim, base, position_offset, stream); break;
-    default:     return static_cast<int>(cudaErrorInvalidValue);
+    default: return static_cast<int>(cudaErrorInvalidValue);
     }
 
     if (err != 0)
@@ -323,9 +304,16 @@ int ops_rope(int dt, const void* x, void* out,
 
 // ─── ops_embedding ────────────────────────────────────────────────────────────
 
-int ops_embedding(int weight_dt, int ids_dt,
-                  const void* weight, const void* ids, void* out,
-                  std::size_t n_ids, std::size_t hidden, std::size_t vocab) noexcept
+int ops_embedding(
+    int         weight_dt,
+    int         ids_dt,
+    const void* weight,
+    const void* ids,
+    void*       out,
+    std::size_t n_ids,
+    std::size_t hidden,
+    std::size_t vocab
+) noexcept
 {
     if (!weight || !ids || !out || n_ids == 0 || hidden == 0 || vocab == 0)
         return static_cast<int>(cudaErrorInvalidValue);
@@ -334,9 +322,9 @@ int ops_embedding(int weight_dt, int ids_dt,
 
     // 按 weight_dt × ids_dt 组合分派（launch_embedding_typed 内部含同步）
     if (weight_dt == kDtF32 && ids_dt == kDtI32)
-        return launch_embedding_typed<float,  std::int32_t>(weight, ids, out, n_ids, hidden, vocab, stream);
+        return launch_embedding_typed<float, std::int32_t>(weight, ids, out, n_ids, hidden, vocab, stream);
     if (weight_dt == kDtF32 && ids_dt == kDtI64)
-        return launch_embedding_typed<float,  std::int64_t>(weight, ids, out, n_ids, hidden, vocab, stream);
+        return launch_embedding_typed<float, std::int64_t>(weight, ids, out, n_ids, hidden, vocab, stream);
     if (weight_dt == kDtF64 && ids_dt == kDtI32)
         return launch_embedding_typed<double, std::int32_t>(weight, ids, out, n_ids, hidden, vocab, stream);
     if (weight_dt == kDtF64 && ids_dt == kDtI64)

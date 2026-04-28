@@ -21,7 +21,11 @@ namespace tensor::cuda
     struct ExecContext;
 }
 
-// 用户面向的 Tensor 外壳：值语义，内部通过 shared_ptr<TensorImpl> 共享数据
+// 用户面向的 Tensor 外壳。
+//
+// Tensor 采用值语义，拷贝 Tensor 只复制 shared_ptr<TensorImpl>，不会复制
+// 数据。形状变换优先生成共享 storage 的视图；只有 clone、contiguous 或
+// 设备迁移等接口会分配新的 storage。
 class Tensor
 {
 public:
@@ -72,14 +76,14 @@ public:
     [[nodiscard]] auto to(Device target) const -> Result<Tensor>;
 
     // 带执行上下文的设备迁移。
-    // 注意：当前实现仍保持同步可观察语义（内部调用 synchronize()）。
-    // ExecContext 目前主要用于传递 stream，为后续真正异步 overlap 扩展预留，
-    // 调用方不应假定该 API 已提供异步 overlap 语义。
+    // 注意：当前实现仍保持同步可观察语义。ExecContext 用于传递 CUDA
+    // stream 与 workspace 约定；调用方不应假定该 API 已提供异步 overlap
+    // 语义。
     [[nodiscard]] auto to(Device target, const bee::tensor::cuda::ExecContext* exec_context) const -> Result<Tensor>;
 
     // ── 视图与形状变换（零拷贝，除非另行说明）──────────────────────────────
 
-    // 返回新形状的视图；要求当前张量 contiguous；支持一个 -1 占位推断
+    // 返回新形状的视图；要求当前张量 contiguous；支持一个 -1 占位推断。
     [[nodiscard]] auto view(Shape new_shape) const -> Result<Tensor>;
 
     // 重塑形状；非 contiguous 时先物化为 contiguous，再返回新的连续视图
@@ -87,7 +91,7 @@ public:
 
     // 返回连续布局张量；若已连续则共享 storage，否则重新排列数据。
     // CUDA 设备：使用通用 strided_copy kernel 在设备端完成，不再回退到 CPU。
-    // ctx 非空时可传入执行上下文（当前实现同步可见语义，ctx 保留供后续异步扩展）。
+    // ctx 非空时可传入执行上下文；当前实现仍保持同步可见语义。
     [[nodiscard]] auto contiguous(const tensor::cuda::ExecContext* ctx = nullptr) const -> Result<Tensor>;
 
     // 维度排列；dims 为 {0..ndim-1} 的一个排列

@@ -96,7 +96,7 @@ auto cast(const Tensor& src, DType dst_dtype, const tensor::cuda::ExecContext* c
         }
     }
 
-    // CPU 路径：通过运行期 ISA 分派进入 B11 的 SIMD + parallel_for cast 内核。
+    // CPU 路径：通过运行期 ISA 分派进入 SIMD + parallel_for cast 内核。
     BEE_RT_DISPATCH_STMT(ct_cast, cont.dtype(), dst_dtype, cont.data_ptr(), out.data_ptr(), cont.numel());
 
     return out;

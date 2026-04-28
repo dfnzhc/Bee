@@ -2,7 +2,7 @@
  * @File Cpu/Gemm/GemmCommon.hpp
  * @Author dfnzhc (https://github.com/dfnzhc)
  * @Date 2026/4/23
- * @Brief This file is part of Bee.
+ * @Brief CPU GEMM 共用常量、对齐分配与预取辅助。
  *
  * GEMM 内核共用的分块常量、对齐分配、软件预取宏。
  *

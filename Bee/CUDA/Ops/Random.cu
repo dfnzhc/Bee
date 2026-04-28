@@ -37,7 +37,7 @@ constexpr int kDtF64  = 5;
 
 constexpr std::uint32_t kPhiloxM0 = 0xD2511F53u;
 constexpr std::uint32_t kPhiloxM1 = 0xCD9E8D57u;
-constexpr std::uint32_t kPhiloxW0 = 0x9E3779B9u; // Weyl 常量，key bump
+constexpr std::uint32_t kPhiloxW0 = 0x9E3779B9u; // Weyl 常量，用于更新 key
 constexpr std::uint32_t kPhiloxW1 = 0xBB67AE85u;
 
 struct U32x4

@@ -2,7 +2,7 @@
 
 // Random 初始化算子自由函数声明：rand / randn / randint
 // CPU 路径基于 std::mt19937_64；CUDA 路径使用设备侧 Philox。
-// seed==0 时使用 std::random_device 生成随机种子。
+// seed==0 时使用随机种子；非零 seed 保证同一后端上的确定性序列。
 
 #include "Base/Diagnostics/Error.hpp"
 #include "Base/Memory/Device.hpp"
@@ -13,14 +13,14 @@
 namespace bee
 {
 
-// 均匀分布 [0, 1)；dtype 仅支持 F32/F64，其他返回 Err
+// 均匀分布 [0, 1)；dtype 仅支持 F32/F64，其他类型返回可恢复错误。
 [[nodiscard]] auto rand(Shape shape, DType dtype = DType::F32, uint64_t seed = 0, Device device = Device::CPU) -> Result<Tensor>;
 
-// 标准正态分布 N(0, 1)；dtype 仅支持 F32/F64，其他返回 Err
+// 标准正态分布 N(0, 1)；dtype 仅支持 F32/F64，其他类型返回可恢复错误。
 [[nodiscard]] auto randn(Shape shape, DType dtype = DType::F32, uint64_t seed = 0, Device device = Device::CPU) -> Result<Tensor>;
 
 // 离散均匀分布 [low, high)；dtype 支持 I32/I64/U8（U8 要求 low >= 0）；
-// low >= high 或 dtype 不合法时返回 Err
+// low >= high 或 dtype 不合法时返回可恢复错误。
 [[nodiscard]] auto randint(int64_t low, int64_t high, Shape shape, DType dtype = DType::I64, uint64_t seed = 0, Device device = Device::CPU)
     -> Result<Tensor>;
 

@@ -9,9 +9,9 @@
 //   越界 id   ：返回 Recoverable 错误；
 //   设备约束  ：weight 与 token_ids 须在同一设备；输出与输入同设备。
 //
-// CUDA 过渡路径：
-//   当前仅有 CPU 原生实现。若两者均在 CUDA 设备上，
-//   函数会先将其迁移至 CPU 完成计算，再将结果迁移回 CUDA（同步语义）。
+// CUDA 路径：
+//   当 weight 与 token_ids 均位于 CUDA 设备时，调用设备端 Embedding 后端；
+//   ctx 用于传递执行上下文，当前保持同步可见语义。
 
 #include "Base/Diagnostics/Error.hpp"
 #include "Tensor/Core/Tensor.hpp"
@@ -20,6 +20,7 @@
 namespace bee
 {
 
+// 返回 token_ids.shape + [hidden] 形状的新张量。
 [[nodiscard]] auto embedding(const Tensor& weight, const Tensor& token_ids, const tensor::cuda::ExecContext* ctx = nullptr) -> Result<Tensor>;
 
 } // namespace bee

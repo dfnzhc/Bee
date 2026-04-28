@@ -1,7 +1,7 @@
 #pragma once
 
-// CPU 元素级算子内核：fast-path（连续 SIMD）与 slow-path（广播 stride 迭代）
-// B2：大规模连续路径支持 parallel_for + non-temporal store。
+// CPU 元素级算子内核：快速路径处理连续 SIMD，慢速路径处理广播 stride 迭代。
+// 大规模连续输出支持 parallel_for 与非时序写入，以降低缓存污染。
 
 #include "Tensor/Core/DType.hpp"
 #include "Tensor/Core/Shape.hpp"
@@ -499,7 +499,7 @@ struct OpLog
 // 连续线性 fast-path
 // ─────────────────────────────────────────────────────────────────────────────
 
-// B2 阈值：大于该字节数的输出使用 NT-store 绕过 LLC（优于 RMW 写入）。
+// 非时序写入阈值：大于该字节数的输出使用 NT-store 绕过 LLC。
 // 13700k：P-core L2 = 2MB；对 a+b→out 三缓冲总量超过 ~6MB 时 NT 更优。
 inline constexpr int64_t kStreamBytesThreshold = 4 * 1024 * 1024;
 // parallel_for grain：以 128 KB 连续子区间为一块（对 F32 = 32K 元素）。

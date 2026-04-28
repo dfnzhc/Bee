@@ -1,11 +1,10 @@
 /**
  * @File Ops/OpsBridge.hpp
  * @Author dfnzhc (https://github.com/dfnzhc)
- * @Brief ASCII-only int-returning bridges for element-wise / cast kernels.
+ * @Brief CUDA 算子内核与 host API 之间的 int 错误码桥接声明。
  *
- * Consumed by both Api.cpp (MSVC, Result-wrapping) and Ops/xx.cu (nvcc).
- * All parameters are raw pointers to device-contiguous buffers; n is the
- * number of elements.
+ * 本头同时被 Api.cpp 与 Ops/*.cu 包含。所有指针参数都指向连续设备缓冲；
+ * 函数返回 cudaError_t 的整数编码，Api.cpp 负责把它包装为 Bee::Result。
  */
 
 #pragma once
@@ -16,8 +15,8 @@
 namespace bee::cuda::detail
 {
 
-// ScalarType / BinaryOp / UnaryOp values must mirror the enums in Api.hpp.
-// They are passed as plain ints to keep this header nvcc-friendly.
+// ScalarType / BinaryOp / UnaryOp 的整数值必须与 Api.hpp 中的枚举保持一致。
+// 使用 int 传参可以让 .cu 内核入口保持简单的 C 风格 ABI。
 
 int ops_binary(int op, int dt, const void* a, const void* b, void* out, std::size_t n) noexcept;
 int ops_unary(int op, int dt, const void* a, void* out, std::size_t n) noexcept;
@@ -34,10 +33,11 @@ int ops_scale_fp(int dt, void* buf, double factor, std::size_t n) noexcept;
 
 // 2D tiled-shared matmul：C[M,N] = A[M,K] * B[K,N]；A/B/C 同 dtype、均连续。
 int ops_matmul(int dt, const void* A, const void* B, void* C, std::size_t M, std::size_t K, std::size_t N) noexcept;
-// B10：手写 TMA + WMMA TF32 GEMM 显式入口（仅 F32，要求 M%128==N%128==K%32==0、16B 对齐）。
+// 手写 TMA + WMMA TF32 GEMM 显式入口；仅支持 F32，要求 M%128==0、
+// N%128==0、K%32==0 且 A/B/C 至少 16B 对齐。
 int ops_matmul_force_tma_wmma(int dt, const void* A, const void* B, void* C, std::size_t M, std::size_t K, std::size_t N) noexcept;
 
-// 低精度 GEMM（Task 5）：读取 F16（dt=7）或 BF16（dt=8）输入，以 float 累加，输出 float。
+// 低精度 GEMM：读取 F16（dt=7）或 BF16（dt=8）输入，以 float 累加，输出 float。
 // C 指向 float 设备缓冲（M×N 个 float）；A/B 指向对应低精度存储缓冲。
 // 不支持的 dt 或有效尺寸下的空指针返回 cudaErrorInvalidValue。
 // K==0 时函数直接返回成功且不写 C；调用方须保证 C 已预清零。
@@ -59,12 +59,12 @@ int ops_strided_copy(
     std::size_t    numel
 ) noexcept;
 
-// 设备侧 Philox4x32-10 随机数（B7）。
+// 设备侧 Philox4x32-10 随机数。
 int ops_random_uniform(int dt, void* dst, std::size_t n, std::uint64_t seed) noexcept;
 int ops_random_normal(int dt, void* dst, std::size_t n, std::uint64_t seed) noexcept;
 int ops_random_int(int dt, void* dst, std::size_t n, std::int64_t low, std::int64_t high, std::uint64_t seed) noexcept;
 
-// ── AI 基础原语（Task 4） ──────────────────────────────────────────────────────
+// ── AI 基础原语 ──────────────────────────────────────────────────────────────
 //
 // RMSNorm：y[r,i] = x[r,i] / sqrt(mean(x[r]^2) + eps) * w[i]
 // 输入/输出均为连续设备内存；rows × dim 布局；dt 仅支持 F32/F64。
@@ -72,14 +72,28 @@ int ops_rms_norm(int dt, const void* x, const void* w, void* out, std::size_t ro
 
 // RoPE：split-half 配对旋转位置编码
 // 输入布局：[n_batch, seq_len, dim]；dt 仅支持 F32/F64；dim 须为偶数。
-int ops_rope(int dt, const void* x, void* out,
-             std::size_t n_batch, std::size_t seq_len, std::size_t dim,
-             double base, std::int64_t position_offset) noexcept;
+int ops_rope(
+    int          dt,
+    const void*  x,
+    void*        out,
+    std::size_t  n_batch,
+    std::size_t  seq_len,
+    std::size_t  dim,
+    double       base,
+    std::int64_t position_offset
+) noexcept;
 
 // Embedding：按 ids 行取 weight；越界 id 在设备侧检测并返回 cudaErrorInvalidValue。
 // weight_dt 仅 F32/F64；ids_dt 仅 I32/I64；vocab 须 > 0。
-int ops_embedding(int weight_dt, int ids_dt,
-                  const void* weight, const void* ids, void* out,
-                  std::size_t n_ids, std::size_t hidden, std::size_t vocab) noexcept;
+int ops_embedding(
+    int         weight_dt,
+    int         ids_dt,
+    const void* weight,
+    const void* ids,
+    void*       out,
+    std::size_t n_ids,
+    std::size_t hidden,
+    std::size_t vocab
+) noexcept;
 
 } // namespace bee::cuda::detail

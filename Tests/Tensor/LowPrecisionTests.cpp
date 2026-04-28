@@ -431,13 +431,15 @@ TEST(LowPrecisionTests, CudaF16MatmulReturnsF32)
     auto a_cpu = bee::Tensor::zeros({2, 3}, bee::DType::F32).value();
     {
         auto* p = static_cast<float*>(a_cpu.data_ptr());
-        for (int i = 0; i < 6; ++i) p[i] = static_cast<float>(i);
+        for (int i = 0; i < 6; ++i)
+            p[i] = static_cast<float>(i);
     }
     // B = [[0,1],[2,3],[4,5]]（arange 0..5，reshape [3,2]）
     auto b_cpu = bee::Tensor::zeros({3, 2}, bee::DType::F32).value();
     {
         auto* p = static_cast<float*>(b_cpu.data_ptr());
-        for (int i = 0; i < 6; ++i) p[i] = static_cast<float>(i);
+        for (int i = 0; i < 6; ++i)
+            p[i] = static_cast<float>(i);
     }
 
     // 上传到 CUDA 并 cast 为 F16
@@ -455,8 +457,8 @@ TEST(LowPrecisionTests, CudaF16MatmulReturnsF32)
     EXPECT_EQ(result.shape(), (bee::Shape{2, 2}));
 
     // 搬回 CPU 验证值：C = [[10,13],[28,40]]
-    auto result_cpu = result.to(bee::Device::CPU).value();
-    const auto* p = static_cast<const float*>(result_cpu.data_ptr());
+    auto        result_cpu = result.to(bee::Device::CPU).value();
+    const auto* p          = static_cast<const float*>(result_cpu.data_ptr());
     EXPECT_NEAR(p[0], 10.0f, 1e-2f);
     EXPECT_NEAR(p[1], 13.0f, 1e-2f);
     EXPECT_NEAR(p[2], 28.0f, 1e-2f);
@@ -472,12 +474,14 @@ TEST(LowPrecisionTests, CudaBF16MatmulReturnsF32)
     auto a_cpu = bee::Tensor::zeros({2, 3}, bee::DType::F32).value();
     {
         auto* p = static_cast<float*>(a_cpu.data_ptr());
-        for (int i = 0; i < 6; ++i) p[i] = static_cast<float>(i);
+        for (int i = 0; i < 6; ++i)
+            p[i] = static_cast<float>(i);
     }
     auto b_cpu = bee::Tensor::zeros({3, 2}, bee::DType::F32).value();
     {
         auto* p = static_cast<float*>(b_cpu.data_ptr());
-        for (int i = 0; i < 6; ++i) p[i] = static_cast<float>(i);
+        for (int i = 0; i < 6; ++i)
+            p[i] = static_cast<float>(i);
     }
 
     auto a_gpu_f32 = a_cpu.to(bee::Device::CUDA).value();
@@ -492,8 +496,8 @@ TEST(LowPrecisionTests, CudaBF16MatmulReturnsF32)
     EXPECT_EQ(result.shape(), (bee::Shape{2, 2}));
 
     // BF16 精度容忍更大（5e-2）
-    auto result_cpu = result.to(bee::Device::CPU).value();
-    const auto* p = static_cast<const float*>(result_cpu.data_ptr());
+    auto        result_cpu = result.to(bee::Device::CPU).value();
+    const auto* p          = static_cast<const float*>(result_cpu.data_ptr());
     EXPECT_NEAR(p[0], 10.0f, 5e-2f);
     EXPECT_NEAR(p[1], 13.0f, 5e-2f);
     EXPECT_NEAR(p[2], 28.0f, 5e-2f);
@@ -534,12 +538,14 @@ TEST(LowPrecisionTests, CpuF16MatmulCastToF32)
     auto a = bee::Tensor::zeros({2, 3}, bee::DType::F32).value();
     {
         auto* p = static_cast<float*>(a.data_ptr());
-        for (int i = 0; i < 6; ++i) p[i] = static_cast<float>(i);
+        for (int i = 0; i < 6; ++i)
+            p[i] = static_cast<float>(i);
     }
     auto b = bee::Tensor::zeros({3, 2}, bee::DType::F32).value();
     {
         auto* p = static_cast<float*>(b.data_ptr());
-        for (int i = 0; i < 6; ++i) p[i] = static_cast<float>(i);
+        for (int i = 0; i < 6; ++i)
+            p[i] = static_cast<float>(i);
     }
     auto af16 = bee::cast(a, bee::DType::F16).value();
     auto bf16 = bee::cast(b, bee::DType::F16).value();

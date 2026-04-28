@@ -1,7 +1,7 @@
 /**
  * @File Ops/Transpose.cu
  * @Author dfnzhc (https://github.com/dfnzhc)
- * @Brief B9: vectorized float4/uint4 快速路径 + 原 32×32 tile kernel 回退。
+ * @Brief 2D 转置内核，包含向量化快速路径与 32×32 tile 回退路径。
  */
 
 #include "CUDA/Ops/OpsBridge.hpp"

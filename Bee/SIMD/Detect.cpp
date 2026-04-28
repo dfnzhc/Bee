@@ -1,7 +1,8 @@
-// SIMD 组件实现：组件名 + 运行期 CPUID 检测
+// SIMD 组件实现：组件名与运行期 CPUID 探测。
 //
-// 本文件**不**使用任何 SIMD intrinsics（只调用 CPUID / xgetbv），
-// 因此**不需要**附加 ISA 编译标志，可以在任何目标机上安全执行。
+// 本文件不使用 SIMD 数据通路 intrinsic，只读取 CPUID / XCR0，因此不需要
+// 为该翻译单元附加 AVX/AVX-512 等 ISA 编译标志。这样可以保证即使二进制
+// 运行在较老 CPU 上，探测逻辑本身也不会触发非法指令。
 
 #include "Detect.hpp"
 
@@ -20,7 +21,9 @@ namespace
 
 #if defined(_MSC_VER)
 
-    // MSVC：用 __cpuid / __cpuidex + _xgetbv 读取
+    // MSVC 下使用 __cpuidex 读取功能叶，用 _xgetbv 读取 XCR0。XCR0 反映
+    // 操作系统是否会在上下文切换时保存扩展寄存器状态；即使 CPU 支持
+    // AVX，若 OS 未启用相应位，也不能安全执行 AVX 指令。
     struct CpuidOut
     {
         int eax;
@@ -48,7 +51,8 @@ namespace
 
     auto detect_impl() -> Isa
     {
-        // Leaf 0：最大可支持 leaf
+        // Leaf 0 返回当前 CPU 支持的最大基础 leaf，用于避免访问不存在的
+        // CPUID leaf。
         const auto leaf0    = call_cpuid(0);
         const int  max_leaf = leaf0.eax;
         if (max_leaf < 1)
@@ -60,10 +64,13 @@ namespace
         const bool has_osxsave = (leaf1.ecx & (1 << 27)) != 0;
         const bool has_avx     = (leaf1.ecx & (1 << 28)) != 0;
 
-        // SSE2+SSE4.1 是 Bee::SIMD SSE2 后端的最低门槛
+        // Bee::SIMD 的“SSE2 后端”在命名上表示 128-bit x86 后端；实现中
+        // 使用了 _mm_min_epi32 等 SSE4.1 指令，因此最低门槛是 SSE2+SSE4.1。
         const bool sse2_ok = has_sse2 && has_sse41;
 
-        // 是否已由 OS 启用 AVX 的 YMM 状态（XCR0 bits 1 & 2）
+        // 检查 OS 是否启用 AVX/YMM 与 AVX-512/ZMM 状态保存。
+        // XCR0 bit1 = XMM，bit2 = YMM；AVX-512 还需要 bit5/6/7 分别保存
+        // opmask、ZMM 高 256 位和高 16 个 ZMM 寄存器。
         bool ymm_enabled = false;
         bool zmm_enabled = false;
         if (has_osxsave && has_avx) {
@@ -97,7 +104,8 @@ namespace
     auto detect_impl() -> Isa
     {
         __builtin_cpu_init();
-        // AVX-512：同时需要 F + BW；编译器的 __builtin_cpu_supports 已包含 OS/XCR0 检查
+        // AVX-512 后端同时依赖 AVX512F 与 AVX512BW；GCC/Clang 的
+        // __builtin_cpu_supports 会同时考虑 CPU 能力与 OS/XCR0 状态。
         if (__builtin_cpu_supports("avx512f") && __builtin_cpu_supports("avx512bw"))
             return Isa::Avx512;
         if (__builtin_cpu_supports("avx2"))

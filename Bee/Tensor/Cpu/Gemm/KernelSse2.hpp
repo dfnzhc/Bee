@@ -2,7 +2,7 @@
  * @File Cpu/Gemm/KernelSse2.hpp
  * @Author dfnzhc (https://github.com/dfnzhc)
  * @Date 2026/4/23
- * @Brief This file is part of Bee.
+ * @Brief CPU GEMM SSE2 微内核。
  *
  * SSE2 微内核：128-bit 寄存器，FMA 用 mul+add 模拟，I32 mullo 用 SSE2
  * 能做到的 pmuludq + 重排（成本高，见下）。

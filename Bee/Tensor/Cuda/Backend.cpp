@@ -125,26 +125,22 @@ auto random_int(int dt, void* dst, std::size_t n, std::int64_t low, std::int64_t
     return ::bee::cuda::ops::random_int(static_cast<::bee::cuda::ScalarType>(dt), dst, n, low, high, seed);
 }
 
-auto rms_norm(int dt, const void* x, const void* w, void* out,
-              std::size_t rows, std::size_t dim, double eps) -> Result<void>
+auto rms_norm(int dt, const void* x, const void* w, void* out, std::size_t rows, std::size_t dim, double eps) -> Result<void>
 {
     return ::bee::cuda::ops::rms_norm(static_cast<::bee::cuda::ScalarType>(dt), x, w, out, rows, dim, eps);
 }
 
-auto rope(int dt, const void* x, void* out,
-          std::size_t n_batch, std::size_t seq_len, std::size_t dim,
-          double base, std::int64_t position_offset) -> Result<void>
+auto rope(int dt, const void* x, void* out, std::size_t n_batch, std::size_t seq_len, std::size_t dim, double base, std::int64_t position_offset)
+    -> Result<void>
 {
     return ::bee::cuda::ops::rope(static_cast<::bee::cuda::ScalarType>(dt), x, out, n_batch, seq_len, dim, base, position_offset);
 }
 
-auto embedding(int weight_dt, int ids_dt,
-               const void* weight, const void* ids, void* out,
-               std::size_t n_ids, std::size_t hidden, std::size_t vocab) -> Result<void>
+auto embedding(int weight_dt, int ids_dt, const void* weight, const void* ids, void* out, std::size_t n_ids, std::size_t hidden, std::size_t vocab)
+    -> Result<void>
 {
     return ::bee::cuda::ops::embedding(
-        static_cast<::bee::cuda::ScalarType>(weight_dt), static_cast<::bee::cuda::ScalarType>(ids_dt),
-        weight, ids, out, n_ids, hidden, vocab
+        static_cast<::bee::cuda::ScalarType>(weight_dt), static_cast<::bee::cuda::ScalarType>(ids_dt), weight, ids, out, n_ids, hidden, vocab
     );
 }
 
@@ -195,8 +191,9 @@ auto request_workspace(std::size_t nbytes, void* stream) -> Result<void*>
 
 #else // BEE_TENSOR_WITH_CUDA
 
-// CUDA 后端未启用时的 stub 实现。
-// 所有函数均返回 Recoverable 错误；Tensor 层会把它原样传播给调用方。
+// CUDA 后端未启用时的占位实现。
+// 所有需要设备能力的函数均返回 Recoverable 错误；Tensor 层会把它原样
+// 传播给调用方。deallocate 保持 no-op，以便析构路径安全执行。
 
 auto allocate(std::size_t /*nbytes*/, std::size_t /*alignment*/) -> Result<void*>
 {
@@ -205,7 +202,7 @@ auto allocate(std::size_t /*nbytes*/, std::size_t /*alignment*/) -> Result<void*
 
 auto deallocate(void* /*p*/, std::size_t /*nbytes*/, std::size_t /*alignment*/) -> void
 {
-    // no-op
+    // CUDA 未启用时没有实际设备分配，释放路径为空操作。
 }
 
 auto memcpy_h2d(void* /*dst*/, const void* /*src*/, std::size_t /*nbytes*/) -> Result<void>

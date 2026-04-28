@@ -3,7 +3,8 @@
  * @Author dfnzhc (https://github.com/dfnzhc)
  * @Brief 低层 PTX 内联包装（cp.async 等）。
  *
- * 仅提供 M1 阶段必要的最小包装；TMA、tcgen05.mma、UMMA 将在 M7/M8 补完。
+ * 当前只封装本组件已使用的 cp.async 等基础 PTX 原语；更高阶矩阵指令由
+ * 专门的 matmul 后端按架构能力单独实现。
  * 所有 inline 汇编仅在设备代码（__CUDA_ARCH__ 可用）中展开。
  */
 

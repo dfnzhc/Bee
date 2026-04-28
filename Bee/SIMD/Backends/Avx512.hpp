@@ -13,6 +13,10 @@
 namespace bee::simd
 {
 
+// AVX-512 后端提供 512-bit 寄存器宽度。当前特化要求 AVX512F；uint8_t
+// 额外要求 AVX512BW。CMake 与运行时探测会同时检查 F/BW，避免在只支持
+// 部分 AVX-512 扩展的机器上实例化字节后端。
+
 // -----------------------------------------------------------------------
 // float × AVX-512F：__m512，宽度 = 16
 // -----------------------------------------------------------------------
@@ -56,7 +60,8 @@ struct SimdBackend<float, IsaAvx512>
         return _mm512_sqrt_ps(a);
     }
 
-    // exp 回退标量逐元素计算
+    // exp 回退标量逐元素计算。AVX-512F 不提供标准指数指令，当前实现以
+    // std::exp 语义为准，性能敏感调用点应考虑专门向量数学实现。
     static auto exp(reg v) -> reg
     {
         alignas(64) float buf[16];
@@ -66,7 +71,7 @@ struct SimdBackend<float, IsaAvx512>
         return _mm512_load_ps(buf);
     }
 
-    // log 回退标量逐元素计算
+    // log 回退标量逐元素计算，边界行为与 std::log 保持一致。
     static auto log(reg v) -> reg
     {
         alignas(64) float buf[16];
@@ -339,7 +344,8 @@ struct SimdBackend<int64_t, IsaAvx512>
         return _mm512_abs_epi64(a);
     }
 
-    // 水平求和：回退到标量提取
+    // 水平求和：回退到标量提取。这里优先保持实现简单和跨编译器稳定；
+    // 若未来需要更高吞吐量，可改为 shuffle/reduce 指令组合。
     static auto reduce_sum(reg v) -> int64_t
     {
         alignas(64) int64_t buf[8];
@@ -347,7 +353,8 @@ struct SimdBackend<int64_t, IsaAvx512>
         return buf[0] + buf[1] + buf[2] + buf[3] + buf[4] + buf[5] + buf[6] + buf[7];
     }
 
-    // 水平求最小值：借助 AVX-512F _mm512_min_epi64 折叠
+    // 水平求最小值：当前通过落到栈上再标量折叠实现，语义稳定但不是
+    // 最优性能路径。
     static auto reduce_min(reg v) -> int64_t
     {
         alignas(64) int64_t buf[8];
@@ -422,7 +429,8 @@ struct SimdBackend<uint8_t, IsaAvx512>
         return _mm512_max_epu8(a, b);
     }
 
-    // 水平求和：_mm512_sad_epu8 返回 8 个 64-bit SAD 值，累加低 16 位
+    // 水平求和：_mm512_sad_epu8 返回 8 个 64-bit SAD 值，累加低 16 位。
+    // 返回值保持 uint8_t，超过 255 的总和会按接口类型截断。
     static auto reduce_sum(reg v) -> uint8_t
     {
         __m512i              zero = _mm512_setzero_si512();

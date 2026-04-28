@@ -2,7 +2,7 @@
  * @File Cpu/Gemm/PackCommon.hpp
  * @Author dfnzhc (https://github.com/dfnzhc)
  * @Date 2026/4/23
- * @Brief This file is part of Bee.
+ * @Brief CPU GEMM 通用 panel packing。
  *
  * GEMM 的通用 A/B panel packing。
  *
@@ -12,7 +12,8 @@
  *  - B pack：把 B 的 kc×nc 子块重排为 (nc / NR) 个条带，每条带布局为
  *    [(k=0 的 NR 个元素)(k=1 的 NR 个元素)...]，供微内核逐 k 连续加载 B 向量。
  *
- * 若后续某个 ISA 需要专门的交织、转置或预取友好布局，也统一在此文件中扩展。
+ * 如果某个 ISA 需要专门的交织、转置或预取友好布局，也应在此文件中扩展，
+ * 以保持所有 GEMM 微内核共享同一 packing 契约。
  */
 
 #pragma once

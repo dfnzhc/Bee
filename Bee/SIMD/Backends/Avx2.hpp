@@ -13,6 +13,11 @@
 namespace bee::simd
 {
 
+// AVX2 后端提供 256-bit 寄存器宽度，并作为 Tensor CPU 快路径的主要目标。
+// 浮点基础算术使用 AVX 指令，整数 add/sub/min/max 使用 AVX2 指令；整数
+// 除法、部分 64-bit 比较和数学函数没有对应硬件原语时不在本层伪装为
+// 完整向量实现。
+
 // -----------------------------------------------------------------------
 // float × AVX2：__m256，宽度 = 8
 // -----------------------------------------------------------------------
@@ -55,7 +60,8 @@ struct SimdBackend<float, IsaAvx2>
         return _mm256_sqrt_ps(a);
     }
 
-    // exp/log 回退到标量逐元素计算
+    // exp/log 回退到标量逐元素计算。这样保留 std::exp/std::log 的边界
+    // 语义和精度，但吞吐量低于真正的向量数学库。
     static auto exp(reg v) -> reg
     {
         alignas(32) float buf[8];
@@ -298,7 +304,8 @@ struct SimdBackend<int32_t, IsaAvx2>
 
 // -----------------------------------------------------------------------
 // int64_t × AVX2：__m256i，宽度 = 4
-// 不提供 min/max/reduce_min/reduce_max（AVX2 缺少有符号 64-bit 比较）
+// 不提供 min/max/reduce_min/reduce_max。AVX2 缺少有符号 64-bit min/max
+// 原语，当前后端选择编译期暴露能力缺口，而不是隐式退化到标量循环。
 // -----------------------------------------------------------------------
 template <>
 struct SimdBackend<int64_t, IsaAvx2>
@@ -361,7 +368,8 @@ struct SimdBackend<int64_t, IsaAvx2>
 
 // -----------------------------------------------------------------------
 // uint8_t × AVX2：__m256i，宽度 = 32
-// 不提供 neg/abs/mul/div
+// 不提供 neg/abs/mul/div；uint8_t 后端用于字节级加减、比较与规约，复杂
+// 算术应在提升后的更宽类型中完成。
 // -----------------------------------------------------------------------
 template <>
 struct SimdBackend<uint8_t, IsaAvx2>
@@ -409,8 +417,9 @@ struct SimdBackend<uint8_t, IsaAvx2>
         return _mm256_max_epu8(a, b);
     }
 
-    // 水平求和：使用 _mm256_sad_epu8 对 32 个 uint8 求和
-    // sad_epu8 将每 8 字节组的绝对差之和存入对应 64-bit lane 的低 16 位
+    // 水平求和：使用 _mm256_sad_epu8 对 32 个 uint8 求和。
+    // sad_epu8 将每 8 字节组的绝对差之和存入对应 64-bit lane 的低 16 位。
+    // 返回值保持 uint8_t，超过 255 的总和会按接口类型截断。
     static auto reduce_sum(reg v) -> uint8_t
     {
         __m256i              zero = _mm256_setzero_si256();

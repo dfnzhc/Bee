@@ -1,13 +1,11 @@
 /**
  * @File Api.cu
  * @Author dfnzhc (https://github.com/dfnzhc)
- * @Brief Bee::CUDA runtime bridge (nvcc-compiled TU).
+ * @Brief Bee::CUDA 运行时桥接翻译单元。
  *
- * Provides thin wrappers over cuda_runtime.h so Api.cpp (C++23, MSVC)
- * can build Result<T> values without needing cuda_runtime.h or <expected>
- * interactions inside nvcc TU.
- *
- * ASCII-only: nvcc on Windows does not reliably accept non-ASCII sources.
+ * 本文件由 nvcc 编译，只负责直接调用 cuda_runtime.h 并返回简单的整数
+ * 错误码。Api.cpp 再把这些错误码转换为 Bee::Result，避免在 nvcc 翻译
+ * 单元中混用 <expected>、格式化库和更高层诊断类型。
  */
 
 #include "CUDA/Runtime.hpp"

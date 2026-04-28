@@ -115,7 +115,7 @@ auto device_synchronize() -> Result<void>
     return {};
 }
 
-// ── 内存通路（M2 实装） ─────────────────────────────────────────────────────
+// ── 内存通路 ───────────────────────────────────────────────────────────────
 
 auto allocate(std::size_t nbytes, std::size_t /*alignment*/) -> Result<void*>
 {
@@ -131,7 +131,7 @@ auto allocate(std::size_t nbytes, std::size_t /*alignment*/) -> Result<void*>
     const auto stream = StreamView::per_thread();
     void*      ptr    = nullptr;
     BEE_TRY_ASSIGN(ptr, pool->allocate_async(nbytes, stream));
-    // 分配后同步：返回的指针立即可用（plan-cuda §5 同步 API 语义）。
+    // 分配后同步：返回给调用方的设备指针立即可用。
     BEE_CUDA_CHECK(cudaStreamSynchronize(stream.native_handle()));
     return ptr;
 }
@@ -211,7 +211,7 @@ auto memset(void* ptr, int value, std::size_t nbytes) -> Result<void>
     return {};
 }
 
-// ── 元素级算子（M3 实装） ──────────────────────────────────────────────────
+// ── 元素级算子 ─────────────────────────────────────────────────────────────
 
 namespace ops
 {
@@ -288,10 +288,9 @@ namespace ops
     {
         if (M == 0 || N == 0)
             return {};
-
         // 按当前全局后端设置分派：
         //  - Cutlass：未独立暴露（Auto/Wmma 在 detail::ops_matmul 内部已优先选择 CUTLASS）
-        //  - Native：B10 手写 TMA + WMMA TF32 路径（要求严格对齐，否则返回错误）
+        //  - Native：手写 TMA + WMMA TF32 路径（要求严格对齐，否则返回错误）
         //  - Auto/Wmma：内部启发式（CUTLASS 或 native tile）
         const auto backend = get_matmul_backend();
         switch (backend) {
@@ -318,10 +317,9 @@ namespace ops
     {
         // 仅接受 F16 或 BF16
         if (dt != ScalarType::F16 && dt != ScalarType::BF16)
-            return std::unexpected(make_error(
-                std::format("cuda::ops::matmul_lowp: 不支持的 dtype={}，仅接受 F16/BF16", static_cast<int>(dt)),
-                Severity::Recoverable
-            ));
+            return std::unexpected(
+                make_error(std::format("cuda::ops::matmul_lowp: 不支持的 dtype={}，仅接受 F16/BF16", static_cast<int>(dt)), Severity::Recoverable)
+            );
 
         // M==0 或 N==0：无输出，直接成功
         if (M == 0 || N == 0)
@@ -388,8 +386,7 @@ namespace ops
         return wrap(err, "cuda::ops::random_int");
     }
 
-    auto rms_norm(ScalarType dt, const void* x, const void* w, void* out,
-                  std::size_t rows, std::size_t dim, double eps) -> Result<void>
+    auto rms_norm(ScalarType dt, const void* x, const void* w, void* out, std::size_t rows, std::size_t dim, double eps) -> Result<void>
     {
         if (!x || !w || !out)
             return std::unexpected(make_error("cuda::ops::rms_norm: 空指针", Severity::Recoverable));
@@ -403,9 +400,16 @@ namespace ops
         return wrap(err, "cuda::ops::rms_norm");
     }
 
-    auto rope(ScalarType dt, const void* x, void* out,
-              std::size_t n_batch, std::size_t seq_len, std::size_t dim,
-              double base, std::int64_t position_offset) -> Result<void>
+    auto rope(
+        ScalarType   dt,
+        const void*  x,
+        void*        out,
+        std::size_t  n_batch,
+        std::size_t  seq_len,
+        std::size_t  dim,
+        double       base,
+        std::int64_t position_offset
+    ) -> Result<void>
     {
         if (!x || !out)
             return std::unexpected(make_error("cuda::ops::rope: 空指针", Severity::Recoverable));
@@ -419,9 +423,16 @@ namespace ops
         return wrap(err, "cuda::ops::rope");
     }
 
-    auto embedding(ScalarType weight_dt, ScalarType ids_dt,
-                   const void* weight, const void* ids, void* out,
-                   std::size_t n_ids, std::size_t hidden, std::size_t vocab) -> Result<void>
+    auto embedding(
+        ScalarType  weight_dt,
+        ScalarType  ids_dt,
+        const void* weight,
+        const void* ids,
+        void*       out,
+        std::size_t n_ids,
+        std::size_t hidden,
+        std::size_t vocab
+    ) -> Result<void>
     {
         if (!weight || !ids || !out)
             return std::unexpected(make_error("cuda::ops::embedding: 空指针", Severity::Recoverable));
@@ -429,13 +440,11 @@ namespace ops
             return std::unexpected(make_error("cuda::ops::embedding: 维度含 0", Severity::Recoverable));
         if (vocab == 0)
             return std::unexpected(make_error("cuda::ops::embedding: vocab 须 > 0", Severity::Recoverable));
-        const int err = detail::ops_embedding(
-            static_cast<int>(weight_dt), static_cast<int>(ids_dt), weight, ids, out, n_ids, hidden, vocab
-        );
+        const int err = detail::ops_embedding(static_cast<int>(weight_dt), static_cast<int>(ids_dt), weight, ids, out, n_ids, hidden, vocab);
         return wrap(err, "cuda::ops::embedding");
     }
 
-    // ── Matmul 后端切换（M6/M7 脚手架） ─────────────────────────────────────────
+    // ── Matmul 后端切换 ───────────────────────────────────────────────────────
 
     namespace
     {
@@ -477,7 +486,7 @@ namespace ops
 
 auto stream_from_handle(void* handle) -> Result<void*>
 {
-    // 骨架阶段直接传递 handle。
+    // 当前实现只透传原生句柄；句柄所有权仍属于调用方。
     return handle;
 }
 
@@ -533,8 +542,8 @@ auto wait_event(void* event_handle, void* stream) -> Result<void>
 
 namespace
 {
-    // 最小 workspace registry：按 device 持有单一缓存块。
-    // 所有权：runtime-owned，调用方不负责 free。
+    // workspace registry：按 device 持有单一缓存块。
+    // 所有权：运行时持有，调用方不负责 free。
     // 生命周期：静态对象析构时释放；进程期间可复用。
     // 线程安全：mtx 保护所有 slot 的并发读写，防止双重 free / 丢失更新。
     struct WorkspaceRegistry
@@ -545,7 +554,7 @@ namespace
             std::size_t capacity = 0;
         };
 
-        std::array<Slot, 16> slots{}; // 最多支持 16 个 device
+        std::array<Slot, 16> slots{}; // 当前支持最多 16 个 device
         std::mutex           mtx;     // 保护 slots 并发访问
 
         ~WorkspaceRegistry()
@@ -567,12 +576,12 @@ namespace
             std::lock_guard lock{mtx};
             auto&           slot = slots[static_cast<std::size_t>(device)];
 
-            // 容量足够，直接复用
+            // 容量足够时直接复用同一指针。
             if (slot.ptr && slot.capacity >= nbytes)
                 return slot.ptr;
 
-            // 容量不足或首次分配：释放旧缓存，重新分配更大块
-            // 注意：旧指针在此处失效，调用方不得跨增长边界缓存旧 workspace 指针
+            // 容量不足或首次分配时重新申请更大块。旧指针会在这里失效，
+            // 调用方不得跨增长边界缓存 workspace 指针。
             if (slot.ptr) {
                 (void)cudaFree(slot.ptr);
                 slot.ptr      = nullptr;
@@ -597,15 +606,15 @@ namespace
 
 auto request_workspace(std::size_t nbytes, void* stream) -> Result<void*>
 {
-    // runtime-owned workspace：返回的指针由 runtime 持有，调用方无需也不应 free。
+    // runtime-owned workspace：返回的指针由运行时持有，调用方无需也不应 free。
     // 生命周期契约：
     // - 同一 device 上容量足够时，直接复用已有块，返回相同指针。
-    // - 当后续请求的 nbytes 超过已有容量时，runtime 会释放旧块并重新分配更大块；
+    // - 当后续请求的 nbytes 超过已有容量时，运行时会释放旧块并重新分配更大块；
     //   旧指针随即失效，调用方不得跨增长边界缓存旧 workspace 指针。
     if (nbytes == 0)
         return static_cast<void*>(nullptr);
 
-    (void)stream; // 当前暂不使用 stream 参数
+    (void)stream; // workspace 申请当前使用同步 cudaMalloc，stream 仅保留接口契约。
 
     int dev = 0;
     BEE_CUDA_CHECK(cudaGetDevice(&dev));

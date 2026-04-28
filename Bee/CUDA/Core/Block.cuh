@@ -2,7 +2,7 @@
  * @File Core/Block.cuh
  * @Author dfnzhc (https://github.com/dfnzhc)
  * @Date 2026/4/23
- * @Brief This file is part of Bee.
+ * @Brief CUDA block 级并行原语。
  *
  * Block 级并行原语：基于 Warp.cuh 的两阶段（warp → shared → warp）实现。
  * CUB 风格 TempStorage：调用方负责声明 __shared__，便于 kernel 内多次复用。

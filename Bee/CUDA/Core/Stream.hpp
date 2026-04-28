@@ -3,8 +3,8 @@
  * @Author dfnzhc (https://github.com/dfnzhc)
  * @Brief cudaStream_t 的 RAII 封装（host only）。
  *
- * 设计要点（plan-cuda §5）：
- *  - 默认内部使用 cudaStreamPerThread（不创建独立 stream），减少隐式同步；
+ * 设计要点：
+ *  - 默认内部使用 cudaStreamPerThread，避免 legacy default stream 引入隐式同步；
  *  - 提供 OwnedStream：创建独立流并在析构时销毁；
  *  - 同步接口返回 Result<void>；
  *  - 仅 host 使用，任何 .cu 内部想拿裸 handle 用 native_handle()。
@@ -22,7 +22,8 @@
 namespace bee::cuda
 {
 
-// 非拥有型 stream 视图；可由 cudaStreamPerThread 或 OwnedStream 构造。
+// 非拥有型 stream 视图。该类型只保存 cudaStream_t，不负责销毁；可表示
+// cudaStreamPerThread、cudaStreamLegacy 或 OwnedStream 暴露出的 view。
 class StreamView
 {
 public:
@@ -44,7 +45,8 @@ public:
         return {};
     }
 
-    // true 表示所有已提交到该 stream 的工作均已完成。
+    // true 表示所有已提交到该 stream 的工作均已完成；false 表示仍有工作
+    // 待完成。其他 CUDA 错误会作为 Result 错误返回。
     [[nodiscard]] auto query() const -> Result<bool>
     {
         const cudaError_t err = cudaStreamQuery(stream_);
@@ -70,7 +72,7 @@ private:
     cudaStream_t stream_ = cudaStreamPerThread;
 };
 
-// 拥有型 stream；析构时调用 cudaStreamDestroy。
+// 拥有型 stream。对象唯一拥有 cudaStream_t，析构或 reset() 时销毁句柄。
 class OwnedStream
 {
 public:

@@ -1,7 +1,7 @@
 /**
  * @File Core/Launch.cuh
  * @Author dfnzhc (https://github.com/dfnzhc)
- * @Brief Kernel launch 辅助（ASCII、可被 .cu 包含）。
+ * @Brief Kernel 启动辅助。
  *
  * 提供 grid/block 计算以及带错误检查的 launch 宏。保持最小依赖。
  */
@@ -26,7 +26,7 @@ namespace bee::cuda
     return (a + b - 1ull) / b;
 }
 
-// 默认 block size：256（与 plan §6.1 elementwise 连续快路径默认一致）。
+// 默认 block size：256，适合一维连续元素级 kernel 的通用吞吐路径。
 inline constexpr int kDefaultBlockSize = 256;
 
 // 根据元素总数与 block size 计算 grid，截断到 CUDA 最大 X 维（2^31-1）。

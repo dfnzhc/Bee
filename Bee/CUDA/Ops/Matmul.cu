@@ -6,8 +6,8 @@
  * 本文件承担所有设备都可用的 baseline 行为：
  * - 支持 F32/F64/I32/I64；
  * - 正确处理非 TILE 整倍数的边界；
- * - 更高阶的 CUTLASS / Native(TMA) 路径放在独立 TU 中，由上层显式选择或自动回退。
- * - Task 5：ops_matmul_lowp 实现 F16/BF16 输入、F32 累加、F32 输出的低精度 GEMM。
+ * - 更高阶的 CUTLASS / Native(TMA) 路径放在独立 TU 中，由上层显式选择或自动回退；
+ * - ops_matmul_lowp 实现 F16/BF16 输入、F32 累加、F32 输出的低精度 GEMM。
  */
 
 #include "CUDA/Ops/OpsBridge.hpp"
@@ -185,7 +185,7 @@ int ops_matmul(int dt, const void* A, const void* B, void* C, std::size_t M, std
     return static_cast<int>(cudaStreamSynchronize(stream));
 }
 
-// 低精度 GEMM 入口（Task 5）：F16/BF16 输入，float 累加，float 输出
+// 低精度 GEMM 入口：F16/BF16 输入，float 累加，float 输出。
 int ops_matmul_lowp(int dt, const void* A, const void* B, float* C, std::size_t M, std::size_t K, std::size_t N) noexcept
 {
     // 验证 dtype：仅接受 F16 或 BF16

@@ -276,10 +276,7 @@ auto matmul(const Tensor& a, const Tensor& b) -> Result<Tensor>
             const int64_t K_lp = a.shape()[1];
             const int64_t N_lp = b.shape()[1];
             if (b.shape()[0] != K_lp)
-                return std::unexpected(make_error(
-                    std::format("matmul: 内维不匹配（a 列={}, b 行={}）", K_lp, b.shape()[0]),
-                    Severity::Recoverable
-                ));
+                return std::unexpected(make_error(std::format("matmul: 内维不匹配（a 列={}, b 行={}）", K_lp, b.shape()[0]), Severity::Recoverable));
 
             // 输出为 F32 张量
             auto out_r = Tensor::zeros({M_lp, N_lp}, DType::F32, Device::CUDA);
@@ -320,10 +317,7 @@ auto matmul(const Tensor& a, const Tensor& b) -> Result<Tensor>
 
         // ── (2) CUDA 批次低精度：第一阶段暂不支持 ──────────────────────────────
         if (a.device() == Device::CUDA) {
-            return std::unexpected(make_error(
-                "matmul: CUDA 批次低精度 matmul (F16/BF16) 暂不支持，请先将输入 cast 到 F32",
-                Severity::Recoverable
-            ));
+            return std::unexpected(make_error("matmul: CUDA 批次低精度 matmul (F16/BF16) 暂不支持，请先将输入 cast 到 F32", Severity::Recoverable));
         }
 
         // ── (3) CPU 低精度：cast 到 F32 后递归 ──────────────────────────────────

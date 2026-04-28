@@ -1,10 +1,10 @@
 /**
  * @File Ops/Reduce.cu
  * @Author dfnzhc (https://github.com/dfnzhc)
- * @Brief Global / axis reduce (Sum/Min/Max/Prod) for I32/I64/F32/F64 (+U8 min/max).
+ * @Brief I32/I64/F32/F64 的全局与按轴规约内核。
  *
- * ASCII-only TU. Contiguous layout assumed by host dispatch. Mean is composed
- * at the Tensor layer (sum then scalar divide).
+ * Host 分派保证输入为连续布局。mean 不在本文件中单独实现，而由 Tensor
+ * 层通过 sum 后标量缩放组合得到；U8 当前只覆盖 min/max 等明确支持路径。
  */
 
 #include "CUDA/Ops/OpsBridge.hpp"

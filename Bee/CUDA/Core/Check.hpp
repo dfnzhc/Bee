@@ -1,10 +1,11 @@
 /**
  * @File Core/Check.hpp
  * @Author dfnzhc (https://github.com/dfnzhc)
- * @Brief Host 端 CUDA 错误检查：返回 bee::Result<T>。
+ * @Brief Host 端 CUDA 错误检查。
  *
- * 仅由 .cpp 源文件包含；需要 cuda_runtime.h（host side 可用）。
- * 对 .cu 源请使用 Core/Check.cuh（int 版本）。
+ * 仅由 .cpp 源文件包含；失败时将 cudaError_t 转换为 Bee::Error 并通过
+ * std::unexpected 返回。设备端或 .cu 翻译单元请使用 Core/Check.cuh 中的
+ * int 错误码版本。
  */
 
 #pragma once
@@ -28,8 +29,8 @@ namespace bee::cuda::detail
 
 } // namespace bee::cuda::detail
 
-// expr 必须返回 cudaError_t。若失败则返回 std::unexpected(Error)。
-// 调用者所在函数必须返回 bee::Result<T>。
+// expr 必须返回 cudaError_t。若失败则清理 CUDA last-error 状态，并从
+// 当前函数返回 std::unexpected(Error)。调用者所在函数必须返回 bee::Result<T>。
 #define BEE_CUDA_CHECK(expr)                                                             \
     do {                                                                                 \
         const cudaError_t _bee_cuda_err = (expr);                                        \
