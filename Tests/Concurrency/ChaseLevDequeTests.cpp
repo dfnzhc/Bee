@@ -54,6 +54,39 @@ struct TrackedObject
     }
 };
 
+struct BlockingMovePayload
+{
+    static inline std::atomic<int>  move_assign_entered{0};
+    static inline std::atomic<bool> release_move_assign{false};
+
+    int value = 0;
+
+    explicit BlockingMovePayload(int v = 0) noexcept
+        : value(v)
+    {
+    }
+
+    BlockingMovePayload(const BlockingMovePayload&) noexcept            = default;
+    BlockingMovePayload& operator=(const BlockingMovePayload&) noexcept = default;
+
+    BlockingMovePayload(BlockingMovePayload&& other) noexcept
+        : value(other.value)
+    {
+        other.value = -1;
+    }
+
+    BlockingMovePayload& operator=(BlockingMovePayload&& other) noexcept
+    {
+        value       = other.value;
+        other.value = -1;
+        move_assign_entered.fetch_add(1, std::memory_order_release);
+        while (!release_move_assign.load(std::memory_order_acquire)) {
+            std::this_thread::yield();
+        }
+        return *this;
+    }
+};
+
 TEST(ChaseLevDequeTests, CapacityAtLeastTwo)
 {
     // 最小物理容量为 2，以保证有效容量至少为 1
@@ -61,9 +94,10 @@ TEST(ChaseLevDequeTests, CapacityAtLeastTwo)
     ChaseLevDeque<int> deque1(1);
     ChaseLevDeque<int> deque2(2);
 
-    EXPECT_EQ(deque0.capacity(), 2u);
-    EXPECT_EQ(deque1.capacity(), 2u);
-    EXPECT_EQ(deque2.capacity(), 2u);
+    EXPECT_EQ(deque0.capacity(), 1u);
+    EXPECT_EQ(deque1.capacity(), 1u);
+    EXPECT_EQ(deque2.capacity(), 1u);
+    EXPECT_EQ(deque2.physical_capacity(), 2u);
 }
 
 TEST(ChaseLevDequeTests, OwnerPushAndPopIsLifo)
@@ -108,6 +142,8 @@ TEST(ChaseLevDequeTests, FullConditionWithTryPush)
 {
     // 有效容量 = 物理容量 - 1（保留 1 个间隔槽位以避免 owner/stealer 数据竞争）
     ChaseLevDeque<int> deque(4); // 物理容量 4，有效容量 3
+
+    ASSERT_EQ(deque.capacity(), 3u);
 
     ASSERT_TRUE(deque.try_push(1));
     ASSERT_TRUE(deque.try_push(2));
@@ -289,6 +325,48 @@ TEST(ChaseLevDequeTests, ConcurrentOwnerAndStealersConsumeAllItems)
     for (const auto& flag : seen) {
         EXPECT_EQ(flag.load(std::memory_order_relaxed), 1);
     }
+}
+
+TEST(ChaseLevDequeTests, InFlightStealersPreventPrematureSlotReuse)
+{
+    BlockingMovePayload::move_assign_entered.store(0, std::memory_order_relaxed);
+    BlockingMovePayload::release_move_assign.store(false, std::memory_order_relaxed);
+
+    ChaseLevDeque<BlockingMovePayload> deque(4);
+    ASSERT_EQ(deque.capacity(), 3u);
+    ASSERT_TRUE(deque.try_emplace(1));
+    ASSERT_TRUE(deque.try_emplace(2));
+    ASSERT_TRUE(deque.try_emplace(3));
+
+    std::vector<std::thread> stealers;
+    stealers.reserve(3);
+    for (int i = 0; i < 3; ++i) {
+        stealers.emplace_back([&] {
+            BlockingMovePayload out;
+            EXPECT_TRUE(deque.try_steal(out));
+        });
+    }
+
+    while (BlockingMovePayload::move_assign_entered.load(std::memory_order_acquire) != 3) {
+        std::this_thread::yield();
+    }
+
+    EXPECT_TRUE(deque.try_emplace(100));
+    EXPECT_FALSE(deque.try_emplace(101));
+
+    BlockingMovePayload::release_move_assign.store(true, std::memory_order_release);
+    for (auto& stealer : stealers) {
+        stealer.join();
+    }
+
+    EXPECT_TRUE(deque.try_emplace(101));
+
+    BlockingMovePayload out;
+    ASSERT_TRUE(deque.try_pop(out));
+    EXPECT_EQ(out.value, 101);
+    ASSERT_TRUE(deque.try_pop(out));
+    EXPECT_EQ(out.value, 100);
+    EXPECT_TRUE(deque.is_empty());
 }
 
 TEST(ChaseLevDequeTests, DestructorReleasesRemainingNonTrivialElements)

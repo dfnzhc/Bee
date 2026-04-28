@@ -233,6 +233,8 @@ public:
 
     [[nodiscard]] size_type size_approx() const noexcept
     {
+        // Approximate observation only. Use try_push/try_pop results for
+        // correctness decisions while producer and consumer are concurrent.
         auto const writeIdx = _writeIdx.load(std::memory_order_relaxed);
         auto const readIdx  = _readIdx.load(std::memory_order_relaxed);
         if (writeIdx >= readIdx) {

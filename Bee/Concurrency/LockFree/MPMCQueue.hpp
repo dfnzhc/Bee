@@ -283,9 +283,14 @@ public:
 
     [[nodiscard]] std::ptrdiff_t size_approx() const noexcept
     {
+        // Approximate observation only. Concurrent producers/consumers may
+        // change both tickets immediately after these relaxed loads.
         const auto head = _enqueue_pos.load(std::memory_order_relaxed);
         const auto tail = _dequeue_pos.load(std::memory_order_relaxed);
-        return static_cast<std::ptrdiff_t>(head - tail);
+        if (head >= tail) {
+            return static_cast<std::ptrdiff_t>(head - tail);
+        }
+        return -static_cast<std::ptrdiff_t>(tail - head);
     }
 
     [[nodiscard]] bool is_empty() const noexcept

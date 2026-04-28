@@ -43,7 +43,9 @@ TEST(WorkPoolTest, PostBatchTasksAllExecute)
     std::atomic<int> counter{0};
 
     for (int i = 0; i < kCount; ++i) {
-        pool.post([&counter] { counter.fetch_add(1, std::memory_order_relaxed); });
+        while (!pool.try_post([&counter] { counter.fetch_add(1, std::memory_order_relaxed); })) {
+            std::this_thread::yield();
+        }
     }
 
     pool.wait_for_tasks();
