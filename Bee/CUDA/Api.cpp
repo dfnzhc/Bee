@@ -16,11 +16,12 @@
 
 #include <cuda_runtime.h>
 
-#include <array>
 #include <atomic>
 #include <cmath>
 #include <format>
 #include <mutex>
+#include <unordered_map>
+#include <vector>
 
 namespace bee::cuda
 {
@@ -289,13 +290,22 @@ namespace ops
         if (M == 0 || N == 0)
             return {};
         // 按当前全局后端设置分派：
-        //  - Cutlass：未独立暴露（Auto/Wmma 在 detail::ops_matmul 内部已优先选择 CUTLASS）
-        //  - Native：手写 TMA + WMMA TF32 路径（要求严格对齐，否则返回错误）
-        //  - Auto/Wmma：内部启发式（CUTLASS 或 native tile）
+        // Dispatch according to the current global backend selection:
+        //  - Cutlass: explicit selection validates availability, then uses detail::ops_matmul.
+        //  - Native: explicit TMA + WMMA TF32 path with strict device requirements.
         const auto backend = get_matmul_backend();
+        if (backend == MatmulBackend::Cutlass) {
+            if (!matmul_backend_available(MatmulBackend::Cutlass))
+                return std::unexpected(make_error(
+                    "cuda::ops::matmul[Cutlass]: backend is unavailable for the current build or device",
+                    Severity::Recoverable,
+                    static_cast<int>(cudaErrorNotSupported)
+                ));
+            const int err = detail::ops_matmul(static_cast<int>(dt), A, B, C, M, K, N);
+            return wrap(err, "cuda::ops::matmul[Cutlass]");
+        }
         switch (backend) {
-        case MatmulBackend::Cutlass:
-            return std::unexpected(make_error("cuda::ops::matmul: Cutlass 后端尚未暴露（Auto 已自动启用）", Severity::Recoverable));
+        case MatmulBackend::Cutlass: break;
         case MatmulBackend::Native: {
             if (!current_device_has_native_tma_wmma())
                 return std::unexpected(make_error(
@@ -550,46 +560,50 @@ namespace
     {
         struct Slot
         {
-            void*       ptr      = nullptr;
-            std::size_t capacity = 0;
+            void*              ptr      = nullptr;
+            std::size_t        capacity = 0;
+            std::vector<void*> retired;
         };
 
-        std::array<Slot, 16> slots{}; // 当前支持最多 16 个 device
-        std::mutex           mtx;     // 保护 slots 并发访问
+        std::mutex                    mtx;
+        std::unordered_map<int, Slot> slots;
 
         ~WorkspaceRegistry()
         {
-            // 析构在进程退出时调用，无需加锁（此时不再有并发访问）
-            for (auto& slot : slots) {
-                if (slot.ptr) {
+            free_slots();
+        }
+
+        void free_slots() noexcept
+        {
+            for (auto& [device, slot] : slots) {
+                (void)device;
+                if (slot.ptr)
                     (void)cudaFree(slot.ptr);
-                    slot.ptr = nullptr;
-                }
+                for (void* ptr : slot.retired)
+                    (void)cudaFree(ptr);
+                slot.ptr = nullptr;
+                slot.retired.clear();
             }
         }
 
         [[nodiscard]] auto get_or_grow(int device, std::size_t nbytes) -> Result<void*>
         {
-            if (device < 0 || device >= static_cast<int>(slots.size()))
-                return std::unexpected(make_error("workspace: device index out of range", Severity::Recoverable));
+            if (device < 0)
+                return std::unexpected(make_error("workspace: invalid device index", Severity::Recoverable));
 
             std::lock_guard lock{mtx};
-            auto&           slot = slots[static_cast<std::size_t>(device)];
+            auto&           slot = slots[device];
 
             // 容量足够时直接复用同一指针。
             if (slot.ptr && slot.capacity >= nbytes)
                 return slot.ptr;
 
-            // 容量不足或首次分配时重新申请更大块。旧指针会在这里失效，
-            // 调用方不得跨增长边界缓存 workspace 指针。
-            if (slot.ptr) {
-                (void)cudaFree(slot.ptr);
-                slot.ptr      = nullptr;
-                slot.capacity = 0;
-            }
-
+            // Growing keeps the previous block alive so outstanding callers
+            // can finish using workspace pointers they already received.
             void* new_ptr = nullptr;
             BEE_CUDA_CHECK(cudaMalloc(&new_ptr, nbytes));
+            if (slot.ptr)
+                slot.retired.push_back(slot.ptr);
             slot.ptr      = new_ptr;
             slot.capacity = nbytes;
             return new_ptr;
@@ -606,11 +620,9 @@ namespace
 
 auto request_workspace(std::size_t nbytes, void* stream) -> Result<void*>
 {
-    // runtime-owned workspace：返回的指针由运行时持有，调用方无需也不应 free。
-    // 生命周期契约：
-    // - 同一 device 上容量足够时，直接复用已有块，返回相同指针。
-    // - 当后续请求的 nbytes 超过已有容量时，运行时会释放旧块并重新分配更大块；
-    //   旧指针随即失效，调用方不得跨增长边界缓存旧 workspace 指针。
+    // Runtime-owned workspace; callers must not free the returned pointer.
+    // Same-device requests reuse the current block when capacity is enough.
+    // Growth allocates a larger block and retires the old block for cleanup at registry destruction.
     if (nbytes == 0)
         return static_cast<void*>(nullptr);
 

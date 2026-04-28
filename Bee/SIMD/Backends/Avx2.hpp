@@ -430,6 +430,16 @@ struct SimdBackend<uint8_t, IsaAvx2>
                          static_cast<uint32_t>(buf[3] & 0xFFFF);
         return static_cast<uint8_t>(total);
     }
+
+    static auto reduce_sum_wide(reg v) -> uint32_t
+    {
+        __m256i              zero = _mm256_setzero_si256();
+        __m256i              sad  = _mm256_sad_epu8(v, zero);
+        alignas(32) uint64_t buf[4];
+        _mm256_store_si256(reinterpret_cast<__m256i*>(buf), sad);
+        return static_cast<uint32_t>(buf[0] & 0xFFFF) + static_cast<uint32_t>(buf[1] & 0xFFFF) + static_cast<uint32_t>(buf[2] & 0xFFFF) +
+               static_cast<uint32_t>(buf[3] & 0xFFFF);
+    }
 };
 
 } // namespace bee::simd

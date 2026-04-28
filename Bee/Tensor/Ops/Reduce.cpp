@@ -199,6 +199,13 @@ auto mean(const Tensor& a) -> Result<Tensor>
     if (a.numel() == 0)
         return std::unexpected(make_error("mean: 不支持空张量（numel == 0）", Severity::Recoverable));
 
+    if (a.dtype() == DType::F16 || a.dtype() == DType::BF16) {
+        auto f32 = cast(a, DType::F32);
+        if (!f32)
+            return std::unexpected(std::move(f32.error()));
+        return mean(*f32);
+    }
+
     const DType out_dt = mean_out_dtype(a.dtype());
     auto        out    = Tensor::empty({}, out_dt, a.device());
     if (!out)
@@ -330,6 +337,13 @@ auto mean(const Tensor& a, int dim, bool keepdim) -> Result<Tensor>
     const int64_t K = a.shape()[static_cast<std::size_t>(d)];
     if (K == 0)
         return std::unexpected(make_error("mean: 被 reduce 的维度大小为 0", Severity::Recoverable));
+
+    if (a.dtype() == DType::F16 || a.dtype() == DType::BF16) {
+        auto f32 = cast(a, DType::F32);
+        if (!f32)
+            return std::unexpected(std::move(f32.error()));
+        return mean(*f32, dim, keepdim);
+    }
 
     const DType out_dt = mean_out_dtype(a.dtype());
     auto        out    = make_axis_out(a, d, keepdim, out_dt);

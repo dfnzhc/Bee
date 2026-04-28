@@ -176,6 +176,7 @@ struct SimdBackend<uint8_t, IsaScalar>
     static auto max(reg a, reg b) -> reg { return std::max(a, b); }
 
     static auto reduce_sum(reg v) -> uint8_t { return v; }
+    static auto reduce_sum_wide(reg v) -> uint32_t { return static_cast<uint32_t>(v); }
     static auto reduce_min(reg v) -> uint8_t { return v; }
     static auto reduce_max(reg v) -> uint8_t { return v; }
     // clang-format on

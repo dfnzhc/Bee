@@ -442,6 +442,18 @@ struct SimdBackend<uint8_t, IsaAvx512>
             total += static_cast<uint32_t>(buf[i] & 0xFFFF);
         return static_cast<uint8_t>(total);
     }
+
+    static auto reduce_sum_wide(reg v) -> uint32_t
+    {
+        __m512i              zero = _mm512_setzero_si512();
+        __m512i              sad  = _mm512_sad_epu8(v, zero);
+        alignas(64) uint64_t buf[8];
+        _mm512_store_si512(reinterpret_cast<__m512i*>(buf), sad);
+        uint32_t total = 0;
+        for (int i = 0; i < 8; ++i)
+            total += static_cast<uint32_t>(buf[i] & 0xFFFF);
+        return total;
+    }
 };
     #endif // __AVX512BW__
 

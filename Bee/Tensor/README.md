@@ -31,6 +31,14 @@ cmake -S .. -B . -DCMAKE_BUILD_TYPE=Debug
 cmake --build . --config Debug
 ```
 
+## Current implementation notes
+
+- CUDA `contiguous()` uses the device-side `strided_copy` path for general strided materialization instead of falling back through CPU for ordinary non-contiguous views.
+- `matmul` supports 2D and batched/broadcasted matrix multiplication. CUDA low-precision batched matmul for F16/BF16 is still unsupported; cast to F32 first when that path is needed.
+- F16/BF16 `sum` and `mean` promote through F32 accumulation and return F32 results.
+- Binary elementwise operations still require matching dtypes. CPU supports broadcasting and non-contiguous inputs; CUDA currently requires equal shapes and contiguous tensors.
+- CUDA `mean(I32/I64)` is still unsupported and returns a recoverable error, while CPU returns F64.
+
 ### CMake 选项
 
 | 选项                        | 默认值   | 说明 |

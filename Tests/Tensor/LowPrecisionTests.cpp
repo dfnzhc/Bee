@@ -405,6 +405,29 @@ TEST(LowPrecisionTests, AxisSumOfF16ReturnsF32)
     EXPECT_NEAR(p[1], 3.0f, 0.05f);
 }
 
+TEST(LowPrecisionTests, MeanOfF16ReturnsF32Scalar)
+{
+    auto src    = bee::cast(bee::Tensor::full({8}, bee::DType::F32, 2.0).value(), bee::DType::F16).value();
+    auto result = bee::mean(src).value();
+
+    EXPECT_EQ(result.dtype(), bee::DType::F32);
+    const auto* p = static_cast<const float*>(result.data_ptr());
+    EXPECT_NEAR(p[0], 2.0f, 0.05f);
+}
+
+TEST(LowPrecisionTests, AxisMeanOfBF16ReturnsF32)
+{
+    auto src_f32 = bee::Tensor::full({2, 4}, bee::DType::F32, 3.0).value();
+    auto src     = bee::cast(src_f32, bee::DType::BF16).value();
+    auto result  = bee::mean(src, 1, false).value();
+
+    EXPECT_EQ(result.dtype(), bee::DType::F32);
+    EXPECT_EQ(result.shape(), (bee::Shape{2}));
+    const auto* p = static_cast<const float*>(result.data_ptr());
+    EXPECT_NEAR(p[0], 3.0f, 0.05f);
+    EXPECT_NEAR(p[1], 3.0f, 0.05f);
+}
+
 TEST(LowPrecisionTests, AxisSumOfBF16ReturnsF32WithKeepdim)
 {
     // BF16 按轴 sum（keepdim=true）应提升到 F32，shape 保留被 reduce 的维度为 1

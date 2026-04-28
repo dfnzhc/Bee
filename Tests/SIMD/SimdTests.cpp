@@ -130,6 +130,7 @@ TEST(SimdScalar, U8_AddSubMinMax)
     EXPECT_EQ(B::sub(B::set1(100), B::set1(50)), uint8_t(50));
     EXPECT_EQ(B::min(B::set1(10), B::set1(20)), uint8_t(10));
     EXPECT_EQ(B::max(B::set1(10), B::set1(20)), uint8_t(20));
+    EXPECT_EQ(B::reduce_sum_wide(B::set1(255)), 255u);
 }
 
 // =====================================================================
@@ -412,6 +413,15 @@ TEST(SimdAvx2, U8_ReduceSumOverflowWrapsToU8)
     for (int i = 0; i < 32; ++i)
         src[i] = 255;
     EXPECT_EQ(B::reduce_sum(B::load(src)), static_cast<uint8_t>(32u * 255u));
+}
+
+TEST(SimdAvx2, U8_ReduceSumWideDoesNotWrap)
+{
+    using B = SimdBackend<uint8_t, IsaAvx2>;
+    alignas(32) uint8_t src[32];
+    for (int i = 0; i < 32; ++i)
+        src[i] = 255;
+    EXPECT_EQ(B::reduce_sum_wide(B::load(src)), 32u * 255u);
 }
 
 TEST(SimdAvx2, Float_MinMaxNaNMatchesHardwareSecondOperandRule)

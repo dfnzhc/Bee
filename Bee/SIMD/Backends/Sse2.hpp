@@ -411,6 +411,14 @@ struct SimdBackend<uint8_t, IsaSse2>
     }
 
     // 水平求最小值：逐步折叠
+    static auto reduce_sum_wide(reg v) -> uint32_t
+    {
+        __m128i zero = _mm_setzero_si128();
+        __m128i sad  = _mm_sad_epu8(v, zero);
+        __m128i hi   = _mm_srli_si128(sad, 8);
+        return static_cast<uint32_t>(_mm_cvtsi128_si32(sad)) + static_cast<uint32_t>(_mm_cvtsi128_si32(hi));
+    }
+
     static auto reduce_min(reg v) -> uint8_t
     {
         __m128i t = _mm_min_epu8(v, _mm_srli_si128(v, 8));

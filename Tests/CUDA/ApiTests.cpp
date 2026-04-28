@@ -126,6 +126,29 @@ TEST(CUDAComponent, MemcpyD2DWorks)
     cuda::deallocate(*b, N * sizeof(float), 16);
 }
 
+TEST(CUDAComponent, WorkspaceGrowthKeepsOldPointerValid)
+{
+    if (cuda::device_count() <= 0) {
+        GTEST_SKIP() << "No CUDA device available";
+    }
+    ASSERT_TRUE(cuda::set_device(0).has_value());
+
+    auto small = cuda::request_workspace(64, nullptr);
+    ASSERT_TRUE(small.has_value()) << small.error().message.view();
+    ASSERT_NE(*small, nullptr);
+    ASSERT_TRUE(cuda::memset(*small, 0x5A, 64).has_value());
+
+    auto large = cuda::request_workspace(4096, nullptr);
+    ASSERT_TRUE(large.has_value()) << large.error().message.view();
+    ASSERT_NE(*large, nullptr);
+    ASSERT_TRUE(cuda::memset(*large, 0, 4096).has_value());
+
+    std::vector<std::uint8_t> back(64, 0);
+    ASSERT_TRUE(cuda::memcpy_d2h(back.data(), *small, back.size()).has_value());
+    for (auto v : back)
+        EXPECT_EQ(v, 0x5Au);
+}
+
 TEST(CUDAAiPrimitiveApi, RmsNormRejectsInvalidDimensionsBeforeBridge)
 {
     float value = 0.0f;
@@ -194,7 +217,7 @@ TEST(CUDAMatmulBackend, SetReturnsPrevious)
     EXPECT_EQ(cuda::ops::get_matmul_backend(), cuda::ops::MatmulBackend::Auto);
 }
 
-TEST(CUDAMatmulBackend, CutlassReturnsNotImplemented)
+TEST(CUDAMatmulBackend, CutlassDispatchesWhenAvailable)
 {
     if (cuda::device_count() == 0)
         GTEST_SKIP() << "No CUDA device";
@@ -203,11 +226,15 @@ TEST(CUDAMatmulBackend, CutlassReturnsNotImplemented)
     auto B = cuda::allocate(4 * 4 * sizeof(float), 16).value();
     auto C = cuda::allocate(4 * 4 * sizeof(float), 16).value();
 
-    const auto prev = cuda::ops::set_matmul_backend(cuda::ops::MatmulBackend::Cutlass);
-    auto       r    = cuda::ops::matmul(cuda::ScalarType::F32, A, B, C, 4, 4, 4);
-    EXPECT_FALSE(r);
-    if (!r)
-        EXPECT_NE(r.error().message.view().find("Cutlass"), std::string_view::npos);
+    const auto prev      = cuda::ops::set_matmul_backend(cuda::ops::MatmulBackend::Cutlass);
+    const bool available = cuda::ops::matmul_backend_available(cuda::ops::MatmulBackend::Cutlass);
+    auto       r         = cuda::ops::matmul(cuda::ScalarType::F32, A, B, C, 4, 4, 4);
+    if (available) {
+        EXPECT_TRUE(r) << (r ? "" : r.error().message.view());
+    } else {
+        ASSERT_FALSE(r);
+        EXPECT_EQ(r.error().errc, static_cast<int>(cudaErrorNotSupported));
+    }
     cuda::ops::set_matmul_backend(prev);
 
     cuda::deallocate(A, 4 * 4 * sizeof(float), 16);
