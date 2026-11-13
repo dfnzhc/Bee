@@ -1,0 +1,8 @@
+[package]
+name = "bee-vulkan"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+ash = "=0.38.0"

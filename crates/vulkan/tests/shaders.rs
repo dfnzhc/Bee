@@ -1,0 +1,56 @@
+use std::path::PathBuf;
+use std::process::Command;
+
+fn compiler() -> PathBuf {
+    PathBuf::from(std::env::var_os("VULKAN_SDK").expect("VULKAN_SDK is required"))
+        .join("Bin")
+        .join("glslc.exe")
+}
+
+#[test]
+fn shader_build_is_reproducible() {
+    let source = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("shaders/foundation.vert");
+    let output = PathBuf::from(env!("OUT_DIR")).join("foundation.reproduced.spv");
+    let result = Command::new(compiler())
+        .args(["--target-env=vulkan1.0", "-fshader-stage=vert", "-O"])
+        .arg(source)
+        .arg("-o")
+        .arg(&output)
+        .output()
+        .unwrap();
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let validator = Command::new(compiler().with_file_name("spirv-val.exe"))
+        .args(["--target-env", "vulkan1.0"])
+        .arg(&output)
+        .output()
+        .unwrap();
+    assert!(
+        validator.status.success(),
+        "{}",
+        String::from_utf8_lossy(&validator.stderr)
+    );
+    let bytes = std::fs::read(output).unwrap();
+    assert_eq!(&bytes[..4], &[0x03, 0x02, 0x23, 0x07]);
+    assert_eq!(bytes, bee_vulkan::FOUNDATION_SHADER);
+}
+
+#[test]
+fn shader_errors_identify_the_source_and_line() {
+    let source = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/invalid.vert");
+    let output = PathBuf::from(env!("OUT_DIR")).join("invalid.spv");
+    let result = Command::new(compiler())
+        .args(["--target-env=vulkan1.0", "-fshader-stage=vert", "-O"])
+        .arg(source)
+        .arg("-o")
+        .arg(output)
+        .output()
+        .unwrap();
+    let error = String::from_utf8_lossy(&result.stderr);
+    assert!(!result.status.success());
+    assert!(error.contains("invalid.vert:2:"), "{error}");
+    assert!(error.contains("error"), "{error}");
+}

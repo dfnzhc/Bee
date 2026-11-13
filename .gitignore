@@ -387,6 +387,7 @@ docs/*
 .github
 
 .worktrees/
+/target/
 
 # Benchmark baseline JSON snapshots (not versioned)
 Benchmarks/baseline/

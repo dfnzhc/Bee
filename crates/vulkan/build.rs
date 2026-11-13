@@ -1,0 +1,45 @@
+use std::env;
+use std::path::PathBuf;
+use std::process::Command;
+
+const COMPILER_VERSION: &str = "shaderc v2023.8 v2025.3\n\
+spirv-tools v2025.3 v2022.4-833-g33e02568\n\
+glslang 11.1.0-1253-gefd24d75";
+
+fn main() {
+    println!("cargo:rerun-if-env-changed=VULKAN_SDK");
+    println!("cargo:rerun-if-changed=shaders/foundation.vert");
+    let sdk = env::var_os("VULKAN_SDK").expect("VULKAN_SDK must point to Vulkan SDK 1.4.321.1");
+    let compiler = PathBuf::from(sdk).join("Bin").join("glslc.exe");
+    println!("cargo:rerun-if-changed={}", compiler.display());
+    let version = Command::new(&compiler)
+        .arg("--version")
+        .output()
+        .unwrap_or_else(|error| panic!("could not run {}: {error}", compiler.display()));
+    let version_text = String::from_utf8_lossy(&version.stdout).replace("\r\n", "\n");
+    assert!(
+        version.status.success() && version_text.starts_with(COMPILER_VERSION),
+        "expected Vulkan SDK 1.4.321.1 glslc; {} reported:\n{}{}",
+        compiler.display(),
+        version_text,
+        String::from_utf8_lossy(&version.stderr)
+    );
+    let output_path = PathBuf::from(env::var_os("OUT_DIR").unwrap()).join("foundation.vert.spv");
+    let output = Command::new(&compiler)
+        .args([
+            "--target-env=vulkan1.0",
+            "-fshader-stage=vert",
+            "-O",
+            "shaders/foundation.vert",
+            "-o",
+        ])
+        .arg(output_path)
+        .output()
+        .unwrap_or_else(|error| panic!("could not run {}: {error}", compiler.display()));
+    assert!(
+        output.status.success(),
+        "GLSL compilation failed:\n{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
