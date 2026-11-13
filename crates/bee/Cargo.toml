@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+bee-scene = { path = "../scene" }
 bee-vulkan = { path = "../vulkan" }
 gpui = { version = "=0.2.2", default-features = false, features = ["windows-manifest"] }
 image = { version = "0.25.10", default-features = false }

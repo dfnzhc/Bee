@@ -1,7 +1,9 @@
 use crate::Bee;
+use bee_scene::{SceneState, Versions};
 use bee_vulkan::{Backend, TestImage};
 use gpui::{
-    canvas, div, prelude::*, px, rgb, Bounds, Context, Corners, Pixels, RenderImage, Window,
+    canvas, div, prelude::*, px, rgb, Bounds, Context, Corners, MouseButton, Pixels, Point,
+    RenderImage, Window,
 };
 use std::sync::Arc;
 
@@ -13,10 +15,13 @@ static PAINTED_IMAGES: std::sync::atomic::AtomicUsize = std::sync::atomic::Atomi
 pub struct Viewport {
     backend: Option<Arc<Backend>>,
     extent: Option<Extent>,
+    versions: Option<Versions>,
     generation: u64,
     running: bool,
     image: Option<Arc<RenderImage>>,
+    image_versions: Option<Versions>,
     error: Option<String>,
+    drag_position: Option<Point<Pixels>>,
 }
 
 impl Viewport {
@@ -24,25 +29,32 @@ impl Viewport {
         Self {
             backend,
             extent: None,
+            versions: None,
             generation: 0,
             running: false,
             image: None,
+            image_versions: None,
             error: None,
+            drag_position: None,
         }
     }
 
-    pub fn render(&self, cx: &mut Context<Bee>) -> impl IntoElement {
+    pub fn render(&self, state: &SceneState, cx: &mut Context<Bee>) -> impl IntoElement {
+        let extent = self.extent;
+        let versions = state.versions();
+        let requested_versions = self.versions;
+        let image = (self.image_versions == Some(versions))
+            .then(|| self.image.clone())
+            .flatten();
         let status = if self.error.is_some() {
             "Viewport error; see device info"
         } else if self.backend.is_none() {
             "Viewport unavailable"
-        } else if self.image.is_some() {
+        } else if image.is_some() {
             "Image path: async Vulkan readback"
         } else {
             "Preparing Vulkan image..."
         };
-        let extent = self.extent;
-        let image = self.image.clone();
         let resize_view = cx.weak_entity();
         let error_view = resize_view.clone();
         div()
@@ -67,50 +79,115 @@ impl Viewport {
                     .child(status),
             )
             .child(
-                canvas(
-                    move |bounds, window, cx| {
-                        // 延后处理尺寸变化，并隐藏尺寸过期的图像。
-                        let next = physical_extent(bounds, window.scale_factor());
-                        if next != extent {
-                            window.defer(cx, move |window, cx| {
-                                resize_view
-                                    .update(cx, |view, cx| view.viewport.resize(next, window, cx))
-                                    .ok();
-                            });
+                div()
+                    .id("scene-canvas")
+                    .debug_selector(|| "scene-canvas".into())
+                    .w_full()
+                    .flex_1()
+                    .min_h_0()
+                    .bg(rgb(0x111417))
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(|view, event: &gpui::MouseDownEvent, _, _| {
+                            view.viewport.drag_position = Some(event.position);
+                        }),
+                    )
+                    .on_mouse_move(cx.listener(|view, event: &gpui::MouseMoveEvent, _, cx| {
+                        let Some(previous) = view.viewport.drag_position else {
+                            return;
+                        };
+                        if event.pressed_button != Some(MouseButton::Left) {
+                            view.viewport.drag_position = None;
+                            return;
                         }
-                        (next == extent).then_some(image).flatten()
-                    },
-                    move |bounds, image, window, cx| {
-                        if let Some(image) = image {
-                            let id = image.id;
-                            let result =
-                                window.paint_image(bounds, Corners::default(), image, 0, false);
-                            #[cfg(test)]
-                            if result.is_ok() {
-                                PAINTED_IMAGES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                            }
-                            if let Err(error) = result {
-                                let reason = format!("GPUI image upload failed: {error:#}");
-                                window.defer(cx, move |window, cx| {
-                                    error_view
-                                        .update(cx, |view, cx| {
-                                            // 旧图像上传失败时不能清除已替换的新图像。
-                                            if view.viewport.image.as_ref().map(|image| image.id)
-                                                == Some(id)
-                                            {
-                                                view.viewport.fail(reason, window);
-                                                cx.notify();
-                                            }
-                                        })
-                                        .ok();
-                                });
-                            }
+                        view.viewport.drag_position = Some(event.position);
+                        let horizontal = f32::from(event.position.x - previous.x);
+                        let vertical = f32::from(event.position.y - previous.y);
+                        let mut camera = view.state.camera();
+                        if camera.orbit(horizontal, vertical) && view.state.set_camera(camera) {
+                            cx.notify();
                         }
-                    },
-                )
-                .w_full()
-                .flex_1()
-                .bg(rgb(0x111417)),
+                    }))
+                    .on_mouse_up(
+                        MouseButton::Left,
+                        cx.listener(|view, _: &gpui::MouseUpEvent, _, _| {
+                            view.viewport.drag_position = None;
+                        }),
+                    )
+                    .on_mouse_up_out(
+                        MouseButton::Left,
+                        cx.listener(|view, _: &gpui::MouseUpEvent, _, _| {
+                            view.viewport.drag_position = None;
+                        }),
+                    )
+                    .on_scroll_wheel(cx.listener(|view, event: &gpui::ScrollWheelEvent, _, cx| {
+                        let scroll = f32::from(event.delta.pixel_delta(px(20.0)).y);
+                        let mut camera = view.state.camera();
+                        if camera.zoom(scroll) && view.state.set_camera(camera) {
+                            cx.notify();
+                        }
+                    }))
+                    .child(
+                        canvas(
+                            move |bounds, window, cx| {
+                                // 延后同步尺寸和状态，并隐藏已过期的图像。
+                                let next = physical_extent(bounds, window.scale_factor());
+                                if next != extent || requested_versions != Some(versions) {
+                                    window.defer(cx, move |window, cx| {
+                                        resize_view
+                                            .update(cx, |view, cx| {
+                                                view.viewport.synchronize(
+                                                    next,
+                                                    &view.state,
+                                                    window,
+                                                    cx,
+                                                )
+                                            })
+                                            .ok();
+                                    });
+                                }
+                                (next == extent).then_some(image).flatten()
+                            },
+                            move |bounds, image, window, cx| {
+                                if let Some(image) = image {
+                                    let id = image.id;
+                                    let result = window.paint_image(
+                                        bounds,
+                                        Corners::default(),
+                                        image,
+                                        0,
+                                        false,
+                                    );
+                                    #[cfg(test)]
+                                    if result.is_ok() {
+                                        PAINTED_IMAGES
+                                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                    }
+                                    if let Err(error) = result {
+                                        let reason = format!("GPUI image upload failed: {error:#}");
+                                        window.defer(cx, move |window, cx| {
+                                            error_view
+                                                .update(cx, |view, cx| {
+                                                    // 旧图像上传失败时不能清除已替换的新图像。
+                                                    if view
+                                                        .viewport
+                                                        .image
+                                                        .as_ref()
+                                                        .map(|image| image.id)
+                                                        == Some(id)
+                                                    {
+                                                        view.viewport.fail(reason, window);
+                                                        cx.notify();
+                                                    }
+                                                })
+                                                .ok();
+                                        });
+                                    }
+                                }
+                            },
+                        )
+                        .size_full(),
+                    ),
             )
     }
 
@@ -118,21 +195,29 @@ impl Viewport {
         self.error.as_deref()
     }
 
-    fn resize(&mut self, extent: Option<Extent>, window: &mut Window, cx: &mut Context<Bee>) {
-        if self.extent == extent {
+    fn synchronize(
+        &mut self,
+        extent: Option<Extent>,
+        state: &SceneState,
+        window: &mut Window,
+        cx: &mut Context<Bee>,
+    ) {
+        let versions = state.versions();
+        if self.extent == extent && self.versions == Some(versions) {
             return;
         }
 
         // 使进行中的读回结果失效，并释放旧的图集图像。
         self.extent = extent;
+        self.versions = Some(versions);
         self.generation = self.generation.wrapping_add(1);
         self.error = None;
         self.drop_image(window);
-        self.start(window, cx);
+        self.start(state, window, cx);
         cx.notify();
     }
 
-    fn start(&mut self, window: &mut Window, cx: &mut Context<Bee>) {
+    fn start(&mut self, state: &SceneState, window: &mut Window, cx: &mut Context<Bee>) {
         let (Some(backend), Some((width, height))) = (&self.backend, self.extent) else {
             return;
         };
@@ -144,27 +229,36 @@ impl Viewport {
         self.running = true;
         let backend = backend.clone();
         let generation = self.generation;
+        let snapshot = state.snapshot();
 
-        // Vulkan 提交和读回不能阻塞 UI 线程。
+        // 后台任务持有快照，直到 Vulkan 提交和读回完成。
         let task = cx.background_spawn(async move {
-            backend
+            let result = backend
                 .submit_test_image(width, height)
                 .and_then(|pending| pending.read())
                 .map_err(|error| format!("Vulkan image readback failed: {error:#}"))
-                .and_then(render_image)
+                .and_then(render_image);
+            (snapshot, result)
         });
         cx.spawn_in(window, async move |view, cx| {
-            let result = task.await;
+            let (snapshot, result) = task.await;
             view.update_in(cx, |view, window, cx| {
                 view.viewport.running = false;
-                // 丢弃过期结果，并开始处理最新请求的尺寸。
-                if view.viewport.generation == generation {
+                // 丢弃过期结果，并开始处理最新的尺寸和状态。
+                if view.viewport.generation == generation
+                    && snapshot.versions == view.state.versions()
+                {
                     match result {
-                        Ok(image) => view.viewport.image = Some(image),
+                        Ok(image) => {
+                            view.viewport.image_versions = Some(snapshot.versions);
+                            view.viewport.image = Some(image);
+                        }
                         Err(reason) => view.viewport.fail(reason, window),
                     }
                 } else {
-                    view.viewport.start(window, cx);
+                    let extent = view.viewport.extent;
+                    view.viewport.synchronize(extent, &view.state, window, cx);
+                    view.viewport.start(&view.state, window, cx);
                 }
                 cx.notify();
             })
@@ -180,6 +274,7 @@ impl Viewport {
     }
 
     fn drop_image(&mut self, window: &mut Window) {
+        self.image_versions = None;
         if let Some(image) = self.image.take() {
             if let Err(error) = window.drop_image(image) {
                 eprintln!("Could not release GPUI image: {error:#}");
@@ -231,7 +326,7 @@ fn render_image(image: TestImage) -> Result<Arc<RenderImage>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gpui::{point, px, size};
+    use gpui::{point, px, size, Modifiers, ScrollDelta, ScrollWheelEvent};
 
     #[test]
     fn readback_removes_padding_without_changing_bgra() {
@@ -276,6 +371,72 @@ mod tests {
             ),
             None
         );
+    }
+
+    #[test]
+    fn viewport_mouse_input_changes_camera() {
+        let mut app = gpui::TestAppContext::single();
+        let (view, cx) = app.add_window_view(|_, _| Bee::failure("test device".into()));
+        cx.draw(
+            point(px(0.0), px(0.0)),
+            size(px(700.0), px(500.0)),
+            |_, _| view.clone(),
+        );
+
+        let start = point(px(100.0), px(150.0));
+        let end = point(px(150.0), px(180.0));
+        let bounds = cx.debug_bounds("scene-canvas").unwrap();
+        assert!(bounds.contains(&end), "viewport bounds: {bounds:?}");
+        let initial = cx.update(|_, cx| view.read(cx).state.camera());
+        cx.simulate_mouse_move(start, None, Modifiers::none());
+        cx.simulate_mouse_down(start, MouseButton::Left, Modifiers::none());
+        assert_eq!(
+            cx.update(|_, cx| view.read(cx).viewport.drag_position),
+            Some(start),
+            "viewport bounds: {:?}",
+            cx.debug_bounds("scene-canvas")
+        );
+        cx.simulate_mouse_move(end, MouseButton::Left, Modifiers::none());
+        assert_eq!(
+            cx.update(|_, cx| view.read(cx).viewport.drag_position),
+            Some(end)
+        );
+        let rotated = cx.update(|_, cx| view.read(cx).state.camera());
+        assert_ne!(rotated.position(), initial.position());
+        assert_ne!(
+            rotated.view_transform().unwrap(),
+            initial.view_transform().unwrap()
+        );
+
+        cx.simulate_mouse_up(
+            point(px(690.0), px(480.0)),
+            MouseButton::Left,
+            Modifiers::none(),
+        );
+        cx.simulate_mouse_move(start, None, Modifiers::none());
+        assert_eq!(cx.update(|_, cx| view.read(cx).state.camera()), rotated);
+        cx.simulate_event(ScrollWheelEvent {
+            position: start,
+            delta: ScrollDelta::Lines(point(0.0, 1.0)),
+            ..Default::default()
+        });
+        let zoomed = cx.update(|_, cx| view.read(cx).state.camera());
+        assert!(zoomed.distance < rotated.distance);
+        assert_ne!(
+            zoomed.view_transform().unwrap(),
+            rotated.view_transform().unwrap()
+        );
+        assert_eq!(cx.update(|_, cx| view.read(cx).state.versions().camera), 2);
+        cx.draw(
+            point(px(0.0), px(0.0)),
+            size(px(700.0), px(500.0)),
+            |_, _| view.clone(),
+        );
+        cx.run_until_parked();
+        cx.update(|_, cx| {
+            let view = view.read(cx);
+            assert_eq!(view.viewport.versions, Some(view.state.versions()));
+        });
     }
 
     #[test]
@@ -395,10 +556,43 @@ mod tests {
             assert!(!viewport.running);
         });
 
+        // 在途任务结束后，只接受最新场景、相机和参数对应的图像。
+        view.update_in(cx, |view, window, cx| {
+            view.viewport
+                .synchronize(Some((23, 11)), &view.state, window, cx);
+            assert!(view.viewport.running);
+
+            let mut scene = view.state.scene().clone();
+            scene.materials[0].albedo[0] = 0.4;
+            assert!(view.state.set_scene(scene));
+            let mut camera = view.state.camera();
+            assert!(camera.orbit(20.0, 10.0));
+            assert!(view.state.set_camera(camera));
+            assert!(view
+                .state
+                .set_render_parameters(bee_scene::RenderParameters {
+                    max_path_bounces: 3,
+                }));
+            assert!(view
+                .state
+                .set_display_parameters(bee_scene::DisplayParameters { exposure_ev: 1.0 }));
+            assert_ne!(view.viewport.versions, Some(view.state.versions()));
+        });
+        cx.run_until_parked();
+        cx.update(|_, cx| {
+            let view = view.read(cx);
+            assert!(!view.viewport.running);
+            assert!(view.viewport.image.is_some());
+            assert_eq!(view.viewport.versions, Some(view.state.versions()));
+            assert_eq!(view.viewport.image_versions, Some(view.state.versions()));
+        });
+
         // 只显示最新尺寸的图像；尺寸为空时清除图像。
         view.update_in(cx, |view, window, cx| {
-            view.viewport.resize(Some((17, 9)), window, cx);
-            view.viewport.resize(Some((7, 13)), window, cx);
+            view.viewport
+                .synchronize(Some((17, 9)), &view.state, window, cx);
+            view.viewport
+                .synchronize(Some((7, 13)), &view.state, window, cx);
             assert!(view.viewport.running);
             assert!(view.viewport.image.is_none());
         });
@@ -412,8 +606,9 @@ mod tests {
         });
 
         view.update_in(cx, |view, window, cx| {
-            view.viewport.resize(Some((19, 11)), window, cx);
-            view.viewport.resize(None, window, cx);
+            view.viewport
+                .synchronize(Some((19, 11)), &view.state, window, cx);
+            view.viewport.synchronize(None, &view.state, window, cx);
             assert!(view.viewport.image.is_none());
             assert!(view.viewport.running);
         });
@@ -434,7 +629,8 @@ mod tests {
 
         // 读回和上传失败时应清除图像，并在尺寸变化后恢复。
         view.update_in(cx, |view, window, cx| {
-            view.viewport.resize(Some((u32::MAX, 1)), window, cx);
+            view.viewport
+                .synchronize(Some((u32::MAX, 1)), &view.state, window, cx);
         });
         cx.run_until_parked();
         cx.update(|_, cx| {
@@ -443,7 +639,8 @@ mod tests {
             assert!(viewport.error.as_ref().unwrap().contains("readback failed"));
         });
         view.update_in(cx, |view, window, cx| {
-            view.viewport.resize(Some((17, 9)), window, cx);
+            view.viewport
+                .synchronize(Some((17, 9)), &view.state, window, cx);
         });
         cx.run_until_parked();
         cx.update(|_, cx| {

@@ -504,10 +504,18 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 name = "bee"
 version = "0.1.0"
 dependencies = [
+ "bee-scene",
  "bee-vulkan",
  "gpui",
  "image",
  "windows 0.61.3",
+]
+
+[[package]]
+name = "bee-scene"
+version = "0.1.0"
+dependencies = [
+ "euclid",
 ]
 
 [[package]]

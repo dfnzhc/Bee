@@ -1,5 +1,6 @@
 mod viewport;
 
+use bee_scene::SceneState;
 use gpui::{
     div, prelude::*, px, relative, rgb, size, App, Application, Bounds, Context, Window,
     WindowBounds, WindowOptions,
@@ -9,6 +10,7 @@ use viewport::Viewport;
 
 struct Bee {
     viewport: Viewport,
+    state: SceneState,
     lines: Vec<String>,
     failed: bool,
 }
@@ -53,6 +55,7 @@ impl Bee {
                 }
                 Self {
                     viewport: Viewport::new(Some(Arc::new(backend))),
+                    state: SceneState::default(),
                     lines,
                     failed: false,
                 }
@@ -66,6 +69,7 @@ impl Bee {
         eprintln!("{message}");
         Self {
             viewport: Viewport::new(None),
+            state: SceneState::default(),
             lines: vec![message],
             failed: true,
         }
@@ -74,6 +78,17 @@ impl Bee {
 
 impl Render for Bee {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let position = self.state.camera().position();
+        let scene_info = [
+            format!(
+                "Scene data: {} instances",
+                self.state.scene().instances.len()
+            ),
+            format!(
+                "Camera: {:.2}, {:.2}, {:.2}",
+                position.x, position.y, position.z
+            ),
+        ];
         div()
             .size_full()
             .flex()
@@ -90,7 +105,7 @@ impl Render for Bee {
                     .min_h_0()
                     .gap_4()
                     // 并排显示视口和设备报告。
-                    .child(self.viewport.render(cx))
+                    .child(self.viewport.render(&self.state, cx))
                     .child(
                         div()
                             .id("device-info")
@@ -107,7 +122,7 @@ impl Render for Bee {
                                 rgb(0xd1d7d4)
                             })
                             .children(
-                                self.lines.iter().cloned().chain(
+                                self.lines.iter().cloned().chain(scene_info).chain(
                                     self.viewport
                                         .error()
                                         .map(|error| format!("Viewport error: {error}")),
