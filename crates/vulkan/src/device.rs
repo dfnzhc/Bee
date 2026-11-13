@@ -124,6 +124,8 @@ impl InstanceState {
             .context("could not enumerate Vulkan validation layers")?;
         let extensions = unsafe { entry.enumerate_instance_extension_properties(None) }
             .context("could not enumerate Vulkan instance extensions")?;
+
+        // 验证层或调试扩展缺失时，仍允许继续初始化。
         let has_layer = layers
             .iter()
             .any(|layer| unsafe { CStr::from_ptr(layer.layer_name.as_ptr()) } == VALIDATION_LAYER);
@@ -172,6 +174,8 @@ impl InstanceState {
             .application_info(&app_info)
             .enabled_layer_names(&layer_names)
             .enabled_extension_names(&extension_names);
+
+        // 同时捕获实例创建期间及创建后的验证消息。
         if validation == ValidationStatus::Enabled {
             create_info = create_info.push_next(&mut debug_info);
         }
@@ -220,6 +224,8 @@ fn query_ray_features(
     if api_version < vk::API_VERSION_1_1 {
         return result;
     }
+
+    // 只查询核心版本或扩展支持的特性结构。
     let supports = |name: &CStr| extensions.contains(name.to_str().unwrap());
     let has_bda =
         api_version >= vk::API_VERSION_1_2 || supports(ash::khr::buffer_device_address::NAME);
@@ -294,6 +300,8 @@ impl Backend {
         let devices = unsafe { instance.instance.enumerate_physical_devices() }
             .context("could not enumerate Vulkan devices")?;
         let mut failures = Vec::new();
+
+        // 某个设备没有图形队列或创建失败时，继续检查其他设备。
         for physical_device in devices {
             let properties = unsafe {
                 instance
@@ -335,6 +343,8 @@ impl Backend {
             }
             let api_version = instance.api_version.min(properties.api_version);
             let features = query_ray_features(&instance, physical_device, api_version, &extensions);
+
+            // 缺少光线追踪能力不影响图形设备初始化。
             let mut ray_tracing_missing =
                 missing_ray_capabilities(api_version, &extensions, &features);
             let priorities = [1.0];
@@ -363,6 +373,8 @@ impl Backend {
                 }
                 unsafe { instance.instance.create_device(physical_device, &create_info, None) }
             };
+
+            // 启用光线追踪失败时，回退为仅支持图形的设备。
             let device = if ray_tracing_missing.is_empty() {
                 match create_device(true, &mut bda, &mut acceleration, &mut pipeline) {
                     Ok(device) => Ok(device),

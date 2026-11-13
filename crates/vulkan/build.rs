@@ -12,6 +12,7 @@ fn main() {
     let sdk = env::var_os("VULKAN_SDK").expect("VULKAN_SDK must point to Vulkan SDK 1.4.321.1");
     let compiler = PathBuf::from(sdk).join("Bin").join("glslc.exe");
     println!("cargo:rerun-if-changed={}", compiler.display());
+    // 固定编译器版本，确保嵌入的 SPIR-V 可以复现。
     let version = Command::new(&compiler)
         .arg("--version")
         .output()

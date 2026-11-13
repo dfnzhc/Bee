@@ -8,6 +8,7 @@ pub(crate) fn ray_extensions(api_version: u32) -> Vec<&'static CStr> {
         ash::khr::ray_tracing_pipeline::NAME,
         ash::khr::deferred_host_operations::NAME,
     ];
+    // 这些依赖在 Vulkan 1.2 中已纳入核心 API。
     if api_version < vk::API_VERSION_1_2 {
         extensions.extend([
             ash::khr::buffer_device_address::NAME,
@@ -48,6 +49,8 @@ pub(crate) fn missing_ray_capabilities(
     if api_version < vk::API_VERSION_1_1 {
         missing.push("Vulkan 1.1 is required for ray tracing".into());
     }
+
+    // 分别报告缺失的扩展、特性和属性。
     for extension in ray_extensions(api_version) {
         let name = extension
             .to_str()
@@ -65,6 +68,8 @@ pub(crate) fn missing_ray_capabilities(
             missing.push(format!("feature {name}"));
         }
     }
+
+    // 句柄对齐后，着色器组仍须符合设备的步长限制。
     let alignment = features.shader_group_handle_alignment;
     let aligned_handle_size = if alignment.is_power_of_two() {
         features

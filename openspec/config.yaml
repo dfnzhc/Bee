@@ -1,5 +1,9 @@
 schema: spec-driven
 
+context: |
+  源代码注释使用中文；专有名词、API 和代码标识符可保留原文。
+  使用简短注释和必要空行划分主要逻辑阶段，说明流程意图、关键约束、资源生命周期和同步关系，避免逐行复述代码。
+
 # Project context (optional)
 # Add only constraints that should guide OpenSpec artifacts and workflows.
 # Include constraints an agent cannot infer by reading the code.

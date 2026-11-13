@@ -26,8 +26,8 @@ impl Drop for BufferState {
 pub struct Frame {
     device: Arc<DeviceState>,
     pool: vk::CommandPool,
-    command_buffer: vk::CommandBuffer,
-    resources: Vec<Arc<BufferState>>,
+    pub(crate) command_buffer: vk::CommandBuffer,
+    pub(crate) resources: Vec<Arc<dyn Send + Sync>>,
 }
 
 impl Drop for Frame {
@@ -60,6 +60,8 @@ impl Backend {
                 .instance
                 .get_physical_device_memory_properties(self.device.physical_device)
         };
+
+        // 优先使用设备本地内存，同时排除受保护的内存。
         let memory_type = (0..properties.memory_type_count)
             .filter(|index| {
                 requirements.memory_type_bits & (1 << index) != 0
@@ -104,6 +106,7 @@ impl Backend {
     }
 
     pub fn begin_frame(&self) -> Result<Frame> {
+        // 每帧持有自己的命令池，确保录制的命令在提交期间保持有效。
         let device = &self.device.device;
         let info = vk::CommandPoolCreateInfo::default()
             .queue_family_index(self.device.queue_family)
@@ -149,6 +152,8 @@ impl Frame {
                 buffer.inner.size,
                 value,
             );
+
+            // 使填充结果对本帧后续的传输命令可见。
             let barrier = vk::MemoryBarrier::default()
                 .src_access_mask(vk::AccessFlags::TRANSFER_WRITE)
                 .dst_access_mask(vk::AccessFlags::TRANSFER_READ | vk::AccessFlags::TRANSFER_WRITE);
@@ -162,6 +167,8 @@ impl Frame {
                 &[],
             );
         }
+
+        // 即使调用方释放原始句柄，也要保留缓冲区。
         self.resources.push(buffer.inner.clone());
         Ok(())
     }
@@ -174,6 +181,8 @@ impl Frame {
             .context("could not create Vulkan submission fence")?;
         let command_buffers = [self.command_buffer];
         let submissions = [vk::SubmitInfo::default().command_buffers(&command_buffers)];
+
+        // Vulkan 要求在外部同步对队列的提交。
         let result = match self.device.queue_lock.lock() {
             Ok(_lock) => unsafe { device.queue_submit(self.device.queue, &submissions, fence) }
                 .context("could not submit Vulkan commands"),
@@ -212,6 +221,7 @@ impl Submission {
                 .wait_for_fences(&[self.fence], true, u64::MAX)
         };
         if let Err(error) = result {
+            // 释放资源前，尝试通过等待设备空闲确认执行已完成。
             let idle = frame
                 .device
                 .queue_lock
@@ -221,7 +231,7 @@ impl Submission {
                     unsafe { frame.device.device.device_wait_idle() }.map_err(Into::into)
                 });
             if idle.is_err() && error != vk::Result::ERROR_DEVICE_LOST {
-                // Keep the device and resources alive when completion cannot be established.
+                // 无法确认执行完成时，继续保留设备和资源。
                 std::mem::forget(self.frame.take());
                 return Err(anyhow!(
                     "Vulkan submission completion could not be established: {error:?}"
@@ -308,6 +318,8 @@ mod tests {
         assert!(frame.fill_buffer(&other_device_buffer, 0).is_err());
         drop(other_device_buffer);
         frame.fill_buffer(&buffer, 0x12345678)?;
+
+        // 使用时间线信号量阻塞队列，以检查执行中的资源是否存活。
         let mut semaphore_type = vk::SemaphoreTypeCreateInfo::default()
             .semaphore_type(vk::SemaphoreType::TIMELINE)
             .initial_value(0);
