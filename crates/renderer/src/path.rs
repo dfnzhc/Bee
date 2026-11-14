@@ -53,6 +53,31 @@ impl PathRenderer {
         height: u32,
         seed: u32,
     ) -> Result<Vec<u8>, String> {
+        let mut modules = ModuleGraph::default();
+        let path = modules.add(Module::PathTracing);
+        let tone = modules.add(Module::ToneMapping {
+            exposure_ev: snapshot.display.exposure_ev,
+        });
+        let output = modules.add(Module::ViewportOutput);
+        modules.connect(path, tone)?;
+        modules.connect(tone, output)?;
+        self.render_graph(backend, snapshot, width, height, seed, &modules)
+    }
+
+    /// 使用已验证的算法图追踪并累积当前场景。
+    pub fn render_graph(
+        &mut self,
+        backend: &Backend,
+        snapshot: &RenderSnapshot,
+        width: u32,
+        height: u32,
+        seed: u32,
+        modules: &ModuleGraph,
+    ) -> Result<Vec<u8>, String> {
+        let (path, _) = modules.display_source()?;
+        if modules.module(path) != Some(Module::PathTracing) {
+            return Err("viewport source is not a path tracing module".into());
+        }
         if width == 0 || height == 0 {
             return Err("invalid path tracing extent".into());
         }
@@ -96,14 +121,6 @@ impl PathRenderer {
         history
             .resources
             .set_temporary(history.mapped, history.mapped_image.clone())?;
-        let mut modules = ModuleGraph::default();
-        let path = modules.add(Module::PathTracing);
-        let tone = modules.add(Module::ToneMapping {
-            exposure_ev: snapshot.display.exposure_ev,
-        });
-        let output = modules.add(Module::ViewportOutput);
-        modules.connect(path, tone)?;
-        modules.connect(tone, output)?;
         let mut graph = history.resources.graph()?;
         let trace = graph.add_work(
             "path tracing",
@@ -117,7 +134,7 @@ impl PathRenderer {
             }],
         )?;
         let display = DisplayWork::declare(
-            &modules,
+            modules,
             &mut graph,
             &[(path, history.color)],
             history.mapped,

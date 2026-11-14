@@ -33,6 +33,12 @@ impl Module {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct NodeId(usize);
 
+impl NodeId {
+    pub fn index(self) -> usize {
+        self.0
+    }
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ModuleGraph {
     nodes: Vec<Option<Module>>,
@@ -55,6 +61,17 @@ impl ModuleGraph {
 
     pub fn module(&self, id: NodeId) -> Option<Module> {
         self.nodes.get(id.0).copied().flatten()
+    }
+
+    pub fn module_mut(&mut self, id: NodeId) -> Option<&mut Module> {
+        self.nodes.get_mut(id.0)?.as_mut()
+    }
+
+    pub fn nodes(&self) -> impl Iterator<Item = (NodeId, Module)> + '_ {
+        self.nodes
+            .iter()
+            .enumerate()
+            .filter_map(|(index, module)| module.map(|module| (NodeId(index), module)))
     }
 
     pub fn connections(&self) -> &[(NodeId, NodeId)] {

@@ -1,5 +1,7 @@
+use crate::flow_editor::FlowEditor;
 use crate::Bee;
-use bee_scene::{SceneState, Versions};
+use bee_renderer::Module;
+use bee_scene::{DisplayParameters, SceneState, Versions};
 use bee_vulkan::{Backend, TestImage};
 use gpui::{
     canvas, div, prelude::*, px, rgb, Bounds, Context, Corners, MouseButton, Pixels, Point,
@@ -32,6 +34,7 @@ pub struct Viewport {
     mode: RenderMode,
     path_renderer: Option<bee_renderer::PathRenderer>,
     samples: u32,
+    pub(crate) flow: FlowEditor,
 }
 
 impl Viewport {
@@ -49,6 +52,7 @@ impl Viewport {
             mode: RenderMode::Raster,
             path_renderer: None,
             samples: 0,
+            flow: FlowEditor::default(),
         }
     }
 
@@ -114,7 +118,7 @@ impl Viewport {
                             .on_click(cx.listener(|view, _, window, cx| {
                                 view.viewport.select_mode(
                                     RenderMode::Raster,
-                                    &view.state,
+                                    &mut view.state,
                                     window,
                                     cx,
                                 );
@@ -124,7 +128,7 @@ impl Viewport {
                                     if matches!(event.keystroke.key.as_str(), "enter" | "space") {
                                         view.viewport.select_mode(
                                             RenderMode::Raster,
-                                            &view.state,
+                                            &mut view.state,
                                             window,
                                             cx,
                                         );
@@ -161,7 +165,7 @@ impl Viewport {
                             .on_click(cx.listener(|view, _, window, cx| {
                                 view.viewport.select_mode(
                                     RenderMode::Path,
-                                    &view.state,
+                                    &mut view.state,
                                     window,
                                     cx,
                                 );
@@ -171,7 +175,7 @@ impl Viewport {
                                     if matches!(event.keystroke.key.as_str(), "enter" | "space") {
                                         view.viewport.select_mode(
                                             RenderMode::Path,
-                                            &view.state,
+                                            &mut view.state,
                                             window,
                                             cx,
                                         );
@@ -314,24 +318,62 @@ impl Viewport {
     fn select_mode(
         &mut self,
         mode: RenderMode,
-        state: &SceneState,
+        state: &mut SceneState,
         window: &mut Window,
         cx: &mut Context<Bee>,
     ) {
-        if self.mode == mode
-            || (mode == RenderMode::Path
-                && self
-                    .backend
-                    .as_ref()
-                    .is_none_or(|backend| !backend.report.ray_tracing_missing.is_empty()))
-        {
+        if self.mode == mode {
             return;
         }
+        let source = match mode {
+            RenderMode::Raster => Module::Rasterization,
+            RenderMode::Path => Module::PathTracing,
+        };
+        if self.flow.select_source(source).is_ok() {
+            self.apply_flow(state, window, cx);
+        } else {
+            cx.notify();
+        }
+    }
+
+    pub(crate) fn apply_flow(
+        &mut self,
+        state: &mut SceneState,
+        window: &mut Window,
+        cx: &mut Context<Bee>,
+    ) {
+        let unavailable = match &self.backend {
+            None => Some("Vulkan device unavailable".to_string()),
+            Some(backend) if !backend.report.ray_tracing_missing.is_empty() => {
+                Some(backend.report.ray_tracing_missing.join(", "))
+            }
+            _ => None,
+        };
+        let previous = self.flow.active().clone();
+        let Ok(graph) = self.flow.apply(unavailable) else {
+            cx.notify();
+            return;
+        };
+        if graph == previous {
+            cx.notify();
+            return;
+        }
+        let (source, exposure_ev) = graph.display_source().unwrap();
+        let mode = match graph.module(source) {
+            Some(Module::Rasterization) => RenderMode::Raster,
+            Some(Module::PathTracing) => RenderMode::Path,
+            _ => unreachable!("validated scene source"),
+        };
+        let mode_changed = self.mode != mode;
         self.mode = mode;
+        state.set_display_parameters(DisplayParameters { exposure_ev });
+        self.versions = Some(state.versions());
         self.generation = self.generation.wrapping_add(1);
-        self.samples = 0;
+        if mode_changed {
+            self.samples = 0;
+            self.drop_image(window);
+        }
         self.error = None;
-        self.drop_image(window);
         self.start(state, window, cx);
         cx.notify();
     }
@@ -375,13 +417,14 @@ impl Viewport {
         let generation = self.generation;
         let snapshot = state.snapshot();
         let mode = self.mode;
+        let modules = self.flow.active().clone();
         let mut path_renderer = self.path_renderer.take();
 
         // 后台任务持有快照，直到 Vulkan 提交和读回完成。
         let task = cx.background_spawn(async move {
             let pixels = match mode {
                 RenderMode::Raster => {
-                    bee_renderer::render_raster_snapshot(&backend, &snapshot, width, height)
+                    bee_renderer::render_raster_graph(&backend, &snapshot, width, height, &modules)
                 }
                 RenderMode::Path => {
                     let renderer = match path_renderer.take() {
@@ -390,7 +433,8 @@ impl Viewport {
                     };
                     match renderer {
                         Ok(mut renderer) => {
-                            let result = renderer.render(&backend, &snapshot, width, height, 1);
+                            let result = renderer
+                                .render_graph(&backend, &snapshot, width, height, 1, &modules);
                             path_renderer = Some(renderer);
                             result
                         }
@@ -643,6 +687,146 @@ mod tests {
         cx.update(|_, cx| {
             let view = view.read(cx);
             assert_eq!(view.viewport.versions, Some(view.state.versions()));
+        });
+    }
+
+    #[test]
+    #[ignore = "requires a ray tracing device and Vulkan validation layer"]
+    fn gpui_flow_connections_and_exposure_drive_rendering() {
+        if std::env::var_os("BEE_TEST_FLOW_CHILD").is_none() {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "viewport::tests::gpui_flow_connections_and_exposure_drive_rendering",
+                    "--ignored",
+                    "--nocapture",
+                ])
+                .env("BEE_TEST_FLOW_CHILD", "1")
+                .env("VK_LAYER_VALIDATE_SYNC", "1")
+                .output()
+                .unwrap();
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            assert!(output.status.success(), "{stdout}\n{stderr}");
+            assert!(
+                !stderr
+                    .lines()
+                    .any(|line| line.starts_with("Vulkan validation ") && line.contains("ERROR")),
+                "{stderr}"
+            );
+            return;
+        }
+
+        let mut app = gpui::TestAppContext::single();
+        let (view, cx) = app.add_window_view(|_, _| Bee::new());
+        cx.simulate_resize(size(px(1100.0), px(1400.0)));
+        cx.draw(
+            point(px(0.0), px(0.0)),
+            size(px(1100.0), px(1400.0)),
+            |_, _| view.clone(),
+        );
+        cx.run_until_parked();
+        let click = |cx: &mut gpui::VisualTestContext, selector: &'static str| {
+            let bounds = cx.debug_bounds(selector).expect(selector);
+            cx.simulate_click(bounds.center(), Modifiers::none());
+            cx.run_until_parked();
+        };
+        let original = cx.update(|_, cx| {
+            let viewport = &view.read(cx).viewport;
+            assert!(viewport.error.is_none(), "{:?}", viewport.error);
+            viewport
+                .image
+                .as_ref()
+                .unwrap()
+                .as_bytes(0)
+                .unwrap()
+                .to_vec()
+        });
+
+        // 节点参数作用于当前的光栅化输出。
+        click(cx, "flow-exposure-up-2");
+        click(cx, "flow-exposure-up-2");
+        click(cx, "flow-apply");
+        cx.update(|_, cx| {
+            let viewport = &view.read(cx).viewport;
+            let brighter = viewport.image.as_ref().unwrap().as_bytes(0).unwrap();
+            assert!(brighter.iter().zip(&original).any(|(new, old)| *new > *old));
+        });
+
+        // 重连后应执行实际路径追踪，而不是只改变界面标记。
+        click(cx, "flow-output-1");
+        click(cx, "flow-input-2");
+        click(cx, "flow-apply");
+        let (backend, snapshot, extent, graph, path_pixels) = cx.update(|_, cx| {
+            let view = view.read(cx);
+            assert_eq!(view.viewport.mode, RenderMode::Path);
+            assert_eq!(view.viewport.samples, 1);
+            assert!(view.viewport.error.is_none(), "{:?}", view.viewport.error);
+            (
+                view.viewport.backend.as_ref().unwrap().clone(),
+                view.state.snapshot(),
+                view.viewport.extent.unwrap(),
+                view.viewport.flow.active().clone(),
+                view.viewport
+                    .image
+                    .as_ref()
+                    .unwrap()
+                    .as_bytes(0)
+                    .unwrap()
+                    .to_vec(),
+            )
+        });
+        let mut fresh = bee_renderer::PathRenderer::new(&backend).unwrap();
+        let expected = fresh
+            .render_graph(&backend, &snapshot, extent.0, extent.1, 1, &graph)
+            .unwrap();
+        assert_eq!(path_pixels.len(), expected.len());
+        let different = path_pixels
+            .iter()
+            .zip(&expected)
+            .filter(|(a, b)| a.abs_diff(**b) > 2)
+            .count();
+        assert_eq!(
+            different, 0,
+            "{different} path image channels differ by more than 2"
+        );
+
+        // 色调映射变化不丢弃已经累积的路径样本。
+        click(cx, "flow-exposure-up-2");
+        click(cx, "flow-apply");
+        let graph = cx.update(|_, cx| {
+            let viewport = &view.read(cx).viewport;
+            assert_eq!(viewport.samples, 2);
+            assert!(viewport.image.as_ref().unwrap().as_bytes(0).unwrap() != path_pixels);
+            viewport.flow.active().clone()
+        });
+
+        click(cx, "flow-output-0");
+        click(cx, "flow-input-3");
+        click(cx, "flow-apply");
+        cx.update(|_, cx| {
+            let viewport = &view.read(cx).viewport;
+            assert_eq!(viewport.mode, RenderMode::Path);
+            assert_eq!(viewport.flow.active(), &graph);
+        });
+        click(cx, "flow-output-2");
+        click(cx, "flow-input-3");
+        click(cx, "flow-output-0");
+        click(cx, "flow-input-2");
+        click(cx, "flow-apply");
+        cx.update(|_, cx| {
+            let view = view.read(cx);
+            assert_eq!(view.viewport.mode, RenderMode::Raster);
+            assert!(view.viewport.error.is_none(), "{:?}", view.viewport.error);
+            let expected = bee_renderer::render_raster_graph(
+                &backend,
+                &view.state.snapshot(),
+                extent.0,
+                extent.1,
+                view.viewport.flow.active(),
+            )
+            .unwrap();
+            assert!(view.viewport.image.as_ref().unwrap().as_bytes(0).unwrap() == expected);
         });
     }
 

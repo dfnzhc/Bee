@@ -1,3 +1,4 @@
+mod flow_editor;
 mod viewport;
 
 use bee_scene::SceneState;
@@ -125,6 +126,8 @@ impl Render for Bee {
                             } else {
                                 rgb(0xd1d7d4)
                             })
+                            .child(self.viewport.flow.render(cx))
+                            .child("Device information")
                             .children(
                                 self.lines.iter().cloned().chain(scene_info).chain(
                                     self.viewport

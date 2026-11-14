@@ -185,6 +185,29 @@ pub fn render_raster_snapshot(
     width: u32,
     height: u32,
 ) -> Result<Vec<u8>, String> {
+    let mut modules = ModuleGraph::default();
+    let raster = modules.add(Module::Rasterization);
+    let tone = modules.add(Module::ToneMapping {
+        exposure_ev: snapshot.display.exposure_ev,
+    });
+    let output = modules.add(Module::ViewportOutput);
+    modules.connect(raster, tone)?;
+    modules.connect(tone, output)?;
+    render_raster_graph(backend, snapshot, width, height, &modules)
+}
+
+/// 使用已验证的算法图渲染光栅化流程。
+pub fn render_raster_graph(
+    backend: &Backend,
+    snapshot: &RenderSnapshot,
+    width: u32,
+    height: u32,
+    modules: &ModuleGraph,
+) -> Result<Vec<u8>, String> {
+    let (raster, _) = modules.display_source()?;
+    if modules.module(raster) != Some(Module::Rasterization) {
+        return Err("viewport source is not a rasterization module".into());
+    }
     let size = (width as usize)
         .checked_mul(height as usize)
         .and_then(|size| size.checked_mul(4))
@@ -230,17 +253,9 @@ pub fn render_raster_snapshot(
         .create_readback_buffer(size)
         .map_err(|error| error.to_string())?;
 
-    let mut modules = ModuleGraph::default();
-    let raster = modules.add(Module::Rasterization);
-    let tone = modules.add(Module::ToneMapping {
-        exposure_ev: snapshot.display.exposure_ev,
-    });
-    let output = modules.add(Module::ViewportOutput);
-    modules.connect(raster, tone)?;
-    modules.connect(tone, output)?;
     let mut graph = resources.graph()?;
-    let raster_work = RasterWork::declare(&modules, raster, &mut graph, color, depth)?;
-    let display = DisplayWork::declare(&modules, &mut graph, &[(raster, color)], mapped, viewport)?;
+    let raster_work = RasterWork::declare(modules, raster, &mut graph, color, depth)?;
+    let display = DisplayWork::declare(modules, &mut graph, &[(raster, color)], mapped, viewport)?;
     let read = graph.add_work(
         "read viewport",
         vec![Access {
