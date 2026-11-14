@@ -56,13 +56,13 @@ impl Viewport {
         let extent = self.extent;
         let versions = state.versions();
         let requested_versions = self.versions;
-        let image = (self.image_versions == Some(versions))
-            .then(|| self.image.clone())
-            .flatten();
+        let image = self.image.clone();
         let status = if self.error.is_some() {
             "Viewport error; see device info".to_string()
         } else if self.backend.is_none() {
             "Viewport unavailable".to_string()
+        } else if image.is_some() && self.image_versions != Some(versions) {
+            "Updating viewport | async Vulkan readback".to_string()
         } else if image.is_some() {
             match self.mode {
                 RenderMode::Raster => "Raster | async Vulkan readback".to_string(),
@@ -246,7 +246,7 @@ impl Viewport {
                     .child(
                         canvas(
                             move |bounds, window, cx| {
-                                // 延后同步尺寸和状态，并隐藏已过期的图像。
+                                // 延后同步尺寸和状态，让已完成的画面保持可见。
                                 let next = physical_extent(bounds, window.scale_factor());
                                 if next != extent || requested_versions != Some(versions) {
                                     window.defer(cx, move |window, cx| {
@@ -348,13 +348,15 @@ impl Viewport {
             return;
         }
 
-        // 使进行中的读回结果失效，并释放旧的图集图像。
+        // 尺寸变化时释放旧图像；状态变化期间保留上一帧。
+        if self.extent != extent {
+            self.drop_image(window);
+        }
         self.extent = extent;
         self.versions = Some(versions);
         self.generation = self.generation.wrapping_add(1);
         self.samples = 0;
         self.error = None;
-        self.drop_image(window);
         self.start(state, window, cx);
         cx.notify();
     }
@@ -416,7 +418,7 @@ impl Viewport {
             view.update_in(cx, |view, window, cx| {
                 view.viewport.running = false;
                 view.viewport.path_renderer = path_renderer;
-                // 丢弃过期结果，并开始处理最新的尺寸和状态。
+                // 最新帧用于更新状态；中间帧仍可供交互时显示。
                 if view.viewport.generation == generation
                     && snapshot.versions == view.state.versions()
                     && view.viewport.mode == mode
@@ -454,6 +456,13 @@ impl Viewport {
                         Err(reason) => view.viewport.fail(reason, window),
                     }
                 } else {
+                    if view.viewport.mode == mode && view.viewport.extent == Some((width, height)) {
+                        if let Ok(image) = result {
+                            view.viewport.drop_image(window);
+                            view.viewport.image_versions = Some(snapshot.versions);
+                            view.viewport.image = Some(image);
+                        }
+                    }
                     let extent = view.viewport.extent;
                     view.viewport.synchronize(extent, &view.state, window, cx);
                     view.viewport.start(&view.state, window, cx);
@@ -709,6 +718,7 @@ mod tests {
 
         // 旧快照仍在处理时连续更改状态；新历史必须从首个样本开始。
         view.update_in(cx, |view, window, cx| {
+            let original_id = view.viewport.image.as_ref().unwrap().id;
             view.viewport.start(&view.state, window, cx);
             assert!(view.viewport.running);
             let mut camera = view.state.camera();
@@ -716,11 +726,13 @@ mod tests {
             assert!(view.state.set_camera(camera));
             view.viewport
                 .synchronize(view.viewport.extent, &view.state, window, cx);
+            assert_eq!(view.viewport.image.as_ref().unwrap().id, original_id);
             let mut camera = view.state.camera();
             camera.orbit(25.0, -4.0);
             assert!(view.state.set_camera(camera));
             view.viewport
                 .synchronize(view.viewport.extent, &view.state, window, cx);
+            assert_eq!(view.viewport.image.as_ref().unwrap().id, original_id);
             let mut scene = view.state.scene().clone();
             scene.materials[1].albedo = [0.2, 0.7, 0.3];
             assert!(view.state.set_scene(scene));
@@ -961,6 +973,52 @@ mod tests {
                 .chunks_exact(4)
                 .any(|p| p[0] > p[2].saturating_add(20)));
             (Arc::downgrade(image), extent)
+        });
+        // 连续移动时保留已显示的画面，并显示先完成的中间相机状态。
+        let (first_version, latest_version) = view.update_in(cx, |view, window, cx| {
+            let original_id = view.viewport.image.as_ref().unwrap().id;
+            let mut camera = view.state.camera();
+            assert!(camera.orbit(20.0, 5.0));
+            assert!(view.state.set_camera(camera));
+            view.viewport
+                .synchronize(view.viewport.extent, &view.state, window, cx);
+            assert!(view.viewport.running);
+            assert_eq!(view.viewport.image.as_ref().unwrap().id, original_id);
+            let first = view.state.versions();
+            assert!(camera.orbit(25.0, -3.0));
+            assert!(view.state.set_camera(camera));
+            view.viewport
+                .synchronize(view.viewport.extent, &view.state, window, cx);
+            assert_eq!(view.viewport.image.as_ref().unwrap().id, original_id);
+            (first, view.state.versions())
+        });
+        let previous_paints = PAINTED_IMAGES.load(Ordering::Relaxed);
+        cx.draw(
+            point(px(0.0), px(0.0)),
+            size(px(700.0), px(500.0)),
+            |_, _| view.clone(),
+        );
+        assert_eq!(PAINTED_IMAGES.load(Ordering::Relaxed), previous_paints + 1);
+        let mut displayed_intermediate = false;
+        for _ in 0..100 {
+            displayed_intermediate |= cx.update(|_, cx| {
+                let viewport = &view.read(cx).viewport;
+                viewport.running && viewport.image_versions == Some(first_version)
+            });
+            if displayed_intermediate || !cx.executor().tick() {
+                break;
+            }
+        }
+        assert!(
+            displayed_intermediate,
+            "completed intermediate camera frame was discarded"
+        );
+        cx.run_until_parked();
+        cx.update(|_, cx| {
+            let viewport = &view.read(cx).viewport;
+            assert!(!viewport.running);
+            assert_eq!(viewport.image_versions, Some(latest_version));
+            assert!(viewport.error.is_none(), "{:?}", viewport.error);
         });
         // 替换图集条目前，先验证 GPUI 的 paint_image 路径。
         let previous_paints = PAINTED_IMAGES.load(Ordering::Relaxed);
