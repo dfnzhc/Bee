@@ -15,17 +15,25 @@ fn shader_build_is_reproducible() {
         ("tonemap.frag", "frag"),
         ("raster.vert", "vert"),
         ("raster.frag", "frag"),
+        ("path.rgen", "rgen"),
+        ("path.rmiss", "rmiss"),
+        ("path.rchit", "rchit"),
     ] {
         let source = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("shaders")
             .join(name);
         let output = PathBuf::from(env!("OUT_DIR")).join(format!("{name}.reproduced.spv"));
-        let result = Command::new(compiler())
-            .args([
-                "--target-env=vulkan1.0",
-                &format!("-fshader-stage={stage}"),
-                "-O",
-            ])
+        let mut command = Command::new(compiler());
+        let target = if stage.starts_with('r') {
+            command.args(["--target-env=vulkan1.1", "--target-spv=spv1.4"]);
+            "vulkan1.1spv1.4"
+        } else {
+            command.arg("--target-env=vulkan1.0");
+            "vulkan1.0"
+        };
+        let optimization = if stage.starts_with('r') { "-O0" } else { "-O" };
+        let result = command
+            .args([&format!("-fshader-stage={stage}"), optimization])
             .arg(source)
             .arg("-o")
             .arg(&output)
@@ -37,7 +45,7 @@ fn shader_build_is_reproducible() {
             String::from_utf8_lossy(&result.stderr)
         );
         let validator = Command::new(compiler().with_file_name("spirv-val.exe"))
-            .args(["--target-env", "vulkan1.0"])
+            .args(["--target-env", target])
             .arg(&output)
             .output()
             .unwrap();

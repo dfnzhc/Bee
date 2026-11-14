@@ -6,3 +6,5 @@ and glslang 11.1.0-1253-gefd24d75. Cargo compiles `foundation.vert`,
 `tonemap.vert`, `tonemap.frag`, `raster.vert`, and `raster.frag` with `--target-env=vulkan1.0`, their matching
 shader stages, and `-O` into its build output.
 Compiler errors include the source location and stop the build.
+The path tracing shaders target Vulkan 1.1 with SPIR-V 1.4 and `-O0`; the
+pinned compiler's optimizer does not support this target combination.

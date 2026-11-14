@@ -2,11 +2,13 @@ mod viewport;
 
 use bee_scene::SceneState;
 use gpui::{
-    div, prelude::*, px, relative, rgb, size, App, Application, Bounds, Context, Window,
-    WindowBounds, WindowOptions,
+    actions, div, prelude::*, px, relative, rgb, size, App, Application, Bounds, Context,
+    KeyBinding, Window, WindowBounds, WindowOptions,
 };
 use std::sync::Arc;
 use viewport::Viewport;
+
+actions!(bee, [FocusNext, FocusPrevious]);
 
 struct Bee {
     viewport: Viewport,
@@ -94,6 +96,8 @@ impl Render for Bee {
             .flex()
             .flex_col()
             .gap_3()
+            .on_action(cx.listener(|_, _: &FocusNext, window, _| window.focus_next()))
+            .on_action(cx.listener(|_, _: &FocusPrevious, window, _| window.focus_prev()))
             .bg(rgb(0x202326))
             .text_color(rgb(0xf4f4f2))
             .p_6()
@@ -135,6 +139,10 @@ impl Render for Bee {
 
 fn main() {
     Application::new().run(|cx: &mut App| {
+        cx.bind_keys([
+            KeyBinding::new("tab", FocusNext, None),
+            KeyBinding::new("shift-tab", FocusPrevious, None),
+        ]);
         let bounds = Bounds::centered(None, size(px(960.0), px(640.0)), cx);
         cx.open_window(
             WindowOptions {

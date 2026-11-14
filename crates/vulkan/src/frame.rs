@@ -366,6 +366,8 @@ mod tests {
             device: Arc::new(DeviceState {
                 instance: initial.device.instance.clone(),
                 physical_device: initial.device.physical_device,
+                api_version: initial.device.api_version,
+                ray_tracing_enabled: false,
                 device: raw_device,
                 queue,
                 queue_family: initial.device.queue_family,

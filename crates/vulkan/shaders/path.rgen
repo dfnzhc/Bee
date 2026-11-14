@@ -1,0 +1,77 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+
+layout(set = 0, binding = 0) uniform accelerationStructureEXT scene_as;
+layout(set = 0, binding = 1, rgba32f) uniform image2D history;
+layout(set = 0, binding = 2, std430) readonly buffer SceneData { vec4 values[]; } scene;
+layout(push_constant) uniform Constants {
+    mat4 inverse_view_projection;
+    vec4 environment;
+    uint light_offset;
+    uint sample_index;
+    uint max_bounces;
+    uint seed;
+} constants;
+struct Payload { vec4 position; vec4 normal; vec4 albedo; };
+layout(location = 0) rayPayloadEXT Payload payload;
+
+uint random_state;
+float random_value() {
+    random_state ^= random_state << 13;
+    random_state ^= random_state >> 17;
+    random_state ^= random_state << 5;
+    return float(random_state >> 8) * (1.0 / 16777216.0);
+}
+
+void main() {
+    uvec2 pixel = gl_LaunchIDEXT.xy;
+    vec2 screen = (vec2(pixel) + 0.5) / vec2(gl_LaunchSizeEXT.xy) * 2.0 - 1.0;
+    vec4 near_point = constants.inverse_view_projection * vec4(screen, 0.0, 1.0);
+    vec4 far_point = constants.inverse_view_projection * vec4(screen, 1.0, 1.0);
+    vec3 origin = near_point.xyz / near_point.w;
+    vec3 segment = far_point.xyz / far_point.w - origin;
+    vec3 direction = normalize(segment);
+    float ray_length = length(segment);
+    random_state = (pixel.x * 1973u + pixel.y * 9277u + constants.sample_index * 26699u + constants.seed * 31847u) | 1u;
+    vec3 radiance = vec3(0.0);
+    vec3 throughput = vec3(1.0);
+    for (uint bounce = 0; bounce < constants.max_bounces; ++bounce) {
+        traceRayEXT(scene_as, gl_RayFlagsOpaqueEXT, 0xff, 0, 0, 0, origin, 0.0001, direction, ray_length, 0);
+        if (payload.position.w == 0.0) {
+            radiance += throughput * constants.environment.xyz;
+            break;
+        }
+        vec3 position = payload.position.xyz;
+        vec3 normal = payload.normal.xyz;
+        vec3 albedo = payload.albedo.xyz;
+        for (uint i = constants.light_offset; i + 1 < scene.values.length(); i += 2) {
+            vec3 to_light = scene.values[i].xyz - position;
+            float distance_squared = dot(to_light, to_light);
+            if (distance_squared > 0.000001) {
+                float distance = sqrt(distance_squared);
+                vec3 light_direction = to_light / distance;
+                float cosine = max(dot(normal, light_direction), 0.0);
+                if (cosine > 0.0 && distance > 0.002) {
+                    payload.position.w = 1.0;
+                    traceRayEXT(scene_as, gl_RayFlagsOpaqueEXT | gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT,
+                        0xff, 0, 0, 0, position + normal * 0.001, 0.0001, light_direction, distance - 0.002, 0);
+                    if (payload.position.w == 0.0) {
+                        radiance += throughput * albedo * scene.values[i + 1].xyz * (cosine / (3.14159265 * distance_squared));
+                    }
+                }
+            }
+        }
+        throughput *= albedo;
+        float u = random_value();
+        float phi = 6.28318531 * random_value();
+        vec3 helper = abs(normal.z) < 0.999 ? vec3(0.0, 0.0, 1.0) : vec3(0.0, 1.0, 0.0);
+        vec3 tangent = normalize(cross(helper, normal));
+        vec3 bitangent = cross(normal, tangent);
+        direction = normalize(tangent * (sqrt(u) * cos(phi)) + bitangent * (sqrt(u) * sin(phi)) + normal * sqrt(1.0 - u));
+        origin = position + normal * 0.001;
+        ray_length = 1e30;
+    }
+    vec3 previous = constants.sample_index == 0 ? vec3(0.0) : imageLoad(history, ivec2(pixel)).rgb;
+    vec3 accumulated = (previous * float(constants.sample_index) + radiance) / float(constants.sample_index + 1u);
+    imageStore(history, ivec2(pixel), vec4(accumulated, 1.0));
+}

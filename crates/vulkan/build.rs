@@ -30,16 +30,25 @@ fn main() {
         ("tonemap.frag", "frag"),
         ("raster.vert", "vert"),
         ("raster.frag", "frag"),
+        ("path.rgen", "rgen"),
+        ("path.rmiss", "rmiss"),
+        ("path.rchit", "rchit"),
     ] {
         let source = format!("shaders/{name}");
         println!("cargo:rerun-if-changed={source}");
         let output_path =
             PathBuf::from(env::var_os("OUT_DIR").unwrap()).join(format!("{name}.spv"));
-        let output = Command::new(&compiler)
+        let mut command = Command::new(&compiler);
+        if stage.starts_with('r') {
+            command.args(["--target-env=vulkan1.1", "--target-spv=spv1.4"]);
+        } else {
+            command.arg("--target-env=vulkan1.0");
+        }
+        let optimization = if stage.starts_with('r') { "-O0" } else { "-O" };
+        let output = command
             .args([
-                "--target-env=vulkan1.0",
                 &format!("-fshader-stage={stage}"),
-                "-O",
+                optimization,
                 &source,
                 "-o",
             ])

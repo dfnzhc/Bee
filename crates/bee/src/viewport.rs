@@ -6,8 +6,15 @@ use gpui::{
     RenderImage, Window,
 };
 use std::sync::Arc;
+use std::time::Duration;
 
 type Extent = (u32, u32);
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum RenderMode {
+    Raster,
+    Path,
+}
 
 #[cfg(test)]
 static PAINTED_IMAGES: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
@@ -22,6 +29,9 @@ pub struct Viewport {
     image_versions: Option<Versions>,
     error: Option<String>,
     drag_position: Option<Point<Pixels>>,
+    mode: RenderMode,
+    path_renderer: Option<bee_renderer::PathRenderer>,
+    samples: u32,
 }
 
 impl Viewport {
@@ -36,6 +46,9 @@ impl Viewport {
             image_versions: None,
             error: None,
             drag_position: None,
+            mode: RenderMode::Raster,
+            path_renderer: None,
+            samples: 0,
         }
     }
 
@@ -47,14 +60,24 @@ impl Viewport {
             .then(|| self.image.clone())
             .flatten();
         let status = if self.error.is_some() {
-            "Viewport error; see device info"
+            "Viewport error; see device info".to_string()
         } else if self.backend.is_none() {
-            "Viewport unavailable"
+            "Viewport unavailable".to_string()
         } else if image.is_some() {
-            "Image path: async Vulkan readback"
+            match self.mode {
+                RenderMode::Raster => "Raster | async Vulkan readback".to_string(),
+                RenderMode::Path => format!(
+                    "Path tracing: {} samples | async Vulkan readback",
+                    self.samples
+                ),
+            }
         } else {
-            "Preparing Vulkan image..."
+            "Preparing Vulkan image...".to_string()
         };
+        let path_available = self
+            .backend
+            .as_ref()
+            .is_some_and(|backend| backend.report.ray_tracing_missing.is_empty());
         let resize_view = cx.weak_entity();
         let error_view = resize_view.clone();
         div()
@@ -64,6 +87,99 @@ impl Viewport {
             .min_w_0()
             .min_h_0()
             .gap_2()
+            .child(
+                div()
+                    .flex()
+                    .gap_3()
+                    .tab_group()
+                    .child(
+                        div()
+                            .id("raster-mode")
+                            .debug_selector(|| "raster-mode".into())
+                            .tab_index(0)
+                            .cursor_pointer()
+                            .px_2()
+                            .border_1()
+                            .border_color(if self.mode == RenderMode::Raster {
+                                rgb(0x76c6b2)
+                            } else {
+                                rgb(0x777777)
+                            })
+                            .focus(|style| style.border_color(rgb(0xffffff)))
+                            .child(if self.mode == RenderMode::Raster {
+                                "Raster (active)"
+                            } else {
+                                "Raster"
+                            })
+                            .on_click(cx.listener(|view, _, window, cx| {
+                                view.viewport.select_mode(
+                                    RenderMode::Raster,
+                                    &view.state,
+                                    window,
+                                    cx,
+                                );
+                            }))
+                            .on_key_down(cx.listener(
+                                |view, event: &gpui::KeyDownEvent, window, cx| {
+                                    if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                                        view.viewport.select_mode(
+                                            RenderMode::Raster,
+                                            &view.state,
+                                            window,
+                                            cx,
+                                        );
+                                    }
+                                },
+                            )),
+                    )
+                    .child(
+                        div()
+                            .id("path-mode")
+                            .debug_selector(|| "path-mode".into())
+                            .tab_index(1)
+                            .cursor_pointer()
+                            .px_2()
+                            .border_1()
+                            .border_color(if self.mode == RenderMode::Path {
+                                rgb(0x76c6b2)
+                            } else {
+                                rgb(0x777777)
+                            })
+                            .focus(|style| style.border_color(rgb(0xffffff)))
+                            .text_color(if path_available {
+                                rgb(0xd1d7d4)
+                            } else {
+                                rgb(0x777777)
+                            })
+                            .child(if self.mode == RenderMode::Path {
+                                "Path tracing (active)"
+                            } else if path_available {
+                                "Path tracing"
+                            } else {
+                                "Path tracing unavailable"
+                            })
+                            .on_click(cx.listener(|view, _, window, cx| {
+                                view.viewport.select_mode(
+                                    RenderMode::Path,
+                                    &view.state,
+                                    window,
+                                    cx,
+                                );
+                            }))
+                            .on_key_down(cx.listener(
+                                |view, event: &gpui::KeyDownEvent, window, cx| {
+                                    if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                                        view.viewport.select_mode(
+                                            RenderMode::Path,
+                                            &view.state,
+                                            window,
+                                            cx,
+                                        );
+                                    }
+                                },
+                            )),
+                    ),
+            )
             .child(
                 div()
                     .h(px(28.0))
@@ -195,6 +311,31 @@ impl Viewport {
         self.error.as_deref()
     }
 
+    fn select_mode(
+        &mut self,
+        mode: RenderMode,
+        state: &SceneState,
+        window: &mut Window,
+        cx: &mut Context<Bee>,
+    ) {
+        if self.mode == mode
+            || (mode == RenderMode::Path
+                && self
+                    .backend
+                    .as_ref()
+                    .is_none_or(|backend| !backend.report.ray_tracing_missing.is_empty()))
+        {
+            return;
+        }
+        self.mode = mode;
+        self.generation = self.generation.wrapping_add(1);
+        self.samples = 0;
+        self.error = None;
+        self.drop_image(window);
+        self.start(state, window, cx);
+        cx.notify();
+    }
+
     fn synchronize(
         &mut self,
         extent: Option<Extent>,
@@ -211,6 +352,7 @@ impl Viewport {
         self.extent = extent;
         self.versions = Some(versions);
         self.generation = self.generation.wrapping_add(1);
+        self.samples = 0;
         self.error = None;
         self.drop_image(window);
         self.start(state, window, cx);
@@ -230,10 +372,31 @@ impl Viewport {
         let backend = backend.clone();
         let generation = self.generation;
         let snapshot = state.snapshot();
+        let mode = self.mode;
+        let mut path_renderer = self.path_renderer.take();
 
         // 后台任务持有快照，直到 Vulkan 提交和读回完成。
         let task = cx.background_spawn(async move {
-            let result = bee_renderer::render_raster_snapshot(&backend, &snapshot, width, height)
+            let pixels = match mode {
+                RenderMode::Raster => {
+                    bee_renderer::render_raster_snapshot(&backend, &snapshot, width, height)
+                }
+                RenderMode::Path => {
+                    let renderer = match path_renderer.take() {
+                        Some(renderer) => Ok(renderer),
+                        None => bee_renderer::PathRenderer::new(&backend),
+                    };
+                    match renderer {
+                        Ok(mut renderer) => {
+                            let result = renderer.render(&backend, &snapshot, width, height, 1);
+                            path_renderer = Some(renderer);
+                            result
+                        }
+                        Err(error) => Err(error),
+                    }
+                }
+            };
+            let result = pixels
                 .map_err(|error| format!("Vulkan image readback failed: {error}"))
                 .and_then(|bgra| {
                     let row_stride = (width as usize)
@@ -246,20 +409,47 @@ impl Viewport {
                         bgra,
                     })
                 });
-            (snapshot, result)
+            (snapshot, result, path_renderer)
         });
         cx.spawn_in(window, async move |view, cx| {
-            let (snapshot, result) = task.await;
+            let (snapshot, result, path_renderer) = task.await;
             view.update_in(cx, |view, window, cx| {
                 view.viewport.running = false;
+                view.viewport.path_renderer = path_renderer;
                 // 丢弃过期结果，并开始处理最新的尺寸和状态。
                 if view.viewport.generation == generation
                     && snapshot.versions == view.state.versions()
+                    && view.viewport.mode == mode
                 {
                     match result {
                         Ok(image) => {
+                            view.viewport.drop_image(window);
+                            view.viewport.samples = if mode == RenderMode::Path {
+                                view.viewport
+                                    .path_renderer
+                                    .as_ref()
+                                    .map_or(0, |renderer| renderer.sample_count())
+                            } else {
+                                0
+                            };
                             view.viewport.image_versions = Some(snapshot.versions);
                             view.viewport.image = Some(image);
+                            if mode == RenderMode::Path {
+                                let timer =
+                                    cx.background_executor().timer(Duration::from_millis(16));
+                                cx.spawn_in(window, async move |view, cx| {
+                                    timer.await;
+                                    view.update_in(cx, |view, window, cx| {
+                                        if view.viewport.mode == RenderMode::Path
+                                            && view.viewport.generation == generation
+                                        {
+                                            view.viewport.start(&view.state, window, cx);
+                                        }
+                                    })
+                                    .ok();
+                                })
+                                .detach();
+                            }
                         }
                         Err(reason) => view.viewport.fail(reason, window),
                     }
@@ -444,6 +634,194 @@ mod tests {
         cx.update(|_, cx| {
             let view = view.read(cx);
             assert_eq!(view.viewport.versions, Some(view.state.versions()));
+        });
+    }
+
+    #[test]
+    #[ignore = "requires a ray tracing device and Vulkan validation layer"]
+    fn gpui_path_tracing_accumulates_and_discards_stale_frames() {
+        if std::env::var_os("BEE_TEST_PATH_CHILD").is_none() {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "viewport::tests::gpui_path_tracing_accumulates_and_discards_stale_frames",
+                    "--ignored",
+                    "--nocapture",
+                ])
+                .env("BEE_TEST_PATH_CHILD", "1")
+                .env("VK_LAYER_VALIDATE_SYNC", "1")
+                .output()
+                .unwrap();
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            assert!(output.status.success(), "{stdout}\n{stderr}");
+            assert!(
+                !stderr
+                    .lines()
+                    .any(|line| line.starts_with("Vulkan validation ") && line.contains("ERROR")),
+                "{stderr}"
+            );
+            return;
+        }
+        let mut app = gpui::TestAppContext::single();
+        let (view, cx) = app.add_window_view(|_, _| Bee::new());
+        cx.simulate_resize(size(px(360.0), px(300.0)));
+        cx.draw(
+            point(px(0.0), px(0.0)),
+            size(px(360.0), px(300.0)),
+            |_, _| view.clone(),
+        );
+        cx.run_until_parked();
+        let path_button = cx.debug_bounds("path-mode").unwrap().center();
+        cx.simulate_click(path_button, Modifiers::none());
+        cx.run_until_parked();
+        cx.update(|_, cx| {
+            let viewport = &view.read(cx).viewport;
+            assert_eq!(viewport.mode, RenderMode::Path);
+            assert!(viewport.error.is_none(), "{:?}", viewport.error);
+            assert_eq!(viewport.samples, 1);
+            assert!(viewport.image.is_some());
+        });
+        cx.executor().advance_clock(Duration::from_millis(17));
+        cx.run_until_parked();
+        cx.update(|_, cx| assert_eq!(view.read(cx).viewport.samples, 2));
+        let start = cx.debug_bounds("scene-canvas").unwrap().center();
+        let first = point(start.x + px(8.0), start.y + px(4.0));
+        let second = point(start.x + px(16.0), start.y + px(8.0));
+        let initial_camera = cx.update(|_, cx| view.read(cx).state.camera());
+        cx.simulate_mouse_move(start, None, Modifiers::none());
+        cx.simulate_mouse_down(start, MouseButton::Left, Modifiers::none());
+        for position in [first, second] {
+            cx.simulate_mouse_move(position, MouseButton::Left, Modifiers::none());
+            cx.run_until_parked();
+            cx.update(|_, cx| {
+                let view = view.read(cx);
+                assert!(view.viewport.error.is_none(), "{:?}", view.viewport.error);
+                assert_eq!(view.viewport.image_versions, Some(view.state.versions()));
+                assert_eq!(view.viewport.samples, 1);
+            });
+        }
+        cx.simulate_mouse_up(second, MouseButton::Left, Modifiers::none());
+        assert_ne!(
+            cx.update(|_, cx| view.read(cx).state.camera()),
+            initial_camera
+        );
+
+        // 旧快照仍在处理时连续更改状态；新历史必须从首个样本开始。
+        view.update_in(cx, |view, window, cx| {
+            view.viewport.start(&view.state, window, cx);
+            assert!(view.viewport.running);
+            let mut camera = view.state.camera();
+            camera.orbit(30.0, 8.0);
+            assert!(view.state.set_camera(camera));
+            view.viewport
+                .synchronize(view.viewport.extent, &view.state, window, cx);
+            let mut camera = view.state.camera();
+            camera.orbit(25.0, -4.0);
+            assert!(view.state.set_camera(camera));
+            view.viewport
+                .synchronize(view.viewport.extent, &view.state, window, cx);
+            let mut scene = view.state.scene().clone();
+            scene.materials[1].albedo = [0.2, 0.7, 0.3];
+            assert!(view.state.set_scene(scene));
+            view.viewport
+                .synchronize(view.viewport.extent, &view.state, window, cx);
+        });
+        cx.run_until_parked();
+        let (backend, snapshot, extent, actual) = cx.update(|_, cx| {
+            let view = view.read(cx);
+            assert!(!view.viewport.running);
+            assert!(view.viewport.error.is_none(), "{:?}", view.viewport.error);
+            assert_eq!(view.viewport.samples, 1);
+            assert_eq!(view.viewport.image_versions, Some(view.state.versions()));
+            (
+                view.viewport.backend.as_ref().unwrap().clone(),
+                view.state.snapshot(),
+                view.viewport.extent.unwrap(),
+                view.viewport
+                    .image
+                    .as_ref()
+                    .unwrap()
+                    .as_bytes(0)
+                    .unwrap()
+                    .to_vec(),
+            )
+        });
+        let mut fresh = bee_renderer::PathRenderer::new(&backend).unwrap();
+        let expected = fresh
+            .render(&backend, &snapshot, extent.0, extent.1, 1)
+            .unwrap();
+        let differences = actual
+            .iter()
+            .zip(&expected)
+            .filter(|(a, b)| a.abs_diff(**b) > 2)
+            .count();
+        assert!(
+            differences == 0,
+            "old frames contaminated the new sampling history: {differences} channels differ"
+        );
+        cx.executor().advance_clock(Duration::from_millis(17));
+        cx.run_until_parked();
+        cx.update(|_, cx| assert_eq!(view.read(cx).viewport.samples, 2));
+        let raster_button = cx.debug_bounds("raster-mode").unwrap().center();
+        cx.simulate_click(raster_button, Modifiers::none());
+        cx.run_until_parked();
+        cx.executor().advance_clock(Duration::from_millis(17));
+        cx.run_until_parked();
+        cx.update(|_, cx| {
+            let viewport = &view.read(cx).viewport;
+            assert_eq!(viewport.mode, RenderMode::Raster);
+            assert_eq!(viewport.samples, 0);
+            assert!(!viewport.running);
+            assert!(viewport.error.is_none(), "{:?}", viewport.error);
+            assert!(viewport.image.is_some());
+        });
+        let path_button = cx.debug_bounds("path-mode").unwrap().center();
+        cx.simulate_click(path_button, Modifiers::none());
+        cx.run_until_parked();
+        cx.update(|_, cx| assert_eq!(view.read(cx).viewport.mode, RenderMode::Path));
+        cx.update(|_, cx| {
+            cx.bind_keys([
+                gpui::KeyBinding::new("tab", crate::FocusNext, None),
+                gpui::KeyBinding::new("shift-tab", crate::FocusPrevious, None),
+            ])
+        });
+        cx.simulate_keystrokes("shift-tab enter");
+        cx.run_until_parked();
+        cx.update(|_, cx| assert_eq!(view.read(cx).viewport.mode, RenderMode::Raster));
+    }
+
+    #[test]
+    #[ignore = "requires a Vulkan graphics device"]
+    fn gpui_unavailable_path_keeps_raster_view() {
+        let mut backend = Backend::new(true).unwrap();
+        backend
+            .report
+            .ray_tracing_missing
+            .push("simulated missing ray tracing".into());
+        let backend = Arc::new(backend);
+        let mut app = gpui::TestAppContext::single();
+        let (view, cx) = app.add_window_view(|_, _| Bee {
+            viewport: Viewport::new(Some(backend.clone())),
+            state: SceneState::default(),
+            lines: vec![],
+            failed: false,
+        });
+        cx.simulate_resize(size(px(360.0), px(300.0)));
+        cx.draw(
+            point(px(0.0), px(0.0)),
+            size(px(360.0), px(300.0)),
+            |_, _| view.clone(),
+        );
+        cx.run_until_parked();
+        let path_button = cx.debug_bounds("path-mode").unwrap().center();
+        cx.simulate_click(path_button, Modifiers::none());
+        cx.run_until_parked();
+        cx.update(|_, cx| {
+            let viewport = &view.read(cx).viewport;
+            assert_eq!(viewport.mode, RenderMode::Raster);
+            assert!(viewport.error.is_none(), "{:?}", viewport.error);
+            assert!(viewport.image.is_some());
         });
     }
 

@@ -58,6 +58,8 @@ pub(crate) struct InstanceState {
 pub(crate) struct DeviceState {
     pub instance: Arc<InstanceState>,
     pub physical_device: vk::PhysicalDevice,
+    pub api_version: u32,
+    pub ray_tracing_enabled: bool,
     pub device: ash::Device,
     pub queue: vk::Queue,
     pub queue_family: u32,
@@ -206,11 +208,13 @@ impl InstanceState {
 }
 
 fn graphics_queue(queues: &[vk::QueueFamilyProperties]) -> Option<u32> {
+    let usable = |queue: &vk::QueueFamilyProperties| {
+        queue.queue_count > 0 && queue.queue_flags.contains(vk::QueueFlags::GRAPHICS)
+    };
     queues
         .iter()
-        .position(|queue| {
-            queue.queue_count > 0 && queue.queue_flags.contains(vk::QueueFlags::GRAPHICS)
-        })
+        .position(|queue| usable(queue) && queue.queue_flags.contains(vk::QueueFlags::COMPUTE))
+        .or_else(|| queues.iter().position(usable))
         .map(|index| index as u32)
 }
 
@@ -347,6 +351,13 @@ impl Backend {
             // 缺少光线追踪能力不影响图形设备初始化。
             let mut ray_tracing_missing =
                 missing_ray_capabilities(api_version, &extensions, &features);
+            if !queues[queue_family as usize]
+                .queue_flags
+                .contains(vk::QueueFlags::COMPUTE)
+            {
+                ray_tracing_missing
+                    .push("graphics queue does not support compute operations".into());
+            }
             let priorities = [1.0];
             let queue_infos = [vk::DeviceQueueCreateInfo::default()
                 .queue_family_index(queue_family)
@@ -397,6 +408,7 @@ impl Backend {
                 }
             };
             let queue = unsafe { device.get_device_queue(queue_family, 0) };
+            let ray_tracing_enabled = ray_tracing_missing.is_empty();
             let report = DeviceReport {
                 name,
                 api_version,
@@ -411,6 +423,8 @@ impl Backend {
                 device: Arc::new(DeviceState {
                     instance,
                     physical_device,
+                    api_version,
+                    ray_tracing_enabled,
                     device,
                     queue,
                     queue_family,
@@ -446,6 +460,21 @@ mod tests {
             },
         ];
         assert_eq!(graphics_queue(&queues), Some(1));
+        assert_eq!(
+            graphics_queue(&[
+                vk::QueueFamilyProperties {
+                    queue_flags: vk::QueueFlags::GRAPHICS,
+                    queue_count: 1,
+                    ..Default::default()
+                },
+                vk::QueueFamilyProperties {
+                    queue_flags: vk::QueueFlags::GRAPHICS | vk::QueueFlags::COMPUTE,
+                    queue_count: 1,
+                    ..Default::default()
+                },
+            ]),
+            Some(1)
+        );
         assert_eq!(graphics_queue(&[]), None);
         assert_eq!(
             graphics_queue(&[vk::QueueFamilyProperties {
@@ -488,6 +517,8 @@ mod tests {
             .ray_tracing_missing
             .iter()
             .any(|item| item.contains("VK_KHR_ray_tracing_pipeline")));
+        assert!(backend.create_path_tracer().is_err());
+        assert!(backend.build_acceleration_scene(&[], 0).is_err());
         assert_ne!(backend.device.queue, vk::Queue::null());
         Ok(())
     }

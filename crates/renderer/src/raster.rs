@@ -82,7 +82,7 @@ impl RasterWork {
     }
 }
 
-fn scene_data(snapshot: &RenderSnapshot) -> Result<(Vec<[f32; 4]>, u32), String> {
+pub(crate) fn scene_data(snapshot: &RenderSnapshot) -> Result<(Vec<[f32; 4]>, u32), String> {
     let scene = &snapshot.scene;
     let valid_color =
         |color: &[f32; 3]| color.iter().all(|value| value.is_finite() && *value >= 0.0);
@@ -288,6 +288,46 @@ mod tests {
     };
     use bee_vulkan::ValidationStatus;
     use std::sync::Arc;
+
+    #[test]
+    #[ignore = "requires a ray tracing device and Vulkan validation layer"]
+    fn builds_builtin_acceleration_scene() {
+        if std::env::var_os("BEE_ACCEL_GPU_CHILD").is_none() {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "raster::tests::builds_builtin_acceleration_scene",
+                    "--ignored",
+                    "--nocapture",
+                ])
+                .env("BEE_ACCEL_GPU_CHILD", "1")
+                .env("VK_LAYER_VALIDATE_SYNC", "1")
+                .output()
+                .unwrap();
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            assert!(output.status.success(), "{stdout}\n{stderr}");
+            assert!(
+                !stderr
+                    .lines()
+                    .any(|line| line.starts_with("Vulkan validation ") && line.contains("ERROR")),
+                "{stderr}"
+            );
+            return;
+        }
+        let backend = Backend::new(true).unwrap();
+        assert_eq!(backend.report.validation, ValidationStatus::Enabled);
+        assert!(
+            backend.report.ray_tracing_missing.is_empty(),
+            "{:?}",
+            backend.report
+        );
+        let snapshot = SceneState::default().snapshot();
+        let (data, vertices) = scene_data(&snapshot).unwrap();
+        let acceleration = backend.build_acceleration_scene(&data, vertices).unwrap();
+        assert_eq!(vertices, 78);
+        assert_eq!(acceleration.triangle_count(), 26);
+    }
 
     fn snapshot() -> RenderSnapshot {
         let normal = Vector3::new(0.0, 0.0, 1.0);
