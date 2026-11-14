@@ -8,7 +8,6 @@ glslang 11.1.0-1253-gefd24d75";
 
 fn main() {
     println!("cargo:rerun-if-env-changed=VULKAN_SDK");
-    println!("cargo:rerun-if-changed=shaders/foundation.vert");
     let sdk = env::var_os("VULKAN_SDK").expect("VULKAN_SDK must point to Vulkan SDK 1.4.321.1");
     let compiler = PathBuf::from(sdk).join("Bin").join("glslc.exe");
     println!("cargo:rerun-if-changed={}", compiler.display());
@@ -25,22 +24,31 @@ fn main() {
         version_text,
         String::from_utf8_lossy(&version.stderr)
     );
-    let output_path = PathBuf::from(env::var_os("OUT_DIR").unwrap()).join("foundation.vert.spv");
-    let output = Command::new(&compiler)
-        .args([
-            "--target-env=vulkan1.0",
-            "-fshader-stage=vert",
-            "-O",
-            "shaders/foundation.vert",
-            "-o",
-        ])
-        .arg(output_path)
-        .output()
-        .unwrap_or_else(|error| panic!("could not run {}: {error}", compiler.display()));
-    assert!(
-        output.status.success(),
-        "GLSL compilation failed:\n{}{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
+    for (name, stage) in [
+        ("foundation.vert", "vert"),
+        ("tonemap.vert", "vert"),
+        ("tonemap.frag", "frag"),
+    ] {
+        let source = format!("shaders/{name}");
+        println!("cargo:rerun-if-changed={source}");
+        let output_path =
+            PathBuf::from(env::var_os("OUT_DIR").unwrap()).join(format!("{name}.spv"));
+        let output = Command::new(&compiler)
+            .args([
+                "--target-env=vulkan1.0",
+                &format!("-fshader-stage={stage}"),
+                "-O",
+                &source,
+                "-o",
+            ])
+            .arg(output_path)
+            .output()
+            .unwrap_or_else(|error| panic!("could not run {}: {error}", compiler.display()));
+        assert!(
+            output.status.success(),
+            "GLSL compilation failed:\n{}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
 }

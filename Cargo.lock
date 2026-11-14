@@ -512,6 +512,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "bee-renderer"
+version = "0.1.0"
+dependencies = [
+ "ash",
+ "bee-vulkan",
+]
+
+[[package]]
 name = "bee-scene"
 version = "0.1.0"
 dependencies = [

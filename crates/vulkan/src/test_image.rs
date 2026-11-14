@@ -48,7 +48,7 @@ impl Drop for TestTarget {
     }
 }
 
-fn memory_type(
+pub(crate) fn memory_type(
     device: &DeviceState,
     bits: u32,
     required: vk::MemoryPropertyFlags,

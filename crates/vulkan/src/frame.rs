@@ -3,15 +3,17 @@ use anyhow::{anyhow, bail, Context, Result};
 use ash::vk;
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct Buffer {
-    inner: Arc<BufferState>,
+    pub(crate) inner: Arc<BufferState>,
 }
 
-struct BufferState {
-    device: Arc<DeviceState>,
-    buffer: vk::Buffer,
+pub(crate) struct BufferState {
+    pub(crate) device: Arc<DeviceState>,
+    pub(crate) buffer: vk::Buffer,
     memory: vk::DeviceMemory,
-    size: u64,
+    pub(crate) size: u64,
+    usage: vk::BufferUsageFlags,
 }
 
 impl Drop for BufferState {
@@ -24,7 +26,7 @@ impl Drop for BufferState {
 }
 
 pub struct Frame {
-    device: Arc<DeviceState>,
+    pub(crate) device: Arc<DeviceState>,
     pool: vk::CommandPool,
     pub(crate) command_buffer: vk::CommandBuffer,
     pub(crate) resources: Vec<Arc<dyn Send + Sync>>,
@@ -46,10 +48,20 @@ impl Backend {
         if size == 0 || !size.is_multiple_of(4) {
             bail!("transfer buffer size must be a nonzero multiple of four");
         }
+        self.create_graph_buffer(size, vk::BufferUsageFlags::TRANSFER_DST)
+    }
+
+    pub fn create_graph_buffer(&self, size: u64, usage: vk::BufferUsageFlags) -> Result<Buffer> {
+        let supported = vk::BufferUsageFlags::TRANSFER_SRC
+            | vk::BufferUsageFlags::TRANSFER_DST
+            | vk::BufferUsageFlags::STORAGE_BUFFER;
+        if size == 0 || usage.is_empty() || !(usage & !supported).is_empty() {
+            bail!("invalid graph buffer size or usage");
+        }
         let device = &self.device.device;
         let info = vk::BufferCreateInfo::default()
             .size(size)
-            .usage(vk::BufferUsageFlags::TRANSFER_DST)
+            .usage(usage)
             .sharing_mode(vk::SharingMode::EXCLUSIVE);
         let buffer = unsafe { device.create_buffer(&info, None) }
             .context("could not create Vulkan buffer")?;
@@ -101,6 +113,7 @@ impl Backend {
                 buffer,
                 memory,
                 size,
+                usage,
             }),
         })
     }
@@ -139,10 +152,27 @@ impl Backend {
     }
 }
 
+impl Buffer {
+    pub fn raw(&self) -> vk::Buffer {
+        self.inner.buffer
+    }
+    pub fn usage(&self) -> vk::BufferUsageFlags {
+        self.inner.usage
+    }
+}
+
 impl Frame {
     pub fn fill_buffer(&mut self, buffer: &Buffer, value: u32) -> Result<()> {
         if !Arc::ptr_eq(&self.device, &buffer.inner.device) {
             bail!("buffer belongs to a different Vulkan device");
+        }
+        if !buffer
+            .inner
+            .usage
+            .contains(vk::BufferUsageFlags::TRANSFER_DST)
+            || !buffer.inner.size.is_multiple_of(4)
+        {
+            bail!("buffer does not support transfer filling");
         }
         unsafe {
             self.device.device.cmd_fill_buffer(
@@ -169,6 +199,38 @@ impl Frame {
         }
 
         // 即使调用方释放原始句柄，也要保留缓冲区。
+        self.resources.push(buffer.inner.clone());
+        Ok(())
+    }
+
+    /// # Safety
+    /// 调用方必须保证屏障描述真实的缓冲区访问，并对跨队列使用进行同步。
+    pub unsafe fn graph_buffer_barrier(
+        &mut self,
+        buffer: &Buffer,
+        before: (vk::PipelineStageFlags, vk::AccessFlags),
+        after: (vk::PipelineStageFlags, vk::AccessFlags),
+    ) -> Result<()> {
+        if !Arc::ptr_eq(&self.device, &buffer.inner.device) {
+            bail!("graph buffer belongs to a different Vulkan device");
+        }
+        let barrier = vk::BufferMemoryBarrier::default()
+            .src_access_mask(before.1)
+            .dst_access_mask(after.1)
+            .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+            .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+            .buffer(buffer.raw())
+            .offset(0)
+            .size(vk::WHOLE_SIZE);
+        self.device.device.cmd_pipeline_barrier(
+            self.command_buffer,
+            before.0,
+            after.0,
+            vk::DependencyFlags::empty(),
+            &[],
+            &[barrier],
+            &[],
+        );
         self.resources.push(buffer.inner.clone());
         Ok(())
     }
