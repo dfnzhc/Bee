@@ -233,11 +233,19 @@ impl Viewport {
 
         // 后台任务持有快照，直到 Vulkan 提交和读回完成。
         let task = cx.background_spawn(async move {
-            let result = backend
-                .submit_test_image(width, height)
-                .and_then(|pending| pending.read())
-                .map_err(|error| format!("Vulkan image readback failed: {error:#}"))
-                .and_then(render_image);
+            let result = bee_renderer::render_raster_snapshot(&backend, &snapshot, width, height)
+                .map_err(|error| format!("Vulkan image readback failed: {error}"))
+                .and_then(|bgra| {
+                    let row_stride = (width as usize)
+                        .checked_mul(4)
+                        .ok_or("Image row size overflow")?;
+                    render_image(TestImage {
+                        width,
+                        height,
+                        row_stride,
+                        bgra,
+                    })
+                });
             (snapshot, result)
         });
         cx.spawn_in(window, async move |view, cx| {
@@ -440,6 +448,74 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires a Vulkan graphics device and validation layer"]
+    fn gpui_camera_input_changes_raster_image() {
+        if std::env::var_os("BEE_TEST_CAMERA_CHILD").is_none() {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "viewport::tests::gpui_camera_input_changes_raster_image",
+                    "--ignored",
+                    "--nocapture",
+                ])
+                .env("BEE_TEST_CAMERA_CHILD", "1")
+                .env("VK_LAYER_VALIDATE_SYNC", "1")
+                .output()
+                .unwrap();
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            assert!(output.status.success(), "{stdout}\n{stderr}");
+            assert!(
+                !stderr
+                    .lines()
+                    .any(|line| line.starts_with("Vulkan validation ") && line.contains("ERROR")),
+                "{stderr}"
+            );
+            return;
+        }
+        let mut app = gpui::TestAppContext::single();
+        let (view, cx) = app.add_window_view(|_, _| Bee::new());
+        cx.simulate_resize(size(px(700.0), px(500.0)));
+        cx.draw(
+            point(px(0.0), px(0.0)),
+            size(px(700.0), px(500.0)),
+            |_, _| view.clone(),
+        );
+        cx.run_until_parked();
+        let (camera_before, image_before) = cx.update(|_, cx| {
+            let view = view.read(cx);
+            assert!(view.viewport.error.is_none(), "{:?}", view.viewport.error);
+            (
+                view.state.camera(),
+                view.viewport
+                    .image
+                    .as_ref()
+                    .unwrap()
+                    .as_bytes(0)
+                    .unwrap()
+                    .to_vec(),
+            )
+        });
+        let start = point(px(100.0), px(150.0));
+        let end = point(px(170.0), px(180.0));
+        cx.simulate_mouse_move(start, None, Modifiers::none());
+        cx.simulate_mouse_down(start, MouseButton::Left, Modifiers::none());
+        cx.simulate_mouse_move(end, MouseButton::Left, Modifiers::none());
+        cx.simulate_mouse_up(end, MouseButton::Left, Modifiers::none());
+        cx.run_until_parked();
+        cx.update(|_, cx| {
+            let view = view.read(cx);
+            assert_ne!(view.state.camera(), camera_before);
+            assert!(view.viewport.error.is_none(), "{:?}", view.viewport.error);
+            assert_eq!(view.viewport.image_versions, Some(view.state.versions()));
+            assert!(
+                view.viewport.image.as_ref().unwrap().as_bytes(0).unwrap() != image_before,
+                "camera movement must change the rendered image"
+            );
+        });
+    }
+
+    #[test]
     #[ignore = "requires a Vulkan graphics device"]
     fn gpui_displays_readback_and_recovers_from_resize_and_failure() {
         use std::sync::atomic::Ordering;
@@ -453,6 +529,7 @@ mod tests {
                     "--nocapture",
                 ])
                 .env("BEE_TEST_VIEWPORT_CHILD", "1")
+                .env("VK_LAYER_VALIDATE_SYNC", "1")
                 .output()
                 .unwrap();
             let stdout = String::from_utf8_lossy(&output.stdout);
@@ -467,7 +544,7 @@ mod tests {
             return;
         }
 
-        // 渲染初始图像，验证尺寸和四角颜色。
+        // 渲染初始图像，验证尺寸和场景内容。
         let mut app = gpui::TestAppContext::single();
         let cx = app.add_empty_window();
         let view = cx.update(|_, cx| cx.new(|_| Bee::new()));
@@ -499,14 +576,12 @@ mod tests {
             assert_eq!(image.size(0).width.0 as u32, extent.0);
             assert_eq!(image.size(0).height.0 as u32, extent.1);
             let bytes = image.as_bytes(0).unwrap();
-            let pixel = |x: u32, y: u32| {
-                let offset = ((y * extent.0 + x) * 4) as usize;
-                &bytes[offset..offset + 4]
-            };
-            assert_eq!(pixel(0, 0), &[0, 0, 255, 255]);
-            assert_eq!(pixel(extent.0 - 1, 0), &[0, 255, 0, 255]);
-            assert_eq!(pixel(0, extent.1 - 1), &[255, 0, 0, 255]);
-            assert_eq!(pixel(extent.0 - 1, extent.1 - 1), &[255, 255, 255, 255]);
+            assert!(bytes
+                .chunks_exact(4)
+                .any(|p| p[2] > p[0].saturating_add(20)));
+            assert!(bytes
+                .chunks_exact(4)
+                .any(|p| p[0] > p[2].saturating_add(20)));
             (Arc::downgrade(image), extent)
         });
         // 替换图集条目前，先验证 GPUI 的 paint_image 路径。

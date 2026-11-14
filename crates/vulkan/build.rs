@@ -28,6 +28,8 @@ fn main() {
         ("foundation.vert", "vert"),
         ("tonemap.vert", "vert"),
         ("tonemap.frag", "frag"),
+        ("raster.vert", "vert"),
+        ("raster.frag", "frag"),
     ] {
         let source = format!("shaders/{name}");
         println!("cargo:rerun-if-changed={source}");

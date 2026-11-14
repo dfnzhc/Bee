@@ -13,6 +13,8 @@ fn shader_build_is_reproducible() {
         ("foundation.vert", "vert"),
         ("tonemap.vert", "vert"),
         ("tonemap.frag", "frag"),
+        ("raster.vert", "vert"),
+        ("raster.frag", "frag"),
     ] {
         let source = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("shaders")

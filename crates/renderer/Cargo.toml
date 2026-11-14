@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 ash = "=0.38.0"
 bee-vulkan = { path = "../vulkan" }
+bee-scene = { path = "../scene" }
