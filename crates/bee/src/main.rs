@@ -1,4 +1,4 @@
-mod flow_editor;
+pub(crate) mod flow_editor;
 mod viewport;
 
 use bee_scene::SceneState;
@@ -11,7 +11,7 @@ use viewport::Viewport;
 
 actions!(bee, [FocusNext, FocusPrevious]);
 
-struct Bee {
+pub(crate) struct Bee {
     viewport: Viewport,
     state: SceneState,
     lines: Vec<String>,
@@ -23,7 +23,7 @@ fn sharing_unavailable_reason() -> &'static str {
 }
 
 impl Bee {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         match bee_vulkan::Backend::new(cfg!(debug_assertions)) {
             Ok(backend) => {
                 let report = &backend.report;
@@ -141,27 +141,42 @@ impl Render for Bee {
 }
 
 fn main() {
-    Application::new().run(|cx: &mut App| {
-        cx.bind_keys([
-            KeyBinding::new("tab", FocusNext, None),
-            KeyBinding::new("shift-tab", FocusPrevious, None),
-        ]);
-        let bounds = Bounds::centered(None, size(px(960.0), px(640.0)), cx);
-        cx.open_window(
-            WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(bounds)),
-                ..Default::default()
-            },
-            |_, cx| cx.new(|_| Bee::new()),
-        )
-        .expect("Failed to open the Bee window");
-        cx.activate(true);
-    });
+    Application::new()
+        .with_assets(gpui_component_assets::Assets)
+        .run(|cx: &mut App| {
+            gpui_component::init(cx);
+            cx.bind_keys([
+                KeyBinding::new("tab", FocusNext, None),
+                KeyBinding::new("shift-tab", FocusPrevious, None),
+            ]);
+            let bounds = Bounds::centered(None, size(px(960.0), px(640.0)), cx);
+            cx.open_window(
+                WindowOptions {
+                    window_bounds: Some(WindowBounds::Windowed(bounds)),
+                    ..Default::default()
+                },
+                |_, cx| cx.new(|_| Bee::new()),
+            )
+            .expect("Failed to open the Bee window");
+            cx.activate(true);
+        });
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn gpui_component_uses_shared_gpui_and_loads_dock_icons() {
+        use gpui::AssetSource;
+
+        let app = gpui::TestAppContext::single();
+        app.update(gpui_component::init);
+        assert!(gpui_component_assets::Assets
+            .load("icons/ellipsis.svg")
+            .unwrap()
+            .is_some());
+    }
 
     #[test]
     fn sharing_reports_missing_gpui_interop() {

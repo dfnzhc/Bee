@@ -47,3 +47,11 @@ cargo test --workspace
 $env:VK_LAYER_VALIDATE_SYNC = '1'
 cargo test --workspace -- --ignored --test-threads=1
 ```
+
+运行以下示例可以检查 GPUI Kit 停靠布局、文件夹选择和现有视口：
+
+```powershell
+cargo run -p bee --example workbench_probe
+```
+
+该示例用于验证接入，尚不是正式工作台。
