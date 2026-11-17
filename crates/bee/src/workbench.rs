@@ -11,6 +11,8 @@ use gpui_component::{
 };
 use std::sync::Arc;
 
+mod scene;
+
 const BACKGROUND: u32 = 0x1b1f20;
 const PANEL: u32 = 0x24292a;
 const BORDER: u32 = 0x454e4c;
@@ -82,16 +84,26 @@ impl PanelKind {
 struct WorkbenchPanel {
     kind: PanelKind,
     bee: Entity<Bee>,
+    selection: Entity<scene::Selection>,
     focus: FocusHandle,
     tab: Option<WeakEntity<TabPanel>>,
 }
 
 impl WorkbenchPanel {
-    fn new(kind: PanelKind, bee: Entity<Bee>, cx: &mut Context<Self>) -> Self {
+    fn new(
+        kind: PanelKind,
+        bee: Entity<Bee>,
+        selection: Entity<scene::Selection>,
+        cx: &mut Context<Self>,
+    ) -> Self {
         cx.observe(&bee, |_, _, cx| cx.notify()).detach();
+        if matches!(kind, PanelKind::Scene | PanelKind::Properties) {
+            cx.observe(&selection, |_, _, cx| cx.notify()).detach();
+        }
         Self {
             kind,
             bee,
+            selection,
             focus: cx.focus_handle(),
             tab: None,
         }
@@ -135,31 +147,36 @@ impl Panel for WorkbenchPanel {
 impl Render for WorkbenchPanel {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let kind = self.kind;
-        let content = self.bee.update(cx, |bee, cx| match kind {
-            PanelKind::Viewport => bee.viewport.render(&bee.state, cx).into_any_element(),
-            PanelKind::Flow => bee.viewport.flow.render(cx).into_any_element(),
-            PanelKind::Scene => div()
-                .flex()
-                .flex_col()
-                .gap_2()
-                .child(format!("Instances: {}", bee.state.scene().instances.len()))
-                .child(format!("Lights: {}", bee.state.scene().lights.len()))
-                .child("Camera")
-                .into_any_element(),
-            PanelKind::Properties => div().child("No selection").into_any_element(),
-            PanelKind::Files => div().child("No folder selected").into_any_element(),
-            PanelKind::Console => div()
-                .flex()
-                .flex_col()
-                .gap_2()
-                .children(bee.lines.iter().cloned())
-                .children(
-                    bee.viewport
-                        .error()
-                        .map(|error| format!("Viewport error: {error}")),
-                )
-                .into_any_element(),
-        });
+        let content = match kind {
+            PanelKind::Scene => scene::scene_list(
+                &self.bee.read(cx).state,
+                self.selection.read(cx),
+                self.bee.clone(),
+                self.selection.clone(),
+            )
+            .into_any_element(),
+            PanelKind::Properties => {
+                scene::properties(&self.bee.read(cx).state, self.selection.read(cx))
+                    .into_any_element()
+            }
+            _ => self.bee.update(cx, |bee, cx| match kind {
+                PanelKind::Viewport => bee.viewport.render(&bee.state, cx).into_any_element(),
+                PanelKind::Flow => bee.viewport.flow.render(cx).into_any_element(),
+                PanelKind::Files => div().child("No folder selected").into_any_element(),
+                PanelKind::Console => div()
+                    .flex()
+                    .flex_col()
+                    .gap_2()
+                    .children(bee.lines.iter().cloned())
+                    .children(
+                        bee.viewport
+                            .error()
+                            .map(|error| format!("Viewport error: {error}")),
+                    )
+                    .into_any_element(),
+                PanelKind::Scene | PanelKind::Properties => unreachable!(),
+            }),
+        };
 
         let selector = format!("panel-content-{}", kind.id());
         div()
@@ -191,9 +208,20 @@ pub(crate) struct Workbench {
 
 impl Workbench {
     pub(crate) fn new(bee: Entity<Bee>, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let selection = cx.new(|_| scene::Selection::default());
+        let observed_selection = selection.clone();
+        cx.observe(&bee, move |_, bee, cx| {
+            if observed_selection.read(cx).is_stale(&bee.read(cx).state) {
+                observed_selection.update(cx, |selection, cx| {
+                    selection.clear();
+                    cx.notify();
+                });
+            }
+        })
+        .detach();
         let panels = PanelKind::ALL
             .into_iter()
-            .map(|kind| cx.new(|cx| WorkbenchPanel::new(kind, bee.clone(), cx)))
+            .map(|kind| cx.new(|cx| WorkbenchPanel::new(kind, bee.clone(), selection.clone(), cx)))
             .collect::<Vec<_>>();
         let dock = cx.new(|cx| {
             DockArea::new("bee-workbench", None, window, cx).panel_style(PanelStyle::TabBar)
@@ -470,6 +498,118 @@ mod tests {
     }
 
     #[test]
+    fn scene_selection_shows_real_objects_and_clears_on_replacement() {
+        let mut app = gpui::TestAppContext::single();
+        app.update(|cx| {
+            gpui_component::init(cx);
+            init_theme(cx);
+            cx.bind_keys([
+                KeyBinding::new("tab", crate::FocusNext, None),
+                KeyBinding::new("shift-tab", crate::FocusPrevious, None),
+            ]);
+        });
+        let (workbench, cx) = app.add_window_view(|window, cx| {
+            let bee = cx.new(|_| Bee::failure("test device".into()));
+            Workbench::new(bee, window, cx)
+        });
+        cx.simulate_resize(size(px(960.0), px(640.0)));
+        redraw(cx, &workbench);
+        let bee = cx.update(|_, cx| workbench.read(cx).panels[0].read(cx).bee.clone());
+        let selection = cx.update(|_, cx| workbench.read(cx).panels[0].read(cx).selection.clone());
+        let versions = cx.update(|_, cx| bee.read(cx).state.versions());
+        let (instances, lights) = cx.update(|_, cx| {
+            let scene = bee.read(cx).state.scene();
+            (scene.instances.len(), scene.lights.len())
+        });
+        assert_eq!((instances, lights), (3, 1));
+        for selector in [
+            "scene-instance-0",
+            "scene-instance-1",
+            "scene-instance-2",
+            "scene-light-0",
+            "scene-camera",
+            "properties-empty-0",
+        ] {
+            assert!(cx.debug_bounds(selector).is_some(), "{selector}");
+        }
+        assert!(cx.debug_bounds("scene-instance-3").is_none());
+        assert!(cx.debug_bounds("scene-light-1").is_none());
+
+        cx.update(|window, cx| window.focus(&workbench.read(cx).menu_focus));
+        redraw(cx, &workbench);
+        cx.simulate_keystrokes("tab enter");
+        redraw(cx, &workbench);
+        cx.update(|_, cx| {
+            assert_eq!(
+                selection.read(cx).current(&bee.read(cx).state),
+                Some(scene::Item::Instance(0))
+            );
+        });
+
+        for (selector, expected, field) in [
+            (
+                "scene-instance-1",
+                scene::Item::Instance(1),
+                "property-albedo",
+            ),
+            ("scene-light-0", scene::Item::Light(0), "property-intensity"),
+            ("scene-camera", scene::Item::Camera, "property-fov"),
+        ] {
+            click(cx, &workbench, selector);
+            cx.update(|_, cx| {
+                assert_eq!(
+                    selection.read(cx).current(&bee.read(cx).state),
+                    Some(expected)
+                );
+                assert_eq!(bee.read(cx).state.versions(), versions);
+            });
+            assert!(cx.debug_bounds(field).is_some(), "{field}");
+        }
+
+        click(cx, &workbench, "scene-clear");
+        assert!(cx.debug_bounds("properties-empty-0").is_some());
+        cx.update(|_, cx| {
+            assert_eq!(selection.read(cx).current(&bee.read(cx).state), None);
+            assert_eq!(bee.read(cx).state.versions(), versions);
+        });
+
+        click(cx, &workbench, "scene-instance-0");
+        cx.update(|_, cx| {
+            bee.update(cx, |bee, cx| {
+                let mut replacement = bee.state.scene().clone();
+                replacement.environment = [0.3, 0.2, 0.1];
+                assert!(bee.state.set_scene(replacement));
+                cx.notify();
+            });
+        });
+        cx.run_until_parked();
+        redraw(cx, &workbench);
+        assert!(cx.debug_bounds("properties-empty-1").is_some());
+        cx.update(|_, cx| {
+            let selection = selection.read(cx);
+            assert_eq!(selection.current(&bee.read(cx).state), None);
+            assert!(!selection.is_stale(&bee.read(cx).state));
+        });
+
+        click(cx, &workbench, "scene-instance-2");
+        cx.update(|_, cx| {
+            bee.update(cx, |bee, cx| {
+                let mut replacement = bee.state.scene().clone();
+                replacement.instances.clear();
+                replacement.lights.clear();
+                assert!(bee.state.set_scene(replacement));
+                cx.notify();
+            });
+        });
+        cx.run_until_parked();
+        redraw(cx, &workbench);
+        assert!(cx.debug_bounds("scene-instances-empty").is_some());
+        assert!(cx.debug_bounds("scene-lights-empty").is_some());
+        assert!(cx.debug_bounds("scene-camera").is_some());
+        assert!(cx.debug_bounds("properties-empty-2").is_some());
+    }
+
+    #[test]
     fn panel_entries_and_layout_preserve_scene_camera_and_flow_draft() {
         let mut app = gpui::TestAppContext::single();
         app.update(|cx| {
@@ -724,7 +864,7 @@ mod tests {
             |_, _| root.clone(),
         );
         cx.simulate_keystrokes("tab");
-        assert!(cx.update(|window, cx| workbench.read(cx).panels[1]
+        assert!(cx.update(|window, cx| workbench.read(cx).panels[0]
             .read(cx)
             .focus
             .contains_focused(window, cx)));

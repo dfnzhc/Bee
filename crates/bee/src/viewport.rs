@@ -698,6 +698,86 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires a ray tracing device and Vulkan validation layer"]
+    fn workbench_selection_preserves_path_samples() {
+        let mut app = gpui::TestAppContext::single();
+        app.update(|cx| {
+            gpui_component::init(cx);
+            crate::workbench::init_theme(cx);
+        });
+        let mut bee = None;
+        let (root, cx) = app.add_window_view(|window, cx| {
+            let view = cx.new(|_| Bee::new());
+            bee = Some(view.clone());
+            let workbench = cx.new(|cx| crate::workbench::Workbench::new(view, window, cx));
+            gpui_component::Root::new(workbench, window, cx)
+        });
+        let bee = bee.unwrap();
+        let dimensions = size(px(960.0), px(640.0));
+        cx.simulate_resize(dimensions);
+        cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| root.clone());
+        cx.run_until_parked();
+        cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| root.clone());
+        let path = cx.debug_bounds("path-mode").unwrap().center();
+        cx.simulate_click(path, Modifiers::none());
+        cx.run_until_parked();
+        cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| root.clone());
+        cx.run_until_parked();
+        let (extent, generation, versions, mut samples) = cx.update(|_, cx| {
+            let bee = bee.read(cx);
+            assert_eq!(bee.viewport.mode, RenderMode::Path);
+            assert!(bee.viewport.error.is_none(), "{:?}", bee.viewport.error);
+            assert!(bee.viewport.samples > 0);
+            (
+                bee.viewport.extent,
+                bee.viewport.generation,
+                bee.state.versions(),
+                bee.viewport.samples,
+            )
+        });
+
+        for (selector, property) in [
+            ("scene-instance-0", "property-albedo"),
+            ("scene-light-0", "property-intensity"),
+            ("scene-camera", "property-fov"),
+            ("scene-clear", "properties-empty-0"),
+        ] {
+            let bounds = cx.debug_bounds(selector).expect(selector);
+            cx.simulate_click(bounds.center(), Modifiers::none());
+            cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| root.clone());
+            cx.run_until_parked();
+            assert!(cx.debug_bounds(property).is_some(), "{property}");
+            cx.update(|_, cx| {
+                let bee = bee.read(cx);
+                assert_eq!(bee.viewport.extent, extent);
+                assert_eq!(bee.viewport.generation, generation);
+                assert_eq!(bee.state.versions(), versions);
+                assert!(bee.viewport.samples >= samples);
+            });
+            cx.executor().advance_clock(Duration::from_millis(17));
+            cx.run_until_parked();
+            let next = cx.update(|_, cx| bee.read(cx).viewport.samples);
+            assert!(next > samples, "{selector}: {samples} -> {next}");
+            samples = next;
+        }
+
+        // 停止采样并消化已安排的定时器后再释放测试窗口。
+        let raster = cx.debug_bounds("raster-mode").unwrap().center();
+        cx.simulate_click(raster, Modifiers::none());
+        cx.run_until_parked();
+        cx.executor().advance_clock(Duration::from_millis(17));
+        cx.run_until_parked();
+        cx.update(|_, cx| {
+            let viewport = &bee.read(cx).viewport;
+            assert_eq!(viewport.mode, RenderMode::Raster);
+            assert!(!viewport.running);
+        });
+        drop(root);
+        drop(bee);
+        cx.quit();
+    }
+
+    #[test]
     fn viewport_mouse_input_changes_camera() {
         let mut app = gpui::TestAppContext::single();
         let (view, cx) = app.add_window_view(|_, _| Bee::failure("test device".into()));
