@@ -27,6 +27,11 @@ impl Default for FlowEditor {
 }
 
 impl FlowEditor {
+    #[cfg(test)]
+    pub(crate) fn draft(&self) -> &ModuleGraph {
+        self.flow.draft()
+    }
+
     pub fn active(&self) -> &ModuleGraph {
         self.flow.active().expect("the initial flow is valid")
     }

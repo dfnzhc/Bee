@@ -90,11 +90,12 @@ impl Viewport {
             .flex_1()
             .min_w_0()
             .min_h_0()
-            .gap_2()
+            .gap_1()
             .child(
                 div()
                     .flex()
-                    .gap_3()
+                    .flex_wrap()
+                    .gap_1()
                     .tab_group()
                     .child(
                         div()
@@ -102,13 +103,23 @@ impl Viewport {
                             .debug_selector(|| "raster-mode".into())
                             .tab_index(0)
                             .cursor_pointer()
+                            .flex()
+                            .items_center()
+                            .h(px(26.0))
                             .px_2()
+                            .rounded_sm()
                             .border_1()
                             .border_color(if self.mode == RenderMode::Raster {
                                 rgb(0x76c6b2)
                             } else {
-                                rgb(0x777777)
+                                rgb(0x454e4c)
                             })
+                            .bg(if self.mode == RenderMode::Raster {
+                                rgb(0x344841)
+                            } else {
+                                rgb(0x292f2e)
+                            })
+                            .hover(|style| style.bg(rgb(0x3b4c47)))
                             .focus(|style| style.border_color(rgb(0xffffff)))
                             .child(if self.mode == RenderMode::Raster {
                                 "Raster (active)"
@@ -142,18 +153,28 @@ impl Viewport {
                             .debug_selector(|| "path-mode".into())
                             .tab_index(1)
                             .cursor_pointer()
+                            .flex()
+                            .items_center()
+                            .h(px(26.0))
                             .px_2()
+                            .rounded_sm()
                             .border_1()
                             .border_color(if self.mode == RenderMode::Path {
                                 rgb(0x76c6b2)
                             } else {
-                                rgb(0x777777)
+                                rgb(0x454e4c)
                             })
+                            .bg(if self.mode == RenderMode::Path {
+                                rgb(0x344841)
+                            } else {
+                                rgb(0x292f2e)
+                            })
+                            .hover(|style| style.bg(rgb(0x3b4c47)))
                             .focus(|style| style.border_color(rgb(0xffffff)))
                             .text_color(if path_available {
                                 rgb(0xd1d7d4)
                             } else {
-                                rgb(0x777777)
+                                rgb(0xb1bfba)
                             })
                             .child(if self.mode == RenderMode::Path {
                                 "Path tracing (active)"
@@ -186,15 +207,16 @@ impl Viewport {
             )
             .child(
                 div()
-                    .h(px(28.0))
+                    .h(px(22.0))
                     .flex_shrink_0()
                     .overflow_hidden()
                     .whitespace_nowrap()
                     .text_ellipsis()
+                    .text_size(px(12.0))
                     .text_color(if self.error.is_some() {
                         rgb(0xffa8a8)
                     } else {
-                        rgb(0xd1d7d4)
+                        rgb(0xb1bfba)
                     })
                     .child(status),
             )
@@ -622,6 +644,57 @@ mod tests {
             ),
             None
         );
+    }
+
+    #[test]
+    #[ignore = "requires a Vulkan graphics device"]
+    fn workbench_viewport_renders_after_layout_and_resize() {
+        use std::sync::atomic::Ordering;
+
+        let mut app = gpui::TestAppContext::single();
+        app.update(|cx| {
+            gpui_component::init(cx);
+            crate::workbench::init_theme(cx);
+        });
+        let mut bee = None;
+        let (root, cx) = app.add_window_view(|window, cx| {
+            let view = cx.new(|_| Bee::new());
+            bee = Some(view.clone());
+            let workbench = cx.new(|cx| crate::workbench::Workbench::new(view, window, cx));
+            gpui_component::Root::new(workbench, window, cx)
+        });
+        let bee = bee.unwrap();
+        let mut previous_extent = None;
+        for dimensions in [size(px(960.0), px(640.0)), size(px(1200.0), px(800.0))] {
+            cx.simulate_resize(dimensions);
+            cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| root.clone());
+            cx.run_until_parked();
+            let previous_paints = PAINTED_IMAGES.load(Ordering::Relaxed);
+            cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| root.clone());
+            let canvas = cx.debug_bounds("scene-canvas").unwrap();
+            let scale = cx.update(|window, _| window.scale_factor());
+            let expected = physical_extent(canvas, scale).expect("drawable canvas");
+            cx.update(|_, cx| {
+                let bee = bee.read(cx);
+                let viewport = &bee.viewport;
+                assert!(viewport.error.is_none(), "{:?}", viewport.error);
+                assert_eq!(viewport.extent, Some(expected));
+                assert_ne!(viewport.extent, previous_extent);
+                assert_eq!(viewport.image_versions, Some(bee.state.versions()));
+                let image = viewport.image.as_ref().expect("Vulkan readback image");
+                assert_eq!(image.size(0).width.0 as u32, expected.0);
+                assert_eq!(image.size(0).height.0 as u32, expected.1);
+                let pixels = image.as_bytes(0).unwrap();
+                assert!(pixels
+                    .chunks_exact(4)
+                    .any(|pixel| pixel[2] > pixel[0].saturating_add(20)));
+                assert!(pixels
+                    .chunks_exact(4)
+                    .any(|pixel| pixel[0] > pixel[2].saturating_add(20)));
+                previous_extent = viewport.extent;
+            });
+            assert!(PAINTED_IMAGES.load(Ordering::Relaxed) > previous_paints);
+        }
     }
 
     #[test]

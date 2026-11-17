@@ -1,5 +1,6 @@
 pub(crate) mod flow_editor;
 mod viewport;
+mod workbench;
 
 use bee_scene::SceneState;
 use gpui::{
@@ -8,6 +9,7 @@ use gpui::{
 };
 use std::sync::Arc;
 use viewport::Viewport;
+use workbench::Workbench;
 
 actions!(bee, [FocusNext, FocusPrevious]);
 
@@ -145,17 +147,23 @@ fn main() {
         .with_assets(gpui_component_assets::Assets)
         .run(|cx: &mut App| {
             gpui_component::init(cx);
+            workbench::init_theme(cx);
             cx.bind_keys([
                 KeyBinding::new("tab", FocusNext, None),
                 KeyBinding::new("shift-tab", FocusPrevious, None),
+                KeyBinding::new("ctrl-w", gpui_component::dock::ClosePanel, None),
             ]);
-            let bounds = Bounds::centered(None, size(px(960.0), px(640.0)), cx);
+            let bounds = Bounds::centered(None, size(px(1200.0), px(800.0)), cx);
             cx.open_window(
                 WindowOptions {
                     window_bounds: Some(WindowBounds::Windowed(bounds)),
                     ..Default::default()
                 },
-                |_, cx| cx.new(|_| Bee::new()),
+                |window, cx| {
+                    let bee = cx.new(|_| Bee::new());
+                    let workbench = cx.new(|cx| Workbench::new(bee, window, cx));
+                    cx.new(|cx| gpui_component::Root::new(workbench, window, cx))
+                },
             )
             .expect("Failed to open the Bee window");
             cx.activate(true);

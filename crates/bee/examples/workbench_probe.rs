@@ -2,9 +2,7 @@
 #[path = "../src/main.rs"]
 mod bee_app;
 
-use bee_app::{flow_editor, Bee};
-#[cfg(test)]
-use bee_app::{FocusNext, FocusPrevious};
+use bee_app::{flow_editor, Bee, FocusNext, FocusPrevious};
 use gpui::{
     div, prelude::*, px, size, App, Application, Bounds, Context, Entity, EventEmitter,
     FocusHandle, Focusable, PathPromptOptions, SharedString, Window, WindowBounds, WindowOptions,
