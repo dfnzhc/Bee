@@ -29,6 +29,7 @@ pub struct Viewport {
     versions: Option<Versions>,
     generation: u64,
     running: bool,
+    closing: bool,
     active: bool,
     zoom_hidden: bool,
     image: Option<Arc<RenderImage>>,
@@ -50,6 +51,7 @@ impl Viewport {
             versions: None,
             generation: 0,
             running: false,
+            closing: false,
             active: true,
             zoom_hidden: false,
             image: None,
@@ -465,6 +467,15 @@ impl Viewport {
         }
     }
 
+    pub(crate) fn request_close(&mut self, window: &mut Window) -> bool {
+        self.closing = true;
+        self.drop_image(window);
+        self.path_renderer = None;
+        self.backend = None;
+        // 在途任务仍持有设备，完成并释放资源后才能关闭最后一个窗口。
+        !self.running
+    }
+
     pub(crate) fn set_zoom_hidden(
         &mut self,
         hidden: bool,
@@ -518,7 +529,7 @@ impl Viewport {
     }
 
     fn start(&mut self, state: &SceneState, window: &mut Window, cx: &mut Context<Bee>) {
-        if !self.active || self.zoom_hidden {
+        if self.closing || !self.active || self.zoom_hidden {
             return;
         }
         let (Some(backend), Some((width, height))) = (&self.backend, self.extent) else {
@@ -578,6 +589,11 @@ impl Viewport {
             let (snapshot, result, path_renderer) = task.await;
             view.update_in(cx, |view, window, cx| {
                 view.viewport.running = false;
+                if view.viewport.closing {
+                    drop(path_renderer);
+                    window.remove_window();
+                    return;
+                }
                 view.viewport.path_renderer = path_renderer;
                 // 过期结果只归还渲染器，不得替换当前画面。
                 if view.viewport.generation == generation
@@ -826,6 +842,119 @@ mod tests {
                 previous_extent = viewport.extent;
             });
             assert!(PAINTED_IMAGES.load(Ordering::Relaxed) > previous_paints);
+        }
+    }
+
+    #[test]
+    fn workbench_close_without_vulkan_is_immediate() {
+        let mut app = gpui::TestAppContext::single();
+        app.update(|cx| {
+            gpui_component::init(cx);
+            crate::workbench::init_theme(cx);
+        });
+        let (_workbench, cx) = app.add_window_view(|window, cx| {
+            let bee = cx.new(|_| Bee::failure("test device".into()));
+            crate::workbench::Workbench::new(bee, window, cx)
+        });
+        assert!(cx.simulate_close());
+        assert!(cx.simulate_close());
+    }
+
+    #[test]
+    #[ignore = "requires a ray tracing device and Vulkan validation layer"]
+    fn workbench_close_releases_resources_before_process_exit() {
+        if std::env::var_os("BEE_TEST_CLOSE_CHILD").is_none() {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "viewport::tests::workbench_close_releases_resources_before_process_exit",
+                    "--ignored",
+                    "--nocapture",
+                ])
+                .env("BEE_TEST_CLOSE_CHILD", "1")
+                .env("VK_LAYER_VALIDATE_SYNC", "1")
+                .output()
+                .unwrap();
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            assert!(output.status.success(), "{stdout}\n{stderr}");
+            assert!(
+                !stderr
+                    .lines()
+                    .any(|line| line.starts_with("Vulkan validation ") && line.contains("ERROR")),
+                "{stderr}"
+            );
+            return;
+        }
+
+        for mode in [RenderMode::Raster, RenderMode::Path] {
+            for in_flight in [false, true] {
+                let mut app = gpui::TestAppContext::single();
+                app.update(|cx| {
+                    gpui_component::init(cx);
+                    crate::workbench::init_theme(cx);
+                });
+                let mut bee = None;
+                let (root, cx) = app.add_window_view(|window, cx| {
+                    let view = cx.new(|_| Bee::new());
+                    bee = Some(view.clone());
+                    let workbench = cx.new(|cx| crate::workbench::Workbench::new(view, window, cx));
+                    gpui_component::Root::new(workbench, window, cx)
+                });
+                let bee = bee.unwrap();
+                let dimensions = size(px(960.0), px(640.0));
+                cx.simulate_resize(dimensions);
+                cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| root.clone());
+                cx.run_until_parked();
+                let backend = cx.update(|_, cx| {
+                    let backend = bee.read(cx).viewport.backend.as_ref().unwrap();
+                    assert_eq!(
+                        backend.report.validation,
+                        bee_vulkan::ValidationStatus::Enabled
+                    );
+                    assert!(backend.report.ray_tracing_missing.is_empty());
+                    Arc::downgrade(backend)
+                });
+                if mode == RenderMode::Path {
+                    let button = cx.debug_bounds("path-mode").unwrap().center();
+                    cx.simulate_click(button, Modifiers::none());
+                    cx.run_until_parked();
+                }
+                bee.update_in(cx, |bee, window, cx| {
+                    assert_eq!(bee.viewport.mode, mode);
+                    assert!(bee.viewport.error.is_none(), "{:?}", bee.viewport.error);
+                    assert!(!bee.viewport.running);
+                    assert!(bee.viewport.image.is_some());
+                    if mode == RenderMode::Path {
+                        assert!(bee.viewport.path_renderer.is_some());
+                    }
+                    if in_flight {
+                        bee.viewport.start(&bee.state, window, cx);
+                        assert!(bee.viewport.running);
+                    }
+                });
+
+                assert_eq!(cx.simulate_close(), !in_flight);
+                if !in_flight {
+                    cx.update(|window, _| window.remove_window());
+                }
+                cx.run_until_parked();
+                cx.executor().advance_clock(Duration::from_millis(120));
+                cx.run_until_parked();
+                cx.cx.update(|cx| {
+                    // 界面实体仍被测试持有时，也必须完成 GPU 清理。
+                    let viewport = &bee.read(cx).viewport;
+                    assert!(!viewport.running);
+                    assert!(viewport.backend.is_none());
+                    assert!(viewport.path_renderer.is_none());
+                    assert!(viewport.image.is_none());
+                    assert!(cx.windows().is_empty());
+                });
+                assert!(backend.upgrade().is_none());
+                drop(root);
+                drop(bee);
+                cx.quit();
+            }
         }
     }
 

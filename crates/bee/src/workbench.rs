@@ -316,6 +316,12 @@ pub(crate) struct Workbench {
 
 impl Workbench {
     pub(crate) fn new(bee: Entity<Bee>, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let closing_bee = bee.downgrade();
+        window.on_window_should_close(cx, move |window, cx| {
+            closing_bee
+                .update(cx, |bee, _| bee.viewport.request_close(window))
+                .unwrap_or(true)
+        });
         let selection = cx.new(|_| scene::Selection::default());
         let observed_selection = selection.clone();
         cx.observe(&bee, move |_, bee, cx| {
