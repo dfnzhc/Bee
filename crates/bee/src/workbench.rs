@@ -1,8 +1,8 @@
 use crate::Bee;
 use gpui::{
     anchored, deferred, div, prelude::*, px, rgb, App, Context, Corner, DismissEvent, Entity,
-    EventEmitter, FocusHandle, Focusable, KeyDownEvent, MouseButton, SharedString, WeakEntity,
-    Window,
+    EventEmitter, FocusHandle, Focusable, KeyDownEvent, MouseButton, SharedString, Subscription,
+    WeakEntity, Window,
 };
 use gpui_component::{
     dock::{DockArea, DockItem, Panel, PanelEvent, PanelStyle, PanelView, TabPanel},
@@ -87,6 +87,8 @@ struct WorkbenchPanel {
     selection: Entity<scene::Selection>,
     focus: FocusHandle,
     tab: Option<WeakEntity<TabPanel>>,
+    zoom_subscription: Option<Subscription>,
+    tab_zoomed: bool,
 }
 
 impl WorkbenchPanel {
@@ -106,7 +108,15 @@ impl WorkbenchPanel {
             selection,
             focus: cx.focus_handle(),
             tab: None,
+            zoom_subscription: None,
+            tab_zoomed: false,
         }
+    }
+
+    fn set_viewport_active(&self, active: bool, window: &mut Window, cx: &mut Context<Self>) {
+        self.bee.update(cx, |bee, cx| {
+            bee.viewport.set_active(active, &bee.state, window, cx);
+        });
     }
 }
 
@@ -131,12 +141,89 @@ impl Panel for WorkbenchPanel {
             .child(self.kind.title())
     }
 
-    fn on_added_to(&mut self, tab: WeakEntity<TabPanel>, _: &mut Window, _: &mut Context<Self>) {
+    fn set_active(&mut self, active: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if self.kind == PanelKind::Viewport {
+            self.set_viewport_active(active, window, cx);
+        }
+    }
+
+    fn on_added_to(
+        &mut self,
+        tab: WeakEntity<TabPanel>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.tab_zoomed = false;
+        self.zoom_subscription = tab.upgrade().map(|tab| {
+            cx.subscribe_in(&tab, window, |this, tab, event, window, cx| {
+                let zoomed = match event {
+                    PanelEvent::ZoomIn => {
+                        this.tab_zoomed = true;
+                        true
+                    }
+                    PanelEvent::ZoomOut => {
+                        this.tab_zoomed = false;
+                        false
+                    }
+                    PanelEvent::LayoutChanged => {
+                        if this.kind == PanelKind::Viewport || this.tab_zoomed {
+                            let tab = tab.downgrade();
+                            let panel = cx.weak_entity();
+                            window.defer(cx, move |window, cx| {
+                                let Some(tab) = tab.upgrade() else {
+                                    return;
+                                };
+                                let active = tab.read(cx).active_panel(cx).is_some_and(|panel| {
+                                    panel.panel_name(cx) == PanelKind::Viewport.title()
+                                });
+                                panel
+                                    .update(cx, |this, cx| {
+                                        if this.tab.as_ref().and_then(WeakEntity::upgrade)
+                                            == Some(tab)
+                                        {
+                                            if this.kind == PanelKind::Viewport {
+                                                this.set_viewport_active(active, window, cx);
+                                            }
+                                            if this.tab_zoomed {
+                                                this.bee.update(cx, |bee, cx| {
+                                                    bee.viewport.set_zoom_hidden(
+                                                        !active, &bee.state, window, cx,
+                                                    );
+                                                });
+                                            }
+                                        }
+                                    })
+                                    .ok();
+                            });
+                        }
+                        return;
+                    }
+                };
+                let tab = tab.downgrade();
+                let bee = this.bee.downgrade();
+                window.defer(cx, move |window, cx| {
+                    let hidden = zoomed
+                        && tab.upgrade().is_some_and(|tab| {
+                            tab.read(cx).active_panel(cx).is_some_and(|panel| {
+                                panel.panel_name(cx) != PanelKind::Viewport.title()
+                            })
+                        });
+                    bee.update(cx, |bee, cx| {
+                        bee.viewport.set_zoom_hidden(hidden, &bee.state, window, cx);
+                    })
+                    .ok();
+                });
+            })
+        });
         self.tab = Some(tab);
     }
 
-    fn on_removed(&mut self, _: &mut Window, _: &mut Context<Self>) {
+    fn on_removed(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        // 停靠库在移除面板后才发送缩放恢复事件，订阅保留至下次停靠。
         self.tab = None;
+        if self.kind == PanelKind::Viewport {
+            self.set_viewport_active(false, window, cx);
+        }
     }
 
     fn inner_padding(&self, _: &App) -> bool {
@@ -238,7 +325,12 @@ impl Workbench {
     }
 
     fn reset(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let bee = self.panels[1].read(cx).bee.clone();
+        bee.update(cx, |bee, cx| {
+            bee.viewport.set_zoom_hidden(false, &bee.state, window, cx);
+        });
         self.dock.update(cx, |dock, cx| {
+            dock.set_zoomed_out(window, cx);
             let weak = cx.entity().downgrade();
             let scene = DockItem::tab(self.panels[0].clone(), &weak, window, cx).size(px(240.0));
             let viewport = DockItem::tab(self.panels[1].clone(), &weak, window, cx).size(px(680.0));
@@ -495,6 +587,241 @@ mod tests {
         for child in &state.children {
             names(child, result);
         }
+    }
+
+    #[test]
+    fn workbench_flow_edits_drive_the_same_viewport() {
+        let mut app = gpui::TestAppContext::single();
+        app.update(|cx| {
+            gpui_component::init(cx);
+            init_theme(cx);
+        });
+        let (workbench, cx) = app.add_window_view(|window, cx| {
+            let bee = cx.new(|_| Bee::failure("test device".into()));
+            Workbench::new(bee, window, cx)
+        });
+        cx.update(|window, cx| {
+            workbench.update(cx, |workbench, cx| {
+                workbench.dock.update(cx, |dock, cx| {
+                    let weak = cx.entity().downgrade();
+                    let viewport = DockItem::tab(workbench.panels[1].clone(), &weak, window, cx);
+                    let flow = DockItem::tab(workbench.panels[5].clone(), &weak, window, cx);
+                    dock.set_center(
+                        DockItem::h_split(vec![viewport, flow], &weak, window, cx),
+                        window,
+                        cx,
+                    );
+                });
+            });
+        });
+        let dimensions = size(px(1200.0), px(1400.0));
+        cx.simulate_resize(dimensions);
+        cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| {
+            workbench.clone()
+        });
+        cx.run_until_parked();
+        let bee = cx.update(|_, cx| workbench.read(cx).panels[1].read(cx).bee.clone());
+        let click = |cx: &mut VisualTestContext, selector: &'static str| {
+            let bounds = cx.debug_bounds(selector).expect(selector);
+            cx.simulate_click(bounds.center(), Modifiers::none());
+            cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| {
+                workbench.clone()
+            });
+            cx.run_until_parked();
+        };
+
+        click(cx, "flow-add-raster");
+        assert_eq!(
+            cx.update(|_, cx| bee.read(cx).viewport.flow.draft().nodes().count()),
+            5
+        );
+        click(cx, "flow-remove-4");
+        click(cx, "flow-exposure-up-2");
+        click(cx, "flow-apply");
+        let active = cx.update(|_, cx| {
+            let bee = bee.read(cx);
+            assert_eq!(bee.state.snapshot().display.exposure_ev, 0.5);
+            assert_eq!(bee.viewport.flow.active().display_source().unwrap().1, 0.5);
+            bee.viewport.flow.active().clone()
+        });
+
+        click(cx, "flow-disconnect-2");
+        click(cx, "flow-apply");
+        cx.update(|_, cx| {
+            let bee = bee.read(cx);
+            assert_eq!(bee.viewport.flow.active(), &active);
+            assert_ne!(bee.viewport.flow.draft(), &active);
+            assert_eq!(bee.state.snapshot().display.exposure_ev, 0.5);
+        });
+    }
+
+    #[test]
+    fn viewport_suspends_and_recovers_with_panel_changes() {
+        let mut app = gpui::TestAppContext::single();
+        app.update(|cx| {
+            gpui_component::init(cx);
+            init_theme(cx);
+            cx.bind_keys([KeyBinding::new("ctrl-w", ClosePanel, None)]);
+        });
+        let (workbench, cx) = app.add_window_view(|window, cx| {
+            let bee = cx.new(|_| Bee::failure("test device".into()));
+            Workbench::new(bee, window, cx)
+        });
+        cx.simulate_resize(size(px(960.0), px(640.0)));
+        redraw(cx, &workbench);
+        let bee = cx.update(|_, cx| workbench.read(cx).panels[1].read(cx).bee.clone());
+        assert!(cx.update(|_, cx| bee.read(cx).viewport.extent().is_some()));
+
+        cx.update(|window, cx| window.focus(&workbench.read(cx).panels[0].read(cx).focus));
+        redraw(cx, &workbench);
+        cx.dispatch_action(gpui_component::dock::ToggleZoom);
+        redraw(cx, &workbench);
+        redraw(cx, &workbench);
+        assert_eq!(cx.update(|_, cx| bee.read(cx).viewport.extent()), None);
+        cx.dispatch_action(gpui_component::dock::ToggleZoom);
+        redraw(cx, &workbench);
+        redraw(cx, &workbench);
+        assert!(cx.update(|_, cx| bee.read(cx).viewport.extent().is_some()));
+
+        cx.update(|window, cx| window.focus(&workbench.read(cx).panels[0].read(cx).focus));
+        redraw(cx, &workbench);
+        cx.dispatch_action(gpui_component::dock::ToggleZoom);
+        redraw(cx, &workbench);
+        redraw(cx, &workbench);
+        assert_eq!(cx.update(|_, cx| bee.read(cx).viewport.extent()), None);
+        cx.update(|window, cx| {
+            let panel = workbench.read(cx).panels[0].clone();
+            let tab = panel.read(cx).tab.as_ref().unwrap().upgrade().unwrap();
+            tab.update(cx, |tab, cx| {
+                tab.remove_panel(Arc::new(panel), window, cx);
+            });
+        });
+        redraw(cx, &workbench);
+        redraw(cx, &workbench);
+        assert!(cx.update(|_, cx| workbench.read(cx).panels[0].read(cx).tab.is_none()));
+        assert!(cx.update(|_, cx| bee.read(cx).viewport.extent().is_some()));
+        click(cx, &workbench, "show-scene");
+        click(cx, &workbench, "reset-workbench");
+
+        cx.update(|window, cx| window.focus(&workbench.read(cx).panels[0].read(cx).focus));
+        redraw(cx, &workbench);
+        cx.dispatch_action(gpui_component::dock::ToggleZoom);
+        redraw(cx, &workbench);
+        redraw(cx, &workbench);
+        assert_eq!(cx.update(|_, cx| bee.read(cx).viewport.extent()), None);
+        click(cx, &workbench, "reset-workbench");
+        assert!(cx.update(|_, cx| bee.read(cx).viewport.extent().is_some()));
+
+        cx.update(|window, cx| window.focus(&workbench.read(cx).panels[1].read(cx).focus));
+        redraw(cx, &workbench);
+        cx.simulate_keystrokes("ctrl-w");
+        redraw(cx, &workbench);
+        assert_eq!(cx.update(|_, cx| bee.read(cx).viewport.extent()), None);
+        click(cx, &workbench, "show-viewport");
+        assert!(cx.update(|_, cx| bee.read(cx).viewport.extent().is_some()));
+        click(cx, &workbench, "show-scene");
+        assert_eq!(cx.update(|_, cx| bee.read(cx).viewport.extent()), None);
+        click(cx, &workbench, "show-viewport");
+        assert!(cx.update(|_, cx| bee.read(cx).viewport.extent().is_some()));
+        click(cx, &workbench, "reset-workbench");
+        assert!(cx.update(|_, cx| bee.read(cx).viewport.extent().is_some()));
+
+        let previous_extent = cx.update(|_, cx| bee.read(cx).viewport.extent());
+        let scene = cx.debug_bounds("panel-content-scene").unwrap();
+        let start = point(scene.right(), scene.center().y);
+        cx.simulate_mouse_move(start, None, Modifiers::none());
+        cx.simulate_mouse_down(start, MouseButton::Left, Modifiers::none());
+        cx.simulate_mouse_move(
+            point(start.x + px(8.0), start.y),
+            MouseButton::Left,
+            Modifiers::none(),
+        );
+        redraw(cx, &workbench);
+        let end = point(start.x + px(60.0), start.y);
+        cx.simulate_mouse_move(end, MouseButton::Left, Modifiers::none());
+        redraw(cx, &workbench);
+        cx.simulate_mouse_up(end, MouseButton::Left, Modifiers::none());
+        redraw(cx, &workbench);
+        assert_ne!(
+            cx.update(|_, cx| bee.read(cx).viewport.extent()),
+            previous_extent
+        );
+
+        let start = cx.debug_bounds("tab-viewport").unwrap().center();
+        let target = cx.debug_bounds("panel-content-scene").unwrap().center();
+        cx.simulate_mouse_move(start, None, Modifiers::none());
+        cx.simulate_mouse_down(start, MouseButton::Left, Modifiers::none());
+        cx.simulate_mouse_move(
+            point(start.x + px(20.0), start.y),
+            MouseButton::Left,
+            Modifiers::none(),
+        );
+        cx.simulate_mouse_move(target, MouseButton::Left, Modifiers::none());
+        redraw(cx, &workbench);
+        cx.simulate_mouse_up(target, MouseButton::Left, Modifiers::none());
+        redraw(cx, &workbench);
+        cx.update(|_, cx| {
+            let workbench = workbench.read(cx);
+            let scene = workbench.panels[0].read(cx).tab.as_ref().unwrap().upgrade();
+            let viewport = workbench.panels[1].read(cx).tab.as_ref().unwrap().upgrade();
+            assert_eq!(scene, viewport);
+        });
+        click(cx, &workbench, "show-scene");
+        assert_eq!(cx.update(|_, cx| bee.read(cx).viewport.extent()), None);
+        click(cx, &workbench, "show-viewport");
+        assert!(cx.update(|_, cx| bee.read(cx).viewport.extent().is_some()));
+
+        click(cx, &workbench, "reset-workbench");
+        let start = cx.debug_bounds("tab-viewport").unwrap().center();
+        let scene_tab = cx.debug_bounds("tab-scene").unwrap();
+        let target = point(scene_tab.right() + px(50.0), scene_tab.center().y);
+        cx.simulate_mouse_move(start, None, Modifiers::none());
+        cx.simulate_mouse_down(start, MouseButton::Left, Modifiers::none());
+        cx.simulate_mouse_move(
+            point(start.x + px(20.0), start.y),
+            MouseButton::Left,
+            Modifiers::none(),
+        );
+        cx.simulate_mouse_move(target, MouseButton::Left, Modifiers::none());
+        redraw(cx, &workbench);
+        cx.simulate_mouse_up(target, MouseButton::Left, Modifiers::none());
+        redraw(cx, &workbench);
+        cx.update(|_, cx| {
+            let workbench = workbench.read(cx);
+            let scene = workbench.panels[0].read(cx).tab.as_ref().unwrap().upgrade();
+            let viewport = workbench.panels[1].read(cx).tab.as_ref().unwrap().upgrade();
+            assert_eq!(scene, viewport);
+            assert_eq!(
+                scene
+                    .unwrap()
+                    .read(cx)
+                    .active_panel(cx)
+                    .unwrap()
+                    .panel_name(cx),
+                PanelKind::Scene.title()
+            );
+            assert_eq!(bee.read(cx).viewport.extent(), None);
+        });
+        cx.update(|window, cx| window.focus(&workbench.read(cx).panels[0].read(cx).focus));
+        redraw(cx, &workbench);
+        cx.dispatch_action(gpui_component::dock::ToggleZoom);
+        redraw(cx, &workbench);
+        redraw(cx, &workbench);
+        assert_eq!(cx.update(|_, cx| bee.read(cx).viewport.extent()), None);
+        click(cx, &workbench, "tab-viewport");
+        assert!(cx.update(|_, cx| bee.read(cx).viewport.extent().is_some()));
+        click(cx, &workbench, "tab-scene");
+        assert_eq!(cx.update(|_, cx| bee.read(cx).viewport.extent()), None);
+        cx.update(|window, cx| window.focus(&workbench.read(cx).panels[0].read(cx).focus));
+        redraw(cx, &workbench);
+        cx.dispatch_action(gpui_component::dock::ToggleZoom);
+        redraw(cx, &workbench);
+        redraw(cx, &workbench);
+        cx.update(|window, cx| window.focus(&workbench.read(cx).panels[0].read(cx).focus));
+        redraw(cx, &workbench);
+        cx.simulate_keystrokes("ctrl-w");
+        redraw(cx, &workbench);
+        assert!(cx.update(|_, cx| bee.read(cx).viewport.extent().is_some()));
     }
 
     #[test]

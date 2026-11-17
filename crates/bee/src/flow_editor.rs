@@ -36,6 +36,10 @@ impl FlowEditor {
         self.flow.active().expect("the initial flow is valid")
     }
 
+    pub fn error(&self) -> Option<&str> {
+        self.error.as_deref()
+    }
+
     pub fn select_source(&mut self, module: Module) -> Result<(), String> {
         let graph = self.edit();
         let output = graph

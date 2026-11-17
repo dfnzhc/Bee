@@ -7,6 +7,7 @@ use gpui::{
     canvas, div, prelude::*, px, rgb, Bounds, Context, Corners, MouseButton, Pixels, Point,
     RenderImage, Window,
 };
+use gpui_component::tooltip::Tooltip;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -27,6 +28,8 @@ pub struct Viewport {
     versions: Option<Versions>,
     generation: u64,
     running: bool,
+    active: bool,
+    zoom_hidden: bool,
     image: Option<Arc<RenderImage>>,
     image_versions: Option<Versions>,
     error: Option<String>,
@@ -45,6 +48,8 @@ impl Viewport {
             versions: None,
             generation: 0,
             running: false,
+            active: true,
+            zoom_hidden: false,
             image: None,
             image_versions: None,
             error: None,
@@ -56,18 +61,24 @@ impl Viewport {
         }
     }
 
-    pub fn render(&self, state: &SceneState, cx: &mut Context<Bee>) -> impl IntoElement {
-        let extent = self.extent;
-        let versions = state.versions();
-        let requested_versions = self.versions;
-        let image = self.image.clone();
-        let status = if self.error.is_some() {
-            "Viewport error; see device info".to_string()
+    fn status(&self, state: &SceneState) -> String {
+        if let Some(error) = &self.error {
+            format!("Viewport error: {error} | See Console")
+        } else if let Some(error) = self.flow.error() {
+            if self.image.is_some() {
+                let active = match self.mode {
+                    RenderMode::Raster => "Raster".to_string(),
+                    RenderMode::Path => format!("Path tracing: {} samples", self.samples),
+                };
+                format!("{active} | {error} | async Vulkan readback | See Render Flow")
+            } else {
+                format!("{error} | See Render Flow")
+            }
         } else if self.backend.is_none() {
             "Viewport unavailable".to_string()
-        } else if image.is_some() && self.image_versions != Some(versions) {
+        } else if self.image.is_some() && self.image_versions != Some(state.versions()) {
             "Updating viewport | async Vulkan readback".to_string()
-        } else if image.is_some() {
+        } else if self.image.is_some() {
             match self.mode {
                 RenderMode::Raster => "Raster | async Vulkan readback".to_string(),
                 RenderMode::Path => format!(
@@ -77,7 +88,18 @@ impl Viewport {
             }
         } else {
             "Preparing Vulkan image...".to_string()
-        };
+        }
+    }
+
+    pub fn render(&self, state: &SceneState, cx: &mut Context<Bee>) -> impl IntoElement {
+        let extent = self.extent;
+        let versions = state.versions();
+        let requested_versions = self.versions;
+        let generation = self.generation;
+        let image = self.image.clone();
+        let status = self.status(state);
+        let status_tooltip = status.clone();
+        let has_error = self.error.is_some() || self.flow.error().is_some();
         let path_available = self
             .backend
             .as_ref()
@@ -207,16 +229,24 @@ impl Viewport {
             )
             .child(
                 div()
+                    .id("viewport-status")
                     .h(px(22.0))
                     .flex_shrink_0()
                     .overflow_hidden()
                     .whitespace_nowrap()
                     .text_ellipsis()
                     .text_size(px(12.0))
-                    .text_color(if self.error.is_some() {
+                    .text_color(if has_error {
                         rgb(0xffa8a8)
                     } else {
                         rgb(0xb1bfba)
+                    })
+                    .when(has_error, |this| {
+                        this.tooltip(move |window, cx| {
+                            Tooltip::new(status_tooltip.clone())
+                                .max_w(px(400.0))
+                                .build(window, cx)
+                        })
                     })
                     .child(status),
             )
@@ -278,12 +308,17 @@ impl Viewport {
                                     window.defer(cx, move |window, cx| {
                                         resize_view
                                             .update(cx, |view, cx| {
-                                                view.viewport.synchronize(
-                                                    next,
-                                                    &view.state,
-                                                    window,
-                                                    cx,
-                                                )
+                                                if view.viewport.generation == generation
+                                                    && view.viewport.active
+                                                    && !view.viewport.zoom_hidden
+                                                {
+                                                    view.viewport.synchronize(
+                                                        next,
+                                                        &view.state,
+                                                        window,
+                                                        cx,
+                                                    )
+                                                }
                                             })
                                             .ok();
                                     });
@@ -335,6 +370,11 @@ impl Viewport {
 
     pub fn error(&self) -> Option<&str> {
         self.error.as_deref()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn extent(&self) -> Option<Extent> {
+        self.extent
     }
 
     fn select_mode(
@@ -400,6 +440,46 @@ impl Viewport {
         cx.notify();
     }
 
+    pub(crate) fn set_active(
+        &mut self,
+        active: bool,
+        state: &SceneState,
+        window: &mut Window,
+        cx: &mut Context<Bee>,
+    ) {
+        if self.active != active {
+            self.active = active;
+            self.visibility_changed(state, window, cx);
+        }
+    }
+
+    pub(crate) fn set_zoom_hidden(
+        &mut self,
+        hidden: bool,
+        state: &SceneState,
+        window: &mut Window,
+        cx: &mut Context<Bee>,
+    ) {
+        if self.zoom_hidden != hidden {
+            self.zoom_hidden = hidden;
+            self.visibility_changed(state, window, cx);
+        }
+    }
+
+    fn visibility_changed(
+        &mut self,
+        state: &SceneState,
+        window: &mut Window,
+        cx: &mut Context<Bee>,
+    ) {
+        self.generation = self.generation.wrapping_add(1);
+        if !self.active || self.zoom_hidden {
+            self.drag_position = None;
+            self.synchronize(None, state, window, cx);
+        }
+        cx.notify();
+    }
+
     fn synchronize(
         &mut self,
         extent: Option<Extent>,
@@ -426,6 +506,9 @@ impl Viewport {
     }
 
     fn start(&mut self, state: &SceneState, window: &mut Window, cx: &mut Context<Bee>) {
+        if !self.active || self.zoom_hidden {
+            return;
+        }
         let (Some(backend), Some((width, height))) = (&self.backend, self.extent) else {
             return;
         };
@@ -484,7 +567,7 @@ impl Viewport {
             view.update_in(cx, |view, window, cx| {
                 view.viewport.running = false;
                 view.viewport.path_renderer = path_renderer;
-                // 最新帧用于更新状态；中间帧仍可供交互时显示。
+                // 过期结果只归还渲染器，不得替换当前画面。
                 if view.viewport.generation == generation
                     && snapshot.versions == view.state.versions()
                     && view.viewport.mode == mode
@@ -522,13 +605,6 @@ impl Viewport {
                         Err(reason) => view.viewport.fail(reason, window),
                     }
                 } else {
-                    if view.viewport.mode == mode && view.viewport.extent == Some((width, height)) {
-                        if let Ok(image) = result {
-                            view.viewport.drop_image(window);
-                            view.viewport.image_versions = Some(snapshot.versions);
-                            view.viewport.image = Some(image);
-                        }
-                    }
                     let extent = view.viewport.extent;
                     view.viewport.synchronize(extent, &view.state, window, cx);
                     view.viewport.start(&view.state, window, cx);
@@ -726,6 +802,9 @@ mod tests {
         let (extent, generation, versions, mut samples) = cx.update(|_, cx| {
             let bee = bee.read(cx);
             assert_eq!(bee.viewport.mode, RenderMode::Path);
+            let graph = bee.viewport.flow.active();
+            let (source, _) = graph.display_source().unwrap();
+            assert_eq!(graph.module(source), Some(Module::PathTracing));
             assert!(bee.viewport.error.is_none(), "{:?}", bee.viewport.error);
             assert!(bee.viewport.samples > 0);
             (
@@ -734,6 +813,31 @@ mod tests {
                 bee.state.versions(),
                 bee.viewport.samples,
             )
+        });
+
+        bee.update_in(cx, |bee, _, cx| {
+            assert!(bee
+                .viewport
+                .flow
+                .apply(Some("simulated missing ray tracing".into()))
+                .is_err());
+            let status = bee.viewport.status(&bee.state);
+            assert!(status.contains(&format!("Path tracing: {} samples", bee.viewport.samples)));
+            assert!(status.contains("simulated missing ray tracing"));
+            assert!(status.contains("async Vulkan readback"));
+            cx.notify();
+        });
+        cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| root.clone());
+        cx.run_until_parked();
+        cx.update(|_, cx| {
+            let bee = bee.read(cx);
+            assert_eq!(bee.viewport.extent, extent);
+            assert_eq!(bee.viewport.generation, generation);
+            assert!(bee.viewport.samples >= samples);
+        });
+        bee.update_in(cx, |bee, _, cx| {
+            bee.viewport.flow.apply(None).unwrap();
+            cx.notify();
         });
 
         for (selector, property) in [
@@ -761,6 +865,85 @@ mod tests {
             samples = next;
         }
 
+        // 在途样本完成后保持暂停，恢复时继续使用当前场景和流程。
+        bee.update_in(cx, |bee, window, cx| {
+            bee.viewport.start(&bee.state, window, cx);
+            assert!(bee.viewport.running);
+            bee.viewport.set_active(false, &bee.state, window, cx);
+        });
+        cx.run_until_parked();
+        cx.executor().advance_clock(Duration::from_millis(50));
+        cx.run_until_parked();
+        cx.update(|_, cx| {
+            let viewport = &bee.read(cx).viewport;
+            assert!(!viewport.running);
+            assert!(viewport.extent.is_none());
+            assert!(viewport.image.is_none());
+            assert_eq!(viewport.samples, 0);
+        });
+        bee.update_in(cx, |bee, window, cx| {
+            bee.viewport.set_active(true, &bee.state, window, cx);
+        });
+        cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| root.clone());
+        cx.run_until_parked();
+        cx.update(|_, cx| {
+            let viewport = &bee.read(cx).viewport;
+            assert_eq!(viewport.mode, RenderMode::Path);
+            assert!(viewport.image.is_some());
+            assert!(viewport.samples > 0);
+        });
+
+        // 按文档通过流程面板切换渲染源，再用快捷按钮切回。
+        let flow_tab = cx.debug_bounds("tab-flow").unwrap().center();
+        cx.simulate_click(flow_tab, Modifiers::none());
+        cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| root.clone());
+        cx.run_until_parked();
+        let click_flow = |cx: &mut gpui::VisualTestContext, selector: &'static str| {
+            let panel = cx.debug_bounds("panel-content-flow").unwrap();
+            for _ in 0..40 {
+                let target = cx.debug_bounds(selector).expect(selector).center();
+                if target.y > panel.top() && target.y < panel.bottom() {
+                    cx.simulate_click(target, Modifiers::none());
+                    cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| root.clone());
+                    cx.run_until_parked();
+                    return;
+                }
+                let direction = if target.y < panel.top() { 1.0 } else { -1.0 };
+                cx.simulate_event(ScrollWheelEvent {
+                    position: panel.center(),
+                    delta: ScrollDelta::Lines(point(0.0, direction)),
+                    ..Default::default()
+                });
+                cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| root.clone());
+                cx.run_until_parked();
+            }
+            panic!("could not scroll to {selector}");
+        };
+        click_flow(cx, "flow-output-0");
+        click_flow(cx, "flow-input-2");
+        click_flow(cx, "flow-apply");
+        cx.update(|_, cx| {
+            let viewport = &bee.read(cx).viewport;
+            let graph = viewport.flow.active();
+            let (source, _) = graph.display_source().unwrap();
+            assert_eq!(graph.module(source), Some(Module::Rasterization));
+            assert_eq!(viewport.mode, RenderMode::Raster);
+            assert!(viewport.image.is_some());
+        });
+
+        let path = cx.debug_bounds("path-mode").unwrap().center();
+        cx.simulate_click(path, Modifiers::none());
+        cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| root.clone());
+        cx.run_until_parked();
+        cx.update(|_, cx| {
+            let viewport = &bee.read(cx).viewport;
+            let graph = viewport.flow.active();
+            let (source, _) = graph.display_source().unwrap();
+            assert_eq!(graph.module(source), Some(Module::PathTracing));
+            assert_eq!(viewport.mode, RenderMode::Path);
+            assert!(viewport.image.is_some());
+        });
+
         // 停止采样并消化已安排的定时器后再释放测试窗口。
         let raster = cx.debug_bounds("raster-mode").unwrap().center();
         cx.simulate_click(raster, Modifiers::none());
@@ -770,6 +953,9 @@ mod tests {
         cx.update(|_, cx| {
             let viewport = &bee.read(cx).viewport;
             assert_eq!(viewport.mode, RenderMode::Raster);
+            let graph = viewport.flow.active();
+            let (source, _) = graph.display_source().unwrap();
+            assert_eq!(graph.module(source), Some(Module::Rasterization));
             assert!(!viewport.running);
         });
         drop(root);
@@ -981,6 +1167,11 @@ mod tests {
             .unwrap();
             assert!(view.viewport.image.as_ref().unwrap().as_bytes(0).unwrap() == expected);
         });
+        cx.executor().advance_clock(Duration::from_millis(17));
+        cx.run_until_parked();
+        drop(fresh);
+        drop(view);
+        cx.quit();
     }
 
     #[test]
@@ -1138,6 +1329,11 @@ mod tests {
         cx.simulate_keystrokes("shift-tab enter");
         cx.run_until_parked();
         cx.update(|_, cx| assert_eq!(view.read(cx).viewport.mode, RenderMode::Raster));
+        cx.executor().advance_clock(Duration::from_millis(17));
+        cx.run_until_parked();
+        drop(fresh);
+        drop(view);
+        cx.quit();
     }
 
     #[test]
@@ -1150,27 +1346,78 @@ mod tests {
             .push("simulated missing ray tracing".into());
         let backend = Arc::new(backend);
         let mut app = gpui::TestAppContext::single();
-        let (view, cx) = app.add_window_view(|_, _| Bee {
-            viewport: Viewport::new(Some(backend.clone())),
-            state: SceneState::default(),
-            lines: vec![],
-            failed: false,
+        app.update(|cx| {
+            gpui_component::init(cx);
+            crate::workbench::init_theme(cx);
         });
-        cx.simulate_resize(size(px(360.0), px(300.0)));
-        cx.draw(
-            point(px(0.0), px(0.0)),
-            size(px(360.0), px(300.0)),
-            |_, _| view.clone(),
-        );
+        let mut bee = None;
+        let (root, cx) = app.add_window_view(|window, cx| {
+            let view = cx.new(|_| Bee {
+                viewport: Viewport::new(Some(backend.clone())),
+                state: SceneState::default(),
+                lines: vec![],
+                failed: false,
+            });
+            bee = Some(view.clone());
+            let workbench = cx.new(|cx| crate::workbench::Workbench::new(view, window, cx));
+            gpui_component::Root::new(workbench, window, cx)
+        });
+        let bee = bee.unwrap();
+        let dimensions = size(px(960.0), px(640.0));
+        cx.simulate_resize(dimensions);
+        cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| root.clone());
         cx.run_until_parked();
+        cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| root.clone());
+        cx.run_until_parked();
+        let (active, image_id, extent) = cx.update(|_, cx| {
+            let bee = bee.read(cx);
+            let viewport = &bee.viewport;
+            assert_eq!(viewport.mode, RenderMode::Raster);
+            assert_eq!(
+                viewport.status(&bee.state),
+                "Raster | async Vulkan readback"
+            );
+            (
+                viewport.flow.active().clone(),
+                viewport.image.as_ref().expect("raster image").id,
+                viewport.extent,
+            )
+        });
+        let canvas = cx.debug_bounds("scene-canvas").unwrap();
         let path_button = cx.debug_bounds("path-mode").unwrap().center();
         cx.simulate_click(path_button, Modifiers::none());
+        cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| root.clone());
         cx.run_until_parked();
         cx.update(|_, cx| {
-            let viewport = &view.read(cx).viewport;
+            let bee = bee.read(cx);
+            let viewport = &bee.viewport;
             assert_eq!(viewport.mode, RenderMode::Raster);
             assert!(viewport.error.is_none(), "{:?}", viewport.error);
-            assert!(viewport.image.is_some());
+            assert_eq!(viewport.flow.active(), &active);
+            assert_eq!(viewport.image.as_ref().unwrap().id, image_id);
+            assert_eq!(viewport.extent, extent);
+            assert!(viewport
+                .status(&bee.state)
+                .contains("Path tracing unavailable: simulated missing ray tracing"));
+        });
+        assert_eq!(cx.debug_bounds("scene-canvas").unwrap(), canvas);
+
+        let start = canvas.center();
+        let end = point(start.x + px(20.0), start.y + px(10.0));
+        cx.simulate_mouse_move(start, None, Modifiers::none());
+        cx.simulate_mouse_down(start, MouseButton::Left, Modifiers::none());
+        cx.simulate_mouse_move(end, MouseButton::Left, Modifiers::none());
+        cx.simulate_mouse_up(end, MouseButton::Left, Modifiers::none());
+        cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| root.clone());
+        cx.run_until_parked();
+        cx.update(|_, cx| {
+            let bee = bee.read(cx);
+            let viewport = &bee.viewport;
+            assert_eq!(viewport.mode, RenderMode::Raster);
+            assert_eq!(viewport.flow.active(), &active);
+            assert_eq!(viewport.image_versions, Some(bee.state.versions()));
+            assert_ne!(viewport.image.as_ref().unwrap().id, image_id);
+            assert!(viewport.error.is_none(), "{:?}", viewport.error);
         });
     }
 
@@ -1311,7 +1558,7 @@ mod tests {
                 .any(|p| p[0] > p[2].saturating_add(20)));
             (Arc::downgrade(image), extent)
         });
-        // 连续移动时保留已显示的画面，并显示先完成的中间相机状态。
+        // 连续移动时保留已显示的画面，不显示过期的中间相机状态。
         let (first_version, latest_version) = view.update_in(cx, |view, window, cx| {
             let original_id = view.viewport.image.as_ref().unwrap().id;
             let mut camera = view.state.camera();
@@ -1342,13 +1589,13 @@ mod tests {
                 let viewport = &view.read(cx).viewport;
                 viewport.running && viewport.image_versions == Some(first_version)
             });
-            if displayed_intermediate || !cx.executor().tick() {
+            if !cx.executor().tick() {
                 break;
             }
         }
         assert!(
-            displayed_intermediate,
-            "completed intermediate camera frame was discarded"
+            !displayed_intermediate,
+            "an outdated camera frame replaced the displayed image"
         );
         cx.run_until_parked();
         cx.update(|_, cx| {
@@ -1475,6 +1722,39 @@ mod tests {
         cx.run_until_parked();
         cx.update(|_, cx| assert!(view.read(cx).viewport.image.is_some()));
 
+        // 隐藏期间更换相机并以相同尺寸恢复时，旧读回也不能覆盖新状态。
+        let stale = view.update_in(cx, |view, window, cx| {
+            view.viewport
+                .synchronize(Some((19, 11)), &view.state, window, cx);
+            assert!(view.viewport.running);
+            let stale = view.state.versions();
+            view.viewport.set_active(false, &view.state, window, cx);
+            let mut camera = view.state.camera();
+            assert!(camera.orbit(10.0, 5.0));
+            assert!(view.state.set_camera(camera));
+            view.viewport.set_active(true, &view.state, window, cx);
+            view.viewport
+                .synchronize(Some((19, 11)), &view.state, window, cx);
+            assert!(view.viewport.image.is_none());
+            stale
+        });
+        let mut stale_displayed = false;
+        for _ in 0..100 {
+            stale_displayed |=
+                cx.update(|_, cx| view.read(cx).viewport.image_versions == Some(stale));
+            if !cx.executor().tick() {
+                break;
+            }
+        }
+        cx.run_until_parked();
+        cx.update(|_, cx| {
+            let view = view.read(cx);
+            assert!(!stale_displayed);
+            assert_eq!(view.viewport.image_versions, Some(view.state.versions()));
+            assert_eq!(view.viewport.extent, Some((19, 11)));
+            assert!(view.viewport.image.is_some());
+        });
+
         // 读回和上传失败时应清除图像，并在尺寸变化后恢复。
         view.update_in(cx, |view, window, cx| {
             view.viewport
@@ -1482,9 +1762,12 @@ mod tests {
         });
         cx.run_until_parked();
         cx.update(|_, cx| {
-            let viewport = &view.read(cx).viewport;
+            let view = view.read(cx);
+            let viewport = &view.viewport;
             assert!(viewport.image.is_none());
             assert!(viewport.error.as_ref().unwrap().contains("readback failed"));
+            assert!(viewport.status(&view.state).contains("readback failed"));
+            assert!(viewport.status(&view.state).contains("See Console"));
         });
         view.update_in(cx, |view, window, cx| {
             view.viewport
