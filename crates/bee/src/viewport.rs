@@ -2,7 +2,7 @@ use crate::flow_editor::FlowEditor;
 use crate::Bee;
 use bee_renderer::Module;
 use bee_scene::{DisplayParameters, SceneState, Versions};
-use bee_vulkan::{Backend, TestImage};
+use bee_vulkan::{Backend, DiagnosticLevel, DiagnosticSender, TestImage};
 use gpui::{
     canvas, div, prelude::*, px, rgb, Bounds, Context, Corners, MouseButton, Pixels, Point,
     RenderImage, Window,
@@ -24,6 +24,7 @@ static PAINTED_IMAGES: std::sync::atomic::AtomicUsize = std::sync::atomic::Atomi
 
 pub struct Viewport {
     backend: Option<Arc<Backend>>,
+    diagnostics: DiagnosticSender,
     extent: Option<Extent>,
     versions: Option<Versions>,
     generation: u64,
@@ -41,9 +42,10 @@ pub struct Viewport {
 }
 
 impl Viewport {
-    pub fn new(backend: Option<Arc<Backend>>) -> Self {
+    pub fn new(backend: Option<Arc<Backend>>, diagnostics: DiagnosticSender) -> Self {
         Self {
             backend,
+            diagnostics,
             extent: None,
             versions: None,
             generation: 0,
@@ -391,10 +393,14 @@ impl Viewport {
             RenderMode::Raster => Module::Rasterization,
             RenderMode::Path => Module::PathTracing,
         };
-        if self.flow.select_source(source).is_ok() {
-            self.apply_flow(state, window, cx);
-        } else {
-            cx.notify();
+        match self.flow.select_source(source) {
+            Ok(()) => self.apply_flow(state, window, cx),
+            Err(error) => {
+                eprintln!("Render Flow: {error}");
+                self.diagnostics
+                    .send(DiagnosticLevel::Error, "Render Flow", error);
+                cx.notify();
+            }
         }
     }
 
@@ -412,9 +418,15 @@ impl Viewport {
             _ => None,
         };
         let previous = self.flow.active().clone();
-        let Ok(graph) = self.flow.apply(unavailable) else {
-            cx.notify();
-            return;
+        let graph = match self.flow.apply(unavailable) {
+            Ok(graph) => graph,
+            Err(error) => {
+                eprintln!("Render Flow: {error}");
+                self.diagnostics
+                    .send(DiagnosticLevel::Error, "Render Flow", error);
+                cx.notify();
+                return;
+            }
         };
         if graph == previous {
             cx.notify();
@@ -618,6 +630,8 @@ impl Viewport {
 
     fn fail(&mut self, reason: String, window: &mut Window) {
         eprintln!("{reason}");
+        self.diagnostics
+            .send(DiagnosticLevel::Error, "Viewport", reason.clone());
         self.drop_image(window);
         self.error = Some(reason);
     }
@@ -627,6 +641,11 @@ impl Viewport {
         if let Some(image) = self.image.take() {
             if let Err(error) = window.drop_image(image) {
                 eprintln!("Could not release GPUI image: {error:#}");
+                self.diagnostics.send(
+                    DiagnosticLevel::Error,
+                    "Viewport",
+                    format!("Could not release GPUI image: {error:#}"),
+                );
             }
         }
     }
@@ -702,6 +721,43 @@ mod tests {
             bgra: vec![0; 14],
         })
         .is_err());
+    }
+
+    #[test]
+    fn runtime_errors_reach_console_without_removing_local_errors_or_active_flow() {
+        let mut app = gpui::TestAppContext::single();
+        let (view, cx) = app.add_window_view(|_, _| Bee::failure("test device".into()));
+        view.update_in(cx, |view, window, cx| {
+            let active = view.viewport.flow.active().clone();
+            view.viewport
+                .fail("Vulkan image readback failed: simulated".into(), window);
+            assert!(view.viewport.status(&view.state).contains("See Console"));
+            view.viewport
+                .flow
+                .select_source(Module::PathTracing)
+                .unwrap();
+            view.viewport.apply_flow(&mut view.state, window, cx);
+            assert_eq!(view.viewport.flow.active(), &active);
+            assert!(view
+                .viewport
+                .flow
+                .error()
+                .unwrap()
+                .contains("Vulkan device unavailable"));
+            assert!(view.viewport.error().unwrap().contains("readback failed"));
+            view.console.drain();
+            for (source, text) in [
+                ("Viewport", "readback failed"),
+                ("Render Flow", "Vulkan device unavailable"),
+            ] {
+                assert!(view
+                    .console
+                    .visible()
+                    .any(|message| message.level == DiagnosticLevel::Error
+                        && message.source == source
+                        && message.message.contains(text)));
+            }
+        });
     }
 
     #[test]
@@ -1352,11 +1408,15 @@ mod tests {
         });
         let mut bee = None;
         let (root, cx) = app.add_window_view(|window, cx| {
-            let view = cx.new(|_| Bee {
-                viewport: Viewport::new(Some(backend.clone())),
-                state: SceneState::default(),
-                lines: vec![],
-                failed: false,
+            let view = cx.new(|_| {
+                let console = crate::workbench::console::Console::default();
+                Bee {
+                    viewport: Viewport::new(Some(backend.clone()), console.sender.clone()),
+                    state: SceneState::default(),
+                    lines: vec![],
+                    failed: false,
+                    console,
+                }
             });
             bee = Some(view.clone());
             let workbench = cx.new(|cx| crate::workbench::Workbench::new(view, window, cx));

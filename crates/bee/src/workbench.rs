@@ -11,6 +11,7 @@ use gpui_component::{
 };
 use std::sync::Arc;
 
+pub(crate) mod console;
 mod files;
 mod scene;
 
@@ -103,6 +104,25 @@ impl WorkbenchPanel {
         cx.observe(&bee, |_, _, cx| cx.notify()).detach();
         if matches!(kind, PanelKind::Scene | PanelKind::Properties) {
             cx.observe(&selection, |_, _, cx| cx.notify()).detach();
+        }
+        if kind == PanelKind::Console {
+            // 消息统一在界面线程收取；面板关闭后仍保留有界历史。
+            cx.spawn(async move |panel, cx| loop {
+                cx.background_executor()
+                    .timer(std::time::Duration::from_millis(100))
+                    .await;
+                if panel
+                    .update(cx, |panel, cx| {
+                        if panel.bee.update(cx, |bee, _| bee.console.drain()) {
+                            cx.notify();
+                        }
+                    })
+                    .is_err()
+                {
+                    break;
+                }
+            })
+            .detach();
         }
         Self {
             kind,
@@ -250,21 +270,19 @@ impl Render for WorkbenchPanel {
                     .into_any_element()
             }
             PanelKind::Files => self.files.render(cx).into_any_element(),
+            PanelKind::Console => self
+                .bee
+                .read(cx)
+                .console
+                .render(self.bee.clone())
+                .into_any_element(),
             _ => self.bee.update(cx, |bee, cx| match kind {
                 PanelKind::Viewport => bee.viewport.render(&bee.state, cx).into_any_element(),
                 PanelKind::Flow => bee.viewport.flow.render(cx).into_any_element(),
-                PanelKind::Console => div()
-                    .flex()
-                    .flex_col()
-                    .gap_2()
-                    .children(bee.lines.iter().cloned())
-                    .children(
-                        bee.viewport
-                            .error()
-                            .map(|error| format!("Viewport error: {error}")),
-                    )
-                    .into_any_element(),
-                PanelKind::Scene | PanelKind::Properties | PanelKind::Files => unreachable!(),
+                PanelKind::Scene
+                | PanelKind::Properties
+                | PanelKind::Files
+                | PanelKind::Console => unreachable!(),
             }),
         };
 
@@ -650,6 +668,15 @@ mod tests {
 
         click(cx, "flow-disconnect-2");
         click(cx, "flow-apply");
+        bee.update(cx, |bee, _| {
+            bee.console.drain();
+            assert!(bee.viewport.flow.error().is_some());
+            assert!(bee
+                .console
+                .visible()
+                .any(|message| message.source == "Render Flow"
+                    && message.message.contains("required input")));
+        });
         cx.update(|_, cx| {
             let bee = bee.read(cx);
             assert_eq!(bee.viewport.flow.active(), &active);

@@ -60,7 +60,9 @@ impl FlowEditor {
             .nodes()
             .find_map(|(id, node)| (node == module).then_some(id));
         let source = source.unwrap_or_else(|| graph.add(module));
-        graph.connect(source, tone)
+        let result = graph.connect(source, tone);
+        self.error = result.as_ref().err().cloned();
+        result
     }
 
     pub fn apply(&mut self, path_unavailable: Option<String>) -> Result<ModuleGraph, String> {
@@ -138,6 +140,14 @@ impl FlowEditor {
                             editor.error = editor.edit().connect(source, id).err();
                         } else {
                             editor.error = Some("Select an output port first".into());
+                        }
+                        if let Some(error) = editor.error() {
+                            eprintln!("Render Flow: {error}");
+                            view.console.sender.send(
+                                bee_vulkan::DiagnosticLevel::Error,
+                                "Render Flow",
+                                error.to_owned(),
+                            );
                         }
                         cx.notify();
                     },

@@ -3,6 +3,7 @@ mod viewport;
 mod workbench;
 
 use bee_scene::SceneState;
+use bee_vulkan::DiagnosticLevel;
 use gpui::{
     actions, div, prelude::*, px, relative, rgb, size, App, Application, Bounds, Context,
     KeyBinding, Window, WindowBounds, WindowOptions,
@@ -18,6 +19,7 @@ pub(crate) struct Bee {
     state: SceneState,
     lines: Vec<String>,
     failed: bool,
+    console: workbench::console::Console,
 }
 
 fn sharing_unavailable_reason() -> &'static str {
@@ -26,7 +28,12 @@ fn sharing_unavailable_reason() -> &'static str {
 
 impl Bee {
     pub(crate) fn new() -> Self {
-        match bee_vulkan::Backend::new(cfg!(debug_assertions)) {
+        // 先建立诊断通道，实例创建和设备失败消息也能保留。
+        let mut console = workbench::console::Console::default();
+        match bee_vulkan::Backend::new_with_diagnostics(
+            cfg!(debug_assertions),
+            console.sender.clone(),
+        ) {
             Ok(backend) => {
                 let report = &backend.report;
                 let version = report.api_version;
@@ -57,26 +64,41 @@ impl Bee {
                 }
                 for line in &lines {
                     eprintln!("{line}");
+                    console
+                        .sender
+                        .send(DiagnosticLevel::Info, "Device", line.clone());
                 }
+                console.drain();
                 Self {
-                    viewport: Viewport::new(Some(Arc::new(backend))),
+                    viewport: Viewport::new(Some(Arc::new(backend)), console.sender.clone()),
                     state: SceneState::default(),
                     lines,
                     failed: false,
+                    console,
                 }
             }
-            Err(error) => Self::failure(format!("{error:#}")),
+            Err(error) => Self::failure_with_console(format!("{error:#}"), console),
         }
     }
 
+    #[cfg(test)]
     fn failure(reason: String) -> Self {
+        Self::failure_with_console(reason, workbench::console::Console::default())
+    }
+
+    fn failure_with_console(reason: String, mut console: workbench::console::Console) -> Self {
         let message = format!("Vulkan initialization failed: {reason}");
         eprintln!("{message}");
+        console
+            .sender
+            .send(DiagnosticLevel::Error, "Device", message.clone());
+        console.drain();
         Self {
-            viewport: Viewport::new(None),
+            viewport: Viewport::new(None, console.sender.clone()),
             state: SceneState::default(),
             lines: vec![message],
             failed: true,
+            console,
         }
     }
 }
@@ -289,6 +311,11 @@ mod tests {
             let view = Bee::new();
             assert!(view.failed);
             assert!(view.lines[0].contains("Vulkan initialization failed"));
+            assert!(view
+                .console
+                .visible()
+                .any(|message| message.level == DiagnosticLevel::Error
+                    && message.message == view.lines[0]));
             assert!(
                 view.lines[0].contains("could not create the Vulkan instance")
                     || view.lines[0].contains("no usable Vulkan graphics device")

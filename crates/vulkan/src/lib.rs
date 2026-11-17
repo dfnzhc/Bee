@@ -2,6 +2,7 @@
 
 mod capabilities;
 mod device;
+mod diagnostics;
 mod frame;
 mod graph_image;
 mod raster;
@@ -11,6 +12,10 @@ mod test_image;
 mod tonemap;
 
 pub use device::{Backend, DeviceReport, ValidationStatus};
+pub use diagnostics::{
+    diagnostic_channel, DiagnosticLevel, DiagnosticMessage, DiagnosticReceiver, DiagnosticSender,
+    DIAGNOSTIC_QUEUE_CAPACITY,
+};
 pub use frame::{Buffer, Frame, Submission};
 pub use graph_image::{GraphImage, ReadbackBuffer};
 pub use raster::Rasterizer;

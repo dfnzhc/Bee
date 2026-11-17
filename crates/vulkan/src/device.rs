@@ -1,4 +1,5 @@
 use crate::capabilities::{missing_ray_capabilities, ray_extensions, RayFeatures};
+use crate::{DiagnosticLevel, DiagnosticSender};
 use anyhow::{anyhow, Context, Result};
 use ash::{vk, Entry, Instance};
 use std::collections::HashSet;
@@ -51,6 +52,8 @@ pub(crate) struct InstanceState {
     _entry: Entry,
     pub instance: Instance,
     debug: Option<(ash::ext::debug_utils::Instance, vk::DebugUtilsMessengerEXT)>,
+    // 地址固定，直到 messenger、实例和在途回调全部销毁后才释放。
+    diagnostics: Option<Box<DiagnosticSender>>,
     api_version: u32,
     validation: ValidationStatus,
 }
@@ -82,6 +85,13 @@ impl Drop for DeviceState {
         unsafe {
             if let Err(error) = self.device.device_wait_idle() {
                 eprintln!("Vulkan device wait failed during shutdown: {error:?}");
+                if let Some(sender) = &self.instance.diagnostics {
+                    sender.send(
+                        DiagnosticLevel::Error,
+                        "Vulkan",
+                        format!("Device wait failed during shutdown: {error:?}"),
+                    );
+                }
             }
             self.device.destroy_device(None);
         }
@@ -101,26 +111,40 @@ unsafe extern "system" fn debug_callback(
     severity: vk::DebugUtilsMessageSeverityFlagsEXT,
     _types: vk::DebugUtilsMessageTypeFlagsEXT,
     data: *const vk::DebugUtilsMessengerCallbackDataEXT<'_>,
-    _user_data: *mut c_void,
+    user_data: *mut c_void,
 ) -> vk::Bool32 {
-    #[cfg(test)]
-    if severity.contains(vk::DebugUtilsMessageSeverityFlagsEXT::ERROR) {
-        VALIDATION_ERRORS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    }
-    let message = if data.is_null() || (*data).p_message.is_null() {
-        "<no validation message>".into()
-    } else {
-        CStr::from_ptr((*data).p_message).to_string_lossy()
-    };
-    let _ = writeln!(
-        std::io::stderr().lock(),
-        "Vulkan validation {severity:?}: {message}"
-    );
+    // FFI 边界不得展开 panic，消息复制和输出失败也不能中断 Vulkan。
+    let _ = std::panic::catch_unwind(|| unsafe {
+        #[cfg(test)]
+        if severity.contains(vk::DebugUtilsMessageSeverityFlagsEXT::ERROR) {
+            VALIDATION_ERRORS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        }
+        let message = if data.is_null() || (*data).p_message.is_null() {
+            "<no validation message>".into()
+        } else {
+            CStr::from_ptr((*data).p_message).to_string_lossy()
+        };
+        let _ = writeln!(
+            std::io::stderr().lock(),
+            "Vulkan validation {severity:?}: {message}"
+        );
+        if let Some(sender) = user_data.cast::<DiagnosticSender>().as_ref() {
+            let level = if severity.contains(vk::DebugUtilsMessageSeverityFlagsEXT::ERROR) {
+                DiagnosticLevel::Error
+            } else if severity.contains(vk::DebugUtilsMessageSeverityFlagsEXT::WARNING) {
+                DiagnosticLevel::Warning
+            } else {
+                DiagnosticLevel::Info
+            };
+            sender.send(level, "Vulkan validation", message.into_owned());
+        }
+    });
     vk::FALSE
 }
 
 impl InstanceState {
-    fn new(request_validation: bool) -> Result<Arc<Self>> {
+    fn new(request_validation: bool, diagnostics: Option<DiagnosticSender>) -> Result<Arc<Self>> {
+        let diagnostics = diagnostics.map(Box::new);
         let entry = unsafe { Entry::load() }.context("could not load the Vulkan loader")?;
         let layers = unsafe { entry.enumerate_instance_layer_properties() }
             .context("could not enumerate Vulkan validation layers")?;
@@ -141,6 +165,13 @@ impl InstanceState {
             ValidationStatus::Unavailable | ValidationStatus::EnabledWithoutDebugUtils
         ) {
             eprintln!("Vulkan validation: {validation}");
+            if let Some(sender) = &diagnostics {
+                sender.send(
+                    DiagnosticLevel::Warning,
+                    "Vulkan",
+                    format!("Validation: {validation}"),
+                );
+            }
         }
 
         let layer_names = if has_layer && request_validation {
@@ -171,7 +202,14 @@ impl InstanceState {
                     | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION
                     | vk::DebugUtilsMessageTypeFlagsEXT::PERFORMANCE,
             )
-            .pfn_user_callback(Some(debug_callback));
+            .pfn_user_callback(Some(debug_callback))
+            .user_data(
+                diagnostics
+                    .as_deref()
+                    .map_or(std::ptr::null_mut(), |sender| {
+                        std::ptr::from_ref(sender).cast_mut().cast()
+                    }),
+            );
         let mut create_info = vk::InstanceCreateInfo::default()
             .application_info(&app_info)
             .enabled_layer_names(&layer_names)
@@ -201,6 +239,7 @@ impl InstanceState {
             _entry: entry,
             instance,
             debug,
+            diagnostics,
             api_version,
             validation,
         }))
@@ -293,14 +332,22 @@ fn query_ray_features(
 
 impl Backend {
     pub fn new(request_validation: bool) -> Result<Self> {
-        Self::new_with_hidden_extensions(request_validation, &[])
+        Self::new_with_hidden_extensions(request_validation, &[], None)
+    }
+
+    pub fn new_with_diagnostics(
+        request_validation: bool,
+        diagnostics: DiagnosticSender,
+    ) -> Result<Self> {
+        Self::new_with_hidden_extensions(request_validation, &[], Some(diagnostics))
     }
 
     fn new_with_hidden_extensions(
         request_validation: bool,
         hidden_extensions: &[&str],
+        diagnostics: Option<DiagnosticSender>,
     ) -> Result<Self> {
-        let instance = InstanceState::new(request_validation)?;
+        let instance = InstanceState::new(request_validation, diagnostics)?;
         let devices = unsafe { instance.instance.enumerate_physical_devices() }
             .context("could not enumerate Vulkan devices")?;
         let mut failures = Vec::new();
@@ -506,11 +553,110 @@ mod tests {
     }
 
     #[test]
+    fn validation_callback_forwards_levels_and_tolerates_full_or_closed_receiver() {
+        let (sender, receiver) = crate::diagnostic_channel();
+        let context = Box::new(sender);
+        let user_data = std::ptr::from_ref(context.as_ref()).cast_mut().cast();
+        let data = vk::DebugUtilsMessengerCallbackDataEXT::default().message(c"callback test");
+        for (severity, level) in [
+            (
+                vk::DebugUtilsMessageSeverityFlagsEXT::INFO,
+                DiagnosticLevel::Info,
+            ),
+            (
+                vk::DebugUtilsMessageSeverityFlagsEXT::WARNING,
+                DiagnosticLevel::Warning,
+            ),
+            (
+                vk::DebugUtilsMessageSeverityFlagsEXT::ERROR,
+                DiagnosticLevel::Error,
+            ),
+        ] {
+            assert_eq!(
+                unsafe {
+                    debug_callback(
+                        severity,
+                        vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION,
+                        &data,
+                        user_data,
+                    )
+                },
+                vk::FALSE
+            );
+            let messages = receiver.drain().collect::<Vec<_>>();
+            assert_eq!(messages.len(), 1);
+            assert_eq!(messages[0].level, level);
+            assert_eq!(messages[0].source, "Vulkan validation");
+            assert_eq!(messages[0].message, "callback test");
+        }
+        for _ in 0..crate::DIAGNOSTIC_QUEUE_CAPACITY {
+            context.send(DiagnosticLevel::Info, "test", "fill queue");
+        }
+        unsafe {
+            debug_callback(
+                vk::DebugUtilsMessageSeverityFlagsEXT::WARNING,
+                vk::DebugUtilsMessageTypeFlagsEXT::GENERAL,
+                std::ptr::null(),
+                user_data,
+            );
+        }
+        assert_eq!(receiver.take_dropped(), 1);
+        drop(receiver);
+        unsafe {
+            debug_callback(
+                vk::DebugUtilsMessageSeverityFlagsEXT::WARNING,
+                vk::DebugUtilsMessageTypeFlagsEXT::GENERAL,
+                &data,
+                user_data,
+            );
+        }
+        unsafe {
+            debug_callback(
+                vk::DebugUtilsMessageSeverityFlagsEXT::WARNING,
+                vk::DebugUtilsMessageTypeFlagsEXT::GENERAL,
+                std::ptr::null(),
+                std::ptr::null_mut(),
+            );
+        }
+    }
+
+    #[test]
+    #[ignore = "requires a Vulkan graphics device and validation layer"]
+    fn validation_messenger_retains_context_through_shutdown() -> Result<()> {
+        let (sender, receiver) = crate::diagnostic_channel();
+        let backend = Backend::new_with_diagnostics(true, sender)?;
+        assert_eq!(backend.report.validation, ValidationStatus::Enabled);
+        let device = backend.device.clone();
+        drop(backend);
+        let (debug, _) = device.instance.debug.as_ref().unwrap();
+        let data = vk::DebugUtilsMessengerCallbackDataEXT::default()
+            .message(c"Bee diagnostic callback lifecycle test");
+        unsafe {
+            debug.submit_debug_utils_message(
+                vk::DebugUtilsMessageSeverityFlagsEXT::WARNING,
+                vk::DebugUtilsMessageTypeFlagsEXT::GENERAL,
+                &data,
+            );
+        }
+        assert!(receiver
+            .drain()
+            .any(|message| message.level == DiagnosticLevel::Warning
+                && message
+                    .message
+                    .contains("Bee diagnostic callback lifecycle test")));
+        // 接收端先关闭，设备及实例销毁期间的回调仍持有有效上下文。
+        drop(receiver);
+        drop(device);
+        Ok(())
+    }
+
+    #[test]
     #[ignore = "requires a Vulkan graphics device"]
     fn graphics_device_initializes_without_ray_tracing() -> Result<()> {
         let native = Backend::new(true)?;
         println!("Native Vulkan capabilities: {:?}", native.report);
-        let backend = Backend::new_with_hidden_extensions(true, &["VK_KHR_ray_tracing_pipeline"])?;
+        let backend =
+            Backend::new_with_hidden_extensions(true, &["VK_KHR_ray_tracing_pipeline"], None)?;
         assert_eq!(backend.report.validation, ValidationStatus::Enabled);
         assert!(backend
             .report
@@ -527,8 +673,13 @@ mod tests {
     #[ignore = "requires a Vulkan graphics device"]
     fn missing_validation_layer_is_reported() {
         if std::env::var_os("BEE_TEST_NO_LAYER").is_some() {
-            let backend = Backend::new(true).unwrap();
+            let (sender, receiver) = crate::diagnostic_channel();
+            let backend = Backend::new_with_diagnostics(true, sender).unwrap();
             assert_eq!(backend.report.validation, ValidationStatus::Unavailable);
+            assert!(receiver
+                .drain()
+                .any(|message| message.level == DiagnosticLevel::Warning
+                    && message.message.contains("requested but unavailable")));
             return;
         }
         let output = std::process::Command::new(std::env::current_exe().unwrap())
