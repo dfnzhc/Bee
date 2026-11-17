@@ -11,6 +11,7 @@ use gpui_component::{
 };
 use std::sync::Arc;
 
+mod files;
 mod scene;
 
 const BACKGROUND: u32 = 0x1b1f20;
@@ -89,6 +90,7 @@ struct WorkbenchPanel {
     tab: Option<WeakEntity<TabPanel>>,
     zoom_subscription: Option<Subscription>,
     tab_zoomed: bool,
+    files: files::Files,
 }
 
 impl WorkbenchPanel {
@@ -110,6 +112,7 @@ impl WorkbenchPanel {
             tab: None,
             zoom_subscription: None,
             tab_zoomed: false,
+            files: files::Files::default(),
         }
     }
 
@@ -246,10 +249,10 @@ impl Render for WorkbenchPanel {
                 scene::properties(&self.bee.read(cx).state, self.selection.read(cx))
                     .into_any_element()
             }
+            PanelKind::Files => self.files.render(cx).into_any_element(),
             _ => self.bee.update(cx, |bee, cx| match kind {
                 PanelKind::Viewport => bee.viewport.render(&bee.state, cx).into_any_element(),
                 PanelKind::Flow => bee.viewport.flow.render(cx).into_any_element(),
-                PanelKind::Files => div().child("No folder selected").into_any_element(),
                 PanelKind::Console => div()
                     .flex()
                     .flex_col()
@@ -261,7 +264,7 @@ impl Render for WorkbenchPanel {
                             .map(|error| format!("Viewport error: {error}")),
                     )
                     .into_any_element(),
-                PanelKind::Scene | PanelKind::Properties => unreachable!(),
+                PanelKind::Scene | PanelKind::Properties | PanelKind::Files => unreachable!(),
             }),
         };
 
