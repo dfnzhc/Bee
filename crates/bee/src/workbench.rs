@@ -1,11 +1,15 @@
 use crate::Bee;
 use gpui::{
     anchored, deferred, div, prelude::*, px, rgb, App, Context, Corner, DismissEvent, Entity,
-    EventEmitter, FocusHandle, Focusable, KeyDownEvent, MouseButton, SharedString, Subscription,
-    WeakEntity, Window,
+    EventEmitter, FocusHandle, Focusable, KeyDownEvent, MouseButton, Pixels, SharedString,
+    Subscription, WeakEntity, Window,
 };
 use gpui_component::{
-    dock::{DockArea, DockItem, Panel, PanelEvent, PanelStyle, PanelView, TabPanel},
+    button::{Button, ButtonVariants},
+    dock::{
+        DockArea, DockEvent, DockItem, Panel, PanelEvent, PanelState, PanelStyle, PanelView,
+        StackPanel, TabPanel, ToggleZoom,
+    },
     menu::{PopupMenu, PopupMenuItem},
     Icon, IconName, Sizable, StyledExt, Theme, ThemeMode,
 };
@@ -21,6 +25,9 @@ const BORDER: u32 = 0x454e4c;
 const TEXT: u32 = 0xe9efec;
 const MUTED: u32 = 0xb1bfba;
 const ACCENT: u32 = 0x79c8b0;
+const SELECTED: u32 = 0x344841;
+const HOVER: u32 = 0x333b39;
+const DRAWER_HEIGHT: Pixels = px(200.0);
 
 pub(crate) fn init_theme(cx: &mut App) {
     Theme::change(ThemeMode::Dark, None, cx);
@@ -30,13 +37,16 @@ pub(crate) fn init_theme(cx: &mut App) {
     theme.border = rgb(BORDER).into();
     theme.ring = rgb(ACCENT).into();
     theme.tab_bar = rgb(BACKGROUND).into();
-    theme.tab_active = rgb(PANEL).into();
+    theme.tab_active = rgb(SELECTED).into();
     theme.tab_active_foreground = rgb(TEXT).into();
     theme.tab_foreground = rgb(MUTED).into();
     theme.popover = rgb(PANEL).into();
     theme.popover_foreground = rgb(TEXT).into();
-    theme.accent = rgb(0x344841).into();
+    theme.accent = rgb(SELECTED).into();
     theme.accent_foreground = rgb(TEXT).into();
+    theme.secondary = rgb(PANEL).into();
+    theme.secondary_hover = rgb(HOVER).into();
+    theme.secondary_active = rgb(SELECTED).into();
     theme.radius = px(4.0);
 }
 
@@ -59,6 +69,7 @@ impl PanelKind {
         Self::Console,
         Self::Flow,
     ];
+    const DRAWER_START: usize = Self::Files as usize;
 
     fn title(self) -> &'static str {
         match self {
@@ -141,6 +152,10 @@ impl WorkbenchPanel {
             bee.viewport.set_active(active, &bee.state, window, cx);
         });
     }
+
+    fn tab(&self) -> Option<Entity<TabPanel>> {
+        self.tab.as_ref()?.upgrade()
+    }
 }
 
 impl EventEmitter<PanelEvent> for WorkbenchPanel {}
@@ -161,6 +176,9 @@ impl Panel for WorkbenchPanel {
         div()
             .id(SharedString::from(selector.clone()))
             .debug_selector(move || selector)
+            .text_size(px(12.0))
+            .line_height(px(16.0))
+            .text_ellipsis()
             .child(self.kind.title())
     }
 
@@ -297,11 +315,14 @@ impl Render for WorkbenchPanel {
             .bg(rgb(PANEL))
             .text_color(rgb(TEXT))
             .border_1()
-            .border_color(rgb(PANEL))
+            .border_color(rgb(BORDER))
             .focus(|style| style.border_color(rgb(ACCENT)))
-            .p_2()
-            .when(kind == PanelKind::Viewport, |this| this.flex().flex_col())
-            .when(kind != PanelKind::Viewport, |this| this.overflow_y_scroll())
+            .when(kind == PanelKind::Viewport, |this| {
+                this.p_2().flex().flex_col()
+            })
+            .when(kind != PanelKind::Viewport, |this| {
+                this.p_1p5().overflow_y_scroll()
+            })
             .child(content)
     }
 }
@@ -312,10 +333,27 @@ enum AppMenu {
     View,
 }
 
+struct Drawer {
+    stack: Entity<StackPanel>,
+    tabs: Entity<TabPanel>,
+    open: bool,
+    height: Pixels,
+}
+
+fn contains_panel(state: &PanelState, kind: PanelKind) -> bool {
+    state.panel_name == kind.title()
+        || state
+            .children
+            .iter()
+            .any(|child| contains_panel(child, kind))
+}
+
 pub(crate) struct Workbench {
     bee: Entity<Bee>,
     dock: Entity<DockArea>,
     panels: Vec<Entity<WorkbenchPanel>>,
+    drawer: Drawer,
+    drawer_focus: [FocusHandle; 3],
     menu_focus: [FocusHandle; 2],
     menu: Option<(AppMenu, Entity<PopupMenu>)>,
     menu_press_was_open: bool,
@@ -345,16 +383,28 @@ impl Workbench {
         let dock = cx.new(|cx| {
             DockArea::new("bee-workbench", None, window, cx).panel_style(PanelStyle::TabBar)
         });
-        let mut this = Self {
+        let drawer = Self::build_layout(&dock, &panels, window, cx);
+        window.blur();
+        cx.subscribe(&dock, |this, _, event, cx| {
+            if matches!(event, DockEvent::LayoutChanged) {
+                // 停靠组件会在最后一个面板移走或关闭后移除空分区。
+                if this.drawer.open && this.drawer.stack.read(cx).dump(cx).children.is_empty() {
+                    this.drawer.open = false;
+                }
+                cx.notify();
+            }
+        })
+        .detach();
+        Self {
             bee,
             dock,
             panels,
+            drawer,
+            drawer_focus: std::array::from_fn(|_| cx.focus_handle().tab_index(0).tab_stop(true)),
             menu_focus: std::array::from_fn(|_| cx.focus_handle().tab_index(0).tab_stop(true)),
             menu: None,
             menu_press_was_open: false,
-        };
-        this.reset(window, cx);
-        this
+        }
     }
 
     fn request_close(bee: &WeakEntity<Bee>, window: &mut Window, cx: &mut App) -> bool {
@@ -366,17 +416,34 @@ impl Workbench {
         self.bee.update(cx, |bee, cx| {
             bee.viewport.set_zoom_hidden(false, &bee.state, window, cx);
         });
-        self.dock.update(cx, |dock, cx| {
+        self.drawer = Self::build_layout(&self.dock, &self.panels, window, cx);
+        window.focus(self.menu_focus(AppMenu::View));
+        cx.notify();
+    }
+
+    fn build_layout(
+        dock: &Entity<DockArea>,
+        panels: &[Entity<WorkbenchPanel>],
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Drawer {
+        dock.update(cx, |dock, cx| {
             dock.set_zoomed_out(window, cx);
             let weak = cx.entity().downgrade();
-            let scene = DockItem::tab(self.panels[0].clone(), &weak, window, cx).size(px(240.0));
-            let viewport = DockItem::tab(self.panels[1].clone(), &weak, window, cx).size(px(680.0));
-            let properties =
-                DockItem::tab(self.panels[2].clone(), &weak, window, cx).size(px(280.0));
-            let top = DockItem::h_split(vec![scene, viewport, properties], &weak, window, cx)
-                .size(px(600.0));
+            let top = DockItem::h_split(
+                [200.0, 780.0, 220.0]
+                    .into_iter()
+                    .zip(panels)
+                    .map(|(size, panel)| {
+                        DockItem::tab(panel.clone(), &weak, window, cx).size(px(size))
+                    })
+                    .collect(),
+                &weak,
+                window,
+                cx,
+            );
             let bottom = DockItem::tabs(
-                self.panels[3..]
+                panels[PanelKind::DRAWER_START..]
                     .iter()
                     .cloned()
                     .map(|panel| Arc::new(panel) as Arc<dyn PanelView>)
@@ -384,15 +451,24 @@ impl Workbench {
                 &weak,
                 window,
                 cx,
-            )
-            .size(px(200.0));
-            dock.set_center(
-                DockItem::v_split(vec![top, bottom], &weak, window, cx),
-                window,
-                cx,
             );
-        });
-        cx.notify();
+            let DockItem::Tabs { view: tabs, .. } = &bottom else {
+                unreachable!();
+            };
+            let tabs = tabs.clone();
+            let DockItem::Split { view: stack, .. } =
+                DockItem::v_split(vec![bottom], &weak, window, cx)
+            else {
+                unreachable!();
+            };
+            dock.set_center(DockItem::v_split(vec![top], &weak, window, cx), window, cx);
+            Drawer {
+                stack,
+                tabs,
+                open: false,
+                height: DRAWER_HEIGHT,
+            }
+        })
     }
 
     fn menu_focus(&self, kind: AppMenu) -> &FocusHandle {
@@ -535,15 +611,80 @@ impl Workbench {
             })
     }
 
+    fn root_stack(&self, cx: &App) -> Entity<StackPanel> {
+        let DockItem::Split { view, .. } = self.dock.read(cx).items() else {
+            unreachable!();
+        };
+        view.clone()
+    }
+
+    fn unzoom_other_than(
+        &self,
+        target: Option<&Entity<TabPanel>>,
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        if let Some(tab) = self.panels.iter().find_map(|panel| {
+            let panel = panel.read(cx);
+            let tab = panel.tab()?;
+            (panel.tab_zoomed && target != Some(&tab)).then_some(tab)
+        }) {
+            tab.read(cx)
+                .focus_handle(cx)
+                .dispatch_action(&ToggleZoom, window, cx);
+        }
+    }
+
+    fn set_drawer_open(&mut self, open: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if self.drawer.open == open {
+            return;
+        }
+        let root = self.root_stack(cx);
+        let drawer_layout = self.drawer.stack.read(cx).dump(cx);
+        let drawer = Arc::new(self.drawer.stack.clone());
+        if open {
+            let dock = self.dock.downgrade();
+            root.update(cx, |root, cx| {
+                root.add_panel(drawer, Some(self.drawer.height), dock, window, cx);
+            });
+        } else {
+            if let Some(height) = root
+                .read(cx)
+                .dump(cx)
+                .info
+                .sizes()
+                .and_then(|sizes| sizes.last())
+            {
+                self.drawer.height = *height;
+            }
+            root.update(cx, |root, cx| root.remove_panel(drawer, window, cx));
+        }
+        self.drawer.open = open;
+        if contains_panel(&drawer_layout, PanelKind::Viewport) {
+            let viewport = &self.panels[PanelKind::Viewport as usize];
+            let active = open
+                && viewport.read(cx).tab().is_some_and(|tab| {
+                    tab.read(cx)
+                        .active_panel(cx)
+                        .is_some_and(|panel| panel.view().entity_id() == viewport.entity_id())
+                });
+            viewport.update(cx, |panel, cx| {
+                panel.set_viewport_active(active, window, cx)
+            });
+        }
+        cx.notify();
+    }
+
     fn show_panel(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
         let panel = self.panels[index].clone();
-        let tab = panel.read(cx).tab.as_ref().and_then(WeakEntity::upgrade);
-        let group = if index >= 3 {
-            &self.panels[3..]
-        } else {
-            &self.panels[..3]
-        };
+        let tab = panel.read(cx).tab();
+        let drawer = self.drawer.stack.read(cx).dump(cx);
+        let in_drawer = contains_panel(&drawer, PanelKind::ALL[index]);
+        self.unzoom_other_than(tab.as_ref(), window, cx);
         if let Some(tab) = tab {
+            if in_drawer {
+                self.set_drawer_open(true, window, cx);
+            }
             let active = tab
                 .read(cx)
                 .active_panel(cx)
@@ -555,22 +696,141 @@ impl Workbench {
                     tab.add_panel(panel, window, cx);
                 });
             }
-        } else if let Some(tab) = group
-            .iter()
-            .chain(self.panels.iter())
-            .find_map(|panel| panel.read(cx).tab.as_ref().and_then(WeakEntity::upgrade))
-        {
+        } else if index >= PanelKind::DRAWER_START {
+            let tabs = &self.drawer.tabs;
+            let empty = tabs.read(cx).active_panel(cx).is_none();
+            tabs.update(cx, |tabs, cx| {
+                tabs.add_panel(Arc::new(panel.clone()), window, cx)
+            });
+            if empty {
+                self.drawer.stack.update(cx, |stack, cx| {
+                    stack.add_panel(
+                        Arc::new(tabs.clone()),
+                        None,
+                        self.dock.downgrade(),
+                        window,
+                        cx,
+                    );
+                });
+            }
+            self.set_drawer_open(true, window, cx);
+        } else if let Some(tab) = self.panels.iter().find_map(|panel| {
+            let panel = panel.read(cx);
+            (!contains_panel(&drawer, panel.kind))
+                .then(|| panel.tab())
+                .flatten()
+        }) {
             tab.update(cx, |tab, cx| {
                 tab.add_panel(Arc::new(panel.clone()), window, cx);
             });
         } else {
-            self.dock.update(cx, |dock, cx| {
-                let item = DockItem::tab(panel.clone(), &cx.entity().downgrade(), window, cx);
-                dock.set_center(item, window, cx);
+            let dock = self.dock.downgrade();
+            let item = DockItem::tab(panel.clone(), &dock, window, cx);
+            self.root_stack(cx).update(cx, |root, cx| {
+                root.insert_panel_before(item.view(), 0, None, dock, window, cx);
             });
         }
         window.focus(&panel.read(cx).focus_handle(cx));
         cx.notify();
+    }
+
+    fn collapse_drawer(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
+        let drawer = self.drawer.stack.read(cx).dump(cx);
+        if self.panels.iter().any(|panel| {
+            let panel = panel.read(cx);
+            panel.tab_zoomed && contains_panel(&drawer, panel.kind)
+        }) {
+            self.unzoom_other_than(None, window, cx);
+        }
+        self.set_drawer_open(false, window, cx);
+        window.focus(&self.drawer_focus[index - PanelKind::DRAWER_START]);
+    }
+
+    fn drawer_bar(&self, cx: &Context<Self>) -> impl IntoElement {
+        let layout = self.drawer.stack.read(cx).dump(cx);
+        let entries = PanelKind::ALL
+            .into_iter()
+            .enumerate()
+            .skip(PanelKind::DRAWER_START);
+        let selected = |index: usize, kind| {
+            self.drawer.open
+                && contains_panel(&layout, kind)
+                && self.panels[index].read(cx).tab().is_some_and(|tab| {
+                    tab.read(cx)
+                        .active_panel(cx)
+                        .is_some_and(|panel| panel.panel_name(cx) == kind.title())
+                })
+        };
+        let collapse_target = entries
+            .clone()
+            .find(|&(index, kind)| selected(index, kind))
+            .map_or(PanelKind::DRAWER_START, |(index, _)| index);
+        div()
+            .flex()
+            .items_center()
+            .h(px(30.0))
+            .flex_shrink_0()
+            .px_2()
+            .gap_1()
+            .border_t_1()
+            .border_color(rgb(BORDER))
+            .tab_index(2)
+            .tab_stop(false)
+            .tab_group()
+            .children(entries.map(|(index, kind)| {
+                let active = selected(index, kind);
+                let selector = format!("drawer-{}", kind.id());
+                let activate =
+                    move |this: &mut Self, window: &mut Window, cx: &mut Context<Self>| {
+                        if active {
+                            this.collapse_drawer(index, window, cx);
+                        } else {
+                            this.show_panel(index, window, cx);
+                        }
+                    };
+                div()
+                    .id(SharedString::from(selector.clone()))
+                    .debug_selector(move || selector)
+                    .track_focus(&self.drawer_focus[index - PanelKind::DRAWER_START])
+                    .tab_index(0)
+                    .flex()
+                    .items_center()
+                    .h(px(24.0))
+                    .px_2()
+                    .rounded_sm()
+                    .border_1()
+                    .border_color(rgb(BACKGROUND))
+                    .text_color(rgb(if active { TEXT } else { MUTED }))
+                    .cursor_pointer()
+                    .when(active, |this| this.bg(rgb(SELECTED)))
+                    .hover(|style| style.bg(rgb(if active { SELECTED } else { HOVER })))
+                    .focus(|style| style.border_color(rgb(ACCENT)))
+                    .child(kind.title())
+                    .on_click(cx.listener(move |this, _, window, cx| activate(this, window, cx)))
+                    .on_key_down(cx.listener(move |this, event: &KeyDownEvent, window, cx| {
+                        if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                            activate(this, window, cx);
+                        }
+                    }))
+            }))
+            .when(self.drawer.open, |bar| {
+                bar.child(div().flex_1()).child(
+                    Button::new("collapse-drawer")
+                        .debug_selector(|| "collapse-drawer".into())
+                        .icon(IconName::ChevronDown)
+                        .small()
+                        .ghost()
+                        .tooltip("Collapse drawer")
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            this.collapse_drawer(collapse_target, window, cx);
+                        }))
+                        .on_key_down(cx.listener(move |this, event: &KeyDownEvent, window, cx| {
+                            if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                                this.collapse_drawer(collapse_target, window, cx);
+                            }
+                        })),
+                )
+            })
     }
 }
 
@@ -589,7 +849,7 @@ impl Render for Workbench {
                 div()
                     .flex()
                     .items_center()
-                    .h(px(36.0))
+                    .h(px(34.0))
                     .flex_shrink_0()
                     .gap_3()
                     .px_3()
@@ -610,6 +870,7 @@ impl Render for Workbench {
                     .tab_group()
                     .child(self.dock.clone()),
             )
+            .child(self.drawer_bar(cx))
     }
 }
 
@@ -620,7 +881,7 @@ mod tests {
         point, size, KeyBinding, Modifiers, MouseButton, ScrollDelta, ScrollWheelEvent,
         VisualTestContext,
     };
-    use gpui_component::dock::ClosePanel;
+    use gpui_component::{dock::ClosePanel, PixelsExt};
 
     fn redraw(cx: &mut VisualTestContext, workbench: &Entity<Workbench>) {
         cx.draw(
@@ -652,6 +913,33 @@ mod tests {
         for child in &state.children {
             names(child, result);
         }
+    }
+
+    fn assert_drawer(
+        cx: &mut VisualTestContext,
+        workbench: &Entity<Workbench>,
+        active: Option<PanelKind>,
+    ) {
+        cx.update(|window, cx| {
+            let wb = workbench.read(cx);
+            assert_eq!(wb.drawer.open, active.is_some());
+            let layout = wb.dock.read(cx).dump(cx).center;
+            assert_eq!(layout.children.len(), if active.is_some() { 2 } else { 1 });
+            if let Some(kind) = active {
+                let panel = wb.panels[kind as usize].read(cx);
+                assert_eq!(panel.tab(), Some(wb.drawer.tabs.clone()));
+                assert_eq!(
+                    wb.drawer
+                        .tabs
+                        .read(cx)
+                        .active_panel(cx)
+                        .unwrap()
+                        .panel_name(cx),
+                    kind.title()
+                );
+                assert!(panel.focus.contains_focused(window, cx));
+            }
+        });
     }
 
     #[test]
@@ -1011,7 +1299,7 @@ mod tests {
     }
 
     #[test]
-    fn panel_entries_and_layout_preserve_scene_camera_and_flow_draft() {
+    fn drawer_entries_and_layout_preserve_workbench_state() {
         let mut app = gpui::TestAppContext::single();
         app.update(|cx| {
             gpui_component::init(cx);
@@ -1029,51 +1317,70 @@ mod tests {
         cx.simulate_resize(size(px(960.0), px(640.0)));
         redraw(cx, &workbench);
 
+        let closed_canvas = cx.debug_bounds("scene-canvas").unwrap().size;
+        assert_drawer(cx, &workbench, None);
+        assert!(cx.debug_bounds("panel-content-files").is_none());
+        assert!(cx.debug_bounds("panel-content-console").is_none());
+        assert!(cx.debug_bounds("panel-content-flow").is_none());
         cx.update(|_, cx| {
             let workbench = workbench.read(cx);
             let mut actual = Vec::new();
             names(&workbench.dock.read(cx).dump(cx).center, &mut actual);
-            assert_eq!(
-                actual,
-                [
-                    "Scene",
-                    "Viewport",
-                    "Properties",
-                    "Files",
-                    "Console",
-                    "Render Flow"
-                ]
-            );
+            assert_eq!(actual, ["Scene", "Viewport", "Properties"]);
         });
 
-        for (entry, content) in [
-            ("show-scene", "panel-content-scene"),
-            ("show-viewport", "panel-content-viewport"),
-            ("show-properties", "panel-content-properties"),
-            ("show-files", "panel-content-files"),
-            ("show-console", "panel-content-console"),
-            ("show-flow", "panel-content-flow"),
-        ] {
-            click(cx, &workbench, entry);
-            let actual = cx.update(|_, cx| {
-                let workbench = workbench.read(cx);
-                workbench
-                    .panels
-                    .iter()
-                    .filter_map(|panel| {
-                        let panel = panel.read(cx);
-                        let tab = panel.tab.as_ref()?.upgrade()?;
-                        Some((
-                            panel.kind.title(),
-                            tab.read(cx)
-                                .active_panel(cx)
-                                .map(|active| active.panel_name(cx)),
-                        ))
-                    })
-                    .collect::<Vec<_>>()
-            });
-            assert!(cx.debug_bounds(content).is_some(), "{content}: {actual:?}");
-        }
+        cx.update(|window, cx| window.focus(workbench.read(cx).menu_focus(AppMenu::File)));
+        cx.simulate_keystrokes("shift-tab shift-tab shift-tab");
+        assert!(cx.update(|window, cx| workbench.read(cx).drawer_focus[0].is_focused(window)));
+        cx.simulate_keystrokes("enter");
+        redraw(cx, &workbench);
+        assert_drawer(cx, &workbench, Some(PanelKind::Files));
+        assert!(cx.debug_bounds("files-choose").is_some());
+        let open_canvas = cx.debug_bounds("scene-canvas").unwrap().size;
+        assert_eq!(open_canvas.width, closed_canvas.width);
+        assert!(closed_canvas.height - open_canvas.height > px(100.0));
+        let (bee, files) = cx.update(|_, cx| {
+            let wb = workbench.read(cx);
+            (wb.bee.clone(), wb.panels[PanelKind::Files as usize].clone())
+        });
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        files.update(cx, |panel, cx| panel.files.navigate(path.clone(), cx));
+        redraw(cx, &workbench);
+
+        click(cx, &workbench, "drawer-files");
+        assert_drawer(cx, &workbench, None);
+        assert_eq!(cx.debug_bounds("scene-canvas").unwrap().size, closed_canvas);
+        assert!(cx.update(|window, cx| workbench.read(cx).drawer_focus[0].is_focused(window)));
+        click(cx, &workbench, "show-files");
+        assert_drawer(cx, &workbench, Some(PanelKind::Files));
+        assert_eq!(
+            cx.update(|_, cx| files.read(cx).files.path().map(|path| path.to_owned())),
+            Some(path.clone())
+        );
+
+        click(cx, &workbench, "drawer-console");
+        assert_drawer(cx, &workbench, Some(PanelKind::Console));
+        assert!(cx.debug_bounds("console-filter-0").is_some());
+        bee.update(cx, |bee, cx| {
+            bee.console
+                .sender
+                .send(bee_vulkan::DiagnosticLevel::Info, "test", "drawer history");
+            assert!(bee.console.drain());
+            cx.notify();
+        });
+        redraw(cx, &workbench);
+        click(cx, &workbench, "console-filter-0");
+        assert!(!cx.update(|_, cx| bee
+            .read(cx)
+            .console
+            .visible()
+            .any(|message| message.source == "test")));
+        click(cx, &workbench, "collapse-drawer");
+        assert_drawer(cx, &workbench, None);
+        assert_eq!(cx.debug_bounds("scene-canvas").unwrap().size, closed_canvas);
+
+        click(cx, &workbench, "drawer-flow");
+        assert_drawer(cx, &workbench, Some(PanelKind::Flow));
         let flow_bounds = cx.debug_bounds("panel-content-flow").unwrap();
         cx.simulate_event(ScrollWheelEvent {
             position: flow_bounds.center(),
@@ -1088,8 +1395,15 @@ mod tests {
             "flow: {flow_bounds:?}, add: {add_button:?}"
         );
         click(cx, &workbench, "flow-add-raster");
+        cx.update(|window, cx| {
+            bee.update(cx, |bee, cx| {
+                bee.viewport.apply_flow(&mut bee.state, window, cx);
+                assert_eq!(bee.viewport.flow.active().nodes().count(), 5);
+            });
+        });
+        redraw(cx, &workbench);
+        click(cx, &workbench, "flow-add-raster");
 
-        let bee = cx.update(|_, cx| workbench.read(cx).panels[0].read(cx).bee.clone());
         cx.update(|_, cx| {
             bee.update(cx, |bee, cx| {
                 let mut scene = bee.state.scene().clone();
@@ -1101,16 +1415,17 @@ mod tests {
                 cx.notify();
             });
         });
-        let (versions, camera, scene, draft) = cx.update(|_, cx| {
+        let (versions, camera, scene, active, draft) = cx.update(|_, cx| {
             let bee = bee.read(cx);
             (
                 bee.state.versions(),
                 bee.state.camera(),
                 bee.state.snapshot().scene,
+                bee.viewport.flow.active().clone(),
                 bee.viewport.flow.draft().clone(),
             )
         });
-        assert_eq!(draft.nodes().count(), 5);
+        assert_eq!(draft.nodes().count(), 6);
 
         let before = cx.debug_bounds("panel-content-scene").unwrap();
         let start = point(before.right(), before.center().y);
@@ -1130,23 +1445,39 @@ mod tests {
         let after = cx.debug_bounds("panel-content-scene").unwrap();
         assert!(after.size.width > before.size.width + px(10.0));
 
-        click(cx, &workbench, "show-flow");
-        cx.simulate_keystrokes("ctrl-w");
-        redraw(cx, &workbench);
-        assert!(cx.update(|_, cx| workbench.read(cx).panels[5].read(cx).tab.is_none()));
-        click(cx, &workbench, "show-flow");
-        assert!(cx.debug_bounds("panel-content-flow").is_some());
         click(cx, &workbench, "reset-workbench");
-        click(cx, &workbench, "show-flow");
-
+        assert_drawer(cx, &workbench, None);
+        assert_eq!(cx.debug_bounds("scene-canvas").unwrap().size, closed_canvas);
         cx.update(|_, cx| {
+            assert_eq!(workbench.read(cx).panels[PanelKind::Files as usize], files);
+            assert_eq!(files.read(cx).files.path(), Some(path.as_path()));
             let bee = bee.read(cx);
             assert_eq!(bee.state.versions(), versions);
             assert_eq!(bee.state.camera(), camera);
             assert!(Arc::ptr_eq(&bee.state.snapshot().scene, &scene));
+            assert_eq!(bee.viewport.flow.active(), &active);
             assert_eq!(bee.viewport.flow.draft(), &draft);
+            assert!(!bee
+                .console
+                .visible()
+                .any(|message| message.source == "test"));
         });
+        click(cx, &workbench, "show-console");
+        assert_drawer(cx, &workbench, Some(PanelKind::Console));
+        click(cx, &workbench, "console-filter-0");
+        assert!(cx.update(|_, cx| bee
+            .read(cx)
+            .console
+            .visible()
+            .any(|message| message.message == "drawer history")));
 
+        click(cx, &workbench, "show-viewport");
+        cx.dispatch_action(ToggleZoom);
+        redraw(cx, &workbench);
+        assert!(cx.update(|_, cx| workbench.read(cx).panels[1].read(cx).tab_zoomed));
+        click(cx, &workbench, "show-flow");
+        assert_drawer(cx, &workbench, Some(PanelKind::Flow));
+        assert!(!cx.update(|_, cx| workbench.read(cx).panels[1].read(cx).tab_zoomed));
         let start = cx.debug_bounds("tab-flow").expect("flow tab").center();
         let scene_center = cx
             .debug_bounds("panel-content-scene")
@@ -1163,17 +1494,51 @@ mod tests {
         redraw(cx, &workbench);
         cx.simulate_mouse_up(scene_center, MouseButton::Left, Modifiers::none());
         redraw(cx, &workbench);
-        cx.update(|_, cx| {
+        click(cx, &workbench, "collapse-drawer");
+        click(cx, &workbench, "show-scene");
+        click(cx, &workbench, "drawer-flow");
+        cx.update(|window, cx| {
             let workbench = workbench.read(cx);
-            let scene_tab = workbench.panels[0].read(cx).tab.as_ref().unwrap().upgrade();
-            let flow_tab = workbench.panels[5].read(cx).tab.as_ref().unwrap().upgrade();
-            assert_eq!(scene_tab, flow_tab);
-            let bee = bee.read(cx);
-            assert_eq!(bee.state.versions(), versions);
-            assert_eq!(bee.state.camera(), camera);
-            assert!(Arc::ptr_eq(&bee.state.snapshot().scene, &scene));
-            assert_eq!(bee.viewport.flow.draft(), &draft);
+            let flow = workbench.panels[PanelKind::Flow as usize].read(cx);
+            assert!(!workbench.drawer.open);
+            assert_eq!(
+                flow.tab(),
+                workbench.panels[PanelKind::Scene as usize].read(cx).tab()
+            );
+            assert!(flow.focus.is_focused(window));
+            let mut center = Vec::new();
+            names(&workbench.dock.read(cx).dump(cx).center, &mut center);
+            assert_eq!(
+                center.iter().filter(|name| *name == "Render Flow").count(),
+                1
+            );
+            assert!(!contains_panel(
+                &workbench.drawer.stack.read(cx).dump(cx),
+                PanelKind::Flow
+            ));
         });
+
+        cx.simulate_keystrokes("ctrl-w");
+        redraw(cx, &workbench);
+        let flow = cx.update(|_, cx| {
+            let flow = workbench.read(cx).panels[PanelKind::Flow as usize].clone();
+            assert!(flow.read(cx).tab().is_none());
+            flow
+        });
+        click(cx, &workbench, "drawer-flow");
+        assert_drawer(cx, &workbench, Some(PanelKind::Flow));
+        cx.update(|_, cx| {
+            assert_eq!(workbench.read(cx).panels[PanelKind::Flow as usize], flow);
+            assert_eq!(bee.read(cx).viewport.flow.draft(), &draft);
+        });
+        for entry in ["drawer-files", "drawer-console", "show-flow"] {
+            click(cx, &workbench, entry);
+            cx.simulate_keystrokes("ctrl-w");
+            redraw(cx, &workbench);
+        }
+        assert_drawer(cx, &workbench, None);
+        click(cx, &workbench, "show-flow");
+        assert_drawer(cx, &workbench, Some(PanelKind::Flow));
     }
 
     #[test]
@@ -1232,6 +1597,38 @@ mod tests {
                         && viewport.size.width > properties.size.width,
                     "viewport: {viewport:?}, scene: {scene:?}, properties: {properties:?}"
                 );
+                let side_scale = dimensions.width / px(1200.0);
+                assert!(
+                    (scene.size.width - px(200.0) * side_scale).as_f64().abs() <= 4.0,
+                    "{scene:?}"
+                );
+                assert!(
+                    (properties.size.width - px(220.0) * side_scale)
+                        .as_f64()
+                        .abs()
+                        <= 4.0,
+                    "{properties:?}"
+                );
+                let row = cx.debug_bounds("scene-camera").unwrap();
+                let title = cx.debug_bounds("tab-scene").unwrap();
+                assert!(
+                    row.size.height <= px(24.0)
+                        && row.bottom() <= scene.bottom()
+                        && row.right() <= scene.right()
+                );
+                assert!(title.size.height <= px(16.0) && title.bottom() <= scene.top());
+            }
+            let mut previous_right = px(0.0);
+            for selector in ["drawer-files", "drawer-console", "drawer-flow"] {
+                let entry = cx.debug_bounds(selector).expect(selector);
+                assert!(
+                    entry.left() >= previous_right
+                        && entry.top() >= viewport.bottom()
+                        && entry.right() <= dimensions.width
+                        && entry.bottom() <= dimensions.height,
+                    "{selector}: {entry:?} in {dimensions:?}"
+                );
+                previous_right = entry.right();
             }
             for selector in ["raster-mode", "path-mode"] {
                 let bounds = cx.debug_bounds(selector).expect(selector);

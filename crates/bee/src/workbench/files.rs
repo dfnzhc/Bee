@@ -68,7 +68,12 @@ impl Files {
         }
     }
 
-    fn navigate(&mut self, path: PathBuf, cx: &mut Context<WorkbenchPanel>) {
+    #[cfg(test)]
+    pub(super) fn path(&self) -> Option<&Path> {
+        self.path.as_deref()
+    }
+
+    pub(super) fn navigate(&mut self, path: PathBuf, cx: &mut Context<WorkbenchPanel>) {
         self.generation = self.generation.wrapping_add(1);
         let generation = self.generation;
         self.path = Some(path.clone());
@@ -117,7 +122,7 @@ impl Files {
             .tab_group()
             .flex()
             .flex_col()
-            .gap_2()
+            .gap_1()
             .child(
                 div()
                     .flex()
@@ -204,7 +209,7 @@ impl Files {
                     div()
                         .child(
                             Button::new(("files-entry", index))
-                                .small()
+                                .xsmall()
                                 .debug_selector(move || selector)
                                 .label(format!("[Folder] {name}"))
                                 .on_key_down(cx.listener(
@@ -221,7 +226,10 @@ impl Files {
                         )
                         .into_any_element()
                 } else {
-                    div().child(format!("[File] {name}")).into_any_element()
+                    div()
+                        .text_ellipsis()
+                        .child(format!("[File] {name}"))
+                        .into_any_element()
                 }
             }))
     }

@@ -73,7 +73,7 @@ impl Console {
             .tab_group()
             .flex()
             .flex_col()
-            .gap_2()
+            .gap_1()
             .child(
                 div().flex().flex_wrap().gap_1().children(
                     [
