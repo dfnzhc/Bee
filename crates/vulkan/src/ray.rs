@@ -225,18 +225,20 @@ impl Backend {
             .geometry_type(vk::GeometryTypeKHR::TRIANGLES)
             .geometry(vk::AccelerationStructureGeometryDataKHR { triangles })
             .flags(vk::GeometryFlagsKHR::OPAQUE)];
+        // 空场景不提交三角形几何，避免验证层计算顶点上界时下溢。
+        let primitives = vertex_count / 3;
+        let geometry_count = usize::from(primitives != 0);
         let bottom_info = vk::AccelerationStructureBuildGeometryInfoKHR::default()
             .ty(vk::AccelerationStructureTypeKHR::BOTTOM_LEVEL)
             .flags(vk::BuildAccelerationStructureFlagsKHR::PREFER_FAST_TRACE)
             .mode(vk::BuildAccelerationStructureModeKHR::BUILD)
-            .geometries(&bottom_geometry);
-        let primitives = vertex_count / 3;
+            .geometries(&bottom_geometry[..geometry_count]);
         let mut bottom_sizes = vk::AccelerationStructureBuildSizesInfoKHR::default();
         unsafe {
             loader.get_acceleration_structure_build_sizes(
                 vk::AccelerationStructureBuildTypeKHR::DEVICE,
                 &bottom_info,
-                &[primitives],
+                &[primitives][..geometry_count],
                 &mut bottom_sizes,
             )
         };
@@ -377,12 +379,13 @@ impl Backend {
                     .scratch_data(vk::DeviceOrHostAddressKHR {
                         device_address: scratch_address,
                     });
+                let bottom_ranges = [vk::AccelerationStructureBuildRangeInfoKHR::default()
+                    .primitive_count(primitives)];
                 unsafe {
                     loader.cmd_build_acceleration_structures(
                         frame.command_buffer,
                         &[bottom_build],
-                        &[&[vk::AccelerationStructureBuildRangeInfoKHR::default()
-                            .primitive_count(primitives)]],
+                        &[&bottom_ranges[..geometry_count]],
                     );
                     let barrier = vk::MemoryBarrier::default()
                         .src_access_mask(vk::AccessFlags::ACCELERATION_STRUCTURE_WRITE_KHR)
