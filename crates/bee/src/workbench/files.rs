@@ -126,7 +126,7 @@ impl Files {
                     .child(
                         Button::new("files-choose")
                             .small()
-                            .label("Choose folder")
+                            .label("Browse Folder…")
                             .debug_selector(|| "files-choose".into())
                             .on_key_down(cx.listener(|_, event: &KeyDownEvent, _, cx| {
                                 if matches!(event.keystroke.key.as_str(), "enter" | "space") {

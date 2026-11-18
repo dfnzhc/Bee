@@ -861,6 +861,32 @@ mod tests {
     }
 
     #[test]
+    fn file_exit_without_vulkan_closes_the_window() {
+        let mut app = gpui::TestAppContext::single();
+        app.update(|cx| {
+            gpui_component::init(cx);
+            crate::workbench::init_theme(cx);
+        });
+        let (workbench, cx) = app.add_window_view(|window, cx| {
+            let bee = cx.new(|_| Bee::failure("test device".into()));
+            crate::workbench::Workbench::new(bee, window, cx)
+        });
+        let dimensions = size(px(960.0), px(640.0));
+        cx.simulate_resize(dimensions);
+        cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| {
+            workbench.clone()
+        });
+        let file = cx.debug_bounds("file-menu").unwrap().center();
+        cx.simulate_click(file, Modifiers::none());
+        cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| {
+            workbench.clone()
+        });
+        assert!(cx.debug_bounds("exit-bee").is_some());
+        cx.simulate_keystrokes("down enter");
+        cx.cx.update(|cx| assert!(cx.windows().is_empty()));
+    }
+
+    #[test]
     #[ignore = "requires a ray tracing device and Vulkan validation layer"]
     fn workbench_close_releases_resources_before_process_exit() {
         if std::env::var_os("BEE_TEST_CLOSE_CHILD").is_none() {
@@ -887,7 +913,12 @@ mod tests {
             return;
         }
 
-        for mode in [RenderMode::Raster, RenderMode::Path] {
+        for (mode, from_menu) in [
+            (RenderMode::Raster, false),
+            (RenderMode::Path, false),
+            (RenderMode::Raster, true),
+            (RenderMode::Path, true),
+        ] {
             for in_flight in [false, true] {
                 let mut app = gpui::TestAppContext::single();
                 app.update(|cx| {
@@ -920,6 +951,13 @@ mod tests {
                     cx.simulate_click(button, Modifiers::none());
                     cx.run_until_parked();
                 }
+                let file_menu_window = from_menu.then(|| {
+                    let file = cx.debug_bounds("file-menu").unwrap().center();
+                    cx.simulate_click(file, Modifiers::none());
+                    cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| root.clone());
+                    cx.simulate_keystrokes("down");
+                    cx.update(|window, _| window.window_handle())
+                });
                 bee.update_in(cx, |bee, window, cx| {
                     assert_eq!(bee.viewport.mode, mode);
                     assert!(bee.viewport.error.is_none(), "{:?}", bee.viewport.error);
@@ -934,9 +972,21 @@ mod tests {
                     }
                 });
 
-                assert_eq!(cx.simulate_close(), !in_flight);
-                if !in_flight {
-                    cx.update(|window, _| window.remove_window());
+                if let Some(window) = file_menu_window {
+                    // 直接发送确认键，检查窗口状态后再让后台任务运行。
+                    cx.cx
+                        .dispatch_keystroke(window, gpui::Keystroke::parse("enter").unwrap());
+                    cx.cx.update(|cx| {
+                        let viewport = &bee.read(cx).viewport;
+                        assert!(viewport.closing);
+                        assert_eq!(viewport.running, in_flight);
+                        assert_eq!(cx.windows().is_empty(), !in_flight);
+                    });
+                } else {
+                    assert_eq!(cx.simulate_close(), !in_flight);
+                    if !in_flight {
+                        cx.update(|window, _| window.remove_window());
+                    }
                 }
                 cx.run_until_parked();
                 cx.executor().advance_clock(Duration::from_millis(120));

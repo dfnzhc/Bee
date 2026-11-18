@@ -306,11 +306,18 @@ impl Render for WorkbenchPanel {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum AppMenu {
+    File,
+    View,
+}
+
 pub(crate) struct Workbench {
+    bee: Entity<Bee>,
     dock: Entity<DockArea>,
     panels: Vec<Entity<WorkbenchPanel>>,
-    menu_focus: FocusHandle,
-    menu: Option<Entity<PopupMenu>>,
+    menu_focus: [FocusHandle; 2],
+    menu: Option<(AppMenu, Entity<PopupMenu>)>,
     menu_press_was_open: bool,
 }
 
@@ -318,9 +325,7 @@ impl Workbench {
     pub(crate) fn new(bee: Entity<Bee>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let closing_bee = bee.downgrade();
         window.on_window_should_close(cx, move |window, cx| {
-            closing_bee
-                .update(cx, |bee, _| bee.viewport.request_close(window))
-                .unwrap_or(true)
+            Self::request_close(&closing_bee, window, cx)
         });
         let selection = cx.new(|_| scene::Selection::default());
         let observed_selection = selection.clone();
@@ -341,9 +346,10 @@ impl Workbench {
             DockArea::new("bee-workbench", None, window, cx).panel_style(PanelStyle::TabBar)
         });
         let mut this = Self {
+            bee,
             dock,
             panels,
-            menu_focus: cx.focus_handle().tab_index(0).tab_stop(true),
+            menu_focus: std::array::from_fn(|_| cx.focus_handle().tab_index(0).tab_stop(true)),
             menu: None,
             menu_press_was_open: false,
         };
@@ -351,9 +357,13 @@ impl Workbench {
         this
     }
 
+    fn request_close(bee: &WeakEntity<Bee>, window: &mut Window, cx: &mut App) -> bool {
+        bee.update(cx, |bee, _| bee.viewport.request_close(window))
+            .unwrap_or(true)
+    }
+
     fn reset(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let bee = self.panels[1].read(cx).bee.clone();
-        bee.update(cx, |bee, cx| {
+        self.bee.update(cx, |bee, cx| {
             bee.viewport.set_zoom_hidden(false, &bee.state, window, cx);
         });
         self.dock.update(cx, |dock, cx| {
@@ -385,58 +395,144 @@ impl Workbench {
         cx.notify();
     }
 
-    fn toggle_menu(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.menu.take().is_some() {
-            window.focus(&self.menu_focus);
+    fn menu_focus(&self, kind: AppMenu) -> &FocusHandle {
+        &self.menu_focus[kind as usize]
+    }
+
+    fn menu_item(label: &'static str, selector: impl Into<SharedString>) -> PopupMenuItem {
+        let selector = selector.into();
+        PopupMenuItem::element(move |_, _| {
+            let selector = selector.clone();
+            div()
+                .id(selector.clone())
+                .debug_selector(move || selector.to_string())
+                .child(label)
+        })
+    }
+
+    fn toggle_menu(&mut self, kind: AppMenu, window: &mut Window, cx: &mut Context<Self>) {
+        if self.menu.as_ref().is_some_and(|(open, _)| *open == kind) {
+            self.menu = None;
+            window.focus(self.menu_focus(kind));
             cx.notify();
             return;
         }
 
         let workbench = cx.weak_entity();
+        let bee = self.bee.downgrade();
         let menu = PopupMenu::build(window, cx, |mut menu, _, _| {
             menu = menu.min_w(px(180.0));
-            for (index, kind) in PanelKind::ALL.into_iter().enumerate() {
+            if kind == AppMenu::File {
+                return menu.item(Self::menu_item("Exit", "exit-bee").on_click(
+                    move |_, window, cx| {
+                        if Self::request_close(&bee, window, cx) {
+                            window.remove_window();
+                        }
+                    },
+                ));
+            }
+
+            for (index, panel) in PanelKind::ALL.into_iter().enumerate() {
                 let workbench = workbench.clone();
-                let selector = format!("show-{}", kind.id());
                 menu = menu.item(
-                    PopupMenuItem::element(move |_, _| {
-                        let selector = selector.clone();
-                        div()
-                            .id(SharedString::from(selector.clone()))
-                            .debug_selector(move || selector)
-                            .child(kind.title())
-                    })
-                    .on_click(move |_, window, cx| {
-                        workbench
-                            .update(cx, |this, cx| this.show_panel(index, window, cx))
-                            .ok();
-                    }),
+                    Self::menu_item(panel.title(), format!("show-{}", panel.id())).on_click(
+                        move |_, window, cx| {
+                            workbench
+                                .update(cx, |this, cx| this.show_panel(index, window, cx))
+                                .ok();
+                        },
+                    ),
                 );
             }
-            let workbench = workbench.clone();
-            menu.separator().item(
-                PopupMenuItem::element(|_, _| {
-                    div()
-                        .id("reset-workbench")
-                        .debug_selector(|| "reset-workbench".into())
-                        .child("Reset layout")
-                })
-                .on_click(move |_, window, cx| {
-                    workbench.update(cx, |this, cx| this.reset(window, cx)).ok();
-                }),
-            )
+            menu.separator()
+                .item(Self::menu_item("Reset Layout", "reset-workbench").on_click(
+                    move |_, window, cx| {
+                        workbench.update(cx, |this, cx| this.reset(window, cx)).ok();
+                    },
+                ))
         });
-        cx.subscribe_in(&menu, window, |this, menu, _: &DismissEvent, window, cx| {
-            if menu.read(cx).focus_handle(cx).contains_focused(window, cx) {
-                window.focus(&this.menu_focus);
-            }
-            this.menu = None;
-            cx.notify();
-        })
+        cx.subscribe_in(
+            &menu,
+            window,
+            move |this, menu, _: &DismissEvent, window, cx| {
+                if this.menu.as_ref().is_some_and(|(_, open)| open == menu) {
+                    if menu.read(cx).focus_handle(cx).contains_focused(window, cx) {
+                        window.focus(this.menu_focus(kind));
+                    }
+                    this.menu = None;
+                    cx.notify();
+                }
+            },
+        )
         .detach();
         window.focus(&menu.read(cx).focus_handle(cx));
-        self.menu = Some(menu);
+        self.menu = Some((kind, menu));
         cx.notify();
+    }
+
+    fn menu_button(&self, kind: AppMenu, cx: &Context<Self>) -> impl IntoElement {
+        let (id, title) = match kind {
+            AppMenu::File => ("file-menu", "File"),
+            AppMenu::View => ("view-menu", "View"),
+        };
+        let popup = self
+            .menu
+            .as_ref()
+            .filter(|(open, _)| *open == kind)
+            .map(|(_, menu)| menu.clone());
+        let menu_open = popup.is_some();
+        div()
+            .relative()
+            .child(
+                div()
+                    .id(id)
+                    .debug_selector(move || id.into())
+                    .track_focus(self.menu_focus(kind))
+                    .tab_index(0)
+                    .flex()
+                    .items_center()
+                    .gap_1()
+                    .h(px(28.0))
+                    .px_2()
+                    .rounded_sm()
+                    .border_1()
+                    .border_color(rgb(BACKGROUND))
+                    .cursor_pointer()
+                    .hover(|style| style.bg(rgb(PANEL)))
+                    .focus(|style| style.border_color(rgb(ACCENT)))
+                    .when(menu_open, |this| this.bg(rgb(PANEL)))
+                    .child(title)
+                    .child(Icon::new(IconName::ChevronDown).xsmall())
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(move |this, _, _, _| {
+                            this.menu_press_was_open = menu_open;
+                        }),
+                    )
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        // 弹出菜单在鼠标按下时就会关闭，松开时避免重新打开同一菜单。
+                        if std::mem::take(&mut this.menu_press_was_open) {
+                            this.menu = None;
+                            window.focus(this.menu_focus(kind));
+                            cx.notify();
+                        } else {
+                            this.toggle_menu(kind, window, cx);
+                        }
+                    }))
+                    .on_key_down(cx.listener(move |this, event: &KeyDownEvent, window, cx| {
+                        if matches!(event.keystroke.key.as_str(), "enter" | "space" | "down") {
+                            this.toggle_menu(kind, window, cx);
+                        }
+                    })),
+            )
+            .when_some(popup, |this, menu| {
+                this.child(deferred(
+                    anchored()
+                        .anchor(Corner::TopLeft)
+                        .snap_to_window_with_margin(px(8.0))
+                        .child(div().top_1().occlude().child(menu)),
+                ))
+            })
     }
 
     fn show_panel(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
@@ -480,7 +576,6 @@ impl Workbench {
 
 impl Render for Workbench {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let menu_open = self.menu.is_some();
         div()
             .size_full()
             .flex()
@@ -502,65 +597,8 @@ impl Render for Workbench {
                     .border_color(rgb(BORDER))
                     .tab_group()
                     .child(div().font_semibold().text_color(rgb(ACCENT)).child("Bee"))
-                    .child(
-                        div()
-                            .relative()
-                            .child(
-                                div()
-                                    .id("panel-menu")
-                                    .debug_selector(|| "panel-menu".into())
-                                    .track_focus(&self.menu_focus)
-                                    .tab_index(0)
-                                    .tab_stop(true)
-                                    .flex()
-                                    .items_center()
-                                    .gap_1()
-                                    .h(px(28.0))
-                                    .px_2()
-                                    .rounded_sm()
-                                    .border_1()
-                                    .border_color(rgb(BACKGROUND))
-                                    .cursor_pointer()
-                                    .hover(|style| style.bg(rgb(PANEL)))
-                                    .focus(|style| style.border_color(rgb(ACCENT)))
-                                    .when(menu_open, |this| this.bg(rgb(PANEL)))
-                                    .child("Panels")
-                                    .child(Icon::new(IconName::ChevronDown).xsmall())
-                                    .on_mouse_down(
-                                        MouseButton::Left,
-                                        cx.listener(move |this, _, _, _| {
-                                            this.menu_press_was_open = menu_open;
-                                        }),
-                                    )
-                                    .on_click(cx.listener(|this, _, window, cx| {
-                                        if this.menu_press_was_open {
-                                            this.menu = None;
-                                            window.focus(&this.menu_focus);
-                                            cx.notify();
-                                        } else {
-                                            this.toggle_menu(window, cx);
-                                        }
-                                    }))
-                                    .on_key_down(cx.listener(
-                                        |this, event: &KeyDownEvent, window, cx| {
-                                            if matches!(
-                                                event.keystroke.key.as_str(),
-                                                "enter" | "space" | "down"
-                                            ) {
-                                                this.toggle_menu(window, cx);
-                                            }
-                                        },
-                                    )),
-                            )
-                            .when_some(self.menu.clone(), |this, menu| {
-                                this.child(deferred(
-                                    anchored()
-                                        .anchor(Corner::TopLeft)
-                                        .snap_to_window_with_margin(px(8.0))
-                                        .child(div().top_1().occlude().child(menu)),
-                                ))
-                            }),
-                    ),
+                    .child(self.menu_button(AppMenu::File, cx))
+                    .child(self.menu_button(AppMenu::View, cx)),
             )
             .child(
                 div()
@@ -595,7 +633,7 @@ mod tests {
 
     fn click(cx: &mut VisualTestContext, workbench: &Entity<Workbench>, selector: &'static str) {
         if selector.starts_with("show-") || selector == "reset-workbench" {
-            let trigger = cx.debug_bounds("panel-menu").unwrap().center();
+            let trigger = cx.debug_bounds("view-menu").unwrap().center();
             cx.simulate_click(trigger, Modifiers::none());
             redraw(cx, workbench);
         }
@@ -898,7 +936,7 @@ mod tests {
         assert!(cx.debug_bounds("scene-instance-3").is_none());
         assert!(cx.debug_bounds("scene-light-1").is_none());
 
-        cx.update(|window, cx| window.focus(&workbench.read(cx).menu_focus));
+        cx.update(|window, cx| window.focus(workbench.read(cx).menu_focus(AppMenu::View)));
         redraw(cx, &workbench);
         cx.simulate_keystrokes("tab enter");
         redraw(cx, &workbench);
@@ -1139,7 +1177,7 @@ mod tests {
     }
 
     #[test]
-    fn panel_entries_fit_and_work_with_keyboard_at_small_sizes() {
+    fn app_menus_fit_and_work_with_keyboard_at_small_sizes() {
         let mut app = gpui::TestAppContext::single();
         app.update(|cx| {
             gpui_component::init(cx);
@@ -1158,6 +1196,15 @@ mod tests {
         });
         let workbench = workbench.unwrap();
 
+        let view_entries = [
+            "show-scene",
+            "show-viewport",
+            "show-properties",
+            "show-files",
+            "show-console",
+            "show-flow",
+            "reset-workbench",
+        ];
         for dimensions in [
             size(px(1200.0), px(800.0)),
             size(px(960.0), px(640.0)),
@@ -1167,8 +1214,10 @@ mod tests {
             cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| root.clone());
             cx.run_until_parked();
             assert_eq!(cx.update(|window, _| window.scale_factor()), 2.0);
-            let menu = cx.debug_bounds("panel-menu").unwrap();
-            assert!(menu.right() <= dimensions.width && menu.bottom() <= dimensions.height);
+            let file = cx.debug_bounds("file-menu").unwrap();
+            let view = cx.debug_bounds("view-menu").unwrap();
+            assert!(file.right() <= view.left());
+            assert!(view.right() <= dimensions.width && view.bottom() <= dimensions.height);
             let viewport = cx.debug_bounds("panel-content-viewport").unwrap();
             let canvas = cx.debug_bounds("scene-canvas").unwrap();
             assert!(
@@ -1193,57 +1242,76 @@ mod tests {
                     "{selector}: {bounds:?} in {viewport:?}"
                 );
             }
-            cx.simulate_click(menu.center(), Modifiers::none());
+            cx.simulate_click(file.center(), Modifiers::none());
             cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| root.clone());
             cx.run_until_parked();
-            for selector in [
-                "show-scene",
-                "show-viewport",
-                "show-properties",
-                "show-files",
-                "show-console",
-                "show-flow",
-                "reset-workbench",
-            ] {
+            let exit = cx.debug_bounds("exit-bee").expect("File > Exit");
+            assert!(exit.left() >= file.left() && exit.top() >= file.bottom());
+            assert!(cx.update(|_, cx| workbench
+                .read(cx)
+                .menu
+                .as_ref()
+                .is_some_and(|(kind, _)| *kind == AppMenu::File)));
+
+            cx.simulate_click(view.center(), Modifiers::none());
+            cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| root.clone());
+            cx.run_until_parked();
+            assert!(cx.update(|_, cx| workbench
+                .read(cx)
+                .menu
+                .as_ref()
+                .is_some_and(|(kind, _)| *kind == AppMenu::View)));
+            for selector in view_entries {
                 let item = cx.debug_bounds(selector).expect(selector);
                 assert!(
                     item.left() >= px(0.0)
-                        && item.top() >= menu.bottom()
+                        && item.top() >= view.bottom()
                         && item.right() <= dimensions.width
                         && item.bottom() <= dimensions.height,
                     "{selector}: {item:?} in {dimensions:?}"
                 );
             }
-            cx.simulate_click(menu.center(), Modifiers::none());
+            cx.simulate_click(view.center(), Modifiers::none());
             cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| root.clone());
             cx.run_until_parked();
             assert!(cx.update(|_, cx| workbench.read(cx).menu.is_none()));
         }
 
-        cx.update(|window, cx| window.focus(&workbench.read(cx).menu_focus));
+        cx.update(|window, cx| window.focus(workbench.read(cx).menu_focus(AppMenu::File)));
         cx.draw(
             point(px(0.0), px(0.0)),
             size(px(640.0), px(426.0)),
             |_, _| root.clone(),
         );
         cx.simulate_keystrokes("tab");
+        assert!(cx.update(|window, cx| workbench
+            .read(cx)
+            .menu_focus(AppMenu::View)
+            .is_focused(window)));
+        cx.simulate_keystrokes("tab");
         assert!(cx.update(|window, cx| workbench.read(cx).panels[0]
             .read(cx)
             .focus
             .contains_focused(window, cx)));
         cx.simulate_keystrokes("shift-tab");
-        assert!(cx.update(|window, cx| workbench.read(cx).menu_focus.is_focused(window)));
-        cx.simulate_keystrokes("enter");
-        cx.draw(
-            point(px(0.0), px(0.0)),
-            size(px(640.0), px(426.0)),
-            |_, _| root.clone(),
-        );
-        cx.simulate_keystrokes("escape");
-        assert!(cx.update(|window, cx| {
-            let workbench = workbench.read(cx);
-            workbench.menu.is_none() && workbench.menu_focus.is_focused(window)
-        }));
+        for (kind, selector) in [(AppMenu::View, "show-scene"), (AppMenu::File, "exit-bee")] {
+            assert!(cx.update(|window, cx| workbench.read(cx).menu_focus(kind).is_focused(window)));
+            cx.simulate_keystrokes("enter");
+            cx.draw(
+                point(px(0.0), px(0.0)),
+                size(px(640.0), px(426.0)),
+                |_, _| root.clone(),
+            );
+            assert!(cx.debug_bounds(selector).is_some(), "{selector}");
+            cx.simulate_keystrokes("escape");
+            assert!(cx.update(|window, cx| {
+                let workbench = workbench.read(cx);
+                workbench.menu.is_none() && workbench.menu_focus(kind).is_focused(window)
+            }));
+            if kind == AppMenu::View {
+                cx.simulate_keystrokes("shift-tab");
+            }
+        }
 
         for (index, content) in [
             "panel-content-scene",
@@ -1256,7 +1324,7 @@ mod tests {
         .into_iter()
         .enumerate()
         {
-            cx.update(|window, cx| window.focus(&workbench.read(cx).menu_focus));
+            cx.update(|window, cx| window.focus(workbench.read(cx).menu_focus(AppMenu::View)));
             cx.simulate_keystrokes(if index % 2 == 0 { "enter" } else { "space" });
             cx.draw(
                 point(px(0.0), px(0.0)),
@@ -1275,6 +1343,14 @@ mod tests {
             );
             cx.run_until_parked();
             assert!(cx.debug_bounds(content).is_some(), "{content}");
+            assert!(
+                cx.update(|window, cx| {
+                    let workbench = workbench.read(cx);
+                    workbench.menu.is_none()
+                        && workbench.panels[index].read(cx).focus.is_focused(window)
+                }),
+                "{content}"
+            );
         }
 
         let flow_bounds = cx.debug_bounds("panel-content-flow").unwrap();
@@ -1321,7 +1397,7 @@ mod tests {
             assert_eq!(bee.viewport.flow.draft().nodes().count(), 5);
         });
 
-        cx.update(|window, cx| window.focus(&workbench.read(cx).menu_focus));
+        cx.update(|window, cx| window.focus(workbench.read(cx).menu_focus(AppMenu::View)));
         cx.simulate_keystrokes("enter");
         cx.draw(
             point(px(0.0), px(0.0)),
