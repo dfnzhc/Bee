@@ -20,7 +20,10 @@ enum RenderMode {
 }
 
 #[cfg(test)]
-static PAINTED_IMAGES: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+thread_local! {
+    static PAINTED_IMAGES: std::cell::Cell<(usize, Option<Bounds<Pixels>>)> =
+        const { std::cell::Cell::new((0, None)) };
+}
 
 pub struct Viewport {
     backend: Option<Arc<Backend>>,
@@ -289,8 +292,10 @@ impl Viewport {
                                     );
                                     #[cfg(test)]
                                     if result.is_ok() {
+                                        let visible =
+                                            bounds.intersect(&window.content_mask().bounds);
                                         PAINTED_IMAGES
-                                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                            .set((PAINTED_IMAGES.get().0 + 1, Some(visible)));
                                     }
                                     if let Err(error) = result {
                                         let reason = format!("GPUI image upload failed: {error:#}");
@@ -766,7 +771,6 @@ mod tests {
     fn workbench_viewport_renders_after_layout_and_resize() {
         use gpui::VisualTestContext;
         use gpui_component::dock::ToggleZoom;
-        use std::sync::atomic::Ordering;
 
         let mut app = gpui::TestAppContext::single();
         app.update(|cx| {
@@ -787,7 +791,7 @@ mod tests {
         let assert_frame = |cx: &mut VisualTestContext, dimensions| {
             redraw(cx, dimensions);
             cx.run_until_parked();
-            let previous_paints = PAINTED_IMAGES.load(Ordering::Relaxed);
+            let previous_paints = PAINTED_IMAGES.get().0;
             redraw(cx, dimensions);
             let canvas = cx.debug_bounds("scene-canvas").unwrap();
             let scale = cx.update(|window, _| window.scale_factor());
@@ -809,13 +813,28 @@ mod tests {
                     .chunks_exact(4)
                     .any(|pixel| pixel[0] > pixel[2].saturating_add(20)));
             });
-            assert!(PAINTED_IMAGES.load(Ordering::Relaxed) > previous_paints);
+            let (paints, visible_image) = PAINTED_IMAGES.get();
+            assert!(paints > previous_paints);
+            assert_eq!(visible_image, Some(canvas));
             expected
         };
         let click = |cx: &mut VisualTestContext, selector| {
             let target = cx.debug_bounds(selector).expect(selector).center();
             cx.simulate_click(target, Modifiers::none());
         };
+
+        let large = size(px(1200.0), px(800.0));
+        cx.simulate_resize(large);
+        let default_extent = assert_frame(cx, large);
+        let painted = PAINTED_IMAGES.get().1.unwrap().size;
+        let width = f32::from(painted.width);
+        let height = f32::from(painted.height);
+        let coverage = (width * height) / (f32::from(large.width) * f32::from(large.height));
+        println!(
+            "Default viewport image: {width:.1} x {height:.1} logical pixels, {:.2}% of the client area",
+            coverage * 100.0
+        );
+        assert!(coverage >= 0.5);
 
         let small = size(px(960.0), px(640.0));
         cx.simulate_resize(small);
@@ -840,9 +859,8 @@ mod tests {
         cx.dispatch_action(ToggleZoom);
         assert_eq!(assert_frame(cx, small), closed);
 
-        let large = size(px(1200.0), px(800.0));
         cx.simulate_resize(large);
-        assert_ne!(assert_frame(cx, large), closed);
+        assert_eq!(assert_frame(cx, large), default_extent);
     }
 
     #[test]
@@ -1758,8 +1776,6 @@ mod tests {
     #[test]
     #[ignore = "requires a Vulkan graphics device"]
     fn gpui_displays_readback_and_recovers_from_resize_and_failure() {
-        use std::sync::atomic::Ordering;
-
         if std::env::var_os("BEE_TEST_VIEWPORT_CHILD").is_none() {
             let output = std::process::Command::new(std::env::current_exe().unwrap())
                 .args([
@@ -1842,13 +1858,13 @@ mod tests {
             assert_eq!(view.viewport.image.as_ref().unwrap().id, original_id);
             (first, view.state.versions())
         });
-        let previous_paints = PAINTED_IMAGES.load(Ordering::Relaxed);
+        let previous_paints = PAINTED_IMAGES.get().0;
         cx.draw(
             point(px(0.0), px(0.0)),
             size(px(700.0), px(500.0)),
             |_, _| view.clone(),
         );
-        assert_eq!(PAINTED_IMAGES.load(Ordering::Relaxed), previous_paints + 1);
+        assert_eq!(PAINTED_IMAGES.get().0, previous_paints + 1);
         let mut displayed_intermediate = false;
         for _ in 0..100 {
             displayed_intermediate |= cx.update(|_, cx| {
@@ -1871,13 +1887,13 @@ mod tests {
             assert!(viewport.error.is_none(), "{:?}", viewport.error);
         });
         // 替换图集条目前，先验证 GPUI 的 paint_image 路径。
-        let previous_paints = PAINTED_IMAGES.load(Ordering::Relaxed);
+        let previous_paints = PAINTED_IMAGES.get().0;
         cx.draw(
             point(px(0.0), px(0.0)),
             size(px(700.0), px(500.0)),
             |_, _| view.clone(),
         );
-        assert_eq!(PAINTED_IMAGES.load(Ordering::Relaxed), previous_paints + 1);
+        assert_eq!(PAINTED_IMAGES.get().0, previous_paints + 1);
         cx.simulate_resize(size(px(850.0), px(600.0)));
         cx.draw(
             point(px(0.0), px(0.0)),
@@ -1902,14 +1918,14 @@ mod tests {
         });
         cx.run_until_parked();
         cx.simulate_resize(size(px(850.0), px(600.0)));
-        let previous_paints = PAINTED_IMAGES.load(Ordering::Relaxed);
+        let previous_paints = PAINTED_IMAGES.get().0;
         cx.draw(
             point(px(0.0), px(0.0)),
             size(px(850.0), px(600.0)),
             |_, _| view.clone(),
         );
         cx.run_until_parked();
-        assert_eq!(PAINTED_IMAGES.load(Ordering::Relaxed), previous_paints + 1);
+        assert_eq!(PAINTED_IMAGES.get().0, previous_paints + 1);
         cx.update(|_, cx| {
             let viewport = &view.read(cx).viewport;
             assert_eq!(viewport.generation, generation);
