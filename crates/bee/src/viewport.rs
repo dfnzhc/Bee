@@ -44,6 +44,13 @@ pub struct Viewport {
 
 impl Viewport {
     pub fn new(backend: Option<Arc<Backend>>, diagnostics: DiagnosticSender) -> Self {
+        if backend.is_some() {
+            diagnostics.send(
+                DiagnosticLevel::Info,
+                "Viewport",
+                "Image presentation: async Vulkan readback",
+            );
+        }
         Self {
             backend,
             diagnostics,
@@ -65,34 +72,87 @@ impl Viewport {
         }
     }
 
-    fn status(&self, state: &SceneState) -> String {
+    fn notice(&self) -> Option<String> {
         if let Some(error) = &self.error {
-            format!("Viewport error: {error} | See Console")
+            Some(format!("Viewport error: {error} | See Console"))
         } else if let Some(error) = self.flow.error() {
-            if self.image.is_some() {
-                let active = match self.mode {
-                    RenderMode::Raster => "Raster".to_string(),
-                    RenderMode::Path => format!("Path tracing: {} samples", self.samples),
-                };
-                format!("{active} | {error} | async Vulkan readback | See Render Flow")
-            } else {
-                format!("{error} | See Render Flow")
-            }
+            Some(format!("{error} | See Render Flow"))
         } else if self.backend.is_none() {
-            "Viewport unavailable".to_string()
-        } else if self.image.is_some() && self.image_versions != Some(state.versions()) {
-            "Updating viewport | async Vulkan readback".to_string()
-        } else if self.image.is_some() {
-            match self.mode {
-                RenderMode::Raster => "Raster | async Vulkan readback".to_string(),
-                RenderMode::Path => format!(
-                    "Path tracing: {} samples | async Vulkan readback",
-                    self.samples
-                ),
-            }
+            Some("Viewport unavailable | See Console".into())
         } else {
-            "Preparing Vulkan image...".to_string()
+            None
         }
+    }
+
+    fn path_unavailable(&self) -> Option<String> {
+        match &self.backend {
+            None => Some("Vulkan device unavailable".into()),
+            Some(backend) if !backend.report.ray_tracing_missing.is_empty() => {
+                Some(backend.report.ray_tracing_missing.join(", "))
+            }
+            _ => None,
+        }
+    }
+
+    fn mode_button(
+        &self,
+        mode: RenderMode,
+        unavailable: Option<String>,
+        cx: &Context<Bee>,
+    ) -> impl IntoElement {
+        let active = self.mode == mode;
+        let (id, index, width) = match mode {
+            RenderMode::Raster => ("raster-mode", 0, 104.0),
+            RenderMode::Path => ("path-mode", 1, 156.0),
+        };
+        let label = match (mode, active, unavailable.is_some()) {
+            (RenderMode::Raster, true, _) => "Raster (active)",
+            (RenderMode::Raster, false, _) => "Raster",
+            (RenderMode::Path, _, true) => "Path tracing unavailable",
+            (RenderMode::Path, true, false) => "Path tracing (active)",
+            (RenderMode::Path, false, false) => "Path tracing",
+        };
+        div()
+            .id(id)
+            .debug_selector(move || id.into())
+            .tab_index(index)
+            .cursor_pointer()
+            .flex()
+            .items_center()
+            .justify_center()
+            .w(px(width))
+            .h(px(24.0))
+            .flex_shrink_0()
+            .rounded_sm()
+            .border_1()
+            .border_color(rgb(if active { 0x76c6b2 } else { 0x454e4c }))
+            .bg(rgb(if active { 0x344841 } else { 0x292f2e }))
+            .text_color(rgb(if unavailable.is_some() {
+                0xb1bfba
+            } else {
+                0xe9efec
+            }))
+            .hover(|style| style.bg(rgb(0x3b4c47)))
+            .focus(|style| style.border_color(rgb(0xffffff)))
+            .when_some(unavailable, |button, reason| {
+                let text = format!("Path tracing unavailable: {reason}");
+                button.tooltip(move |window, cx| {
+                    Tooltip::new(text.clone())
+                        .max_w(px(400.0))
+                        .build(window, cx)
+                })
+            })
+            .child(label)
+            .on_click(cx.listener(move |view, _, window, cx| {
+                view.viewport.select_mode(mode, &mut view.state, window, cx);
+            }))
+            .on_key_down(
+                cx.listener(move |view, event: &gpui::KeyDownEvent, window, cx| {
+                    if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                        view.viewport.select_mode(mode, &mut view.state, window, cx);
+                    }
+                }),
+            )
     }
 
     pub fn render(&self, state: &SceneState, cx: &mut Context<Bee>) -> impl IntoElement {
@@ -101,13 +161,6 @@ impl Viewport {
         let requested_versions = self.versions;
         let generation = self.generation;
         let image = self.image.clone();
-        let status = self.status(state);
-        let status_tooltip = status.clone();
-        let has_error = self.error.is_some() || self.flow.error().is_some();
-        let path_available = self
-            .backend
-            .as_ref()
-            .is_some_and(|backend| backend.report.ray_tracing_missing.is_empty());
         let resize_view = cx.weak_entity();
         let error_view = resize_view.clone();
         div()
@@ -116,143 +169,36 @@ impl Viewport {
             .flex_1()
             .min_w_0()
             .min_h_0()
-            .gap_1()
             .child(
                 div()
+                    .id("viewport-toolbar")
+                    .debug_selector(|| "viewport-toolbar".into())
                     .flex()
-                    .flex_wrap()
+                    .items_center()
                     .gap_1()
-                    .tab_group()
-                    .child(
-                        div()
-                            .id("raster-mode")
-                            .debug_selector(|| "raster-mode".into())
-                            .tab_index(0)
-                            .cursor_pointer()
-                            .flex()
-                            .items_center()
-                            .h(px(26.0))
-                            .px_2()
-                            .rounded_sm()
-                            .border_1()
-                            .border_color(if self.mode == RenderMode::Raster {
-                                rgb(0x76c6b2)
-                            } else {
-                                rgb(0x454e4c)
-                            })
-                            .bg(if self.mode == RenderMode::Raster {
-                                rgb(0x344841)
-                            } else {
-                                rgb(0x292f2e)
-                            })
-                            .hover(|style| style.bg(rgb(0x3b4c47)))
-                            .focus(|style| style.border_color(rgb(0xffffff)))
-                            .child(if self.mode == RenderMode::Raster {
-                                "Raster (active)"
-                            } else {
-                                "Raster"
-                            })
-                            .on_click(cx.listener(|view, _, window, cx| {
-                                view.viewport.select_mode(
-                                    RenderMode::Raster,
-                                    &mut view.state,
-                                    window,
-                                    cx,
-                                );
-                            }))
-                            .on_key_down(cx.listener(
-                                |view, event: &gpui::KeyDownEvent, window, cx| {
-                                    if matches!(event.keystroke.key.as_str(), "enter" | "space") {
-                                        view.viewport.select_mode(
-                                            RenderMode::Raster,
-                                            &mut view.state,
-                                            window,
-                                            cx,
-                                        );
-                                    }
-                                },
-                            )),
-                    )
-                    .child(
-                        div()
-                            .id("path-mode")
-                            .debug_selector(|| "path-mode".into())
-                            .tab_index(1)
-                            .cursor_pointer()
-                            .flex()
-                            .items_center()
-                            .h(px(26.0))
-                            .px_2()
-                            .rounded_sm()
-                            .border_1()
-                            .border_color(if self.mode == RenderMode::Path {
-                                rgb(0x76c6b2)
-                            } else {
-                                rgb(0x454e4c)
-                            })
-                            .bg(if self.mode == RenderMode::Path {
-                                rgb(0x344841)
-                            } else {
-                                rgb(0x292f2e)
-                            })
-                            .hover(|style| style.bg(rgb(0x3b4c47)))
-                            .focus(|style| style.border_color(rgb(0xffffff)))
-                            .text_color(if path_available {
-                                rgb(0xd1d7d4)
-                            } else {
-                                rgb(0xb1bfba)
-                            })
-                            .child(if self.mode == RenderMode::Path {
-                                "Path tracing (active)"
-                            } else if path_available {
-                                "Path tracing"
-                            } else {
-                                "Path tracing unavailable"
-                            })
-                            .on_click(cx.listener(|view, _, window, cx| {
-                                view.viewport.select_mode(
-                                    RenderMode::Path,
-                                    &mut view.state,
-                                    window,
-                                    cx,
-                                );
-                            }))
-                            .on_key_down(cx.listener(
-                                |view, event: &gpui::KeyDownEvent, window, cx| {
-                                    if matches!(event.keystroke.key.as_str(), "enter" | "space") {
-                                        view.viewport.select_mode(
-                                            RenderMode::Path,
-                                            &mut view.state,
-                                            window,
-                                            cx,
-                                        );
-                                    }
-                                },
-                            )),
-                    ),
-            )
-            .child(
-                div()
-                    .id("viewport-status")
-                    .h(px(22.0))
+                    .px_1p5()
+                    .h(px(30.0))
                     .flex_shrink_0()
-                    .overflow_hidden()
+                    .overflow_x_scroll()
                     .whitespace_nowrap()
-                    .text_ellipsis()
+                    .border_b_1()
+                    .border_color(rgb(0x454e4c))
                     .text_size(px(12.0))
-                    .text_color(if has_error {
-                        rgb(0xffa8a8)
-                    } else {
-                        rgb(0xb1bfba)
-                    })
-                    .when(has_error, |this| {
-                        this.tooltip(move |window, cx| {
-                            Tooltip::new(status_tooltip.clone())
-                                .max_w(px(400.0))
-                                .build(window, cx)
-                        })
-                    })
-                    .child(status),
+                    .tab_group()
+                    .child(self.mode_button(RenderMode::Raster, None, cx))
+                    .child(self.mode_button(RenderMode::Path, self.path_unavailable(), cx))
+                    .when(self.mode == RenderMode::Path, |toolbar| {
+                        toolbar.child(
+                            div()
+                                .id("viewport-samples")
+                                .debug_selector(|| "viewport-samples".into())
+                                .w(px(120.0))
+                                .flex_shrink_0()
+                                .pl_1()
+                                .text_color(rgb(0xb1bfba))
+                                .child(format!("{} samples", self.samples)),
+                        )
+                    }),
             )
             .child(
                 div()
@@ -261,6 +207,8 @@ impl Viewport {
                     .w_full()
                     .flex_1()
                     .min_h_0()
+                    .relative()
+                    .overflow_hidden()
                     .bg(rgb(0x111417))
                     .on_mouse_down(
                         MouseButton::Left,
@@ -368,7 +316,31 @@ impl Viewport {
                             },
                         )
                         .size_full(),
-                    ),
+                    )
+                    .when_some(self.notice(), |canvas, notice| {
+                        let tooltip = notice.clone();
+                        canvas.child(
+                            div().absolute().left_2().right_2().top_2().flex().child(
+                                div()
+                                    .id("viewport-notice")
+                                    .debug_selector(|| "viewport-notice".into())
+                                    .min_w_0()
+                                    .rounded_sm()
+                                    .bg(rgb(0x34272a))
+                                    .px_2()
+                                    .py_1()
+                                    .text_ellipsis()
+                                    .text_size(px(12.0))
+                                    .text_color(rgb(0xffa8a8))
+                                    .tooltip(move |window, cx| {
+                                        Tooltip::new(tooltip.clone())
+                                            .max_w(px(400.0))
+                                            .build(window, cx)
+                                    })
+                                    .child(notice),
+                            ),
+                        )
+                    }),
             )
     }
 
@@ -412,13 +384,7 @@ impl Viewport {
         window: &mut Window,
         cx: &mut Context<Bee>,
     ) {
-        let unavailable = match &self.backend {
-            None => Some("Vulkan device unavailable".to_string()),
-            Some(backend) if !backend.report.ray_tracing_missing.is_empty() => {
-                Some(backend.report.ray_tracing_missing.join(", "))
-            }
-            _ => None,
-        };
+        let unavailable = self.path_unavailable();
         let previous = self.flow.active().clone();
         let graph = match self.flow.apply(unavailable) {
             Ok(graph) => graph,
@@ -649,6 +615,7 @@ impl Viewport {
         self.diagnostics
             .send(DiagnosticLevel::Error, "Viewport", reason.clone());
         self.drop_image(window);
+        self.samples = 0;
         self.error = Some(reason);
     }
 
@@ -747,7 +714,7 @@ mod tests {
             let active = view.viewport.flow.active().clone();
             view.viewport
                 .fail("Vulkan image readback failed: simulated".into(), window);
-            assert!(view.viewport.status(&view.state).contains("See Console"));
+            assert!(view.viewport.notice().unwrap().contains("See Console"));
             view.viewport
                 .flow
                 .select_source(Module::PathTracing)
@@ -797,6 +764,8 @@ mod tests {
     #[test]
     #[ignore = "requires a Vulkan graphics device"]
     fn workbench_viewport_renders_after_layout_and_resize() {
+        use gpui::VisualTestContext;
+        use gpui_component::dock::ToggleZoom;
         use std::sync::atomic::Ordering;
 
         let mut app = gpui::TestAppContext::single();
@@ -812,13 +781,14 @@ mod tests {
             gpui_component::Root::new(workbench, window, cx)
         });
         let bee = bee.unwrap();
-        let mut previous_extent = None;
-        for dimensions in [size(px(960.0), px(640.0)), size(px(1200.0), px(800.0))] {
-            cx.simulate_resize(dimensions);
+        let redraw = |cx: &mut VisualTestContext, dimensions| {
             cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| root.clone());
+        };
+        let assert_frame = |cx: &mut VisualTestContext, dimensions| {
+            redraw(cx, dimensions);
             cx.run_until_parked();
             let previous_paints = PAINTED_IMAGES.load(Ordering::Relaxed);
-            cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| root.clone());
+            redraw(cx, dimensions);
             let canvas = cx.debug_bounds("scene-canvas").unwrap();
             let scale = cx.update(|window, _| window.scale_factor());
             let expected = physical_extent(canvas, scale).expect("drawable canvas");
@@ -827,7 +797,6 @@ mod tests {
                 let viewport = &bee.viewport;
                 assert!(viewport.error.is_none(), "{:?}", viewport.error);
                 assert_eq!(viewport.extent, Some(expected));
-                assert_ne!(viewport.extent, previous_extent);
                 assert_eq!(viewport.image_versions, Some(bee.state.versions()));
                 let image = viewport.image.as_ref().expect("Vulkan readback image");
                 assert_eq!(image.size(0).width.0 as u32, expected.0);
@@ -839,10 +808,41 @@ mod tests {
                 assert!(pixels
                     .chunks_exact(4)
                     .any(|pixel| pixel[0] > pixel[2].saturating_add(20)));
-                previous_extent = viewport.extent;
             });
             assert!(PAINTED_IMAGES.load(Ordering::Relaxed) > previous_paints);
-        }
+            expected
+        };
+        let click = |cx: &mut VisualTestContext, selector| {
+            let target = cx.debug_bounds(selector).expect(selector).center();
+            cx.simulate_click(target, Modifiers::none());
+        };
+
+        let small = size(px(960.0), px(640.0));
+        cx.simulate_resize(small);
+        let closed = assert_frame(cx, small);
+        click(cx, "drawer-console");
+        let open = assert_frame(cx, small);
+        assert_eq!(open.0, closed.0);
+        assert!(open.1 < closed.1);
+        click(cx, "drawer-console");
+        assert_eq!(assert_frame(cx, small), closed);
+
+        click(cx, "tab-scene");
+        cx.dispatch_action(ToggleZoom);
+        redraw(cx, small);
+        cx.run_until_parked();
+        cx.update(|_, cx| {
+            let viewport = &bee.read(cx).viewport;
+            assert!(viewport.extent.is_none());
+            assert!(viewport.image.is_none());
+            assert!(!viewport.running);
+        });
+        cx.dispatch_action(ToggleZoom);
+        assert_eq!(assert_frame(cx, small), closed);
+
+        let large = size(px(1200.0), px(800.0));
+        cx.simulate_resize(large);
+        assert_ne!(assert_frame(cx, large), closed);
     }
 
     #[test]
@@ -1049,6 +1049,11 @@ mod tests {
                 bee.viewport.samples,
             )
         });
+        let toolbar = cx.debug_bounds("viewport-toolbar").unwrap();
+        let path = cx.debug_bounds("path-mode").unwrap();
+        let sample_count = cx.debug_bounds("viewport-samples").unwrap();
+        assert!(sample_count.left() >= path.right() && sample_count.right() <= toolbar.right());
+        assert!(sample_count.top() >= toolbar.top() && sample_count.bottom() <= toolbar.bottom());
 
         bee.update_in(cx, |bee, _, cx| {
             assert!(bee
@@ -1056,14 +1061,14 @@ mod tests {
                 .flow
                 .apply(Some("simulated missing ray tracing".into()))
                 .is_err());
-            let status = bee.viewport.status(&bee.state);
-            assert!(status.contains(&format!("Path tracing: {} samples", bee.viewport.samples)));
-            assert!(status.contains("simulated missing ray tracing"));
-            assert!(status.contains("async Vulkan readback"));
+            let notice = bee.viewport.notice().unwrap();
+            assert!(notice.contains("simulated missing ray tracing"));
             cx.notify();
         });
         cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| root.clone());
         cx.run_until_parked();
+        assert_eq!(cx.debug_bounds("viewport-samples"), Some(sample_count));
+        assert!(cx.debug_bounds("viewport-notice").is_some());
         cx.update(|_, cx| {
             let bee = bee.read(cx);
             assert_eq!(bee.viewport.extent, extent);
@@ -1129,8 +1134,8 @@ mod tests {
         });
 
         // 按文档通过流程面板切换渲染源，再用快捷按钮切回。
-        let flow_tab = cx.debug_bounds("tab-flow").unwrap().center();
-        cx.simulate_click(flow_tab, Modifiers::none());
+        let flow_entry = cx.debug_bounds("drawer-flow").unwrap().center();
+        cx.simulate_click(flow_entry, Modifiers::none());
         cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| root.clone());
         cx.run_until_parked();
         let click_flow = |cx: &mut gpui::VisualTestContext, selector: &'static str| {
@@ -1378,10 +1383,18 @@ mod tests {
         click(cx, "flow-output-0");
         click(cx, "flow-input-3");
         click(cx, "flow-apply");
-        cx.update(|_, cx| {
-            let viewport = &view.read(cx).viewport;
+        view.update_in(cx, |view, _, _| {
+            let viewport = &view.viewport;
             assert_eq!(viewport.mode, RenderMode::Path);
             assert_eq!(viewport.flow.active(), &graph);
+            let error = viewport.flow.error().expect("invalid flow error");
+            assert!(viewport.notice().unwrap().contains(error));
+            view.console.drain();
+            assert!(view.console.visible().any(|message| {
+                message.level == DiagnosticLevel::Error
+                    && message.source == "Render Flow"
+                    && message.message == error
+            }));
         });
         click(cx, "flow-output-2");
         click(cx, "flow-input-3");
@@ -1437,12 +1450,9 @@ mod tests {
         }
         let mut app = gpui::TestAppContext::single();
         let (view, cx) = app.add_window_view(|_, _| Bee::new());
-        cx.simulate_resize(size(px(360.0), px(300.0)));
-        cx.draw(
-            point(px(0.0), px(0.0)),
-            size(px(360.0), px(300.0)),
-            |_, _| view.clone(),
-        );
+        let dimensions = size(px(800.0), px(300.0));
+        cx.simulate_resize(dimensions);
+        cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| view.clone());
         cx.run_until_parked();
         let path_button = cx.debug_bounds("path-mode").unwrap().center();
         cx.simulate_click(path_button, Modifiers::none());
@@ -1612,10 +1622,7 @@ mod tests {
             let bee = bee.read(cx);
             let viewport = &bee.viewport;
             assert_eq!(viewport.mode, RenderMode::Raster);
-            assert_eq!(
-                viewport.status(&bee.state),
-                "Raster | async Vulkan readback"
-            );
+            assert!(viewport.notice().is_none());
             (
                 viewport.flow.active().clone(),
                 viewport.image.as_ref().expect("raster image").id,
@@ -1636,10 +1643,14 @@ mod tests {
             assert_eq!(viewport.image.as_ref().unwrap().id, image_id);
             assert_eq!(viewport.extent, extent);
             assert!(viewport
-                .status(&bee.state)
+                .notice()
+                .unwrap()
                 .contains("Path tracing unavailable: simulated missing ray tracing"));
         });
         assert_eq!(cx.debug_bounds("scene-canvas").unwrap(), canvas);
+        let notice = cx.debug_bounds("viewport-notice").unwrap();
+        assert!(notice.left() >= canvas.left() && notice.right() <= canvas.right());
+        assert!(notice.top() >= canvas.top() && notice.bottom() <= canvas.bottom());
 
         let start = canvas.center();
         let end = point(start.x + px(20.0), start.y + px(10.0));
@@ -1649,14 +1660,30 @@ mod tests {
         cx.simulate_mouse_up(end, MouseButton::Left, Modifiers::none());
         cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| root.clone());
         cx.run_until_parked();
-        cx.update(|_, cx| {
-            let bee = bee.read(cx);
+        bee.update_in(cx, |bee, _, _| {
             let viewport = &bee.viewport;
             assert_eq!(viewport.mode, RenderMode::Raster);
             assert_eq!(viewport.flow.active(), &active);
             assert_eq!(viewport.image_versions, Some(bee.state.versions()));
             assert_ne!(viewport.image.as_ref().unwrap().id, image_id);
             assert!(viewport.error.is_none(), "{:?}", viewport.error);
+            bee.console.drain();
+            assert_eq!(
+                bee.console
+                    .visible()
+                    .filter(|message| {
+                        message.level == DiagnosticLevel::Info
+                            && message.source == "Viewport"
+                            && message.message == "Image presentation: async Vulkan readback"
+                    })
+                    .count(),
+                1
+            );
+            assert!(bee.console.visible().any(|message| {
+                message.level == DiagnosticLevel::Error
+                    && message.source == "Render Flow"
+                    && message.message.contains("simulated missing ray tracing")
+            }));
         });
     }
 
@@ -2000,13 +2027,19 @@ mod tests {
                 .synchronize(Some((u32::MAX, 1)), &view.state, window, cx);
         });
         cx.run_until_parked();
-        cx.update(|_, cx| {
-            let view = view.read(cx);
+        view.update_in(cx, |view, _, _| {
             let viewport = &view.viewport;
             assert!(viewport.image.is_none());
-            assert!(viewport.error.as_ref().unwrap().contains("readback failed"));
-            assert!(viewport.status(&view.state).contains("readback failed"));
-            assert!(viewport.status(&view.state).contains("See Console"));
+            let error = viewport.error.as_ref().unwrap();
+            assert!(error.contains("readback failed"));
+            let notice = viewport.notice().unwrap();
+            assert!(notice.contains(error) && notice.contains("See Console"));
+            view.console.drain();
+            assert!(view.console.visible().any(|message| {
+                message.level == DiagnosticLevel::Error
+                    && message.source == "Viewport"
+                    && message.message == *error
+            }));
         });
         view.update_in(cx, |view, window, cx| {
             view.viewport

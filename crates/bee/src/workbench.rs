@@ -317,9 +317,7 @@ impl Render for WorkbenchPanel {
             .border_1()
             .border_color(rgb(BORDER))
             .focus(|style| style.border_color(rgb(ACCENT)))
-            .when(kind == PanelKind::Viewport, |this| {
-                this.p_2().flex().flex_col()
-            })
+            .when(kind == PanelKind::Viewport, |this| this.flex().flex_col())
             .when(kind != PanelKind::Viewport, |this| {
                 this.p_1p5().overflow_y_scroll()
             })
@@ -1584,11 +1582,19 @@ mod tests {
             assert!(file.right() <= view.left());
             assert!(view.right() <= dimensions.width && view.bottom() <= dimensions.height);
             let viewport = cx.debug_bounds("panel-content-viewport").unwrap();
+            let toolbar = cx.debug_bounds("viewport-toolbar").unwrap();
             let canvas = cx.debug_bounds("scene-canvas").unwrap();
             assert!(
                 canvas.size.width > px(0.0) && canvas.size.height > px(0.0),
                 "canvas has no drawable area: {canvas:?} in {viewport:?}"
             );
+            assert_eq!(canvas.left(), viewport.left() + px(1.0));
+            assert_eq!(canvas.right(), viewport.right() - px(1.0));
+            assert_eq!(canvas.bottom(), viewport.bottom() - px(1.0));
+            assert_eq!(canvas.top(), toolbar.bottom());
+            let raster = cx.debug_bounds("raster-mode").unwrap();
+            let path = cx.debug_bounds("path-mode").unwrap();
+            assert!(raster.right() <= path.left() && raster.top() == path.top());
             if dimensions.width >= px(960.0) {
                 let scene = cx.debug_bounds("panel-content-scene").unwrap();
                 let properties = cx.debug_bounds("panel-content-properties").unwrap();
@@ -1635,7 +1641,8 @@ mod tests {
                 assert!(
                     bounds.left() >= viewport.left()
                         && bounds.right() <= viewport.right()
-                        && bounds.bottom() <= viewport.bottom(),
+                        && bounds.top() >= toolbar.top()
+                        && bounds.bottom() <= toolbar.bottom(),
                     "{selector}: {bounds:?} in {viewport:?}"
                 );
             }
