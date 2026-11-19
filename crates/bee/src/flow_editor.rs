@@ -32,6 +32,11 @@ impl FlowEditor {
         self.flow.draft()
     }
 
+    #[cfg(test)]
+    pub(crate) fn draft_mut(&mut self) -> &mut ModuleGraph {
+        self.edit()
+    }
+
     pub fn active(&self) -> &ModuleGraph {
         self.flow.active().expect("the initial flow is valid")
     }

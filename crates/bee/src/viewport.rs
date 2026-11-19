@@ -21,7 +21,7 @@ enum RenderMode {
 
 #[cfg(test)]
 thread_local! {
-    static PAINTED_IMAGES: std::cell::Cell<(usize, Option<Bounds<Pixels>>)> =
+    static PAINTED_IMAGES: std::cell::Cell<(usize, Option<(Bounds<Pixels>, gpui::ImageId)>)> =
         const { std::cell::Cell::new((0, None)) };
 }
 
@@ -43,6 +43,8 @@ pub struct Viewport {
     path_renderer: Option<bee_renderer::PathRenderer>,
     samples: u32,
     pub(crate) flow: FlowEditor,
+    #[cfg(test)]
+    render_delay: Option<Duration>,
 }
 
 impl Viewport {
@@ -72,6 +74,8 @@ impl Viewport {
             path_renderer: None,
             samples: 0,
             flow: FlowEditor::default(),
+            #[cfg(test)]
+            render_delay: None,
         }
     }
 
@@ -219,22 +223,29 @@ impl Viewport {
                             view.viewport.drag_position = Some(event.position);
                         }),
                     )
-                    .on_mouse_move(cx.listener(|view, event: &gpui::MouseMoveEvent, _, cx| {
-                        let Some(previous) = view.viewport.drag_position else {
-                            return;
-                        };
-                        if event.pressed_button != Some(MouseButton::Left) {
-                            view.viewport.drag_position = None;
-                            return;
-                        }
-                        view.viewport.drag_position = Some(event.position);
-                        let horizontal = f32::from(event.position.x - previous.x);
-                        let vertical = f32::from(event.position.y - previous.y);
-                        let mut camera = view.state.camera();
-                        if camera.orbit(horizontal, vertical) && view.state.set_camera(camera) {
-                            cx.notify();
-                        }
-                    }))
+                    .on_mouse_move(
+                        cx.listener(|view, event: &gpui::MouseMoveEvent, window, cx| {
+                            let Some(previous) = view.viewport.drag_position else {
+                                return;
+                            };
+                            if event.pressed_button != Some(MouseButton::Left) {
+                                view.viewport.drag_position = None;
+                                return;
+                            }
+                            view.viewport.drag_position = Some(event.position);
+                            let horizontal = f32::from(event.position.x - previous.x);
+                            let vertical = f32::from(event.position.y - previous.y);
+                            let mut camera = view.state.camera();
+                            if camera.orbit(horizontal, vertical) && view.state.set_camera(camera) {
+                                view.viewport.synchronize(
+                                    view.viewport.extent,
+                                    &view.state,
+                                    window,
+                                    cx,
+                                );
+                            }
+                        }),
+                    )
                     .on_mouse_up(
                         MouseButton::Left,
                         cx.listener(|view, _: &gpui::MouseUpEvent, _, _| {
@@ -247,17 +258,24 @@ impl Viewport {
                             view.viewport.drag_position = None;
                         }),
                     )
-                    .on_scroll_wheel(cx.listener(|view, event: &gpui::ScrollWheelEvent, _, cx| {
-                        let scroll = f32::from(event.delta.pixel_delta(px(20.0)).y);
-                        let mut camera = view.state.camera();
-                        if camera.zoom(scroll) && view.state.set_camera(camera) {
-                            cx.notify();
-                        }
-                    }))
+                    .on_scroll_wheel(cx.listener(
+                        |view, event: &gpui::ScrollWheelEvent, window, cx| {
+                            let scroll = f32::from(event.delta.pixel_delta(px(20.0)).y);
+                            let mut camera = view.state.camera();
+                            if camera.zoom(scroll) && view.state.set_camera(camera) {
+                                view.viewport.synchronize(
+                                    view.viewport.extent,
+                                    &view.state,
+                                    window,
+                                    cx,
+                                );
+                            }
+                        },
+                    ))
                     .child(
                         canvas(
                             move |bounds, window, cx| {
-                                // 延后同步尺寸和状态，让已完成的画面保持可见。
+                                // 布局提供物理尺寸，也补齐尚未同步的场景状态。
                                 let next = physical_extent(bounds, window.scale_factor());
                                 if next != extent || requested_versions != Some(versions) {
                                     window.defer(cx, move |window, cx| {
@@ -295,7 +313,7 @@ impl Viewport {
                                         let visible =
                                             bounds.intersect(&window.content_mask().bounds);
                                         PAINTED_IMAGES
-                                            .set((PAINTED_IMAGES.get().0 + 1, Some(visible)));
+                                            .set((PAINTED_IMAGES.get().0 + 1, Some((visible, id))));
                                     }
                                     if let Err(error) = result {
                                         let reason = format!("GPUI image upload failed: {error:#}");
@@ -417,7 +435,6 @@ impl Viewport {
         self.versions = Some(state.versions());
         self.generation = self.generation.wrapping_add(1);
         if mode_changed {
-            self.samples = 0;
             self.drop_image(window);
         }
         self.error = None;
@@ -489,11 +506,10 @@ impl Viewport {
         // 尺寸变化时释放旧图像；状态变化期间保留上一帧。
         if self.extent != extent {
             self.drop_image(window);
+            self.extent = extent;
+            self.generation = self.generation.wrapping_add(1);
         }
-        self.extent = extent;
         self.versions = Some(versions);
-        self.generation = self.generation.wrapping_add(1);
-        self.samples = 0;
         self.error = None;
         self.start(state, window, cx);
         cx.notify();
@@ -507,7 +523,7 @@ impl Viewport {
             return;
         };
 
-        // 同时只执行一次读回，后续尺寸变化将在完成后处理。
+        // 同时只执行一次读回，完成后再从当前状态获取最新快照。
         if self.running {
             return;
         }
@@ -515,12 +531,22 @@ impl Viewport {
         let backend = backend.clone();
         let generation = self.generation;
         let snapshot = state.snapshot();
+        let versions = snapshot.versions;
+        self.versions = Some(versions);
         let mode = self.mode;
         let modules = self.flow.active().clone();
         let mut path_renderer = self.path_renderer.take();
+        #[cfg(test)]
+        let delay = self
+            .render_delay
+            .map(|delay| cx.background_executor().timer(delay));
 
         // 后台任务持有快照，直到 Vulkan 提交和读回完成。
         let task = cx.background_spawn(async move {
+            #[cfg(test)]
+            if let Some(delay) = delay {
+                delay.await;
+            }
             let pixels = match mode {
                 RenderMode::Raster => {
                     bee_renderer::render_raster_graph(&backend, &snapshot, width, height, &modules)
@@ -554,61 +580,72 @@ impl Viewport {
                         bgra,
                     })
                 });
-            (snapshot, result, path_renderer)
+            (result, path_renderer)
         });
         cx.spawn_in(window, async move |view, cx| {
-            let (snapshot, result, path_renderer) = task.await;
+            let (result, path_renderer) = task.await;
             view.update_in(cx, |view, window, cx| {
-                view.viewport.running = false;
-                if view.viewport.closing {
+                let viewport = &mut view.viewport;
+                viewport.running = false;
+                if viewport.closing {
                     drop(path_renderer);
+                    drop(result);
                     window.remove_window();
                     return;
                 }
-                view.viewport.path_renderer = path_renderer;
-                // 过期结果只归还渲染器，不得替换当前画面。
-                if view.viewport.generation == generation
-                    && snapshot.versions == view.state.versions()
-                    && view.viewport.mode == mode
-                {
-                    match result {
-                        Ok(image) => {
-                            view.viewport.drop_image(window);
-                            view.viewport.samples = if mode == RenderMode::Path {
-                                view.viewport
-                                    .path_renderer
-                                    .as_ref()
-                                    .map_or(0, |renderer| renderer.sample_count())
-                            } else {
-                                0
-                            };
-                            view.viewport.image_versions = Some(snapshot.versions);
-                            view.viewport.image = Some(image);
-                            if mode == RenderMode::Path {
-                                let timer =
-                                    cx.background_executor().timer(Duration::from_millis(16));
-                                cx.spawn_in(window, async move |view, cx| {
-                                    timer.await;
-                                    view.update_in(cx, |view, window, cx| {
-                                        if view.viewport.mode == RenderMode::Path
-                                            && view.viewport.generation == generation
-                                        {
-                                            view.viewport.start(&view.state, window, cx);
-                                        }
-                                    })
-                                    .ok();
-                                })
-                                .detach();
-                            }
+                viewport.path_renderer = path_renderer;
+
+                // 相机可以落后于最新输入，但不能回退已显示的进度。
+                let current = view.state.versions();
+                let same_viewport = viewport.generation == generation && viewport.mode == mode;
+                let latest = same_viewport && versions == current;
+                let compatible = same_viewport
+                    && versions.scene == current.scene
+                    && versions.render == current.render
+                    && versions.display == current.display;
+                let advances_camera = viewport
+                    .image_versions
+                    .is_none_or(|shown| versions.camera >= shown.camera);
+                match result {
+                    Ok(image) if compatible && advances_camera => {
+                        viewport.drop_image(window);
+                        if mode == RenderMode::Path {
+                            viewport.samples = viewport
+                                .path_renderer
+                                .as_ref()
+                                .map_or(0, |renderer| renderer.sample_count());
                         }
-                        Err(reason) => view.viewport.fail(reason, window),
+                        viewport.image_versions = Some(versions);
+                        viewport.image = Some(image);
+                        viewport.error = None;
+                        cx.notify();
+
+                        if latest && mode == RenderMode::Path {
+                            let timer = cx.background_executor().timer(Duration::from_millis(16));
+                            cx.spawn_in(window, async move |view, cx| {
+                                timer.await;
+                                view.update_in(cx, |view, window, cx| {
+                                    if view.viewport.mode == RenderMode::Path
+                                        && view.viewport.generation == generation
+                                        && view.state.versions() == versions
+                                    {
+                                        view.viewport.start(&view.state, window, cx);
+                                    }
+                                })
+                                .ok();
+                            })
+                            .detach();
+                        }
                     }
-                } else {
-                    let extent = view.viewport.extent;
-                    view.viewport.synchronize(extent, &view.state, window, cx);
-                    view.viewport.start(&view.state, window, cx);
+                    Err(reason) if latest => {
+                        viewport.fail(reason, window);
+                        cx.notify();
+                    }
+                    _ => {}
                 }
-                cx.notify();
+                if !latest {
+                    viewport.start(&view.state, window, cx);
+                }
             })
             .ok();
         })
@@ -620,12 +657,12 @@ impl Viewport {
         self.diagnostics
             .send(DiagnosticLevel::Error, "Viewport", reason.clone());
         self.drop_image(window);
-        self.samples = 0;
         self.error = Some(reason);
     }
 
     fn drop_image(&mut self, window: &mut Window) {
         self.image_versions = None;
+        self.samples = 0;
         if let Some(image) = self.image.take() {
             if let Err(error) = window.drop_image(image) {
                 eprintln!("Could not release GPUI image: {error:#}");
@@ -683,6 +720,13 @@ fn render_image(image: TestImage) -> Result<Arc<RenderImage>, String> {
 mod tests {
     use super::*;
     use gpui::{point, px, size, Modifiers, ScrollDelta, ScrollWheelEvent};
+
+    const FRAME_DELAY: Duration = Duration::from_millis(5);
+
+    fn finish_frame(cx: &mut gpui::VisualTestContext) {
+        cx.executor().advance_clock(FRAME_DELAY);
+        cx.run_until_parked();
+    }
 
     #[test]
     fn readback_removes_padding_without_changing_bgra() {
@@ -813,9 +857,9 @@ mod tests {
                     .chunks_exact(4)
                     .any(|pixel| pixel[0] > pixel[2].saturating_add(20)));
             });
-            let (paints, visible_image) = PAINTED_IMAGES.get();
+            let (paints, painted_image) = PAINTED_IMAGES.get();
             assert!(paints > previous_paints);
-            assert_eq!(visible_image, Some(canvas));
+            assert_eq!(painted_image.unwrap().0, canvas);
             expected
         };
         let click = |cx: &mut VisualTestContext, selector| {
@@ -826,7 +870,7 @@ mod tests {
         let large = size(px(1200.0), px(800.0));
         cx.simulate_resize(large);
         let default_extent = assert_frame(cx, large);
-        let painted = PAINTED_IMAGES.get().1.unwrap().size;
+        let painted = PAINTED_IMAGES.get().1.unwrap().0.size;
         let width = f32::from(painted.width);
         let height = f32::from(painted.height);
         let coverage = (width * height) / (f32::from(large.width) * f32::from(large.height));
@@ -861,6 +905,99 @@ mod tests {
 
         cx.simulate_resize(large);
         assert_eq!(assert_frame(cx, large), default_extent);
+    }
+
+    #[test]
+    #[ignore = "requires a ray tracing device and Vulkan validation layer"]
+    fn docked_viewport_paints_camera_progress_during_drag() {
+        for mode in [RenderMode::Raster, RenderMode::Path] {
+            let mut app = gpui::TestAppContext::single();
+            app.update(|cx| {
+                gpui_component::init(cx);
+                crate::workbench::init_theme(cx);
+            });
+            let mut bee = None;
+            let (root, cx) = app.add_window_view(|window, cx| {
+                let view = cx.new(|_| Bee::new());
+                bee = Some(view.clone());
+                let workbench = cx.new(|cx| crate::workbench::Workbench::new(view, window, cx));
+                gpui_component::Root::new(workbench, window, cx)
+            });
+            let bee = bee.unwrap();
+            let dimensions = size(px(960.0), px(640.0));
+            let redraw = |cx: &mut gpui::VisualTestContext| {
+                cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| root.clone());
+            };
+            cx.simulate_resize(dimensions);
+            redraw(cx);
+            cx.run_until_parked();
+            if mode == RenderMode::Path {
+                let button = cx.debug_bounds("path-mode").unwrap().center();
+                cx.simulate_click(button, Modifiers::none());
+            }
+            bee.update_in(cx, |bee, _, _| {
+                let viewport = &mut bee.viewport;
+                assert_eq!(viewport.mode, mode);
+                assert_eq!(
+                    viewport.backend.as_ref().unwrap().report.validation,
+                    bee_vulkan::ValidationStatus::Enabled
+                );
+                assert!(viewport.image.is_some());
+                viewport.render_delay = Some(FRAME_DELAY);
+            });
+
+            let start = cx.debug_bounds("scene-canvas").unwrap().center();
+            cx.simulate_mouse_move(start, None, Modifiers::none());
+            cx.simulate_mouse_down(start, MouseButton::Left, Modifiers::none());
+            let drag = |cx: &mut gpui::VisualTestContext, offset| {
+                let position = point(start.x + px(offset), start.y + px(offset / 2.0));
+                cx.simulate_mouse_move(position, MouseButton::Left, Modifiers::none());
+                cx.update(|_, cx| {
+                    let bee = bee.read(cx);
+                    assert!(bee.viewport.running);
+                    (bee.state.versions(), position)
+                })
+            };
+            let paint = |cx: &mut gpui::VisualTestContext, versions, position| {
+                let image = cx.update(|_, cx| {
+                    let viewport = &bee.read(cx).viewport;
+                    assert_eq!(viewport.drag_position, Some(position));
+                    assert_eq!(viewport.image_versions, Some(versions));
+                    assert!(viewport.error.is_none(), "{:?}", viewport.error);
+                    viewport.image.as_ref().unwrap().clone()
+                });
+                let previous_paints = PAINTED_IMAGES.get().0;
+                redraw(cx);
+                let (paints, painted_image) = PAINTED_IMAGES.get();
+                assert!(paints > previous_paints);
+                assert_eq!(
+                    painted_image,
+                    Some((cx.debug_bounds("scene-canvas").unwrap(), image.id))
+                );
+                image
+            };
+
+            // 每张在途帧完成前先到达更新的鼠标位置。
+            let (first, _) = drag(cx, 18.0);
+            let (second, position) = drag(cx, 36.0);
+            finish_frame(cx);
+            let first_image = paint(cx, first, position);
+
+            let (skipped, _) = drag(cx, 54.0);
+            let (latest, position) = drag(cx, 72.0);
+            assert!(first.camera < second.camera && second.camera < skipped.camera);
+            assert!(skipped.camera < latest.camera);
+            finish_frame(cx);
+            let second_image = paint(cx, second, position);
+            assert!(first_image.as_bytes(0) != second_image.as_bytes(0));
+
+            finish_frame(cx);
+            let latest_image = paint(cx, latest, position);
+            assert!(second_image.as_bytes(0) != latest_image.as_bytes(0));
+            cx.update(|_, cx| assert!(!bee.read(cx).viewport.running));
+            cx.simulate_mouse_up(position, MouseButton::Left, Modifiers::none());
+            cx.quit();
+        }
     }
 
     #[test]
@@ -985,6 +1122,7 @@ mod tests {
                         assert!(bee.viewport.path_renderer.is_some());
                     }
                     if in_flight {
+                        bee.viewport.render_delay = Some(FRAME_DELAY);
                         bee.viewport.start(&bee.state, window, cx);
                         assert!(bee.viewport.running);
                     }
@@ -1007,6 +1145,13 @@ mod tests {
                     }
                 }
                 cx.run_until_parked();
+                if in_flight {
+                    cx.cx.update(|cx| {
+                        assert!(bee.read(cx).viewport.running);
+                        assert_eq!(cx.windows().len(), 1);
+                    });
+                    assert!(backend.upgrade().is_some());
+                }
                 cx.executor().advance_clock(Duration::from_millis(120));
                 cx.run_until_parked();
                 cx.cx.update(|cx| {
@@ -1488,27 +1633,64 @@ mod tests {
         let start = cx.debug_bounds("scene-canvas").unwrap().center();
         let first = point(start.x + px(8.0), start.y + px(4.0));
         let second = point(start.x + px(16.0), start.y + px(8.0));
-        let initial_camera = cx.update(|_, cx| view.read(cx).state.camera());
+        let (initial_camera, initial_image) = view.update_in(cx, |view, _, _| {
+            view.viewport.render_delay = Some(FRAME_DELAY);
+            (
+                view.state.camera(),
+                view.viewport.image.as_ref().unwrap().id,
+            )
+        });
         cx.simulate_mouse_move(start, None, Modifiers::none());
         cx.simulate_mouse_down(start, MouseButton::Left, Modifiers::none());
-        for position in [first, second] {
-            cx.simulate_mouse_move(position, MouseButton::Left, Modifiers::none());
-            cx.run_until_parked();
-            cx.update(|_, cx| {
-                let view = view.read(cx);
-                assert!(view.viewport.error.is_none(), "{:?}", view.viewport.error);
-                assert_eq!(view.viewport.image_versions, Some(view.state.versions()));
-                assert_eq!(view.viewport.samples, 1);
-            });
-        }
+        cx.simulate_mouse_move(first, MouseButton::Left, Modifiers::none());
+        let first_version = cx.update(|_, cx| view.read(cx).state.versions());
+        cx.simulate_mouse_move(second, MouseButton::Left, Modifiers::none());
+        cx.update(|_, cx| {
+            let viewport = &view.read(cx).viewport;
+            assert!(viewport.running);
+            assert_eq!(viewport.image.as_ref().unwrap().id, initial_image);
+            assert_eq!(viewport.samples, 2);
+        });
+        finish_frame(cx);
+        cx.update(|_, cx| {
+            let view = view.read(cx);
+            assert_ne!(view.state.versions(), first_version);
+            assert_eq!(view.viewport.image_versions, Some(first_version));
+            assert_eq!(view.viewport.samples, 1);
+            assert!(view.viewport.running);
+        });
+        finish_frame(cx);
+        let latest_image = cx.update(|_, cx| {
+            let view = view.read(cx);
+            assert_ne!(view.state.camera(), initial_camera);
+            assert_eq!(view.viewport.image_versions, Some(view.state.versions()));
+            assert_eq!(view.viewport.samples, 1);
+            assert!(!view.viewport.running);
+            view.viewport.image.as_ref().unwrap().id
+        });
         cx.simulate_mouse_up(second, MouseButton::Left, Modifiers::none());
-        assert_ne!(
-            cx.update(|_, cx| view.read(cx).state.camera()),
-            initial_camera
-        );
+
+        // 旧计时器先到期，此时最新视角已显示且处于空闲。
+        cx.executor().advance_clock(Duration::from_millis(8));
+        cx.run_until_parked();
+        cx.update(|_, cx| {
+            let viewport = &view.read(cx).viewport;
+            assert!(!viewport.running);
+            assert_eq!(viewport.image.as_ref().unwrap().id, latest_image);
+            assert_eq!(viewport.samples, 1);
+        });
+        cx.executor().advance_clock(Duration::from_millis(15));
+        cx.run_until_parked();
+        cx.update(|_, cx| {
+            let view = view.read(cx);
+            assert_eq!(view.viewport.image_versions, Some(view.state.versions()));
+            assert_ne!(view.viewport.image.as_ref().unwrap().id, latest_image);
+            assert_eq!(view.viewport.samples, 2);
+        });
 
         // 旧快照仍在处理时连续更改状态；新历史必须从首个样本开始。
         view.update_in(cx, |view, window, cx| {
+            view.viewport.render_delay = None;
             let original_id = view.viewport.image.as_ref().unwrap().id;
             view.viewport.start(&view.state, window, cx);
             assert!(view.viewport.running);
@@ -1740,7 +1922,7 @@ mod tests {
             |_, _| view.clone(),
         );
         cx.run_until_parked();
-        let (camera_before, image_before) = cx.update(|_, cx| {
+        let (camera_before, image_before, idle_backend_owners) = cx.update(|_, cx| {
             let view = view.read(cx);
             assert!(view.viewport.error.is_none(), "{:?}", view.viewport.error);
             (
@@ -1752,24 +1934,65 @@ mod tests {
                     .as_bytes(0)
                     .unwrap()
                     .to_vec(),
+                Arc::strong_count(view.viewport.backend.as_ref().unwrap()),
             )
         });
+        view.update_in(cx, |view, _, _| {
+            view.viewport.render_delay = Some(FRAME_DELAY);
+        });
         let start = point(px(100.0), px(150.0));
-        let end = point(px(170.0), px(180.0));
         cx.simulate_mouse_move(start, None, Modifiers::none());
         cx.simulate_mouse_down(start, MouseButton::Left, Modifiers::none());
-        cx.simulate_mouse_move(end, MouseButton::Left, Modifiers::none());
-        cx.simulate_mouse_up(end, MouseButton::Left, Modifiers::none());
-        cx.run_until_parked();
+        for (index, position) in [
+            point(px(120.0), px(160.0)),
+            point(px(140.0), px(170.0)),
+            point(px(170.0), px(180.0)),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            cx.simulate_mouse_move(position, MouseButton::Left, Modifiers::none());
+            cx.update(|_, cx| {
+                let view = view.read(cx);
+                assert_eq!(view.state.versions().camera, index as u64 + 1);
+                assert!(view.viewport.running);
+                assert_eq!(
+                    Arc::strong_count(view.viewport.backend.as_ref().unwrap()),
+                    idle_backend_owners + 1
+                );
+            });
+        }
+        finish_frame(cx);
+        cx.update(|_, cx| assert!(view.read(cx).viewport.running));
+        finish_frame(cx);
         cx.update(|_, cx| {
             let view = view.read(cx);
             assert_ne!(view.state.camera(), camera_before);
             assert!(view.viewport.error.is_none(), "{:?}", view.viewport.error);
+            assert!(!view.viewport.running);
             assert_eq!(view.viewport.image_versions, Some(view.state.versions()));
             assert!(
                 view.viewport.image.as_ref().unwrap().as_bytes(0).unwrap() != image_before,
                 "camera movement must change the rendered image"
             );
+        });
+        let end = point(px(170.0), px(180.0));
+        cx.simulate_mouse_up(end, MouseButton::Left, Modifiers::none());
+        cx.simulate_event(ScrollWheelEvent {
+            position: end,
+            delta: ScrollDelta::Lines(point(0.0, 1.0)),
+            ..Default::default()
+        });
+        cx.update(|_, cx| {
+            let view = view.read(cx);
+            assert_eq!(view.state.versions().camera, 4);
+            assert!(view.viewport.running);
+        });
+        finish_frame(cx);
+        cx.update(|_, cx| {
+            let view = view.read(cx);
+            assert_eq!(view.viewport.image_versions, Some(view.state.versions()));
+            assert!(!view.viewport.running);
         });
     }
 
@@ -1840,7 +2063,13 @@ mod tests {
                 .any(|p| p[0] > p[2].saturating_add(20)));
             (Arc::downgrade(image), extent)
         });
-        // 连续移动时保留已显示的画面，不显示过期的中间相机状态。
+        // 新输入等待期间保留上一张图，完成的兼容相机帧要通知界面。
+        let notified = std::rc::Rc::new(std::cell::Cell::new(None));
+        let _observer = view.update_in(cx, |view, _, cx| {
+            view.viewport.render_delay = Some(FRAME_DELAY);
+            let notified = notified.clone();
+            cx.observe_self(move |view, _| notified.set(view.viewport.image_versions))
+        });
         let (first_version, latest_version) = view.update_in(cx, |view, window, cx| {
             let original_id = view.viewport.image.as_ref().unwrap().id;
             let mut camera = view.state.camera();
@@ -1865,21 +2094,14 @@ mod tests {
             |_, _| view.clone(),
         );
         assert_eq!(PAINTED_IMAGES.get().0, previous_paints + 1);
-        let mut displayed_intermediate = false;
-        for _ in 0..100 {
-            displayed_intermediate |= cx.update(|_, cx| {
-                let viewport = &view.read(cx).viewport;
-                viewport.running && viewport.image_versions == Some(first_version)
-            });
-            if !cx.executor().tick() {
-                break;
-            }
-        }
-        assert!(
-            !displayed_intermediate,
-            "an outdated camera frame replaced the displayed image"
-        );
-        cx.run_until_parked();
+        finish_frame(cx);
+        assert_eq!(notified.get(), Some(first_version));
+        cx.update(|_, cx| {
+            let viewport = &view.read(cx).viewport;
+            assert!(viewport.running);
+            assert_eq!(viewport.image_versions, Some(first_version));
+        });
+        finish_frame(cx);
         cx.update(|_, cx| {
             let viewport = &view.read(cx).viewport;
             assert!(!viewport.running);
@@ -1900,7 +2122,7 @@ mod tests {
             size(px(850.0), px(600.0)),
             |_, _| view.clone(),
         );
-        cx.run_until_parked();
+        finish_frame(cx);
         cx.update(|_, cx| {
             let viewport = &view.read(cx).viewport;
             assert_ne!(viewport.extent, Some(original_extent));
@@ -1933,36 +2155,77 @@ mod tests {
             assert!(!viewport.running);
         });
 
-        // 在途任务结束后，只接受最新场景、相机和参数对应的图像。
-        view.update_in(cx, |view, window, cx| {
-            view.viewport
-                .synchronize(Some((23, 11)), &view.state, window, cx);
-            assert!(view.viewport.running);
+        let expect_replacement = |cx: &mut gpui::VisualTestContext, previous| {
+            finish_frame(cx);
+            cx.update(|_, cx| {
+                let viewport = &view.read(cx).viewport;
+                assert!(viewport.running, "replaced request must start immediately");
+                assert_eq!(viewport.image.as_ref().map(|image| image.id), previous);
+                assert!(viewport.error.is_none(), "{:?}", viewport.error);
+            });
+            finish_frame(cx);
+            cx.update(|_, cx| {
+                let view = view.read(cx);
+                let viewport = &view.viewport;
+                assert!(!viewport.running);
+                assert!(viewport.error.is_none(), "{:?}", viewport.error);
+                assert_eq!(viewport.versions, Some(view.state.versions()));
+                assert_eq!(viewport.image_versions, Some(view.state.versions()));
+                let image = viewport.image.as_ref().unwrap();
+                assert_ne!(Some(image.id), previous);
+                assert_eq!(
+                    Some((image.size(0).width.0 as u32, image.size(0).height.0 as u32)),
+                    viewport.extent
+                );
+            });
+        };
 
-            let mut scene = view.state.scene().clone();
-            scene.materials[0].albedo[0] = 0.4;
-            assert!(view.state.set_scene(scene));
-            let mut camera = view.state.camera();
-            assert!(camera.orbit(20.0, 10.0));
-            assert!(view.state.set_camera(camera));
-            assert!(view
-                .state
-                .set_render_parameters(bee_scene::RenderParameters {
+        // 分别更改尚未同步的场景、渲染和显示参数，避免一处检查掩盖另一处。
+        let changes: [fn(&mut SceneState); 3] = [
+            |state| {
+                let mut scene = state.scene().clone();
+                scene.materials[0].albedo[0] = 0.4;
+                assert!(state.set_scene(scene));
+            },
+            |state| {
+                assert!(state.set_render_parameters(bee_scene::RenderParameters {
                     max_path_bounces: 3,
                 }));
-            assert!(view
-                .state
-                .set_display_parameters(bee_scene::DisplayParameters { exposure_ev: 1.0 }));
-            assert_ne!(view.viewport.versions, Some(view.state.versions()));
+            },
+            |state| {
+                assert!(state.set_display_parameters(DisplayParameters { exposure_ev: 1.0 }));
+            },
+        ];
+        for change in changes {
+            let previous = view.update_in(cx, |view, window, cx| {
+                view.viewport.start(&view.state, window, cx);
+                change(&mut view.state);
+                assert_ne!(view.viewport.versions, Some(view.state.versions()));
+                view.viewport.image.as_ref().unwrap().id
+            });
+            expect_replacement(cx, Some(previous));
+        }
+
+        // 同模式应用不同流程也会淘汰在途帧。
+        let previous = view.update_in(cx, |view, window, cx| {
+            view.viewport.start(&view.state, window, cx);
+            let versions = view.state.versions();
+            let viewport = &mut view.viewport;
+            let original_graph = viewport.flow.active().clone();
+            let tone = original_graph
+                .nodes()
+                .find_map(|(id, module)| matches!(module, Module::ToneMapping { .. }).then_some(id))
+                .unwrap();
+            *viewport.flow.draft_mut().module_mut(tone).unwrap() = Module::ToneMapping {
+                exposure_ev: view.state.snapshot().display.exposure_ev,
+            };
+            viewport.apply_flow(&mut view.state, window, cx);
+            assert_ne!(viewport.flow.active(), &original_graph);
+            assert_eq!(viewport.mode, RenderMode::Raster);
+            assert_eq!(view.state.versions(), versions);
+            viewport.image.as_ref().unwrap().id
         });
-        cx.run_until_parked();
-        cx.update(|_, cx| {
-            let view = view.read(cx);
-            assert!(!view.viewport.running);
-            assert!(view.viewport.image.is_some());
-            assert_eq!(view.viewport.versions, Some(view.state.versions()));
-            assert_eq!(view.viewport.image_versions, Some(view.state.versions()));
-        });
+        expect_replacement(cx, Some(previous));
 
         // 只显示最新尺寸的图像；尺寸为空时清除图像。
         view.update_in(cx, |view, window, cx| {
@@ -1973,7 +2236,7 @@ mod tests {
             assert!(view.viewport.running);
             assert!(view.viewport.image.is_none());
         });
-        cx.run_until_parked();
+        expect_replacement(cx, None);
         cx.update(|_, cx| {
             let viewport = &view.read(cx).viewport;
             assert_eq!(viewport.extent, Some((7, 13)));
@@ -1989,7 +2252,7 @@ mod tests {
             assert!(view.viewport.image.is_none());
             assert!(view.viewport.running);
         });
-        cx.run_until_parked();
+        finish_frame(cx);
         cx.update(|_, cx| {
             let viewport = &view.read(cx).viewport;
             assert!(!viewport.running);
@@ -2001,44 +2264,48 @@ mod tests {
             size(px(850.0), px(600.0)),
             |_, _| view.clone(),
         );
-        cx.run_until_parked();
+        finish_frame(cx);
         cx.update(|_, cx| assert!(view.read(cx).viewport.image.is_some()));
 
-        // 隐藏期间更换相机并以相同尺寸恢复时，旧读回也不能覆盖新状态。
-        let stale = view.update_in(cx, |view, window, cx| {
-            view.viewport
-                .synchronize(Some((19, 11)), &view.state, window, cx);
+        // 隐藏后以相同尺寸和相机恢复，旧帧的版本仍相同。
+        view.update_in(cx, |view, window, cx| {
+            let extent = view.viewport.extent;
+            view.viewport.start(&view.state, window, cx);
             assert!(view.viewport.running);
-            let stale = view.state.versions();
             view.viewport.set_active(false, &view.state, window, cx);
-            let mut camera = view.state.camera();
-            assert!(camera.orbit(10.0, 5.0));
-            assert!(view.state.set_camera(camera));
             view.viewport.set_active(true, &view.state, window, cx);
-            view.viewport
-                .synchronize(Some((19, 11)), &view.state, window, cx);
+            view.viewport.synchronize(extent, &view.state, window, cx);
             assert!(view.viewport.image.is_none());
-            stale
         });
-        let mut stale_displayed = false;
-        for _ in 0..100 {
-            stale_displayed |=
-                cx.update(|_, cx| view.read(cx).viewport.image_versions == Some(stale));
-            if !cx.executor().tick() {
-                break;
-            }
-        }
-        cx.run_until_parked();
-        cx.update(|_, cx| {
-            let view = view.read(cx);
-            assert!(!stale_displayed);
-            assert_eq!(view.viewport.image_versions, Some(view.state.versions()));
-            assert_eq!(view.viewport.extent, Some((19, 11)));
-            assert!(view.viewport.image.is_some());
+        expect_replacement(cx, None);
+
+        // 已被取代的失败不能清除上一张图或送出诊断。
+        let previous = view.update_in(cx, |view, window, cx| {
+            let scene = view.state.scene().clone();
+            let mut invalid = scene.clone();
+            invalid.environment[0] = -1.0;
+            assert!(view.state.set_scene(invalid));
+            view.viewport
+                .synchronize(view.viewport.extent, &view.state, window, cx);
+            assert!(view.viewport.running);
+            assert!(view.state.set_scene(scene));
+            view.viewport
+                .synchronize(view.viewport.extent, &view.state, window, cx);
+            view.viewport.image.as_ref().unwrap().id
+        });
+        expect_replacement(cx, Some(previous));
+        view.update_in(cx, |view, _, _| {
+            view.console.drain();
+            assert!(!view
+                .console
+                .visible()
+                .any(|message| message.level == DiagnosticLevel::Error
+                    && message.source == "Viewport"));
         });
 
         // 读回和上传失败时应清除图像，并在尺寸变化后恢复。
         view.update_in(cx, |view, window, cx| {
+            view.viewport.render_delay = None;
             view.viewport
                 .synchronize(Some((u32::MAX, 1)), &view.state, window, cx);
         });
