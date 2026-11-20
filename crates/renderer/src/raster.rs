@@ -3,7 +3,7 @@ use crate::{
     Access, GraphResource, Module, ModuleGraph, NodeId, ResourceId, Usage, WorkGraph, WorkId,
 };
 use bee_scene::RenderSnapshot;
-use bee_vulkan::{Backend, Frame, Rasterizer};
+use bee_vulkan::{Backend, Frame, RasterPass, Rasterizer};
 
 pub struct RasterWork {
     color: ResourceId,
@@ -19,6 +19,17 @@ impl RasterWork {
         color: ResourceId,
         depth: ResourceId,
     ) -> Result<Self, String> {
+        Self::declare_with_inputs(modules, node, graph, color, depth, [])
+    }
+
+    pub(crate) fn declare_with_inputs(
+        modules: &ModuleGraph,
+        node: NodeId,
+        graph: &mut WorkGraph,
+        color: ResourceId,
+        depth: ResourceId,
+        inputs: impl IntoIterator<Item = Access>,
+    ) -> Result<Self, String> {
         if modules.module(node) != Some(Module::Rasterization)
             || color == depth
             || color.0 >= graph.resources.len()
@@ -28,7 +39,7 @@ impl RasterWork {
         }
         let work = graph.add_work(
             "rasterization",
-            vec![
+            [
                 Access {
                     resource: color,
                     usage: Usage::ColorAttachment,
@@ -37,9 +48,36 @@ impl RasterWork {
                     resource: depth,
                     usage: Usage::DepthAttachment,
                 },
-            ],
+            ]
+            .into_iter()
+            .chain(inputs)
+            .collect(),
         )?;
         Ok(Self { color, depth, work })
+    }
+
+    pub(crate) fn prepare_draws(
+        &self,
+        backend: &Backend,
+        resources: &[GraphResource],
+        rasterizer: &Rasterizer,
+        scene: &RasterScene,
+        view_projection: [f32; 16],
+    ) -> Result<(WorkId, RasterPass), String> {
+        let pass = backend
+            .prepare_raster(
+                rasterizer,
+                resources[self.color.0].image()?,
+                resources[self.depth.0].image()?,
+                &scene.meshes,
+                &scene.instances,
+                &scene.materials,
+                &scene.lights,
+                view_projection,
+                scene.source.environment,
+            )
+            .map_err(|error| error.to_string())?;
+        Ok((self.work, pass))
     }
 
     /// # Safety

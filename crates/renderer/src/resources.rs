@@ -1,7 +1,11 @@
-use crate::{GraphResource, ResourceId, Usage, WorkGraph, WorkId};
+use crate::{GraphResource, ResourceId, Usage, WorkGraph, WorkId, WorkPlan};
 use bee_vulkan::profile;
-use bee_vulkan::{Backend, Frame, Submission};
+use bee_vulkan::{
+    Backend, Frame, RasterCommands, RasterPass, RecordedCommands, Submission, WorkerCommands,
+};
+use rayon::ThreadPool;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Mutex;
 
 static NEXT_RESOURCES_ID: AtomicU64 = AtomicU64::new(1);
 
@@ -18,12 +22,23 @@ struct Slot {
     usage: Option<Usage>,
 }
 
+enum InFlight {
+    Serial(Submission),
+    Parallel(Submission),
+}
+
+enum RecordedJob {
+    Primary(RecordedCommands, Vec<profile::Event>),
+    Raster(RasterCommands),
+}
+
 pub struct GraphResources {
     id: u64,
     revision: u64,
     slots: Vec<Slot>,
-    pending: Option<Submission>,
+    pending: Option<InFlight>,
     frame: Option<Frame>,
+    workers: Vec<Mutex<Option<WorkerCommands>>>,
     poisoned: bool,
 }
 
@@ -35,6 +50,7 @@ impl Default for GraphResources {
             slots: Vec::new(),
             pending: None,
             frame: None,
+            workers: Vec::new(),
             poisoned: false,
         }
     }
@@ -148,12 +164,15 @@ impl GraphResources {
             return Err("previous graph submission did not complete safely".into());
         }
         if let Some(submission) = self.pending.take() {
-            match submission.reclaim() {
-                Ok(frame) => self.frame = Some(frame),
-                Err(error) => {
-                    self.poisoned = true;
-                    return Err(error.to_string());
+            let result = match submission {
+                InFlight::Serial(submission) => {
+                    submission.reclaim().map(|frame| self.frame = Some(frame))
                 }
+                InFlight::Parallel(submission) => submission.wait(),
+            };
+            if let Err(error) = result {
+                self.poisoned = true;
+                return Err(error.to_string());
             }
         }
         Ok(())
@@ -198,18 +217,10 @@ impl GraphResources {
     pub unsafe fn submit_plan(
         &mut self,
         backend: &Backend,
-        plan: &crate::WorkPlan,
+        plan: &WorkPlan,
         mut record: impl FnMut(WorkId, &mut Frame, &[GraphResource]) -> Result<(), String>,
     ) -> Result<(), String> {
-        if self.poisoned || self.pending.is_some() {
-            return Err("graph resources are not ready for submission".into());
-        }
-        let resources: Vec<GraphResource> = self
-            .slots
-            .iter()
-            .map(|slot| slot.resource.clone().ok_or("graph resource is unavailable"))
-            .collect::<Result<_, _>>()?;
-        let mut usages: Vec<_> = self.slots.iter().map(|slot| slot.usage).collect();
+        let (resources, mut usages) = self.bindings()?;
         let mut frame = profile::span("begin_frame_us", || match self.frame.take() {
             Some(frame) => backend.reuse_frame(frame),
             None => backend.begin_frame(),
@@ -222,6 +233,128 @@ impl GraphResources {
         })?;
         let submission =
             profile::span("submit_us", || frame.submit()).map_err(|error| error.to_string())?;
+        self.submitted(InFlight::Serial(submission), usages);
+        Ok(())
+    }
+
+    /// # Safety
+    /// 回调须遵守计划声明及对象生命周期，可在不同工作线程上同时调用。
+    pub(crate) unsafe fn submit_parallel(
+        &mut self,
+        backend: &Backend,
+        plan: &WorkPlan,
+        pool: &ThreadPool,
+        raster_pass: impl FnOnce(&[GraphResource]) -> Result<Option<(WorkId, RasterPass)>, String>,
+        record: impl Fn(WorkId, &mut Frame, &[GraphResource]) -> Result<(), String> + Sync,
+    ) -> Result<(), String> {
+        let (resources, mut usages) = self.bindings()?;
+        profile::span("begin_frame_us", || {
+            self.workers
+                .resize_with(pool.current_num_threads(), || Mutex::new(None));
+            for worker in &mut self.workers {
+                if let Some(commands) = worker.get_mut().unwrap() {
+                    commands.reset().map_err(|error| error.to_string())?;
+                }
+            }
+            Ok::<_, String>(())
+        })?;
+        let workers = &self.workers;
+        let capture = profile::capture_start();
+        let commands = profile::span("record_us", || {
+            let barriers = plan.bind(&resources, &mut usages)?;
+            let mut schedule = None;
+            let raster = raster_pass(&resources)?.map(|(work, pass)| {
+                let jobs = schedule.insert(plan.cpu.clone()).add_predecessors(work, 2);
+                (work, pass, jobs)
+            });
+            schedule
+                .as_ref()
+                .unwrap_or(&plan.cpu)
+                .run(pool, plan.order(), |work, finished| {
+                    let mut worker = workers[pool.current_thread_index().unwrap()]
+                        .lock()
+                        .unwrap();
+                    if worker.is_none() {
+                        *worker = Some(
+                            backend
+                                .worker_commands()
+                                .map_err(|error| error.to_string())?,
+                        );
+                    }
+                    let worker = worker.as_mut().unwrap();
+                    if let Some((_, pass, jobs)) = &raster {
+                        if jobs.contains(&work.0) {
+                            let middle = pass.draw_count().div_ceil(2);
+                            let range = if work.0 == jobs.start {
+                                0..middle
+                            } else {
+                                middle..pass.draw_count()
+                            };
+                            return pass
+                                .record_batch(worker, range)
+                                .map(RecordedJob::Raster)
+                                .map_err(|error| error.to_string());
+                        }
+                    }
+                    let mut encode = || {
+                        worker.record(|frame| {
+                            plan.record_one(work, frame, &resources, &barriers, |work, frame| {
+                                if let Some((id, pass, jobs)) = &raster {
+                                    if work == *id {
+                                        let ranges = [jobs.start, jobs.start + 1].map(|id| {
+                                            match finished[id].get().unwrap() {
+                                                RecordedJob::Raster(commands) => commands,
+                                                _ => unreachable!(),
+                                            }
+                                        });
+                                        return frame
+                                            .record_raster(pass, &ranges)
+                                            .map_err(|error| error.to_string());
+                                    }
+                                }
+                                record(work, frame, &resources)
+                            })
+                        })
+                    };
+                    match capture {
+                        Some(start) => {
+                            let (commands, events) = profile::capture_from(start, encode);
+                            Ok(RecordedJob::Primary(commands?, events))
+                        }
+                        None => Ok(RecordedJob::Primary(encode()?, Vec::new())),
+                    }
+                })
+        })?;
+        let commands = commands
+            .into_iter()
+            .map(|job| {
+                let RecordedJob::Primary(commands, events) = job else {
+                    unreachable!()
+                };
+                profile::append(events);
+                commands
+            })
+            .collect();
+        let submission = profile::span("submit_us", || backend.submit_recorded(commands))
+            .map_err(|error| error.to_string())?;
+        self.submitted(InFlight::Parallel(submission), usages);
+        Ok(())
+    }
+
+    fn bindings(&self) -> Result<(Vec<GraphResource>, Vec<Option<Usage>>), String> {
+        if self.poisoned || self.pending.is_some() {
+            return Err("graph resources are not ready for submission".into());
+        }
+        let resources = self
+            .slots
+            .iter()
+            .map(|slot| slot.resource.clone().ok_or("graph resource is unavailable"))
+            .collect::<Result<_, _>>()?;
+        let usages = self.slots.iter().map(|slot| slot.usage).collect();
+        Ok((resources, usages))
+    }
+
+    fn submitted(&mut self, submission: InFlight, usages: Vec<Option<Usage>>) {
         for (slot, usage) in self.slots.iter_mut().zip(usages) {
             slot.usage = usage;
             if slot.lifetime == Lifetime::Temporary {
@@ -231,7 +364,6 @@ impl GraphResources {
         }
         self.pending = Some(submission);
         self.revision = self.revision.wrapping_add(1);
-        Ok(())
     }
 
     /// # Safety
@@ -252,6 +384,24 @@ impl GraphResources {
 
     pub(crate) fn usage(&self, id: ResourceId) -> Option<Usage> {
         self.slots[id.0].usage
+    }
+
+    /// # Safety
+    /// 新绑定须已由相同队列或宿主生产，producer 须与实际写入匹配。
+    pub(crate) unsafe fn bind_input(
+        &mut self,
+        id: ResourceId,
+        resource: impl Into<GraphResource>,
+        producer: Usage,
+    ) {
+        let resource = resource.into();
+        if self.slots[id.0]
+            .resource
+            .as_ref()
+            .is_none_or(|old| !old.same_handle(&resource))
+        {
+            self.bind_ordered(id, resource, Some(producer));
+        }
     }
 
     pub(crate) fn clear_bindings(&mut self) {

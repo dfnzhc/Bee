@@ -1,3 +1,4 @@
+use crate::buffer::BufferState;
 use crate::device::{Backend, DeviceState};
 use crate::test_image::memory_type;
 use crate::{Buffer, Frame};
@@ -31,24 +32,7 @@ impl Drop for ImageState {
 }
 
 pub struct ReadbackBuffer {
-    inner: Arc<ReadbackState>,
-}
-
-struct ReadbackState {
-    device: Arc<DeviceState>,
-    buffer: vk::Buffer,
-    memory: vk::DeviceMemory,
-    size: usize,
-    coherent: bool,
-}
-
-impl Drop for ReadbackState {
-    fn drop(&mut self) {
-        unsafe {
-            self.device.device.destroy_buffer(self.buffer, None);
-            self.device.device.free_memory(self.memory, None);
-        }
-    }
+    inner: Arc<BufferState>,
 }
 
 impl Backend {
@@ -149,46 +133,14 @@ impl Backend {
         if size == 0 {
             bail!("readback buffer size must be nonzero");
         }
-        let mut buffer = ReadbackState {
-            device: self.device.clone(),
-            buffer: vk::Buffer::null(),
-            memory: vk::DeviceMemory::null(),
-            size,
-            coherent: false,
-        };
-        let info = vk::BufferCreateInfo::default()
-            .size(size as u64)
-            .usage(vk::BufferUsageFlags::TRANSFER_DST)
-            .sharing_mode(vk::SharingMode::EXCLUSIVE);
-        buffer.buffer = unsafe { buffer.device.device.create_buffer(&info, None) }
-            .context("could not create readback buffer")?;
-        let requirements = unsafe {
-            buffer
-                .device
-                .device
-                .get_buffer_memory_requirements(buffer.buffer)
-        };
-        let (index, flags) = memory_type(
-            &buffer.device,
-            requirements.memory_type_bits,
-            vk::MemoryPropertyFlags::HOST_VISIBLE,
-            vk::MemoryPropertyFlags::HOST_COHERENT,
-        )?;
-        buffer.coherent = flags.contains(vk::MemoryPropertyFlags::HOST_COHERENT);
-        let allocation = vk::MemoryAllocateInfo::default()
-            .allocation_size(requirements.size)
-            .memory_type_index(index);
-        buffer.memory = unsafe { buffer.device.device.allocate_memory(&allocation, None) }
-            .context("could not allocate readback buffer memory")?;
-        unsafe {
-            buffer
-                .device
-                .device
-                .bind_buffer_memory(buffer.buffer, buffer.memory, 0)
-        }
-        .context("could not bind readback buffer memory")?;
         Ok(ReadbackBuffer {
-            inner: Arc::new(buffer),
+            inner: Arc::new(BufferState::allocate(
+                &self.device,
+                size as u64,
+                vk::BufferUsageFlags::TRANSFER_DST,
+                true,
+                false,
+            )?),
         })
     }
 }
@@ -206,6 +158,12 @@ impl GraphImage {
 }
 
 impl ReadbackBuffer {
+    pub fn graph_buffer(&self) -> Buffer {
+        Buffer {
+            inner: self.inner.clone(),
+        }
+    }
+
     /// # Safety
     /// 调用方必须先等待所有写入此缓冲区的提交完成，并保证没有并发访问。
     pub unsafe fn read(&self) -> Result<Vec<u8>> {
@@ -228,7 +186,7 @@ impl ReadbackBuffer {
                 return Err(error).context("could not invalidate readback memory");
             }
         }
-        let bytes = std::slice::from_raw_parts(ptr.cast::<u8>(), self.inner.size).to_vec();
+        let bytes = std::slice::from_raw_parts(ptr.cast::<u8>(), self.inner.size as usize).to_vec();
         device.unmap_memory(self.inner.memory);
         Ok(bytes)
     }
@@ -245,7 +203,7 @@ impl Frame {
         if !Arc::ptr_eq(&self.device, &source.inner.device)
             || !Arc::ptr_eq(&self.device, &target.inner.device)
             || !source.usage().contains(vk::BufferUsageFlags::TRANSFER_SRC)
-            || source.inner.size > target.inner.size as u64
+            || source.inner.size > target.inner.size
         {
             bail!("incompatible buffer or readback buffer");
         }
@@ -374,6 +332,24 @@ impl Frame {
         image: &GraphImage,
         buffer: &ReadbackBuffer,
     ) -> Result<()> {
+        self.copy_graph_image_to_buffer(image, buffer)?;
+        self.graph_buffer_barrier(
+            &buffer.graph_buffer(),
+            (
+                vk::PipelineStageFlags::TRANSFER,
+                vk::AccessFlags::TRANSFER_WRITE,
+            ),
+            (vk::PipelineStageFlags::HOST, vk::AccessFlags::HOST_READ),
+        )
+    }
+
+    /// # Safety
+    /// 调用方须同步图像传输读取及缓冲区传输写入，读回前还须同步宿主读取。
+    pub unsafe fn copy_graph_image_to_buffer(
+        &mut self,
+        image: &GraphImage,
+        buffer: &ReadbackBuffer,
+    ) -> Result<()> {
         if !Arc::ptr_eq(&self.device, &image.inner.device)
             || !Arc::ptr_eq(&self.device, &buffer.inner.device)
         {
@@ -391,7 +367,7 @@ impl Frame {
             || (image.inner.width as usize)
                 .checked_mul(image.inner.height as usize)
                 .and_then(|size| size.checked_mul(4))
-                .is_none_or(|size| size > buffer.inner.size)
+                .is_none_or(|size| size as u64 > buffer.inner.size)
         {
             bail!("incompatible image or readback buffer");
         }
@@ -412,18 +388,6 @@ impl Frame {
             vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
             buffer.inner.buffer,
             &[copy],
-        );
-        let barrier = vk::MemoryBarrier::default()
-            .src_access_mask(vk::AccessFlags::TRANSFER_WRITE)
-            .dst_access_mask(vk::AccessFlags::HOST_READ);
-        self.device.device.cmd_pipeline_barrier(
-            self.command_buffer,
-            vk::PipelineStageFlags::TRANSFER,
-            vk::PipelineStageFlags::HOST,
-            vk::DependencyFlags::empty(),
-            &[barrier],
-            &[],
-            &[],
         );
         self.resources.push(image.inner.clone());
         self.resources.push(buffer.inner.clone());

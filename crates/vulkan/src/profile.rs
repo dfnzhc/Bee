@@ -21,7 +21,14 @@ pub fn active() -> bool {
 }
 
 pub fn capture<T>(run: impl FnOnce() -> T) -> (T, Vec<Event>) {
-    let start = Instant::now();
+    capture_from(Instant::now(), run)
+}
+
+pub fn capture_start() -> Option<Instant> {
+    CAPTURE.with(|capture| capture.borrow().as_ref().map(|(start, _)| *start))
+}
+
+pub fn capture_from<T>(start: Instant, run: impl FnOnce() -> T) -> (T, Vec<Event>) {
     CAPTURE.with(|capture| {
         assert!(capture.borrow().is_none(), "nested frame profile");
         *capture.borrow_mut() = Some((start, Vec::new()));
@@ -36,6 +43,14 @@ pub fn capture<T>(run: impl FnOnce() -> T) -> (T, Vec<Event>) {
     let result = run();
     let (_, events) = CAPTURE.with(|capture| capture.borrow_mut().take().unwrap());
     (result, events)
+}
+
+pub fn append(events: Vec<Event>) {
+    CAPTURE.with(|capture| {
+        if let Some((_, existing)) = capture.borrow_mut().as_mut() {
+            existing.extend(events);
+        }
+    });
 }
 
 pub fn record(name: &'static str, value: f64) {

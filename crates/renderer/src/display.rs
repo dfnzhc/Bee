@@ -63,7 +63,7 @@ impl DisplayWork {
             vec![
                 Access {
                     resource: scene,
-                    usage: Usage::ShaderRead,
+                    usage: Usage::FragmentRead,
                 },
                 Access {
                     resource: mapped,

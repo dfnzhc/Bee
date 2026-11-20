@@ -1,11 +1,12 @@
 //! 算法模块图和渲染工作。
 
 mod display;
+mod jobs;
 mod modules;
 mod path;
 mod raster;
-mod scene;
 mod resources;
+mod scene;
 mod viewport;
 mod work;
 

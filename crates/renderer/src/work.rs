@@ -1,11 +1,15 @@
+use crate::jobs::CpuSchedule;
 use ash::vk;
 use bee_vulkan::profile;
 use bee_vulkan::{Buffer, Frame, GraphImage};
+use std::collections::HashSet;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub enum GraphResource {
     Image(GraphImage),
     Buffer(Buffer),
+    Buffers(Arc<[Buffer]>),
 }
 
 impl From<GraphImage> for GraphResource {
@@ -17,6 +21,12 @@ impl From<GraphImage> for GraphResource {
 impl From<Buffer> for GraphResource {
     fn from(buffer: Buffer) -> Self {
         Self::Buffer(buffer)
+    }
+}
+
+impl From<Vec<Buffer>> for GraphResource {
+    fn from(buffers: Vec<Buffer>) -> Self {
+        Self::Buffers(buffers.into())
     }
 }
 
@@ -35,11 +45,20 @@ impl GraphResource {
         }
     }
 
-    fn same_handle(&self, other: &Self) -> bool {
+    pub(crate) fn same_handle(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Image(a), Self::Image(b)) => a.raw() == b.raw(),
             (Self::Buffer(a), Self::Buffer(b)) => a.raw() == b.raw(),
+            (Self::Buffers(a), Self::Buffers(b)) => Arc::ptr_eq(a, b),
             _ => false,
+        }
+    }
+
+    fn buffers(&self) -> &[Buffer] {
+        match self {
+            Self::Buffer(buffer) => std::slice::from_ref(buffer),
+            Self::Buffers(buffers) => buffers,
+            Self::Image(_) => unreachable!(),
         }
     }
 }
@@ -54,7 +73,7 @@ impl ResourceId {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct WorkId(usize);
+pub struct WorkId(pub(crate) usize);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Usage {
@@ -65,18 +84,37 @@ pub enum Usage {
     ShaderRead,
     ShaderWrite,
     ShaderReadWrite,
+    HostWrite,
+    HostRead,
+    VertexRead,
+    FragmentRead,
+    RayRead,
+    RayWrite,
+    RayReadWrite,
+    ShaderTableRead,
+    AccelerationBuildWrite,
+    AccelerationTraceRead,
 }
 
 impl Usage {
     fn reads(self) -> bool {
         matches!(
             self,
-            Self::TransferRead | Self::ShaderRead | Self::ShaderReadWrite
+            Self::TransferRead
+                | Self::ShaderRead
+                | Self::ShaderReadWrite
+                | Self::HostRead
+                | Self::VertexRead
+                | Self::FragmentRead
+                | Self::RayRead
+                | Self::RayReadWrite
+                | Self::ShaderTableRead
+                | Self::AccelerationTraceRead
         )
     }
 
     fn writes(self) -> bool {
-        !matches!(self, Self::TransferRead | Self::ShaderRead)
+        !self.reads() || matches!(self, Self::ShaderReadWrite | Self::RayReadWrite)
     }
 }
 
@@ -114,6 +152,7 @@ pub struct WorkPlan {
     barriers: Vec<Vec<Barrier>>,
     resource_count: usize,
     initial_usages: Vec<Option<Usage>>,
+    pub(crate) cpu: CpuSchedule,
 }
 
 impl WorkPlan {
@@ -157,25 +196,36 @@ impl WorkPlan {
         usages: &mut [Option<Usage>],
         mut record_work: impl FnMut(WorkId, &mut Frame) -> Result<(), String>,
     ) -> Result<(), String> {
+        let barriers = self.bind(resources, usages)?;
+        for &work in &self.order {
+            self.record_one(work, frame, resources, &barriers, &mut record_work)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn bind(
+        &self,
+        resources: &[GraphResource],
+        usages: &mut [Option<Usage>],
+    ) -> Result<Vec<Vec<Barrier>>, String> {
         if resources.len() != self.resource_count || usages.len() != self.resource_count {
             return Err("incorrect number of graph resources".into());
         }
-        for (index, resource) in resources.iter().enumerate() {
-            if resources[..index]
-                .iter()
-                .any(|other| other.same_handle(resource))
-            {
+        let mut images = HashSet::new();
+        let mut buffers = HashSet::new();
+        for resource in resources {
+            let unique = match resource {
+                GraphResource::Image(image) => images.insert(image.raw()),
+                resource => resource
+                    .buffers()
+                    .iter()
+                    .all(|buffer| buffers.insert(buffer.raw())),
+            };
+            if !unique {
                 return Err("one Vulkan object cannot represent multiple graph resources".into());
             }
         }
-        for work in &self.work {
-            for access in &work.accesses {
-                match &resources[access.resource.0] {
-                    GraphResource::Image(image) => validate_image(image, access.usage)?,
-                    GraphResource::Buffer(buffer) => validate_buffer(buffer, access.usage)?,
-                }
-            }
-        }
+        let mut barriers = vec![Vec::new(); self.work.len()];
         for &work in &self.order {
             for &Access { resource, usage } in &self.work[work.0].accesses {
                 let state = &mut usages[resource.0];
@@ -185,32 +235,67 @@ impl WorkPlan {
                         self.name(work)
                     ));
                 }
-                let before = state.map(vulkan_usage).unwrap_or((
-                    vk::PipelineStageFlags::TOP_OF_PIPE,
-                    vk::AccessFlags::empty(),
-                    vk::ImageLayout::UNDEFINED,
-                ));
-                let after = vulkan_usage(usage);
                 match &resources[resource.0] {
-                    GraphResource::Image(image) => frame.graph_image_barrier(image, before, after),
-                    GraphResource::Buffer(buffer) => {
-                        frame.graph_buffer_barrier(buffer, (before.0, before.1), (after.0, after.1))
+                    GraphResource::Image(image) => validate_image(image, usage)?,
+                    resource => {
+                        for buffer in resource.buffers() {
+                            validate_buffer(buffer, usage)?;
+                        }
                     }
                 }
-                .map_err(|error| error.to_string())?;
+                if *state != Some(usage) || usage.writes() {
+                    barriers[work.0].push(Barrier {
+                        resource,
+                        before: *state,
+                        after: usage,
+                    });
+                }
                 *state = Some(usage);
             }
-            let timestamp = match self.name(work) {
-                "rasterization" => frame.profile_begin("gpu_raster_us"),
-                "path tracing" => frame.profile_begin("gpu_trace_us"),
-                "tone mapping" => frame.profile_begin("gpu_tone_us"),
-                "viewport output" => frame.profile_begin("gpu_copy_us"),
-                "read viewport" => frame.profile_begin("gpu_read_us"),
-                _ => None,
-            };
-            record_work(work, frame)?;
-            frame.profile_end(timestamp);
         }
+        Ok(barriers)
+    }
+
+    pub(crate) unsafe fn record_one(
+        &self,
+        work: WorkId,
+        frame: &mut Frame,
+        resources: &[GraphResource],
+        barriers: &[Vec<Barrier>],
+        record_work: impl FnOnce(WorkId, &mut Frame) -> Result<(), String>,
+    ) -> Result<(), String> {
+        for &Barrier {
+            resource,
+            before,
+            after,
+        } in &barriers[work.0]
+        {
+            let before = before.map(vulkan_usage).unwrap_or((
+                vk::PipelineStageFlags::TOP_OF_PIPE,
+                vk::AccessFlags::empty(),
+                vk::ImageLayout::UNDEFINED,
+            ));
+            let after = vulkan_usage(after);
+            match &resources[resource.0] {
+                GraphResource::Image(image) => frame.graph_image_barrier(image, before, after),
+                resource => frame.graph_buffer_barriers(
+                    resource.buffers(),
+                    (before.0, before.1),
+                    (after.0, after.1),
+                ),
+            }
+            .map_err(|error| error.to_string())?;
+        }
+        let timestamp = match self.name(work) {
+            "rasterization" => frame.profile_begin("gpu_raster_us"),
+            "path tracing" => frame.profile_begin("gpu_trace_us"),
+            "tone mapping" => frame.profile_begin("gpu_tone_us"),
+            "viewport output" => frame.profile_begin("gpu_copy_us"),
+            "read viewport" => frame.profile_begin("gpu_read_us"),
+            _ => None,
+        };
+        record_work(work, frame)?;
+        frame.profile_end(timestamp);
         Ok(())
     }
 }
@@ -246,6 +331,7 @@ impl WorkGraph {
         Ok(id)
     }
 
+    /// 显式前置同时约束 CPU 工作。由资源读写推导的依赖只约束 GPU。
     pub fn depends_on(&mut self, work: WorkId, dependency: WorkId) -> Result<(), String> {
         if work.0 >= self.work.len() || dependency.0 >= self.work.len() {
             return Err("dependency refers to unknown work".into());
@@ -266,6 +352,7 @@ impl WorkGraph {
             edges[before.0][after.0] = true;
         }
         let mut reachable = closure(&edges)?;
+        let cpu = CpuSchedule::new(&edges);
 
         // 先建立无初始内容资源的依赖，再处理可能读取上一帧的资源。
         for initially_defined in [false, true] {
@@ -355,6 +442,7 @@ impl WorkGraph {
             barriers,
             resource_count: self.resources.len(),
             initial_usages: self.resources.clone(),
+            cpu,
         })
     }
 
@@ -373,6 +461,8 @@ impl WorkGraph {
 }
 
 fn vulkan_usage(usage: Usage) -> (vk::PipelineStageFlags, vk::AccessFlags, vk::ImageLayout) {
+    use vk::{AccessFlags as Flags, ImageLayout as Layout, PipelineStageFlags as Stage};
+
     match usage {
         Usage::TransferRead => (
             vk::PipelineStageFlags::TRANSFER,
@@ -397,9 +487,14 @@ fn vulkan_usage(usage: Usage) -> (vk::PipelineStageFlags, vk::AccessFlags, vk::I
             vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
         ),
         Usage::ShaderRead => (
-            vk::PipelineStageFlags::ALL_COMMANDS,
-            vk::AccessFlags::SHADER_READ,
-            vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+            Stage::ALL_COMMANDS,
+            Flags::SHADER_READ,
+            Layout::SHADER_READ_ONLY_OPTIMAL,
+        ),
+        Usage::FragmentRead => (
+            Stage::FRAGMENT_SHADER,
+            Flags::SHADER_READ,
+            Layout::SHADER_READ_ONLY_OPTIMAL,
         ),
         Usage::ShaderWrite => (
             vk::PipelineStageFlags::ALL_COMMANDS,
@@ -410,6 +505,34 @@ fn vulkan_usage(usage: Usage) -> (vk::PipelineStageFlags, vk::AccessFlags, vk::I
             vk::PipelineStageFlags::ALL_COMMANDS,
             vk::AccessFlags::SHADER_READ | vk::AccessFlags::SHADER_WRITE,
             vk::ImageLayout::GENERAL,
+        ),
+        Usage::HostWrite => (Stage::HOST, Flags::HOST_WRITE, Layout::UNDEFINED),
+        Usage::HostRead => (Stage::HOST, Flags::HOST_READ, Layout::UNDEFINED),
+        Usage::VertexRead => (Stage::VERTEX_SHADER, Flags::SHADER_READ, Layout::UNDEFINED),
+        Usage::RayRead | Usage::ShaderTableRead => (
+            Stage::RAY_TRACING_SHADER_KHR,
+            Flags::SHADER_READ,
+            Layout::UNDEFINED,
+        ),
+        Usage::RayWrite => (
+            Stage::RAY_TRACING_SHADER_KHR,
+            Flags::SHADER_WRITE,
+            Layout::GENERAL,
+        ),
+        Usage::RayReadWrite => (
+            Stage::RAY_TRACING_SHADER_KHR,
+            Flags::SHADER_READ | Flags::SHADER_WRITE,
+            Layout::GENERAL,
+        ),
+        Usage::AccelerationBuildWrite => (
+            Stage::ACCELERATION_STRUCTURE_BUILD_KHR,
+            Flags::ACCELERATION_STRUCTURE_WRITE_KHR,
+            Layout::UNDEFINED,
+        ),
+        Usage::AccelerationTraceRead => (
+            Stage::RAY_TRACING_SHADER_KHR,
+            Flags::ACCELERATION_STRUCTURE_READ_KHR,
+            Layout::UNDEFINED,
         ),
     }
 }
@@ -426,10 +549,11 @@ fn validate_image(image: &GraphImage, usage: Usage) -> Result<(), String> {
             vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
             vk::ImageAspectFlags::DEPTH,
         ),
-        Usage::ShaderRead => (vk::ImageUsageFlags::SAMPLED, image.aspect()),
-        Usage::ShaderWrite | Usage::ShaderReadWrite => {
+        Usage::ShaderRead | Usage::FragmentRead => (vk::ImageUsageFlags::SAMPLED, image.aspect()),
+        Usage::ShaderWrite | Usage::ShaderReadWrite | Usage::RayWrite | Usage::RayReadWrite => {
             (vk::ImageUsageFlags::STORAGE, image.aspect())
         }
+        _ => return Err("an image does not support the declared buffer usage".into()),
     };
     if !image.usage().contains(required) || image.aspect() != aspect {
         return Err("image does not support its declared graph usage".into());
@@ -441,12 +565,21 @@ fn validate_buffer(buffer: &Buffer, usage: Usage) -> Result<(), String> {
     let required = match usage {
         Usage::TransferRead => vk::BufferUsageFlags::TRANSFER_SRC,
         Usage::TransferWrite => vk::BufferUsageFlags::TRANSFER_DST,
-        Usage::ShaderRead | Usage::ShaderWrite | Usage::ShaderReadWrite => {
-            vk::BufferUsageFlags::STORAGE_BUFFER
+        Usage::ShaderRead
+        | Usage::ShaderWrite
+        | Usage::ShaderReadWrite
+        | Usage::VertexRead
+        | Usage::FragmentRead
+        | Usage::RayRead => vk::BufferUsageFlags::STORAGE_BUFFER,
+        Usage::ShaderTableRead => vk::BufferUsageFlags::SHADER_BINDING_TABLE_KHR,
+        Usage::AccelerationBuildWrite | Usage::AccelerationTraceRead => {
+            vk::BufferUsageFlags::ACCELERATION_STRUCTURE_STORAGE_KHR
         }
+        Usage::HostRead | Usage::HostWrite if buffer.host_visible() => return Ok(()),
         Usage::ColorAttachment | Usage::DepthAttachment => {
             return Err("a buffer cannot be an image attachment".into())
         }
+        _ => return Err("buffer does not support its declared graph usage".into()),
     };
     if !buffer.usage().contains(required) {
         return Err("buffer does not support its declared graph usage".into());

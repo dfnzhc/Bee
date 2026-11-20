@@ -1,10 +1,12 @@
 use crate::device::{Backend, DeviceState};
+use crate::frame::SecondaryCommands;
 use crate::ray::{bytes_of_slice, SceneBuffer};
+use crate::WorkerCommands;
 use crate::{Frame, GraphImage};
 use anyhow::{bail, Context, Result};
 use ash::vk;
 use std::io::Cursor;
-use std::sync::Arc;
+use std::{ops::Range, sync::Arc};
 
 const VERTEX: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/raster.vert.spv"));
 const FRAGMENT: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/raster.frag.spv"));
@@ -29,7 +31,30 @@ pub struct RasterInstance {
 #[derive(Clone)]
 pub struct RasterInstances {
     data: SceneBuffer,
-    meshes: Arc<[usize]>,
+    batches: Arc<[DrawBatch]>,
+}
+
+struct DrawBatch {
+    mesh: usize,
+    first_instance: u32,
+    instance_count: u32,
+}
+
+pub struct RasterPass(Arc<Draws>);
+
+pub struct RasterCommands {
+    pass: RasterPass,
+    commands: Arc<SecondaryCommands>,
+    range: Range<usize>,
+}
+
+struct Draws {
+    pass: Pass,
+    descriptors: Vec<vk::DescriptorSet>,
+    vertex_counts: Vec<u32>,
+    instances: RasterInstances,
+    _scene: Vec<SceneBuffer>,
+    constants: Constants,
 }
 
 struct Pipeline {
@@ -82,6 +107,22 @@ impl Rasterizer {
     }
 }
 
+impl RasterGeometry {
+    pub fn graph_buffer(&self) -> crate::Buffer {
+        self.data.graph_buffer()
+    }
+}
+
+impl RasterInstances {
+    pub fn graph_buffer(&self) -> crate::Buffer {
+        self.data.graph_buffer()
+    }
+
+    pub fn draw_batches(&self) -> usize {
+        self.batches.len()
+    }
+}
+
 impl Backend {
     pub fn upload_raster_geometry(&self, data: &[[f32; 4]]) -> Result<RasterGeometry> {
         if !data.len().is_multiple_of(6) {
@@ -110,9 +151,23 @@ impl Backend {
         {
             bail!("invalid raster instance data");
         }
+        let mut first_instance = 0;
+        let batches = meshes
+            .chunk_by(|a, b| a == b)
+            .map(|batch| {
+                let instance_count = batch.len() as u32;
+                let draw = DrawBatch {
+                    mesh: batch[0],
+                    first_instance,
+                    instance_count,
+                };
+                first_instance += instance_count;
+                draw
+            })
+            .collect();
         Ok(RasterInstances {
             data: SceneBuffer::upload(&self.device, unsafe { bytes_of_slice(data) })?,
-            meshes: meshes.into(),
+            batches,
         })
     }
 
@@ -313,14 +368,141 @@ impl Frame {
         view_projection: [f32; 16],
         environment: [f32; 3],
     ) -> Result<()> {
-        if !Arc::ptr_eq(&self.device, &rasterizer.inner.device)
+        let pass = RasterPass::prepare(
+            &self.device,
+            rasterizer,
+            color,
+            depth,
+            meshes,
+            instances,
+            materials,
+            lights,
+            view_projection,
+            environment,
+        )?;
+        self.record_raster(&pass, &[])
+    }
+
+    /// # Safety
+    /// 附件和场景缓冲区须已按图同步。每个次级命令缓冲区只允许参与一次提交。
+    pub unsafe fn record_raster(
+        &mut self,
+        pass: &RasterPass,
+        batches: &[&RasterCommands],
+    ) -> Result<()> {
+        let draws = &pass.0;
+        if !Arc::ptr_eq(&self.device, &draws.pass.device) {
+            bail!("raster pass belongs to a different Vulkan device");
+        }
+        let mut end = 0;
+        for batch in batches {
+            if !Arc::ptr_eq(&pass.0, &batch.pass.0) || batch.range.start != end {
+                bail!("raster batches must form a contiguous, ordered pass");
+            }
+            end = batch.range.end;
+        }
+        if !batches.is_empty() && end != draws.instances.draw_batches() {
+            bail!("raster batches do not cover the whole pass");
+        }
+        let area = draws.area();
+        let [r, g, b] = draws.constants.environment;
+        let clears = [
+            vk::ClearValue {
+                color: vk::ClearColorValue {
+                    float32: [r, g, b, 1.0],
+                },
+            },
+            vk::ClearValue {
+                depth_stencil: vk::ClearDepthStencilValue {
+                    depth: 1.0,
+                    stencil: 0,
+                },
+            },
+        ];
+        let begin = vk::RenderPassBeginInfo::default()
+            .render_pass(draws.pass._pipeline.render_pass)
+            .framebuffer(draws.pass.framebuffer)
+            .render_area(area)
+            .clear_values(&clears);
+        let device = &self.device.device;
+        let contents = if batches.is_empty() {
+            vk::SubpassContents::INLINE
+        } else {
+            vk::SubpassContents::SECONDARY_COMMAND_BUFFERS
+        };
+        device.cmd_begin_render_pass(self.command_buffer, &begin, contents);
+        if batches.is_empty() {
+            draws.record(self.command_buffer, 0..draws.instances.draw_batches());
+        } else {
+            let handles: Vec<_> = batches.iter().map(|batch| batch.commands.handle).collect();
+            device.cmd_execute_commands(self.command_buffer, &handles);
+            self.resources.extend(
+                batches
+                    .iter()
+                    .map(|batch| batch.commands.clone() as Arc<dyn Send + Sync>),
+            );
+        }
+        device.cmd_end_render_pass(self.command_buffer);
+        self.resources.push(draws.clone());
+        crate::profile::record("raster_pass", 1.0);
+        Ok(())
+    }
+}
+
+impl Backend {
+    pub fn prepare_raster(
+        &self,
+        rasterizer: &Rasterizer,
+        color: &GraphImage,
+        depth: &GraphImage,
+        meshes: &[RasterGeometry],
+        instances: &RasterInstances,
+        materials: &SceneBuffer,
+        lights: &SceneBuffer,
+        view_projection: [f32; 16],
+        environment: [f32; 3],
+    ) -> Result<RasterPass> {
+        unsafe {
+            RasterPass::prepare(
+                &self.device,
+                rasterizer,
+                color,
+                depth,
+                meshes,
+                instances,
+                materials,
+                lights,
+                view_projection,
+                environment,
+            )
+        }
+    }
+}
+
+impl RasterPass {
+    unsafe fn prepare(
+        state: &Arc<DeviceState>,
+        rasterizer: &Rasterizer,
+        color: &GraphImage,
+        depth: &GraphImage,
+        meshes: &[RasterGeometry],
+        instances: &RasterInstances,
+        materials: &SceneBuffer,
+        lights: &SceneBuffer,
+        view_projection: [f32; 16],
+        environment: [f32; 3],
+    ) -> Result<Self> {
+        if !Arc::ptr_eq(state, &rasterizer.inner.device)
             || [&instances.data, materials, lights]
                 .into_iter()
                 .chain(meshes.iter().map(|mesh| &mesh.data))
-                .any(|buffer| !Arc::ptr_eq(&self.device, &buffer.0.device))
-            || instances.meshes.iter().any(|&index| index >= meshes.len())
-            || !Arc::ptr_eq(&self.device, &color.inner.device)
-            || !Arc::ptr_eq(&self.device, &depth.inner.device)
+                .any(|buffer| !Arc::ptr_eq(state, &buffer.0.device))
+            || instances
+                .batches
+                .iter()
+                .any(|batch| batch.mesh >= meshes.len())
+            || !Arc::ptr_eq(state, &color.inner.device)
+            || !Arc::ptr_eq(state, &depth.inner.device)
             || color.inner.width != depth.inner.width
             || color.inner.height != depth.inner.height
             || color.inner.format != vk::Format::R32G32B32A32_SFLOAT
@@ -343,7 +525,7 @@ impl Frame {
             bail!("incompatible raster attachments or scene data");
         }
         let mut pass = Pass {
-            device: self.device.clone(),
+            device: state.clone(),
             _pipeline: rasterizer.inner.clone(),
             _color: color.clone(),
             _depth: depth.clone(),
@@ -352,7 +534,7 @@ impl Frame {
             framebuffer: vk::Framebuffer::null(),
             descriptor_pool: vk::DescriptorPool::null(),
         };
-        let device = &self.device.device;
+        let device = &state.device;
         for (image, view) in [(color, &mut pass.color_view), (depth, &mut pass.depth_view)] {
             let range = vk::ImageSubresourceRange::default()
                 .aspect_mask(image.inner.aspect)
@@ -419,96 +601,108 @@ impl Frame {
             device.update_descriptor_sets(&writes, &[]);
         }
 
-        let extent = vk::Extent2D {
-            width: color.inner.width,
-            height: color.inner.height,
-        };
-        let area = vk::Rect2D {
+        Ok(Self(Arc::new(Draws {
+            pass,
+            descriptors,
+            vertex_counts: meshes.iter().map(|mesh| mesh.vertex_count).collect(),
+            instances: instances.clone(),
+            _scene: meshes
+                .iter()
+                .map(|mesh| mesh.data.clone())
+                .chain([materials.clone(), lights.clone()])
+                .collect(),
+            constants: Constants {
+                view_projection,
+                environment,
+                _padding: 0,
+            },
+        })))
+    }
+
+    pub fn draw_count(&self) -> usize {
+        self.0.instances.draw_batches()
+    }
+
+    pub fn record_batch(
+        &self,
+        worker: &mut WorkerCommands,
+        range: Range<usize>,
+    ) -> Result<RasterCommands> {
+        if range.is_empty() || range.end > self.draw_count() {
+            bail!("invalid range for raster draw batch");
+        }
+        let draws = &self.0;
+        let inheritance = vk::CommandBufferInheritanceInfo::default()
+            .render_pass(draws.pass._pipeline.render_pass)
+            .framebuffer(draws.pass.framebuffer)
+            .subpass(0);
+        let commands = worker.record_secondary(&draws.pass.device, &inheritance, |command| {
+            unsafe { draws.record(command, range.clone()) };
+        })?;
+        Ok(RasterCommands {
+            pass: RasterPass(draws.clone()),
+            commands,
+            range,
+        })
+    }
+}
+
+impl Draws {
+    fn area(&self) -> vk::Rect2D {
+        vk::Rect2D {
             offset: vk::Offset2D { x: 0, y: 0 },
-            extent,
-        };
-        let clears = [
-            vk::ClearValue {
-                color: vk::ClearColorValue {
-                    float32: [environment[0], environment[1], environment[2], 1.0],
-                },
+            extent: vk::Extent2D {
+                width: self.pass._color.inner.width,
+                height: self.pass._color.inner.height,
             },
-            vk::ClearValue {
-                depth_stencil: vk::ClearDepthStencilValue {
-                    depth: 1.0,
-                    stencil: 0,
-                },
-            },
-        ];
-        let begin = vk::RenderPassBeginInfo::default()
-            .render_pass(rasterizer.inner.render_pass)
-            .framebuffer(pass.framebuffer)
-            .render_area(area)
-            .clear_values(&clears);
+        }
+    }
+
+    unsafe fn record(&self, command: vk::CommandBuffer, range: Range<usize>) {
+        let area = self.area();
+        let device = &self.pass.device.device;
+        let pipeline = &self.pass._pipeline;
         let viewport = vk::Viewport {
             x: 0.0,
             y: 0.0,
-            width: extent.width as f32,
-            height: extent.height as f32,
+            width: area.extent.width as f32,
+            height: area.extent.height as f32,
             min_depth: 0.0,
             max_depth: 1.0,
         };
-        let constants = Constants {
-            view_projection,
-            environment,
-            _padding: 0,
-        };
         let bytes = std::slice::from_raw_parts(
-            (&constants as *const Constants).cast::<u8>(),
+            (&self.constants as *const Constants).cast::<u8>(),
             std::mem::size_of::<Constants>(),
         );
-        device.cmd_begin_render_pass(self.command_buffer, &begin, vk::SubpassContents::INLINE);
-        device.cmd_bind_pipeline(
-            self.command_buffer,
-            vk::PipelineBindPoint::GRAPHICS,
-            rasterizer.inner.pipeline,
-        );
+        device.cmd_bind_pipeline(command, vk::PipelineBindPoint::GRAPHICS, pipeline.pipeline);
         device.cmd_push_constants(
-            self.command_buffer,
-            rasterizer.inner.layout,
+            command,
+            pipeline.layout,
             vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
             0,
             bytes,
         );
-        device.cmd_set_viewport(self.command_buffer, 0, &[viewport]);
-        device.cmd_set_scissor(self.command_buffer, 0, &[area]);
-        let mut first_instance = 0;
-        for batch in instances.meshes.chunk_by(|a, b| a == b) {
-            let index = batch[0];
-            let vertex_count = meshes[index].vertex_count;
+        device.cmd_set_viewport(command, 0, &[viewport]);
+        device.cmd_set_scissor(command, 0, &[area]);
+        for batch in &self.instances.batches[range] {
+            let vertex_count = self.vertex_counts[batch.mesh];
             if vertex_count > 0 {
                 device.cmd_bind_descriptor_sets(
-                    self.command_buffer,
+                    command,
                     vk::PipelineBindPoint::GRAPHICS,
-                    rasterizer.inner.layout,
+                    pipeline.layout,
                     0,
-                    &[descriptors[index]],
+                    &[self.descriptors[batch.mesh]],
                     &[],
                 );
                 device.cmd_draw(
-                    self.command_buffer,
+                    command,
                     vertex_count,
-                    batch.len() as u32,
+                    batch.instance_count,
                     0,
-                    first_instance,
+                    batch.first_instance,
                 );
             }
-            first_instance += batch.len() as u32;
         }
-        device.cmd_end_render_pass(self.command_buffer);
-        for buffer in [&instances.data, materials, lights]
-            .into_iter()
-            .chain(meshes.iter().map(|mesh| &mesh.data))
-        {
-            self.resources.push(buffer.0.clone());
-        }
-        self.resources.push(Arc::new(pass));
-        crate::profile::record("raster_pass", 1.0);
-        Ok(())
     }
 }

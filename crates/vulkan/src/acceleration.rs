@@ -1,8 +1,10 @@
+use crate::buffer::{Buffer, BufferState};
 use crate::device::DeviceState;
-use crate::ray::{align_up, bytes_of_slice, RayBuffer, SceneBuffer};
+use crate::ray::{align_up, bytes_of_slice, SceneBuffer};
 use crate::{profile, Backend, Frame};
 use anyhow::{bail, Context, Result};
 use ash::vk;
+use std::collections::HashSet;
 use std::sync::Arc;
 
 const BUILD_INPUT: vk::BufferUsageFlags =
@@ -12,8 +14,8 @@ const BUILD_INPUT: vk::BufferUsageFlags =
 pub struct AccelerationMesh(Option<Arc<Mesh>>);
 
 struct Mesh {
-    _bottom: Arc<Structure>,
-    vertices: Arc<RayBuffer>,
+    bottom: Arc<Structure>,
+    vertices: Arc<BufferState>,
     address: vk::DeviceAddress,
     triangles: u32,
 }
@@ -63,7 +65,7 @@ struct HitInput {
 struct Structure {
     loader: ash::khr::acceleration_structure::Device,
     handle: vk::AccelerationStructureKHR,
-    storage: RayBuffer,
+    storage: Arc<BufferState>,
 }
 
 impl Drop for Structure {
@@ -80,6 +82,27 @@ impl AccelerationScene {
         self.triangles
     }
 
+    pub fn shader_buffers(&self) -> Vec<Buffer> {
+        let mut buffers = vec![self.hits.graph_buffer()];
+        let mut seen = HashSet::new();
+        for mesh in self.top._meshes.iter().filter_map(|mesh| mesh.0.as_ref()) {
+            if seen.insert(mesh.vertices.buffer) {
+                buffers.push(Buffer {
+                    inner: mesh.vertices.clone(),
+                });
+            }
+        }
+        buffers
+    }
+
+    pub fn acceleration_buffers(&self) -> Vec<Buffer> {
+        let mut buffers = bottom_level_buffers(self.top._meshes.iter());
+        buffers.push(Buffer {
+            inner: self.top.structure.storage.clone(),
+        });
+        buffers
+    }
+
     pub(crate) fn handle(&self) -> vk::AccelerationStructureKHR {
         self.top.structure.handle
     }
@@ -87,6 +110,18 @@ impl AccelerationScene {
     pub(crate) fn device(&self) -> &Arc<DeviceState> {
         &self.top.structure.storage.device
     }
+}
+
+fn bottom_level_buffers<'a>(meshes: impl Iterator<Item = &'a AccelerationMesh>) -> Vec<Buffer> {
+    let mut seen = HashSet::new();
+    meshes
+        .filter_map(|mesh| mesh.0.as_ref())
+        .map(|mesh| &mesh.bottom.storage)
+        .filter(|buffer| seen.insert(buffer.buffer))
+        .map(|buffer| Buffer {
+            inner: buffer.clone(),
+        })
+        .collect()
 }
 
 impl Backend {
@@ -130,10 +165,11 @@ impl Backend {
         }
         let bytes = unsafe { bytes_of_slice(values) };
         let vertices = Arc::new(profile::span("mesh_upload_us", || {
-            let vertices = RayBuffer::new(
+            let vertices = BufferState::allocate(
                 &self.device,
                 bytes.len() as u64,
                 vk::BufferUsageFlags::STORAGE_BUFFER | BUILD_INPUT,
+                true,
                 true,
             )?;
             vertices.write(bytes)?;
@@ -160,8 +196,9 @@ impl Backend {
             primitives,
             &properties,
             None,
+            &vertices,
+            &[],
         )?;
-        frame.resources.push(vertices.clone());
         frame.submit()?.wait()?;
         let address = unsafe {
             bottom.loader.get_acceleration_structure_device_address(
@@ -173,7 +210,7 @@ impl Backend {
             bail!("bottom-level acceleration structure has no device address");
         }
         Ok(AccelerationMesh(Some(Arc::new(Mesh {
-            _bottom: bottom,
+            bottom,
             vertices,
             address,
             triangles: primitives,
@@ -261,10 +298,11 @@ impl Backend {
                 })
                 .collect();
             let bytes = unsafe { bytes_of_slice(&records) };
-            let input = Arc::new(RayBuffer::new(
+            let input = Arc::new(BufferState::allocate(
                 &self.device,
                 bytes.len().max(64) as u64,
                 BUILD_INPUT,
+                true,
                 true,
             )?);
             input.write(bytes)?;
@@ -277,6 +315,16 @@ impl Backend {
                 .geometry_type(vk::GeometryTypeKHR::INSTANCES)
                 .geometry(vk::AccelerationStructureGeometryDataKHR { instances: data })];
             let mut frame = self.begin_frame()?;
+            let referenced_meshes: Vec<_> = instances
+                .iter()
+                .map(|instance| meshes[instance.mesh].clone())
+                .collect();
+            let mut structures = bottom_level_buffers(referenced_meshes.iter());
+            if let Some(old) = update {
+                structures.push(Buffer {
+                    inner: old.structure.storage.clone(),
+                });
+            }
             let structure = self.record_acceleration_build(
                 &mut frame,
                 vk::AccelerationStructureTypeKHR::TOP_LEVEL,
@@ -284,20 +332,18 @@ impl Backend {
                 count as u32,
                 &properties,
                 update.map(|old| &old.structure),
+                &input,
+                &structures,
             )?;
             let top = Arc::new(TopLevel {
                 structure,
                 inputs: top_inputs,
-                _meshes: instances
-                    .iter()
-                    .map(|instance| meshes[instance.mesh].clone())
-                    .collect(),
+                _meshes: referenced_meshes,
             });
             // 旧 TLAS 可被在途帧读取，更新写入独立目标，源结构及 BLAS 保留到完成。
             if let Some(old) = update {
                 frame.resources.push(old.clone());
             }
-            frame.resources.push(input);
             frame.resources.push(top.clone());
             frame.submit()?.wait()?;
             top
@@ -318,6 +364,8 @@ impl Backend {
         primitives: u32,
         properties: &vk::PhysicalDeviceAccelerationStructurePropertiesKHR,
         source: Option<&Arc<Structure>>,
+        input: &Arc<BufferState>,
+        structures: &[Buffer],
     ) -> Result<Arc<Structure>> {
         let device = &self.device.device;
         let loader =
@@ -342,12 +390,13 @@ impl Backend {
                 &mut sizes,
             );
         }
-        let storage = RayBuffer::new(
+        let storage = Arc::new(BufferState::allocate(
             &self.device,
             sizes.acceleration_structure_size,
             vk::BufferUsageFlags::ACCELERATION_STRUCTURE_STORAGE_KHR,
             false,
-        )?;
+            true,
+        )?);
         let handle = unsafe {
             loader.create_acceleration_structure(
                 &vk::AccelerationStructureCreateInfoKHR::default()
@@ -377,22 +426,37 @@ impl Backend {
             ),
         };
         let alignment = u64::from(properties.min_acceleration_structure_scratch_offset_alignment);
-        let scratch = Arc::new(RayBuffer::new(
+        let scratch = Arc::new(BufferState::allocate(
             &self.device,
             scratch_size
                 .checked_add(alignment)
                 .context("scratch size overflow")?,
             vk::BufferUsageFlags::STORAGE_BUFFER,
             false,
+            true,
         )?);
         let build =
             info.dst_acceleration_structure(handle)
                 .scratch_data(vk::DeviceOrHostAddressKHR {
                     device_address: align_up(scratch.address, alignment)?,
                 });
-        let timestamp = frame.profile_begin(if top { "gpu_tlas_us" } else { "gpu_blas_us" });
-        profile::record(counter, 1.0);
         unsafe {
+            let stage = vk::PipelineStageFlags::ACCELERATION_STRUCTURE_BUILD_KHR;
+            // 构建读取宿主上传的几何或实例，以及已有的 BLAS 和更新源 TLAS。
+            frame.graph_buffer_barrier(
+                &Buffer {
+                    inner: input.clone(),
+                },
+                (vk::PipelineStageFlags::HOST, vk::AccessFlags::HOST_WRITE),
+                (stage, vk::AccessFlags::SHADER_READ),
+            )?;
+            frame.graph_buffer_barriers(
+                structures,
+                (stage, vk::AccessFlags::ACCELERATION_STRUCTURE_WRITE_KHR),
+                (stage, vk::AccessFlags::ACCELERATION_STRUCTURE_READ_KHR),
+            )?;
+            let timestamp = frame.profile_begin(if top { "gpu_tlas_us" } else { "gpu_blas_us" });
+            profile::record(counter, 1.0);
             structure.loader.cmd_build_acceleration_structures(
                 frame.command_buffer,
                 &[build],
@@ -400,19 +464,6 @@ impl Backend {
                     .primitive_count(primitives)]],
             );
             frame.profile_end(timestamp);
-            let build_stage = vk::PipelineStageFlags::ACCELERATION_STRUCTURE_BUILD_KHR;
-            let barrier = vk::MemoryBarrier::default()
-                .src_access_mask(vk::AccessFlags::ACCELERATION_STRUCTURE_WRITE_KHR)
-                .dst_access_mask(vk::AccessFlags::ACCELERATION_STRUCTURE_READ_KHR);
-            device.cmd_pipeline_barrier(
-                frame.command_buffer,
-                build_stage,
-                build_stage | vk::PipelineStageFlags::RAY_TRACING_SHADER_KHR,
-                vk::DependencyFlags::empty(),
-                &[barrier],
-                &[],
-                &[],
-            );
         }
         frame.resources.push(structure.clone());
         frame.resources.push(scratch);

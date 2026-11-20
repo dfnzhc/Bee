@@ -1,47 +1,46 @@
+use crate::buffer::{Buffer, BufferState};
 use crate::device::{Backend, DeviceState};
 use crate::profile::{self, Timestamps};
 use anyhow::{anyhow, bail, Context, Result};
 use ash::vk;
 use std::sync::Arc;
 
-#[derive(Clone)]
-pub struct Buffer {
-    pub(crate) inner: Arc<BufferState>,
-}
-
-pub(crate) struct BufferState {
-    pub(crate) device: Arc<DeviceState>,
-    pub(crate) buffer: vk::Buffer,
-    memory: vk::DeviceMemory,
-    pub(crate) size: u64,
-    usage: vk::BufferUsageFlags,
-}
-
-impl Drop for BufferState {
-    fn drop(&mut self) {
-        unsafe {
-            self.device.device.destroy_buffer(self.buffer, None);
-            self.device.device.free_memory(self.memory, None);
-        }
-    }
-}
-
 pub struct Frame {
     pub(crate) device: Arc<DeviceState>,
-    pool: vk::CommandPool,
+    pool: Arc<CommandPool>,
     pub(crate) command_buffer: vk::CommandBuffer,
     pub(crate) resources: Vec<Arc<dyn Send + Sync>>,
     timestamps: Option<Timestamps>,
 }
 
-impl Drop for Frame {
+struct CommandPool {
+    device: Arc<DeviceState>,
+    handle: vk::CommandPool,
+}
+
+impl Drop for CommandPool {
     fn drop(&mut self) {
-        unsafe { self.device.device.destroy_command_pool(self.pool, None) };
+        unsafe { self.device.device.destroy_command_pool(self.handle, None) };
     }
 }
 
+pub struct WorkerCommands {
+    pool: Arc<CommandPool>,
+    buffers: Vec<vk::CommandBuffer>,
+    used: usize,
+    secondary_buffers: Vec<vk::CommandBuffer>,
+    secondary_used: usize,
+}
+
+pub struct RecordedCommands(Frame);
+
+pub(crate) struct SecondaryCommands {
+    _pool: Arc<CommandPool>,
+    pub handle: vk::CommandBuffer,
+}
+
 pub struct Submission {
-    frame: Option<Frame>,
+    frames: Vec<Frame>,
     fence: vk::Fence,
 }
 
@@ -60,128 +59,186 @@ impl Backend {
         if size == 0 || usage.is_empty() || !(usage & !supported).is_empty() {
             bail!("invalid graph buffer size or usage");
         }
-        let device = &self.device.device;
-        let info = vk::BufferCreateInfo::default()
-            .size(size)
-            .usage(usage)
-            .sharing_mode(vk::SharingMode::EXCLUSIVE);
-        let buffer = unsafe { device.create_buffer(&info, None) }
-            .context("could not create Vulkan buffer")?;
-        let requirements = unsafe { device.get_buffer_memory_requirements(buffer) };
-        let properties = unsafe {
-            self.device
-                .instance
-                .instance
-                .get_physical_device_memory_properties(self.device.physical_device)
-        };
-
-        // 优先使用设备本地内存，同时排除受保护的内存。
-        let memory_type = (0..properties.memory_type_count)
-            .filter(|index| {
-                requirements.memory_type_bits & (1 << index) != 0
-                    && !properties.memory_types[*index as usize]
-                        .property_flags
-                        .contains(vk::MemoryPropertyFlags::PROTECTED)
-            })
-            .min_by_key(|index| {
-                !properties.memory_types[*index as usize]
-                    .property_flags
-                    .contains(vk::MemoryPropertyFlags::DEVICE_LOCAL)
-            });
-        let Some(memory_type) = memory_type else {
-            unsafe { device.destroy_buffer(buffer, None) };
-            bail!("no compatible Vulkan memory type for transfer buffer");
-        };
-        let allocation = vk::MemoryAllocateInfo::default()
-            .allocation_size(requirements.size)
-            .memory_type_index(memory_type);
-        let memory = match unsafe { device.allocate_memory(&allocation, None) } {
-            Ok(memory) => memory,
-            Err(error) => {
-                unsafe { device.destroy_buffer(buffer, None) };
-                return Err(error).context("could not allocate Vulkan buffer memory");
-            }
-        };
-        if let Err(error) = unsafe { device.bind_buffer_memory(buffer, memory, 0) } {
-            unsafe {
-                device.destroy_buffer(buffer, None);
-                device.free_memory(memory, None);
-            }
-            return Err(error).context("could not bind Vulkan buffer memory");
-        }
         Ok(Buffer {
-            inner: Arc::new(BufferState {
-                device: self.device.clone(),
-                buffer,
-                memory,
+            inner: Arc::new(BufferState::allocate(
+                &self.device,
                 size,
                 usage,
-            }),
+                false,
+                false,
+            )?),
         })
     }
 
     pub fn begin_frame(&self) -> Result<Frame> {
-        // 每帧持有自己的命令池，确保录制的命令在提交期间保持有效。
-        let device = &self.device.device;
+        let pool = self.create_command_pool()?;
+        let command_buffer = pool.allocate(vk::CommandBufferLevel::PRIMARY)?;
+        Frame::begin(pool, command_buffer)
+    }
+
+    fn create_command_pool(&self) -> Result<Arc<CommandPool>> {
         let info = vk::CommandPoolCreateInfo::default()
             .queue_family_index(self.device.queue_family)
             .flags(vk::CommandPoolCreateFlags::TRANSIENT);
-        let pool = unsafe { device.create_command_pool(&info, None) }
+        let handle = unsafe { self.device.device.create_command_pool(&info, None) }
             .context("could not create Vulkan command pool")?;
-        let allocate = vk::CommandBufferAllocateInfo::default()
-            .command_pool(pool)
-            .level(vk::CommandBufferLevel::PRIMARY)
-            .command_buffer_count(1);
-        let command_buffer = match unsafe { device.allocate_command_buffers(&allocate) } {
-            Ok(buffers) => buffers[0],
-            Err(error) => {
-                unsafe { device.destroy_command_pool(pool, None) };
-                return Err(error).context("could not allocate Vulkan command buffer");
-            }
-        };
-        let begin = vk::CommandBufferBeginInfo::default()
-            .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
-        if let Err(error) = unsafe { device.begin_command_buffer(command_buffer, &begin) } {
-            unsafe { device.destroy_command_pool(pool, None) };
-            return Err(error).context("could not begin Vulkan command buffer");
-        }
-        Ok(Frame {
+        Ok(Arc::new(CommandPool {
             device: self.device.clone(),
-            pool,
-            command_buffer,
-            resources: Vec::new(),
-            timestamps: None,
-        })
+            handle,
+        }))
     }
 
     pub fn reuse_frame(&self, mut frame: Frame) -> Result<Frame> {
         if !Arc::ptr_eq(&self.device, &frame.device) {
             bail!("frame belongs to a different Vulkan device");
         }
-        let device = &frame.device.device;
-        let begin = vk::CommandBufferBeginInfo::default()
-            .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
-        unsafe {
-            device.reset_command_pool(frame.pool, vk::CommandPoolResetFlags::empty())?;
-            device.begin_command_buffer(frame.command_buffer, &begin)?;
-        }
+        Arc::get_mut(&mut frame.pool)
+            .context("command pool is still in use")?
+            .reset()?;
+        frame.begin_recording()?;
         if let Some(timestamps) = &mut frame.timestamps {
             timestamps.reset(frame.command_buffer);
         }
         Ok(frame)
     }
+
+    pub fn worker_commands(&self) -> Result<WorkerCommands> {
+        Ok(WorkerCommands {
+            pool: self.create_command_pool()?,
+            buffers: Vec::new(),
+            used: 0,
+            secondary_buffers: Vec::new(),
+            secondary_used: 0,
+        })
+    }
+
+    pub fn submit_recorded(&self, commands: Vec<RecordedCommands>) -> Result<Submission> {
+        if commands
+            .iter()
+            .any(|commands| !Arc::ptr_eq(&self.device, &commands.0.device))
+        {
+            bail!("recorded commands belong to a different Vulkan device");
+        }
+        Submission::queue(commands.into_iter().map(|commands| commands.0).collect())
+    }
 }
 
-impl Buffer {
-    pub fn raw(&self) -> vk::Buffer {
-        self.inner.buffer
+impl CommandPool {
+    fn allocate(&self, level: vk::CommandBufferLevel) -> Result<vk::CommandBuffer> {
+        let allocate = vk::CommandBufferAllocateInfo::default()
+            .command_pool(self.handle)
+            .level(level)
+            .command_buffer_count(1);
+        let buffers = unsafe { self.device.device.allocate_command_buffers(&allocate) }
+            .context("could not allocate Vulkan command buffer")?;
+        Ok(buffers[0])
     }
-    pub fn usage(&self) -> vk::BufferUsageFlags {
-        self.inner.usage
+
+    fn reset(&mut self) -> Result<()> {
+        unsafe {
+            self.device
+                .device
+                .reset_command_pool(self.handle, vk::CommandPoolResetFlags::empty())
+        }
+        .context("could not reset Vulkan command pool")
+    }
+}
+
+impl WorkerCommands {
+    pub fn reset(&mut self) -> Result<()> {
+        if self.used != 0 || self.secondary_used != 0 {
+            // 录制结果和在途提交都持有引用，最后一个引用回收后才可重置。
+            Arc::get_mut(&mut self.pool)
+                .context("worker command pool is still in use")?
+                .reset()?;
+            self.used = 0;
+            self.secondary_used = 0;
+        }
+        Ok(())
+    }
+
+    pub fn record(
+        &mut self,
+        run: impl FnOnce(&mut Frame) -> Result<(), String>,
+    ) -> Result<RecordedCommands, String> {
+        if self.used == self.buffers.len() {
+            self.buffers.push(
+                self.pool
+                    .allocate(vk::CommandBufferLevel::PRIMARY)
+                    .map_err(|error| error.to_string())?,
+            );
+        }
+        let command_buffer = self.buffers[self.used];
+        self.used += 1;
+        let mut frame =
+            Frame::begin(self.pool.clone(), command_buffer).map_err(|error| error.to_string())?;
+        run(&mut frame)?;
+        frame
+            .finish_recording()
+            .map_err(|error| error.to_string())?;
+        Ok(RecordedCommands(frame))
+    }
+
+    pub(crate) fn record_secondary(
+        &mut self,
+        device: &Arc<DeviceState>,
+        inheritance: &vk::CommandBufferInheritanceInfo<'_>,
+        run: impl FnOnce(vk::CommandBuffer),
+    ) -> Result<Arc<SecondaryCommands>> {
+        if !Arc::ptr_eq(device, &self.pool.device) {
+            bail!("secondary commands belong to a different Vulkan device");
+        }
+        if self.secondary_used == self.secondary_buffers.len() {
+            self.secondary_buffers
+                .push(self.pool.allocate(vk::CommandBufferLevel::SECONDARY)?);
+        }
+        let handle = self.secondary_buffers[self.secondary_used];
+        self.secondary_used += 1;
+        let begin = vk::CommandBufferBeginInfo::default()
+            .flags(
+                vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT
+                    | vk::CommandBufferUsageFlags::RENDER_PASS_CONTINUE,
+            )
+            .inheritance_info(inheritance);
+        unsafe { device.device.begin_command_buffer(handle, &begin)? };
+        run(handle);
+        unsafe { device.device.end_command_buffer(handle)? };
+        Ok(Arc::new(SecondaryCommands {
+            _pool: self.pool.clone(),
+            handle,
+        }))
     }
 }
 
 impl Frame {
+    fn begin(pool: Arc<CommandPool>, command_buffer: vk::CommandBuffer) -> Result<Self> {
+        let frame = Self {
+            device: pool.device.clone(),
+            pool,
+            command_buffer,
+            resources: Vec::new(),
+            timestamps: None,
+        };
+        frame.begin_recording()?;
+        Ok(frame)
+    }
+
+    fn begin_recording(&self) -> Result<()> {
+        let info = vk::CommandBufferBeginInfo::default()
+            .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+        unsafe {
+            self.device
+                .device
+                .begin_command_buffer(self.command_buffer, &info)
+        }
+        .context("could not begin Vulkan command buffer")
+    }
+
+    fn finish_recording(&self) -> Result<()> {
+        unsafe { self.device.device.end_command_buffer(self.command_buffer) }
+            .context("could not finish Vulkan command buffer")
+    }
+
     pub fn profile_begin(&mut self, name: &'static str) -> Option<u32> {
         if !profile::active() || self.device.timestamp_bits == 0 {
             return None;
@@ -212,10 +269,7 @@ impl Frame {
         if !Arc::ptr_eq(&self.device, &buffer.inner.device) {
             bail!("buffer belongs to a different Vulkan device");
         }
-        if !buffer
-            .inner
-            .usage
-            .contains(vk::BufferUsageFlags::TRANSFER_DST)
+        if !buffer.usage().contains(vk::BufferUsageFlags::TRANSFER_DST)
             || !buffer.inner.size.is_multiple_of(4)
         {
             bail!("buffer does not support transfer filling");
@@ -257,42 +311,77 @@ impl Frame {
         before: (vk::PipelineStageFlags, vk::AccessFlags),
         after: (vk::PipelineStageFlags, vk::AccessFlags),
     ) -> Result<()> {
-        if !Arc::ptr_eq(&self.device, &buffer.inner.device) {
+        self.graph_buffer_barriers(std::slice::from_ref(buffer), before, after)
+    }
+
+    /// # Safety
+    /// 调用方须保证屏障阶段和访问类型匹配这些缓冲区的真实用途。
+    pub unsafe fn graph_buffer_barriers(
+        &mut self,
+        buffers: &[Buffer],
+        before: (vk::PipelineStageFlags, vk::AccessFlags),
+        after: (vk::PipelineStageFlags, vk::AccessFlags),
+    ) -> Result<()> {
+        if buffers.is_empty() {
+            return Ok(());
+        }
+        if buffers
+            .iter()
+            .any(|buffer| !Arc::ptr_eq(&self.device, &buffer.inner.device))
+        {
             bail!("graph buffer belongs to a different Vulkan device");
         }
-        let barrier = vk::BufferMemoryBarrier::default()
-            .src_access_mask(before.1)
-            .dst_access_mask(after.1)
-            .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-            .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-            .buffer(buffer.raw())
-            .offset(0)
-            .size(vk::WHOLE_SIZE);
+        let barriers: Vec<_> = buffers
+            .iter()
+            .map(|buffer| {
+                vk::BufferMemoryBarrier::default()
+                    .src_access_mask(before.1)
+                    .dst_access_mask(after.1)
+                    .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                    .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                    .buffer(buffer.raw())
+                    .offset(0)
+                    .size(vk::WHOLE_SIZE)
+            })
+            .collect();
         self.device.device.cmd_pipeline_barrier(
             self.command_buffer,
             before.0,
             after.0,
             vk::DependencyFlags::empty(),
             &[],
-            &[barrier],
+            &barriers,
             &[],
         );
-        self.resources.push(buffer.inner.clone());
+        self.resources.extend(
+            buffers
+                .iter()
+                .map(|buffer| buffer.inner.clone() as Arc<dyn Send + Sync>),
+        );
         Ok(())
     }
 
     pub fn submit(self) -> Result<Submission> {
-        let device = &self.device.device;
-        unsafe { device.end_command_buffer(self.command_buffer) }
-            .context("could not finish Vulkan command buffer")?;
+        self.finish_recording()?;
+        Submission::queue(vec![self])
+    }
+}
+
+impl Submission {
+    fn queue(frames: Vec<Frame>) -> Result<Self> {
+        let state = &frames
+            .first()
+            .context("no Vulkan commands to submit")?
+            .device;
+        let device = &state.device;
         let fence = unsafe { device.create_fence(&vk::FenceCreateInfo::default(), None) }
             .context("could not create Vulkan submission fence")?;
-        let command_buffers = [self.command_buffer];
+        let command_buffers: Vec<_> = frames.iter().map(|frame| frame.command_buffer).collect();
         let submissions = [vk::SubmitInfo::default().command_buffers(&command_buffers)];
 
         // Vulkan 要求在外部同步对队列的提交。
-        let result = match self.device.queue_lock.lock() {
-            Ok(_lock) => unsafe { device.queue_submit(self.device.queue, &submissions, fence) }
+        let result = match state.queue_lock.lock() {
+            Ok(_lock) => unsafe { device.queue_submit(state.queue, &submissions, fence) }
                 .context("could not submit Vulkan commands"),
             Err(_) => Err(anyhow!("Vulkan queue lock was poisoned")),
         };
@@ -300,16 +389,11 @@ impl Frame {
             unsafe { device.destroy_fence(fence, None) };
             return Err(error);
         }
-        Ok(Submission {
-            frame: Some(self),
-            fence,
-        })
+        Ok(Submission { frames, fence })
     }
-}
 
-impl Submission {
     pub fn is_complete(&self) -> Result<bool> {
-        let frame = self.frame.as_ref().expect("submission is already finished");
+        let frame = self.frames.first().expect("submission is already finished");
         unsafe { frame.device.device.get_fence_status(self.fence) }
             .context("could not query Vulkan submission fence")
     }
@@ -320,14 +404,17 @@ impl Submission {
 
     pub fn reclaim(mut self) -> Result<Frame> {
         self.finish()?;
+        if self.frames.len() != 1 {
+            bail!("cannot reclaim a multi-buffer submission as one frame");
+        }
         Ok(self
-            .frame
-            .take()
+            .frames
+            .pop()
             .expect("completed submission retains its frame"))
     }
 
     fn finish(&mut self) -> Result<()> {
-        let Some(frame) = self.frame.as_ref() else {
+        let Some(frame) = self.frames.first() else {
             return Ok(());
         };
         let result = profile::span("fence_wait_us", || unsafe {
@@ -337,8 +424,10 @@ impl Submission {
                 .wait_for_fences(&[self.fence], true, u64::MAX)
         });
         if result.is_ok() {
-            if let Some(Err(error)) = frame.timestamps.as_ref().map(Timestamps::collect) {
-                eprintln!("Could not collect Vulkan timestamps: {error}");
+            for frame in &self.frames {
+                if let Some(Err(error)) = frame.timestamps.as_ref().map(Timestamps::collect) {
+                    eprintln!("Could not collect Vulkan timestamps: {error}");
+                }
             }
         }
         if let Err(error) = result {
@@ -353,14 +442,14 @@ impl Submission {
                 });
             if idle.is_err() && error != vk::Result::ERROR_DEVICE_LOST {
                 // 无法确认执行完成时，继续保留设备和资源。
-                std::mem::forget(self.frame.take());
+                std::mem::forget(std::mem::take(&mut self.frames));
                 return Err(anyhow!(
                     "Vulkan submission completion could not be established: {error:?}"
                 ));
             }
         }
         unsafe { frame.device.device.destroy_fence(self.fence, None) };
-        if let Some(frame) = &mut self.frame {
+        for frame in &mut self.frames {
             frame.resources.clear();
         }
         self.fence = vk::Fence::null();

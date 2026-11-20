@@ -7,3 +7,4 @@ edition = "2021"
 ash = "=0.38.0"
 bee-vulkan = { path = "../vulkan" }
 bee-scene = { path = "../scene" }
+rayon = "1.12"

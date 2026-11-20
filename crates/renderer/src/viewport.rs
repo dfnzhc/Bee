@@ -1,14 +1,14 @@
 use crate::{
     scene::{PathScene, RasterScene},
-    Access, DisplayWork, GraphResources, Module, ModuleGraph, NodeId, RasterWork, ResourceId,
-    Usage, WorkGraph, WorkId, WorkPlan,
+    Access, DisplayWork, GraphResource, GraphResources, Module, ModuleGraph, NodeId, RasterWork,
+    ResourceId, Usage, WorkGraph, WorkId, WorkPlan,
 };
 use ash::vk;
 use bee_scene::RenderSnapshot;
 use bee_vulkan::{
     profile, Backend, GraphImage, PathTracer, Rasterizer, ReadbackBuffer, ToneMapper,
 };
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 #[derive(Clone)]
 pub struct PreparedFlow {
@@ -24,13 +24,16 @@ struct FlowPlan {
     scene: ResourceId,
     depth: Option<ResourceId>,
     display: ResourceId,
+    readback: ResourceId,
+    scene_inputs: [ResourceId; 2],
+    shader_table: Option<ResourceId>,
     first_work: SceneWork,
     continued_trace: Option<WorkId>,
     tone: DisplayWork,
-    read: WorkId,
+    read: [WorkId; 2],
     display_only: WorkPlan,
     display_tone: DisplayWork,
-    display_read: WorkId,
+    display_read: [WorkId; 2],
 }
 
 enum SceneWork {
@@ -51,46 +54,62 @@ impl PreparedFlow {
             });
         }
 
-        let make_graph = |scene_usage| {
-            let mut graph = WorkGraph::default();
-            let scene = graph.add_resource(scene_usage);
-            let depth = (mode == Module::Rasterization).then(|| graph.add_resource(None));
-            let display = graph.add_resource(None);
-            (graph, scene, depth, display)
-        };
-        let (mut graph, scene, depth, display) = make_graph(None);
+        let tracing = mode == Module::PathTracing;
+        let (mut graph, scene, depth, display, readback, scene_inputs, shader_table) =
+            viewport_graph(tracing, None);
         let first_work = match mode {
-            Module::Rasterization => SceneWork::Raster(RasterWork::declare(
+            Module::Rasterization => SceneWork::Raster(RasterWork::declare_with_inputs(
                 modules,
                 chain[0],
                 &mut graph,
                 scene,
                 depth.unwrap(),
+                [
+                    Access {
+                        resource: scene_inputs[0],
+                        usage: Usage::VertexRead,
+                    },
+                    Access {
+                        resource: scene_inputs[1],
+                        usage: Usage::FragmentRead,
+                    },
+                ],
             )?),
-            Module::PathTracing => {
-                SceneWork::Trace(trace_work(&mut graph, scene, Usage::ShaderWrite)?)
-            }
+            Module::PathTracing => SceneWork::Trace(trace_work(
+                &mut graph,
+                scene,
+                Usage::RayWrite,
+                scene_inputs,
+                shader_table.unwrap(),
+            )?),
             _ => return Err("viewport input is not connected to a scene renderer".into()),
         };
         let tone =
             DisplayWork::declare(modules, &mut graph, &[(chain[0], scene)], display, display)?;
-        let read = read_work(&mut graph, display)?;
+        let read = read_work(&mut graph, display, readback)?;
         let first = graph.compile()?;
-        let (continued, continued_trace) = if mode == Module::PathTracing {
+        let (continued, continued_trace) = if tracing {
             // 续采仅在前一个已提交样本定义历史后使用。
-            let (mut graph, scene, _, display) = make_graph(Some(Usage::ShaderRead));
-            let trace = trace_work(&mut graph, scene, Usage::ShaderReadWrite)?;
+            let (mut graph, scene, _, display, readback, scene_inputs, table) =
+                viewport_graph(true, Some(Usage::FragmentRead));
+            let trace = trace_work(
+                &mut graph,
+                scene,
+                Usage::RayReadWrite,
+                scene_inputs,
+                table.unwrap(),
+            )?;
             DisplayWork::declare(modules, &mut graph, &[(chain[0], scene)], display, display)?;
-            let continued_read = read_work(&mut graph, display)?;
+            let continued_read = read_work(&mut graph, display, readback)?;
             debug_assert_eq!(continued_read, read);
             (Some(graph.compile()?), Some(trace))
         } else {
             (None, None)
         };
-        let (mut graph, _, _, _) = make_graph(Some(Usage::ShaderRead));
+        let (mut graph, _, _, _, _, _, _) = viewport_graph(tracing, Some(Usage::FragmentRead));
         let display_tone =
             DisplayWork::declare(modules, &mut graph, &[(chain[0], scene)], display, display)?;
-        let display_read = read_work(&mut graph, display)?;
+        let display_read = read_work(&mut graph, display, readback)?;
         let display_only = graph.compile()?;
         Ok(Self {
             plan: Arc::new(FlowPlan {
@@ -101,6 +120,9 @@ impl PreparedFlow {
                 scene,
                 depth,
                 display,
+                readback,
+                scene_inputs,
+                shader_table,
                 first_work,
                 continued_trace,
                 tone,
@@ -118,27 +140,96 @@ impl PreparedFlow {
     }
 }
 
-fn trace_work(graph: &mut WorkGraph, scene: ResourceId, usage: Usage) -> Result<WorkId, String> {
+fn viewport_graph(
+    tracing: bool,
+    scene_usage: Option<Usage>,
+) -> (
+    WorkGraph,
+    ResourceId,
+    Option<ResourceId>,
+    ResourceId,
+    ResourceId,
+    [ResourceId; 2],
+    Option<ResourceId>,
+) {
+    let mut graph = WorkGraph::default();
+    let scene = graph.add_resource(scene_usage);
+    let depth = (!tracing).then(|| graph.add_resource(None));
+    let display = graph.add_resource(None);
+    let readback = graph.add_resource(None);
+    let inputs = [
+        graph.add_resource(Some(Usage::HostWrite)),
+        graph.add_resource(Some(if tracing {
+            Usage::AccelerationBuildWrite
+        } else {
+            Usage::HostWrite
+        })),
+    ];
+    let shader_table = tracing.then(|| graph.add_resource(Some(Usage::HostWrite)));
+    (graph, scene, depth, display, readback, inputs, shader_table)
+}
+
+fn trace_work(
+    graph: &mut WorkGraph,
+    scene: ResourceId,
+    usage: Usage,
+    inputs: [ResourceId; 2],
+    shader_table: ResourceId,
+) -> Result<WorkId, String> {
     graph.add_work(
         "path tracing",
-        vec![Access {
-            resource: scene,
-            usage,
-        }],
+        vec![
+            Access {
+                resource: scene,
+                usage,
+            },
+            Access {
+                resource: inputs[0],
+                usage: Usage::RayRead,
+            },
+            Access {
+                resource: inputs[1],
+                usage: Usage::AccelerationTraceRead,
+            },
+            Access {
+                resource: shader_table,
+                usage: Usage::ShaderTableRead,
+            },
+        ],
     )
 }
 
-fn read_work(graph: &mut WorkGraph, display: ResourceId) -> Result<WorkId, String> {
-    graph.add_work(
+fn read_work(
+    graph: &mut WorkGraph,
+    display: ResourceId,
+    readback: ResourceId,
+) -> Result<[WorkId; 2], String> {
+    let copy = graph.add_work(
         "read viewport",
+        vec![
+            Access {
+                resource: display,
+                usage: Usage::TransferRead,
+            },
+            Access {
+                resource: readback,
+                usage: Usage::TransferWrite,
+            },
+        ],
+    )?;
+    let host = graph.add_work(
+        "host read viewport",
         vec![Access {
-            resource: display,
-            usage: Usage::TransferRead,
+            resource: readback,
+            usage: Usage::HostRead,
         }],
-    )
+    )?;
+    Ok([copy, host])
 }
 
 type Extent = (u32, u32);
+// 每个录制任务持有一半绘制批次。切换门槛来自同条件 Release 对照。
+const PARALLEL_DRAW_BATCHES: usize = 8192;
 
 #[derive(Default)]
 pub struct ViewportRenderer {
@@ -148,6 +239,7 @@ pub struct ViewportRenderer {
     tracer: Option<PathTracer>,
     path_scene: Option<PathScene>,
     history: Option<History>,
+    recording_pool: OnceLock<Option<rayon::ThreadPool>>,
 }
 
 struct History {
@@ -346,6 +438,17 @@ impl ViewportRenderer {
                 (scene_id, depth_id, display_id),
                 (plan.scene, plan.depth, plan.display)
             );
+            assert_eq!(
+                slot.resources.add_history(readback.graph_buffer()),
+                plan.readback
+            );
+            for id in plan.scene_inputs.into_iter().chain(plan.shader_table) {
+                assert_eq!(
+                    slot.resources
+                        .add_history(GraphResource::Buffers(Arc::default())),
+                    id
+                );
+            }
             slot.readback = Some(readback);
             slot.key = Some(key);
         }
@@ -358,68 +461,138 @@ impl ViewportRenderer {
             (plan.continued.as_ref().unwrap(), &plan.tone, plan.read)
         };
         let readback = slot.readback.as_ref().unwrap();
+        let parallel = !display_only
+            && !tracing
+            && self.raster_scene.as_ref().unwrap().instances.draw_batches()
+                >= PARALLEL_DRAW_BATCHES;
+        let pool = if parallel {
+            self.recording_pool
+                .get_or_init(|| {
+                    rayon::ThreadPoolBuilder::new()
+                        .num_threads(2)
+                        .thread_name(|index| format!("bee-record-{index}"))
+                        .build()
+                        .ok()
+                })
+                .as_ref()
+        } else {
+            None
+        };
         unsafe {
             // 两个槽在同一队列交接 HDR，按已提交的顺序继续访问与转换布局。
             slot.resources
                 .bind_ordered(plan.scene, history.image.clone(), history.usage);
-            slot.resources
-                .submit_plan(backend, work_plan, |work, frame, images| {
-                    if work == read {
-                        frame
-                            .copy_graph_image_to_readback(
-                                images[plan.display.index()].image()?,
-                                readback,
-                            )
-                            .map_err(string_error)?;
-                        return Ok(());
-                    }
-                    if tone.record_exposure(work, frame, images, mapper, flow.exposure_ev)? {
-                        return Ok(());
-                    }
-                    if !display_only {
-                        match &plan.first_work {
-                            SceneWork::Raster(raster) => {
-                                if raster.record(
-                                    work,
-                                    frame,
-                                    images,
-                                    self.raster.as_ref().unwrap(),
-                                    self.raster_scene.as_ref().unwrap(),
-                                    matrix,
-                                )? {
-                                    return Ok(());
-                                }
-                            }
-                            SceneWork::Trace(first)
-                                if Some(work)
-                                    == if samples == 0 {
-                                        Some(*first)
-                                    } else {
-                                        plan.continued_trace
-                                    } =>
-                            {
-                                let scene = self.path_scene.as_ref().unwrap();
-                                frame
-                                    .trace_paths(
-                                        self.tracer.as_ref().unwrap(),
-                                        &scene.instances,
-                                        &scene.materials,
-                                        &scene.lights,
-                                        images[plan.scene.index()].image()?,
-                                        matrix,
-                                        snapshot.scene.environment,
-                                        samples,
-                                        snapshot.render.max_path_bounces,
-                                        seed,
-                                    )
-                                    .map_err(string_error)?;
+            if !display_only {
+                let (reads, producers) = if tracing {
+                    let tracer = self.tracer.as_ref().unwrap();
+                    slot.resources.bind_input(
+                        plan.shader_table.unwrap(),
+                        tracer.shader_table(),
+                        Usage::HostWrite,
+                    );
+                    (
+                        &self.path_scene.as_ref().unwrap().reads,
+                        [Usage::HostWrite, Usage::AccelerationBuildWrite],
+                    )
+                } else {
+                    (
+                        &self.raster_scene.as_ref().unwrap().reads,
+                        [Usage::HostWrite; 2],
+                    )
+                };
+                for ((id, resource), producer) in
+                    plan.scene_inputs.into_iter().zip(reads).zip(producers)
+                {
+                    slot.resources.bind_input(id, resource.clone(), producer);
+                }
+            }
+            let record = |work, frame: &mut bee_vulkan::Frame, images: &[GraphResource]| {
+                if work == read[0] {
+                    frame
+                        .copy_graph_image_to_buffer(images[plan.display.index()].image()?, readback)
+                        .map_err(string_error)?;
+                    return Ok(());
+                }
+                if work == read[1] {
+                    return Ok(());
+                }
+                if tone.record_exposure(work, frame, images, mapper, flow.exposure_ev)? {
+                    return Ok(());
+                }
+                if !display_only {
+                    match &plan.first_work {
+                        SceneWork::Raster(raster) => {
+                            if raster.record(
+                                work,
+                                frame,
+                                images,
+                                self.raster.as_ref().unwrap(),
+                                self.raster_scene.as_ref().unwrap(),
+                                matrix,
+                            )? {
                                 return Ok(());
                             }
-                            _ => {}
                         }
+                        SceneWork::Trace(first)
+                            if Some(work)
+                                == if samples == 0 {
+                                    Some(*first)
+                                } else {
+                                    plan.continued_trace
+                                } =>
+                        {
+                            let scene = self.path_scene.as_ref().unwrap();
+                            frame
+                                .trace_paths(
+                                    self.tracer.as_ref().unwrap(),
+                                    &scene.instances,
+                                    &scene.materials,
+                                    &scene.lights,
+                                    images[plan.scene.index()].image()?,
+                                    matrix,
+                                    snapshot.scene.environment,
+                                    samples,
+                                    snapshot.render.max_path_bounces,
+                                    seed,
+                                )
+                                .map_err(string_error)?;
+                            return Ok(());
+                        }
+                        _ => {}
                     }
-                    Err("unknown viewport graph work".into())
-                })?;
+                }
+                Err("unknown viewport graph work".into())
+            };
+            if let Some(pool) = pool {
+                profile::record("parallel_record", 1.0);
+                slot.resources.submit_parallel(
+                    backend,
+                    work_plan,
+                    pool,
+                    |resources| {
+                        if let SceneWork::Raster(raster) = &plan.first_work {
+                            if !display_only {
+                                let scene = self.raster_scene.as_ref().unwrap();
+                                if scene.instances.draw_batches() > 1 {
+                                    return raster
+                                        .prepare_draws(
+                                            backend,
+                                            resources,
+                                            self.raster.as_ref().unwrap(),
+                                            scene,
+                                            matrix,
+                                        )
+                                        .map(Some);
+                                }
+                            }
+                        }
+                        Ok(None)
+                    },
+                    record,
+                )?;
+            } else {
+                slot.resources.submit_plan(backend, work_plan, record)?;
+            }
         }
         history.usage = slot.resources.usage(plan.scene);
         history.exposure_ev = flow.exposure_ev;

@@ -1,3 +1,4 @@
+use crate::GraphResource;
 use bee_scene::{Geometry, Instance, Scene, Transform3};
 use bee_vulkan::{
     profile, AccelerationMesh, AccelerationScene, Backend, RasterGeometry, RasterInstance,
@@ -14,6 +15,7 @@ pub(crate) struct CachedScene<M, I> {
     pub instances: I,
     pub materials: SceneBuffer,
     pub lights: SceneBuffer,
+    pub reads: [GraphResource; 2],
 }
 
 impl<M: Clone, I> CachedScene<M, I> {
@@ -23,6 +25,7 @@ impl<M: Clone, I> CachedScene<M, I> {
         previous: Option<&Self>,
         upload_mesh: impl Fn(&Backend, &[[f32; 4]]) -> Result<M, String>,
         prepare_instances: impl FnOnce(&[M], bool) -> Result<I, String>,
+        graph_reads: impl FnOnce(&[M], &I, &SceneBuffer, &SceneBuffer) -> [GraphResource; 2],
     ) -> Result<Self, String> {
         if !valid_color(&source.environment) {
             return Err("invalid environment color".into());
@@ -88,12 +91,14 @@ impl<M: Clone, I> CachedScene<M, I> {
             }
         }
         let instances = prepare_instances(&meshes, meshes_changed)?;
+        let reads = graph_reads(&meshes, &instances, &materials, &lights);
         Ok(Self {
             source: source.clone(),
             meshes,
             instances,
             materials,
             lights,
+            reads,
         })
     }
 }
@@ -131,6 +136,14 @@ impl RasterScene {
                 backend
                     .upload_raster_instances(&data, meshes)
                     .map_err(|error| error.to_string())
+            },
+            |meshes, instances, materials, lights| {
+                let vertex: Vec<_> = meshes
+                    .iter()
+                    .map(RasterGeometry::graph_buffer)
+                    .chain([instances.graph_buffer(), materials.graph_buffer()])
+                    .collect();
+                [vertex.into(), lights.graph_buffer().into()]
             },
         )
     }
@@ -183,6 +196,11 @@ impl PathScene {
                     )
                 })
                 .map_err(|error| error.to_string())
+            },
+            |_, instances, materials, lights| {
+                let mut shader = instances.shader_buffers();
+                shader.extend([materials.graph_buffer(), lights.graph_buffer()]);
+                [shader.into(), instances.acceleration_buffers().into()]
             },
         )
     }

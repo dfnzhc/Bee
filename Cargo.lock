@@ -546,6 +546,7 @@ dependencies = [
  "ash",
  "bee-scene",
  "bee-vulkan",
+ "rayon",
 ]
 
 [[package]]
