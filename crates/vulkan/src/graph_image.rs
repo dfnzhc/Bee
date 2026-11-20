@@ -310,6 +310,7 @@ impl Frame {
                 height: source.inner.height,
                 depth: 1,
             });
+        crate::profile::record("image_copy", 1.0);
         self.device.device.cmd_copy_image(
             self.command_buffer,
             source.raw(),

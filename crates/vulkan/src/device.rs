@@ -66,6 +66,8 @@ pub(crate) struct DeviceState {
     pub device: ash::Device,
     pub queue: vk::Queue,
     pub queue_family: u32,
+    pub timestamp_bits: u32,
+    pub timestamp_period: f32,
     pub queue_lock: Mutex<()>,
 }
 
@@ -475,6 +477,8 @@ impl Backend {
                     device,
                     queue,
                     queue_family,
+                    timestamp_bits: queues[queue_family as usize].timestamp_valid_bits,
+                    timestamp_period: properties.limits.timestamp_period,
                     queue_lock: Mutex::new(()),
                 }),
             });

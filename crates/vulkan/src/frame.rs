@@ -1,4 +1,5 @@
 use crate::device::{Backend, DeviceState};
+use crate::profile::{self, Timestamps};
 use anyhow::{anyhow, bail, Context, Result};
 use ash::vk;
 use std::sync::Arc;
@@ -30,6 +31,7 @@ pub struct Frame {
     pool: vk::CommandPool,
     pub(crate) command_buffer: vk::CommandBuffer,
     pub(crate) resources: Vec<Arc<dyn Send + Sync>>,
+    timestamps: Option<Timestamps>,
 }
 
 impl Drop for Frame {
@@ -148,7 +150,25 @@ impl Backend {
             pool,
             command_buffer,
             resources: Vec::new(),
+            timestamps: None,
         })
+    }
+
+    pub fn reuse_frame(&self, mut frame: Frame) -> Result<Frame> {
+        if !Arc::ptr_eq(&self.device, &frame.device) {
+            bail!("frame belongs to a different Vulkan device");
+        }
+        let device = &frame.device.device;
+        let begin = vk::CommandBufferBeginInfo::default()
+            .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+        unsafe {
+            device.reset_command_pool(frame.pool, vk::CommandPoolResetFlags::empty())?;
+            device.begin_command_buffer(frame.command_buffer, &begin)?;
+        }
+        if let Some(timestamps) = &mut frame.timestamps {
+            timestamps.reset(frame.command_buffer);
+        }
+        Ok(frame)
     }
 }
 
@@ -162,6 +182,32 @@ impl Buffer {
 }
 
 impl Frame {
+    pub fn profile_begin(&mut self, name: &'static str) -> Option<u32> {
+        if !profile::active() || self.device.timestamp_bits == 0 {
+            return None;
+        }
+        if self.timestamps.is_none() {
+            match Timestamps::new(&self.device) {
+                Ok(Some(mut timestamps)) => {
+                    timestamps.reset(self.command_buffer);
+                    self.timestamps = Some(timestamps);
+                }
+                Ok(None) => return None,
+                Err(error) => {
+                    eprintln!("Vulkan timestamps unavailable: {error}");
+                    return None;
+                }
+            }
+        }
+        self.timestamps.as_mut()?.begin(self.command_buffer, name)
+    }
+
+    pub fn profile_end(&self, end: Option<u32>) {
+        if let (Some(timestamps), Some(end)) = (&self.timestamps, end) {
+            timestamps.end(self.command_buffer, end);
+        }
+    }
+
     pub fn fill_buffer(&mut self, buffer: &Buffer, value: u32) -> Result<()> {
         if !Arc::ptr_eq(&self.device, &buffer.inner.device) {
             bail!("buffer belongs to a different Vulkan device");
@@ -272,16 +318,29 @@ impl Submission {
         self.finish()
     }
 
+    pub fn reclaim(mut self) -> Result<Frame> {
+        self.finish()?;
+        Ok(self
+            .frame
+            .take()
+            .expect("completed submission retains its frame"))
+    }
+
     fn finish(&mut self) -> Result<()> {
         let Some(frame) = self.frame.as_ref() else {
             return Ok(());
         };
-        let result = unsafe {
+        let result = profile::span("fence_wait_us", || unsafe {
             frame
                 .device
                 .device
                 .wait_for_fences(&[self.fence], true, u64::MAX)
-        };
+        });
+        if result.is_ok() {
+            if let Some(Err(error)) = frame.timestamps.as_ref().map(Timestamps::collect) {
+                eprintln!("Could not collect Vulkan timestamps: {error}");
+            }
+        }
         if let Err(error) = result {
             // 释放资源前，尝试通过等待设备空闲确认执行已完成。
             let idle = frame
@@ -301,15 +360,20 @@ impl Submission {
             }
         }
         unsafe { frame.device.device.destroy_fence(self.fence, None) };
-        self.frame.take();
+        if let Some(frame) = &mut self.frame {
+            frame.resources.clear();
+        }
+        self.fence = vk::Fence::null();
         result.context("Vulkan submission wait failed")
     }
 }
 
 impl Drop for Submission {
     fn drop(&mut self) {
-        if let Err(error) = self.finish() {
-            eprintln!("{error:#}");
+        if self.fence != vk::Fence::null() {
+            if let Err(error) = self.finish() {
+                eprintln!("{error:#}");
+            }
         }
     }
 }
@@ -371,6 +435,8 @@ mod tests {
                 device: raw_device,
                 queue,
                 queue_family: initial.device.queue_family,
+                timestamp_bits: initial.device.timestamp_bits,
+                timestamp_period: initial.device.timestamp_period,
                 queue_lock: Mutex::new(()),
             }),
         };

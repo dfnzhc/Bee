@@ -28,7 +28,7 @@ pub struct DisplayWork {
     viewport: ResourceId,
     exposure_ev: f32,
     tone_work: WorkId,
-    output_work: WorkId,
+    output_work: Option<WorkId>,
 }
 
 impl DisplayWork {
@@ -55,9 +55,8 @@ impl DisplayWork {
             .any(|id| id.0 >= graph.resources.len())
             || scene == mapped
             || scene == viewport
-            || mapped == viewport
         {
-            return Err("display work requires three distinct graph resources".into());
+            return Err("display work requires separate scene and display resources".into());
         }
         let tone_work = graph.add_work(
             "tone mapping",
@@ -72,19 +71,23 @@ impl DisplayWork {
                 },
             ],
         )?;
-        let output_work = graph.add_work(
-            "viewport output",
-            vec![
-                Access {
-                    resource: mapped,
-                    usage: Usage::TransferRead,
-                },
-                Access {
-                    resource: viewport,
-                    usage: Usage::TransferWrite,
-                },
-            ],
-        )?;
+        let output_work = (mapped != viewport)
+            .then(|| {
+                graph.add_work(
+                    "viewport output",
+                    vec![
+                        Access {
+                            resource: mapped,
+                            usage: Usage::TransferRead,
+                        },
+                        Access {
+                            resource: viewport,
+                            usage: Usage::TransferWrite,
+                        },
+                    ],
+                )
+            })
+            .transpose()?;
         Ok(Self {
             source,
             scene,
@@ -109,6 +112,17 @@ impl DisplayWork {
         images: &[GraphResource],
         mapper: &ToneMapper,
     ) -> Result<bool, String> {
+        self.record_exposure(work, frame, images, mapper, self.exposure_ev)
+    }
+
+    pub(crate) unsafe fn record_exposure(
+        &self,
+        work: WorkId,
+        frame: &mut Frame,
+        images: &[GraphResource],
+        mapper: &ToneMapper,
+        exposure_ev: f32,
+    ) -> Result<bool, String> {
         if images.len() <= self.scene.0.max(self.mapped.0).max(self.viewport.0) {
             return Err("display work is missing an image".into());
         }
@@ -118,10 +132,10 @@ impl DisplayWork {
                     mapper,
                     images[self.scene.0].image()?,
                     images[self.mapped.0].image()?,
-                    self.exposure_ev,
+                    exposure_ev,
                 )
                 .map_err(|error| error.to_string())?;
-        } else if work == self.output_work {
+        } else if Some(work) == self.output_work {
             frame
                 .copy_graph_image(
                     images[self.mapped.0].image()?,

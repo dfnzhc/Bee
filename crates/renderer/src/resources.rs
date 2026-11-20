@@ -1,4 +1,5 @@
 use crate::{GraphResource, ResourceId, Usage, WorkGraph, WorkId};
+use bee_vulkan::profile;
 use bee_vulkan::{Backend, Frame, Submission};
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -22,6 +23,7 @@ pub struct GraphResources {
     revision: u64,
     slots: Vec<Slot>,
     pending: Option<Submission>,
+    frame: Option<Frame>,
     poisoned: bool,
 }
 
@@ -32,6 +34,7 @@ impl Default for GraphResources {
             revision: 0,
             slots: Vec::new(),
             pending: None,
+            frame: None,
             poisoned: false,
         }
     }
@@ -145,9 +148,12 @@ impl GraphResources {
             return Err("previous graph submission did not complete safely".into());
         }
         if let Some(submission) = self.pending.take() {
-            if let Err(error) = submission.wait() {
-                self.poisoned = true;
-                return Err(error.to_string());
+            match submission.reclaim() {
+                Ok(frame) => self.frame = Some(frame),
+                Err(error) => {
+                    self.poisoned = true;
+                    return Err(error.to_string());
+                }
             }
         }
         Ok(())
@@ -173,7 +179,7 @@ impl GraphResources {
         &mut self,
         backend: &Backend,
         graph: &WorkGraph,
-        mut record: impl FnMut(WorkId, &mut Frame, &[GraphResource]) -> Result<(), String>,
+        record: impl FnMut(WorkId, &mut Frame, &[GraphResource]) -> Result<(), String>,
     ) -> Result<(), String> {
         if self.poisoned
             || self.pending.is_some()
@@ -183,17 +189,40 @@ impl GraphResources {
             return Err("graph resources changed or a submission is still pending".into());
         }
         let plan = graph.compile()?;
+        self.frame = None;
+        self.submit_plan(backend, &plan, record)
+    }
+
+    /// # Safety
+    /// 资源的初始用途和队列所有权须真实，回调须遵守计划声明及对象生命周期。
+    pub unsafe fn submit_plan(
+        &mut self,
+        backend: &Backend,
+        plan: &crate::WorkPlan,
+        mut record: impl FnMut(WorkId, &mut Frame, &[GraphResource]) -> Result<(), String>,
+    ) -> Result<(), String> {
+        if self.poisoned || self.pending.is_some() {
+            return Err("graph resources are not ready for submission".into());
+        }
         let resources: Vec<GraphResource> = self
             .slots
             .iter()
             .map(|slot| slot.resource.clone().ok_or("graph resource is unavailable"))
             .collect::<Result<_, _>>()?;
-        let mut frame = backend.begin_frame().map_err(|error| error.to_string())?;
-        plan.record(&mut frame, &resources, |work, frame| {
-            record(work, frame, &resources)
+        let mut usages: Vec<_> = self.slots.iter().map(|slot| slot.usage).collect();
+        let mut frame = profile::span("begin_frame_us", || match self.frame.take() {
+            Some(frame) => backend.reuse_frame(frame),
+            None => backend.begin_frame(),
+        })
+        .map_err(|error| error.to_string())?;
+        profile::span("record_us", || {
+            plan.record_bound(&mut frame, &resources, &mut usages, |work, frame| {
+                record(work, frame, &resources)
+            })
         })?;
-        let submission = frame.submit().map_err(|error| error.to_string())?;
-        for (slot, &usage) in self.slots.iter_mut().zip(plan.final_usages()) {
+        let submission =
+            profile::span("submit_us", || frame.submit()).map_err(|error| error.to_string())?;
+        for (slot, usage) in self.slots.iter_mut().zip(usages) {
             slot.usage = usage;
             if slot.lifetime == Lifetime::Temporary {
                 slot.resource = None;
@@ -203,6 +232,32 @@ impl GraphResources {
         self.pending = Some(submission);
         self.revision = self.revision.wrapping_add(1);
         Ok(())
+    }
+
+    /// # Safety
+    /// 所有使用方须在同一队列按提交顺序交接，usage 须反映最后一次已提交的用途。
+    pub(crate) unsafe fn bind_ordered(
+        &mut self,
+        id: ResourceId,
+        resource: impl Into<GraphResource>,
+        usage: Option<Usage>,
+    ) {
+        assert!(self.pending.is_none());
+        let slot = &mut self.slots[id.0];
+        assert!(slot.lifetime == Lifetime::History);
+        slot.resource = Some(resource.into());
+        slot.usage = usage;
+        self.revision = self.revision.wrapping_add(1);
+    }
+
+    pub(crate) fn usage(&self, id: ResourceId) -> Option<Usage> {
+        self.slots[id.0].usage
+    }
+
+    pub(crate) fn clear_bindings(&mut self) {
+        assert!(self.pending.is_none());
+        self.slots.clear();
+        self.revision = self.revision.wrapping_add(1);
     }
 }
 

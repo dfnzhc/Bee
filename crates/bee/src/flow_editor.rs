@@ -1,9 +1,10 @@
 use crate::Bee;
-use bee_renderer::{Module, ModuleGraph, NodeId, PortType, RenderFlow};
+use bee_renderer::{Module, ModuleGraph, NodeId, PortType, PreparedFlow, RenderFlow};
 use gpui::{div, prelude::*, rgb, Context, Div, KeyDownEvent, SharedString, Stateful, Window};
 
 pub struct FlowEditor {
     flow: RenderFlow,
+    prepared: PreparedFlow,
     selected_output: Option<NodeId>,
     error: Option<String>,
 }
@@ -19,6 +20,7 @@ impl Default for FlowEditor {
         flow.edit().connect(tone, output).unwrap();
         flow.apply().unwrap();
         Self {
+            prepared: PreparedFlow::prepare(flow.active().unwrap(), None).unwrap(),
             flow,
             selected_output: None,
             error: None,
@@ -39,6 +41,10 @@ impl FlowEditor {
 
     pub fn active(&self) -> &ModuleGraph {
         self.flow.active().expect("the initial flow is valid")
+    }
+
+    pub(crate) fn prepared(&self) -> &PreparedFlow {
+        &self.prepared
     }
 
     pub fn error(&self) -> Option<&str> {
@@ -77,7 +83,9 @@ impl FlowEditor {
                     return Err(format!("Path tracing unavailable: {reason}"));
                 }
             }
+            let prepared = PreparedFlow::prepare(self.flow.draft(), Some(&self.prepared))?;
             self.flow.apply()?;
+            self.prepared = prepared;
             Ok(self.active().clone())
         });
         self.error = result.as_ref().err().cloned();

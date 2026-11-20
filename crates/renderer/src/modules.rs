@@ -160,6 +160,11 @@ impl ModuleGraph {
     }
 
     pub fn display_source(&self) -> Result<(NodeId, f32), String> {
+        let ([source, _, _], exposure) = self.display_chain()?;
+        Ok((source, exposure))
+    }
+
+    pub(crate) fn display_chain(&self) -> Result<([NodeId; 3], f32), String> {
         self.validate()?;
         let output = NodeId(
             self.nodes
@@ -182,7 +187,7 @@ impl ModuleGraph {
             .find(|&&(_, to)| to == tone)
             .unwrap()
             .0;
-        Ok((source, exposure_ev))
+        Ok(([source, tone, output], exposure_ev))
     }
 }
 

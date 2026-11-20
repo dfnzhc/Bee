@@ -1,5 +1,5 @@
 use crate::device::{Backend, DeviceState};
-use crate::test_image::memory_type;
+use crate::ray::RayBuffer;
 use crate::{Frame, GraphImage};
 use anyhow::{bail, Context, Result};
 use ash::vk;
@@ -11,6 +11,12 @@ const FRAGMENT: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/raster.frag.sp
 
 pub struct Rasterizer {
     inner: Arc<Pipeline>,
+}
+
+#[derive(Clone)]
+pub struct RasterGeometry {
+    data: Arc<RayBuffer>,
+    vertex_count: u32,
 }
 
 struct Pipeline {
@@ -43,8 +49,6 @@ struct Pass {
     depth_view: vk::ImageView,
     framebuffer: vk::Framebuffer,
     descriptor_pool: vk::DescriptorPool,
-    buffer: vk::Buffer,
-    memory: vk::DeviceMemory,
 }
 
 impl Drop for Pass {
@@ -53,8 +57,6 @@ impl Drop for Pass {
             let device = &self.device.device;
             device.destroy_framebuffer(self.framebuffer, None);
             device.destroy_descriptor_pool(self.descriptor_pool, None);
-            device.destroy_buffer(self.buffer, None);
-            device.free_memory(self.memory, None);
             device.destroy_image_view(self.color_view, None);
             device.destroy_image_view(self.depth_view, None);
         }
@@ -68,6 +70,40 @@ impl Rasterizer {
 }
 
 impl Backend {
+    pub fn upload_raster_geometry(
+        &self,
+        data: &[[f32; 4]],
+        vertex_count: u32,
+    ) -> Result<RasterGeometry> {
+        let light_offset = vertex_count
+            .checked_mul(3)
+            .context("too many raster vertices")?;
+        let size = std::mem::size_of_val(data);
+        let limits = unsafe {
+            self.device
+                .instance
+                .instance
+                .get_physical_device_properties(self.device.physical_device)
+        }
+        .limits;
+        if !vertex_count.is_multiple_of(3)
+            || data.len() < light_offset as usize
+            || !(data.len() - light_offset as usize).is_multiple_of(2)
+            || size > limits.max_storage_buffer_range as usize
+            || data.iter().flatten().any(|value| !value.is_finite())
+        {
+            bail!("invalid raster scene data");
+        }
+        let buffer = RayBuffer::host_storage(&self.device, size.max(16) as u64)?;
+        let bytes = unsafe { std::slice::from_raw_parts(data.as_ptr().cast::<u8>(), size) };
+        crate::profile::span("mesh_upload_us", || buffer.write(bytes))?;
+        crate::profile::record("mesh_upload", 1.0);
+        Ok(RasterGeometry {
+            data: Arc::new(buffer),
+            vertex_count,
+        })
+    }
+
     pub fn create_rasterizer(&self) -> Result<Rasterizer> {
         let device = &self.device.device;
         let instance = &self.device.instance.instance;
@@ -217,6 +253,7 @@ impl Backend {
             .render_pass(pipeline.render_pass);
         let result =
             unsafe { device.create_graphics_pipelines(vk::PipelineCache::null(), &[info], None) };
+        crate::profile::record("pipeline_create", 1.0);
         unsafe {
             device.destroy_shader_module(fragment, None);
             device.destroy_shader_module(vertex, None);
@@ -251,25 +288,14 @@ impl Frame {
         rasterizer: &Rasterizer,
         color: &GraphImage,
         depth: &GraphImage,
-        data: &[[f32; 4]],
-        vertex_count: u32,
+        geometry: &RasterGeometry,
         view_projection: [f32; 16],
         environment: [f32; 3],
     ) -> Result<()> {
-        let light_offset = vertex_count
-            .checked_mul(3)
-            .context("too many raster vertices")?;
-        let size = data
-            .len()
-            .checked_mul(16)
-            .context("raster scene size overflow")?;
-        let limits = self
-            .device
-            .instance
-            .instance
-            .get_physical_device_properties(self.device.physical_device)
-            .limits;
+        let vertex_count = geometry.vertex_count;
+        let light_offset = vertex_count * 3;
         if !Arc::ptr_eq(&self.device, &rasterizer.inner.device)
+            || !Arc::ptr_eq(&self.device, &geometry.data.device)
             || !Arc::ptr_eq(&self.device, &color.inner.device)
             || !Arc::ptr_eq(&self.device, &depth.inner.device)
             || color.inner.width != depth.inner.width
@@ -286,14 +312,9 @@ impl Frame {
                 .inner
                 .usage
                 .contains(vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT)
-            || !vertex_count.is_multiple_of(3)
-            || data.len() < light_offset as usize
-            || !(data.len() - light_offset as usize).is_multiple_of(2)
-            || size > limits.max_storage_buffer_range as usize
             || view_projection
                 .iter()
                 .chain(&environment)
-                .chain(data.iter().flatten())
                 .any(|v| !v.is_finite())
         {
             bail!("incompatible raster attachments or scene data");
@@ -307,8 +328,6 @@ impl Frame {
             depth_view: vk::ImageView::null(),
             framebuffer: vk::Framebuffer::null(),
             descriptor_pool: vk::DescriptorPool::null(),
-            buffer: vk::Buffer::null(),
-            memory: vk::DeviceMemory::null(),
         };
         let device = &self.device.device;
         for (image, view) in [(color, &mut pass.color_view), (depth, &mut pass.depth_view)] {
@@ -340,52 +359,6 @@ impl Frame {
             )
             .context("could not create raster framebuffer")?;
 
-        // 场景数据在提交前上传；本帧持有缓冲区直到 GPU 完成。
-        let buffer_size = size.max(16) as u64;
-        pass.buffer = device
-            .create_buffer(
-                &vk::BufferCreateInfo::default()
-                    .size(buffer_size)
-                    .usage(vk::BufferUsageFlags::STORAGE_BUFFER)
-                    .sharing_mode(vk::SharingMode::EXCLUSIVE),
-                None,
-            )
-            .context("could not create raster scene buffer")?;
-        let requirements = device.get_buffer_memory_requirements(pass.buffer);
-        let (index, flags) = memory_type(
-            &self.device,
-            requirements.memory_type_bits,
-            vk::MemoryPropertyFlags::HOST_VISIBLE,
-            vk::MemoryPropertyFlags::HOST_COHERENT,
-        )?;
-        pass.memory = device
-            .allocate_memory(
-                &vk::MemoryAllocateInfo::default()
-                    .allocation_size(requirements.size)
-                    .memory_type_index(index),
-                None,
-            )
-            .context("could not allocate raster scene memory")?;
-        device
-            .bind_buffer_memory(pass.buffer, pass.memory, 0)
-            .context("could not bind raster scene memory")?;
-        let mapped = device
-            .map_memory(pass.memory, 0, vk::WHOLE_SIZE, vk::MemoryMapFlags::empty())
-            .context("could not map raster scene memory")?;
-        if size > 0 {
-            std::ptr::copy_nonoverlapping(data.as_ptr().cast::<u8>(), mapped.cast::<u8>(), size);
-        }
-        let flush = if flags.contains(vk::MemoryPropertyFlags::HOST_COHERENT) {
-            Ok(())
-        } else {
-            device.flush_mapped_memory_ranges(&[vk::MappedMemoryRange::default()
-                .memory(pass.memory)
-                .offset(0)
-                .size(vk::WHOLE_SIZE)])
-        };
-        device.unmap_memory(pass.memory);
-        flush.context("could not flush raster scene memory")?;
-
         let sizes = [vk::DescriptorPoolSize::default()
             .ty(vk::DescriptorType::STORAGE_BUFFER)
             .descriptor_count(1)];
@@ -406,9 +379,9 @@ impl Frame {
             )
             .context("could not allocate raster descriptor")?[0];
         let buffers = [vk::DescriptorBufferInfo::default()
-            .buffer(pass.buffer)
+            .buffer(geometry.data.buffer)
             .offset(0)
-            .range(buffer_size)];
+            .range(geometry.data.size)];
         let writes = [vk::WriteDescriptorSet::default()
             .dst_set(descriptor)
             .dst_binding(0)
@@ -484,6 +457,7 @@ impl Frame {
         device.cmd_set_scissor(self.command_buffer, 0, &[area]);
         device.cmd_draw(self.command_buffer, vertex_count, 1, 0, 0);
         device.cmd_end_render_pass(self.command_buffer);
+        self.resources.push(geometry.data.clone());
         self.resources.push(Arc::new(pass));
         Ok(())
     }

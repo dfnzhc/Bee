@@ -5,6 +5,7 @@ mod device;
 mod diagnostics;
 mod frame;
 mod graph_image;
+pub mod profile;
 mod raster;
 mod ray;
 mod sharing;
@@ -18,7 +19,7 @@ pub use diagnostics::{
 };
 pub use frame::{Buffer, Frame, Submission};
 pub use graph_image::{GraphImage, ReadbackBuffer};
-pub use raster::Rasterizer;
+pub use raster::{RasterGeometry, Rasterizer};
 pub use ray::{AccelerationScene, PathTracer};
 pub use sharing::{ExternalHandleSupport, SharingProbe};
 pub use test_image::{PendingTestImage, TestImage};

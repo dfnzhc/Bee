@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+async-channel = "2.5"
 bee-renderer = { path = "../renderer" }
 bee-scene = { path = "../scene" }
 bee-vulkan = { path = "../vulkan" }

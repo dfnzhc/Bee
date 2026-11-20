@@ -1,4 +1,5 @@
 use ash::vk;
+use bee_vulkan::profile;
 use bee_vulkan::{Buffer, Frame, GraphImage};
 
 #[derive(Clone)]
@@ -112,7 +113,7 @@ pub struct WorkPlan {
     work: Vec<Work>,
     barriers: Vec<Vec<Barrier>>,
     resource_count: usize,
-    final_usages: Vec<Option<Usage>>,
+    initial_usages: Vec<Option<Usage>>,
 }
 
 impl WorkPlan {
@@ -132,10 +133,6 @@ impl WorkPlan {
         &self.barriers[work.0]
     }
 
-    pub(crate) fn final_usages(&self) -> &[Option<Usage>] {
-        &self.final_usages
-    }
-
     /// # Safety
     /// 调用方须保证初始状态真实、跨帧及外部访问已经同步，且回调只按声明录制工作。
     /// 如果回调失败，必须丢弃此帧，不得提交部分录制的命令。
@@ -143,9 +140,24 @@ impl WorkPlan {
         &self,
         frame: &mut Frame,
         resources: &[GraphResource],
+        record_work: impl FnMut(WorkId, &mut Frame) -> Result<(), String>,
+    ) -> Result<(), String> {
+        self.record_bound(
+            frame,
+            resources,
+            &mut self.initial_usages.clone(),
+            record_work,
+        )
+    }
+
+    pub(crate) unsafe fn record_bound(
+        &self,
+        frame: &mut Frame,
+        resources: &[GraphResource],
+        usages: &mut [Option<Usage>],
         mut record_work: impl FnMut(WorkId, &mut Frame) -> Result<(), String>,
     ) -> Result<(), String> {
-        if resources.len() != self.resource_count {
+        if resources.len() != self.resource_count || usages.len() != self.resource_count {
             return Err("incorrect number of graph resources".into());
         }
         for (index, resource) in resources.iter().enumerate() {
@@ -165,22 +177,39 @@ impl WorkPlan {
             }
         }
         for &work in &self.order {
-            for barrier in &self.barriers[work.0] {
-                let before = barrier.before.map(vulkan_usage).unwrap_or((
+            for &Access { resource, usage } in &self.work[work.0].accesses {
+                let state = &mut usages[resource.0];
+                if state.is_none() && usage.reads() {
+                    return Err(format!(
+                        "work {:?} reads undefined resource {resource:?}",
+                        self.name(work)
+                    ));
+                }
+                let before = state.map(vulkan_usage).unwrap_or((
                     vk::PipelineStageFlags::TOP_OF_PIPE,
                     vk::AccessFlags::empty(),
                     vk::ImageLayout::UNDEFINED,
                 ));
-                let after = vulkan_usage(barrier.after);
-                match &resources[barrier.resource.0] {
+                let after = vulkan_usage(usage);
+                match &resources[resource.0] {
                     GraphResource::Image(image) => frame.graph_image_barrier(image, before, after),
                     GraphResource::Buffer(buffer) => {
                         frame.graph_buffer_barrier(buffer, (before.0, before.1), (after.0, after.1))
                     }
                 }
                 .map_err(|error| error.to_string())?;
+                *state = Some(usage);
             }
+            let timestamp = match self.name(work) {
+                "rasterization" => frame.profile_begin("gpu_raster_us"),
+                "path tracing" => frame.profile_begin("gpu_trace_us"),
+                "tone mapping" => frame.profile_begin("gpu_tone_us"),
+                "viewport output" => frame.profile_begin("gpu_copy_us"),
+                "read viewport" => frame.profile_begin("gpu_read_us"),
+                _ => None,
+            };
             record_work(work, frame)?;
+            frame.profile_end(timestamp);
         }
         Ok(())
     }
@@ -226,6 +255,11 @@ impl WorkGraph {
     }
 
     pub fn compile(&self) -> Result<WorkPlan, String> {
+        profile::record("graph_compile", 1.0);
+        profile::span("compile_us", || self.compile_plan())
+    }
+
+    fn compile_plan(&self) -> Result<WorkPlan, String> {
         let count = self.work.len();
         let mut edges = vec![vec![false; count]; count];
         for &(before, after) in &self.dependencies {
@@ -320,7 +354,7 @@ impl WorkGraph {
             work: self.work.clone(),
             barriers,
             resource_count: self.resources.len(),
-            final_usages: previous,
+            initial_usages: self.resources.clone(),
         })
     }
 

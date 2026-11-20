@@ -1,10 +1,8 @@
 use crate::{
-    Access, DisplayWork, GraphResource, GraphResources, Module, ModuleGraph, NodeId, ResourceId,
-    Usage, WorkGraph, WorkId,
+    Access, GraphResource, Module, ModuleGraph, NodeId, ResourceId, Usage, WorkGraph, WorkId,
 };
-use ash::vk;
 use bee_scene::{RenderSnapshot, Vector3};
-use bee_vulkan::{Backend, Frame, Rasterizer};
+use bee_vulkan::{Backend, Frame, RasterGeometry, Rasterizer};
 
 pub struct RasterWork {
     color: ResourceId,
@@ -51,6 +49,7 @@ impl RasterWork {
         frame: &mut Frame,
         images: &[GraphResource],
         rasterizer: &Rasterizer,
+        geometry: &RasterGeometry,
         snapshot: &RenderSnapshot,
         width: u32,
         height: u32,
@@ -66,14 +65,12 @@ impl RasterWork {
             .view_projection(width as f32 / height as f32)
             .ok_or("invalid raster camera")?
             .to_array();
-        let (data, vertices) = scene_data(snapshot)?;
         frame
             .rasterize(
                 rasterizer,
                 images[self.color.0].image()?,
                 images[self.depth.0].image()?,
-                &data,
-                vertices,
+                geometry,
                 matrix,
                 snapshot.scene.environment,
             )
@@ -204,94 +201,22 @@ pub fn render_raster_graph(
     height: u32,
     modules: &ModuleGraph,
 ) -> Result<Vec<u8>, String> {
-    let (raster, _) = modules.display_source()?;
-    if modules.module(raster) != Some(Module::Rasterization) {
+    let flow = crate::PreparedFlow::prepare(modules, None)?;
+    if flow.source() != Module::Rasterization {
         return Err("viewport source is not a rasterization module".into());
     }
-    let size = (width as usize)
-        .checked_mul(height as usize)
-        .and_then(|size| size.checked_mul(4))
-        .ok_or("viewport size overflow")?;
-    let rasterizer = backend
-        .create_rasterizer()
-        .map_err(|error| error.to_string())?;
-    let mapper = backend
-        .create_tone_mapper()
-        .map_err(|error| error.to_string())?;
-    let image = |format, usage, aspect| unsafe {
-        backend
-            .create_graph_image(width, height, format, usage, aspect)
-            .map_err(|error| error.to_string())
-    };
-    let mut resources = GraphResources::default();
-    let color = resources.add_temporary(image(
-        vk::Format::R32G32B32A32_SFLOAT,
-        vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED,
-        vk::ImageAspectFlags::COLOR,
-    )?);
-    let depth = resources.add_temporary(image(
-        rasterizer.depth_format(),
-        vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
-        vk::ImageAspectFlags::DEPTH,
-    )?);
-    let mapped = resources.add_temporary(image(
-        vk::Format::R8G8B8A8_UNORM,
-        vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC,
-        vk::ImageAspectFlags::COLOR,
-    )?);
-    let viewport = unsafe {
-        resources.add_external(
-            image(
-                vk::Format::R8G8B8A8_UNORM,
-                vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::TRANSFER_SRC,
-                vk::ImageAspectFlags::COLOR,
-            )?,
-            None,
-        )
-    };
-    let readback = backend
-        .create_readback_buffer(size)
-        .map_err(|error| error.to_string())?;
-
-    let mut graph = resources.graph()?;
-    let raster_work = RasterWork::declare(modules, raster, &mut graph, color, depth)?;
-    let display = DisplayWork::declare(modules, &mut graph, &[(raster, color)], mapped, viewport)?;
-    let read = graph.add_work(
-        "read viewport",
-        vec![Access {
-            resource: viewport,
-            usage: Usage::TransferRead,
-        }],
-    )?;
-
-    // 图负责附件布局、色调映射和读回之间的依赖；等待后才访问像素。
-    unsafe {
-        resources.submit(backend, &graph, |work, frame, images| {
-            if work == read {
-                frame
-                    .copy_graph_image_to_readback(images[viewport.index()].image()?, &readback)
-                    .map_err(|error| error.to_string())?;
-            } else if !raster_work.record(
-                work,
-                frame,
-                images,
-                &rasterizer,
-                snapshot,
-                width,
-                height,
-            )? && !display.record(work, frame, images, &mapper)?
-            {
-                return Err("unknown raster graph work".into());
-            }
-            Ok(())
-        })?;
-        resources.wait()?;
-        let mut pixels = readback.read().map_err(|error| error.to_string())?;
-        for pixel in pixels.chunks_exact_mut(4) {
-            pixel.swap(0, 2);
-        }
-        Ok(pixels)
-    }
+    crate::ViewportRenderer::default()
+        .submit(
+            backend,
+            &flow,
+            snapshot,
+            (width, height),
+            0,
+            1,
+            &mut crate::FrameSlot::default(),
+        )?
+        .finish()
+        .1
 }
 
 #[cfg(test)]

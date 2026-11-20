@@ -35,8 +35,31 @@ impl RayBuffer {
         usage: vk::BufferUsageFlags,
         host_visible: bool,
     ) -> Result<Self> {
-        if size == 0 || !device.ray_tracing_enabled {
+        Self::allocate(device, size, usage, host_visible, true)
+    }
+
+    pub(crate) fn host_storage(device: &Arc<DeviceState>, size: u64) -> Result<Self> {
+        Self::allocate(
+            device,
+            size,
+            vk::BufferUsageFlags::STORAGE_BUFFER,
+            true,
+            false,
+        )
+    }
+
+    fn allocate(
+        device: &Arc<DeviceState>,
+        size: u64,
+        mut usage: vk::BufferUsageFlags,
+        host_visible: bool,
+        needs_address: bool,
+    ) -> Result<Self> {
+        if size == 0 || (needs_address && !device.ray_tracing_enabled) {
             bail!("invalid ray tracing buffer size or unsupported device");
+        }
+        if needs_address {
+            usage |= vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS;
         }
         let mut result = Self {
             device: device.clone(),
@@ -52,7 +75,7 @@ impl RayBuffer {
                 .create_buffer(
                     &vk::BufferCreateInfo::default()
                         .size(size)
-                        .usage(usage | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS)
+                        .usage(usage)
                         .sharing_mode(vk::SharingMode::EXCLUSIVE),
                     None,
                 )
@@ -73,18 +96,21 @@ impl RayBuffer {
             result.coherent = flags.contains(vk::MemoryPropertyFlags::HOST_COHERENT);
             let mut address_flags = vk::MemoryAllocateFlagsInfo::default()
                 .flags(vk::MemoryAllocateFlags::DEVICE_ADDRESS);
+            let mut info = vk::MemoryAllocateInfo::default()
+                .allocation_size(requirements.size)
+                .memory_type_index(index);
+            if needs_address {
+                info = info.push_next(&mut address_flags);
+            }
             result.memory = vk_device
-                .allocate_memory(
-                    &vk::MemoryAllocateInfo::default()
-                        .allocation_size(requirements.size)
-                        .memory_type_index(index)
-                        .push_next(&mut address_flags),
-                    None,
-                )
+                .allocate_memory(&info, None)
                 .context("could not allocate ray tracing buffer memory")?;
             vk_device
                 .bind_buffer_memory(result.buffer, result.memory, 0)
                 .context("could not bind ray tracing buffer memory")?;
+            if !needs_address {
+                return Ok(result);
+            }
             let info = vk::BufferDeviceAddressInfo::default().buffer(result.buffer);
             result.address = if device.api_version >= vk::API_VERSION_1_2 {
                 vk_device.get_buffer_device_address(&info)
@@ -207,7 +233,8 @@ impl Backend {
             true,
         )?;
         let bytes = unsafe { std::slice::from_raw_parts(values.as_ptr().cast::<u8>(), size) };
-        vertices.write(bytes)?;
+        crate::profile::record("mesh_upload", 1.0);
+        crate::profile::span("mesh_upload_us", || vertices.write(bytes))?;
         let loader = ash::khr::acceleration_structure::Device::new(
             &self.device.instance.instance,
             &self.device.device,
@@ -381,12 +408,15 @@ impl Backend {
                     });
                 let bottom_ranges = [vk::AccelerationStructureBuildRangeInfoKHR::default()
                     .primitive_count(primitives)];
+                let blas = frame.profile_begin("gpu_blas_us");
+                crate::profile::record("blas_build", 1.0);
                 unsafe {
                     loader.cmd_build_acceleration_structures(
                         frame.command_buffer,
                         &[bottom_build],
                         &[&bottom_ranges[..geometry_count]],
                     );
+                    frame.profile_end(blas);
                     let barrier = vk::MemoryBarrier::default()
                         .src_access_mask(vk::AccessFlags::ACCELERATION_STRUCTURE_WRITE_KHR)
                         .dst_access_mask(
@@ -402,12 +432,15 @@ impl Backend {
                         &[],
                         &[],
                     );
+                    let tlas = frame.profile_begin("gpu_tlas_us");
+                    crate::profile::record("tlas_build", 1.0);
                     loader.cmd_build_acceleration_structures(
                         frame.command_buffer,
                         &[top_build],
                         &[&[vk::AccelerationStructureBuildRangeInfoKHR::default()
                             .primitive_count(1)]],
                     );
+                    frame.profile_end(tlas);
                     let barrier = vk::MemoryBarrier::default()
                         .src_access_mask(vk::AccessFlags::ACCELERATION_STRUCTURE_WRITE_KHR)
                         .dst_access_mask(vk::AccessFlags::ACCELERATION_STRUCTURE_READ_KHR);
@@ -614,6 +647,7 @@ impl Backend {
             .groups(&groups)
             .max_pipeline_ray_recursion_depth(1)
             .layout(pipeline.layout);
+        crate::profile::record("pipeline_create", 1.0);
         let result = unsafe {
             loader.create_ray_tracing_pipelines(
                 vk::DeferredOperationKHR::null(),

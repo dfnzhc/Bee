@@ -112,6 +112,12 @@ impl WorkbenchPanel {
         selection: Entity<scene::Selection>,
         cx: &mut Context<Self>,
     ) -> Self {
+        if kind == PanelKind::Viewport {
+            cx.subscribe(&bee, |_, _, _: &super::viewport::ViewportChanged, cx| {
+                cx.notify()
+            })
+            .detach();
+        }
         cx.observe(&bee, |_, _, cx| cx.notify()).detach();
         if matches!(kind, PanelKind::Scene | PanelKind::Properties) {
             cx.observe(&selection, |_, _, cx| cx.notify()).detach();
@@ -359,6 +365,7 @@ pub(crate) struct Workbench {
 
 impl Workbench {
     pub(crate) fn new(bee: Entity<Bee>, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        bee.update(cx, |bee, _| bee.viewport.set_docked());
         let closing_bee = bee.downgrade();
         window.on_window_should_close(cx, move |window, cx| {
             Self::request_close(&closing_bee, window, cx)

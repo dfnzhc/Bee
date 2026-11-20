@@ -222,12 +222,15 @@ mod tests {
             let bee = cx.new(|_| Bee::failure("test device".into()));
             Workbench::new(bee, window, cx)
         });
-        let bee = cx.update(|window, cx| {
-            workbench.update(cx, |workbench, cx| workbench.show_panel(4, window, cx));
-            workbench.read(cx).panels[4].read(cx).bee.clone()
-        });
+        let bee = cx.update(|_, cx| workbench.read(cx).panels[4].read(cx).bee.clone());
         let dimensions = size(px(960.0), px(640.0));
         cx.simulate_resize(dimensions);
+        cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| {
+            workbench.clone()
+        });
+        cx.run_until_parked();
+        let button = cx.debug_bounds("drawer-console").unwrap().center();
+        cx.simulate_click(button, Modifiers::none());
         cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| {
             workbench.clone()
         });

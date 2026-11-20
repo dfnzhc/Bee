@@ -14,6 +14,7 @@ pub struct ToneMapper {
 
 struct Pipeline {
     device: Arc<DeviceState>,
+    format: vk::Format,
     descriptor_layout: vk::DescriptorSetLayout,
     layout: vk::PipelineLayout,
     render_pass: vk::RenderPass,
@@ -59,8 +60,41 @@ impl Drop for Pass {
 
 impl Backend {
     pub fn create_tone_mapper(&self) -> Result<ToneMapper> {
+        self.create_tone_mapper_for(vk::Format::R8G8B8A8_UNORM)
+    }
+
+    pub fn viewport_format(&self) -> vk::Format {
+        let bgra = vk::Format::B8G8R8A8_UNORM;
+        let info = unsafe {
+            self.device
+                .instance
+                .instance
+                .get_physical_device_image_format_properties(
+                    self.device.physical_device,
+                    bgra,
+                    vk::ImageType::TYPE_2D,
+                    vk::ImageTiling::OPTIMAL,
+                    vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC,
+                    vk::ImageCreateFlags::empty(),
+                )
+        };
+        if info.is_ok() {
+            bgra
+        } else {
+            vk::Format::R8G8B8A8_UNORM
+        }
+    }
+
+    pub fn create_tone_mapper_for(&self, format: vk::Format) -> Result<ToneMapper> {
+        if !matches!(
+            format,
+            vk::Format::B8G8R8A8_UNORM | vk::Format::R8G8B8A8_UNORM
+        ) {
+            bail!("unsupported viewport output format");
+        }
         let mut pipeline = Pipeline {
             device: self.device.clone(),
+            format,
             descriptor_layout: vk::DescriptorSetLayout::null(),
             layout: vk::PipelineLayout::null(),
             render_pass: vk::RenderPass::null(),
@@ -93,7 +127,7 @@ impl Backend {
         }
         .context("could not create tone mapping pipeline layout")?;
         let attachments = [vk::AttachmentDescription::default()
-            .format(vk::Format::R8G8B8A8_UNORM)
+            .format(format)
             .samples(vk::SampleCountFlags::TYPE_1)
             .load_op(vk::AttachmentLoadOp::DONT_CARE)
             .store_op(vk::AttachmentStoreOp::STORE)
@@ -180,6 +214,7 @@ impl Backend {
             .subpass(0);
         let result =
             unsafe { device.create_graphics_pipelines(vk::PipelineCache::null(), &[info], None) };
+        crate::profile::record("pipeline_create", 1.0);
         unsafe {
             device.destroy_shader_module(fragment, None);
             device.destroy_shader_module(vertex, None);
@@ -217,7 +252,7 @@ impl Frame {
             || source.inner.width != target.inner.width
             || source.inner.height != target.inner.height
             || source.inner.format != vk::Format::R32G32B32A32_SFLOAT
-            || target.inner.format != vk::Format::R8G8B8A8_UNORM
+            || target.inner.format != mapper.inner.format
             || source.inner.aspect != vk::ImageAspectFlags::COLOR
             || target.inner.aspect != vk::ImageAspectFlags::COLOR
             || !source.inner.usage.contains(vk::ImageUsageFlags::SAMPLED)

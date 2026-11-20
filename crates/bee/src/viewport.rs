@@ -1,14 +1,20 @@
+mod queue;
+
 use crate::flow_editor::FlowEditor;
 use crate::Bee;
 use bee_renderer::Module;
 use bee_scene::{DisplayParameters, SceneState, Versions};
 use bee_vulkan::{Backend, DiagnosticLevel, DiagnosticSender, TestImage};
 use gpui::{
-    canvas, div, prelude::*, px, rgb, Bounds, Context, Corners, MouseButton, Pixels, Point,
-    RenderImage, Window,
+    canvas, div, prelude::*, px, rgb, Bounds, Context, Corners, EventEmitter, MouseButton, Pixels,
+    Point, RenderImage, Window,
 };
 use gpui_component::tooltip::Tooltip;
+use queue::{Completed, RenderQueue, Request};
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::sync::Arc;
+#[cfg(test)]
 use std::time::Duration;
 
 type Extent = (u32, u32);
@@ -18,6 +24,9 @@ enum RenderMode {
     Raster,
     Path,
 }
+
+pub(crate) struct ViewportChanged;
+impl EventEmitter<ViewportChanged> for Bee {}
 
 #[cfg(test)]
 thread_local! {
@@ -31,16 +40,19 @@ pub struct Viewport {
     extent: Option<Extent>,
     versions: Option<Versions>,
     generation: u64,
-    running: bool,
+    history_epoch: u64,
+    displayed_sequence: u64,
+    queue: Option<RenderQueue>,
+    docked: bool,
     closing: bool,
     active: bool,
     zoom_hidden: bool,
     image: Option<Arc<RenderImage>>,
+    painted: Rc<RefCell<Option<Arc<RenderImage>>>>,
     image_versions: Option<Versions>,
     error: Option<String>,
     drag_position: Option<Point<Pixels>>,
     mode: RenderMode,
-    path_renderer: Option<bee_renderer::PathRenderer>,
     samples: u32,
     pub(crate) flow: FlowEditor,
     #[cfg(test)]
@@ -62,16 +74,19 @@ impl Viewport {
             extent: None,
             versions: None,
             generation: 0,
-            running: false,
+            history_epoch: 0,
+            displayed_sequence: 0,
+            queue: None,
+            docked: false,
             closing: false,
             active: true,
             zoom_hidden: false,
             image: None,
+            painted: Rc::default(),
             image_versions: None,
             error: None,
             drag_position: None,
             mode: RenderMode::Raster,
-            path_renderer: None,
             samples: 0,
             flow: FlowEditor::default(),
             #[cfg(test)]
@@ -168,6 +183,7 @@ impl Viewport {
         let requested_versions = self.versions;
         let generation = self.generation;
         let image = self.image.clone();
+        let painted = self.painted.clone();
         let resize_view = cx.weak_entity();
         let error_view = resize_view.clone();
         div()
@@ -299,15 +315,20 @@ impl Viewport {
                                 (next == extent).then_some(image).flatten()
                             },
                             move |bounds, image, window, cx| {
+                                // 退役的是已绘入 GPUI 场景的纹理，不是尚未绘制的 CPU 帧。
+                                let mut next_painted = None;
                                 if let Some(image) = image {
                                     let id = image.id;
                                     let result = window.paint_image(
                                         bounds,
                                         Corners::default(),
-                                        image,
+                                        image.clone(),
                                         0,
                                         false,
                                     );
+                                    if result.is_ok() {
+                                        next_painted = Some(image);
+                                    }
                                     #[cfg(test)]
                                     if result.is_ok() {
                                         let visible =
@@ -333,6 +354,16 @@ impl Viewport {
                                                     }
                                                 })
                                                 .ok();
+                                        });
+                                    }
+                                }
+                                let mut painted = painted.borrow_mut();
+                                if painted.as_ref().map(|old| old.id) != next_painted.as_ref().map(|new| new.id) {
+                                    if let Some(old) = std::mem::replace(&mut *painted, next_painted) {
+                                        window.defer(cx, move |window, _| {
+                                            if let Err(error) = window.drop_image(old) {
+                                                eprintln!("Could not release GPUI image: {error:#}");
+                                            }
                                         });
                                     }
                                 }
@@ -423,10 +454,10 @@ impl Viewport {
             cx.notify();
             return;
         }
-        let (source, exposure_ev) = graph.display_source().unwrap();
-        let mode = match graph.module(source) {
-            Some(Module::Rasterization) => RenderMode::Raster,
-            Some(Module::PathTracing) => RenderMode::Path,
+        let exposure_ev = self.flow.prepared().exposure_ev;
+        let mode = match self.flow.prepared().source() {
+            Module::Rasterization => RenderMode::Raster,
+            Module::PathTracing => RenderMode::Path,
             _ => unreachable!("validated scene source"),
         };
         let mode_changed = self.mode != mode;
@@ -435,7 +466,8 @@ impl Viewport {
         self.versions = Some(state.versions());
         self.generation = self.generation.wrapping_add(1);
         if mode_changed {
-            self.drop_image(window);
+            self.history_epoch += 1;
+            self.drop_image();
         }
         self.error = None;
         self.start(state, window, cx);
@@ -455,13 +487,18 @@ impl Viewport {
         }
     }
 
-    pub(crate) fn request_close(&mut self, window: &mut Window) -> bool {
+    pub(crate) fn request_close(&mut self, _window: &mut Window) -> bool {
         self.closing = true;
-        self.drop_image(window);
-        self.path_renderer = None;
+        self.drop_image();
+        // 窗口可能仍呈现缓存的场景；纹理随窗口一起释放。
+        self.painted.borrow_mut().take();
         self.backend = None;
-        // 在途任务仍持有设备，完成并释放资源后才能关闭最后一个窗口。
-        !self.running
+        if let Some(queue) = &self.queue {
+            queue.close();
+            false
+        } else {
+            true
+        }
     }
 
     pub(crate) fn set_zoom_hidden(
@@ -488,7 +525,7 @@ impl Viewport {
             self.drag_position = None;
             self.synchronize(None, state, window, cx);
         }
-        cx.notify();
+        self.notify_frame(cx);
     }
 
     fn synchronize(
@@ -505,174 +542,144 @@ impl Viewport {
 
         // 尺寸变化时释放旧图像；状态变化期间保留上一帧。
         if self.extent != extent {
-            self.drop_image(window);
+            self.drop_image();
             self.extent = extent;
             self.generation = self.generation.wrapping_add(1);
+            self.history_epoch += 1;
         }
         self.versions = Some(versions);
         self.error = None;
         self.start(state, window, cx);
-        cx.notify();
+        self.notify_frame(cx);
     }
 
     fn start(&mut self, state: &SceneState, window: &mut Window, cx: &mut Context<Bee>) {
-        if self.closing || !self.active || self.zoom_hidden {
+        if self.closing {
             return;
         }
-        let (Some(backend), Some((width, height))) = (&self.backend, self.extent) else {
+        let (Some(backend), Some(extent)) = (&self.backend, self.extent) else {
+            if let Some(queue) = &self.queue {
+                queue.replace(None);
+            }
             return;
         };
-
-        // 同时只执行一次读回，完成后再从当前状态获取最新快照。
-        if self.running {
+        if !self.active || self.zoom_hidden {
+            if let Some(queue) = &self.queue {
+                queue.replace(None);
+            }
             return;
         }
-        self.running = true;
-        let backend = backend.clone();
-        let generation = self.generation;
-        let snapshot = state.snapshot();
-        let versions = snapshot.versions;
-        self.versions = Some(versions);
-        let mode = self.mode;
-        let modules = self.flow.active().clone();
-        let mut path_renderer = self.path_renderer.take();
-        #[cfg(test)]
-        let delay = self
-            .render_delay
-            .map(|delay| cx.background_executor().timer(delay));
-
-        // 后台任务持有快照，直到 Vulkan 提交和读回完成。
-        let task = cx.background_spawn(async move {
-            #[cfg(test)]
-            if let Some(delay) = delay {
-                delay.await;
-            }
-            let pixels = match mode {
-                RenderMode::Raster => {
-                    bee_renderer::render_raster_graph(&backend, &snapshot, width, height, &modules)
-                }
-                RenderMode::Path => {
-                    let renderer = match path_renderer.take() {
-                        Some(renderer) => Ok(renderer),
-                        None => bee_renderer::PathRenderer::new(&backend),
-                    };
-                    match renderer {
-                        Ok(mut renderer) => {
-                            let result = renderer
-                                .render_graph(&backend, &snapshot, width, height, 1, &modules);
-                            path_renderer = Some(renderer);
-                            result
-                        }
-                        Err(error) => Err(error),
+        let queue = self.queue.get_or_insert_with(|| {
+            let (queue, ready) = RenderQueue::new(backend.clone(), cx.background_executor());
+            cx.spawn_in(window, async move |view, cx| {
+                while ready.recv().await.is_ok() {
+                    let alive = view
+                        .update_in(cx, |view, window, cx| {
+                            let viewport = &mut view.viewport;
+                            if let Some(completed) =
+                                viewport.queue.as_ref().and_then(RenderQueue::take)
+                            {
+                                // 状态变更可能先于布局回调，丢弃旧帧前补交最新输入。
+                                viewport.synchronize(viewport.extent, &view.state, window, cx);
+                                viewport.accept(completed, view.state.versions(), window, cx);
+                            }
+                        })
+                        .is_ok();
+                    if !alive {
+                        return;
                     }
                 }
-            };
-            let result = pixels
-                .map_err(|error| format!("Vulkan image readback failed: {error}"))
-                .and_then(|bgra| {
-                    let row_stride = (width as usize)
-                        .checked_mul(4)
-                        .ok_or("Image row size overflow")?;
-                    render_image(TestImage {
-                        width,
-                        height,
-                        row_stride,
-                        bgra,
-                    })
+                let _ = view.update_in(cx, |view, window, _| {
+                    view.viewport.queue = None;
+                    if view.viewport.closing {
+                        window.remove_window();
+                    }
                 });
-            (result, path_renderer)
-        });
-        cx.spawn_in(window, async move |view, cx| {
-            let (result, path_renderer) = task.await;
-            view.update_in(cx, |view, window, cx| {
-                let viewport = &mut view.viewport;
-                viewport.running = false;
-                if viewport.closing {
-                    drop(path_renderer);
-                    drop(result);
-                    window.remove_window();
-                    return;
-                }
-                viewport.path_renderer = path_renderer;
-
-                // 相机可以落后于最新输入，但不能回退已显示的进度。
-                let current = view.state.versions();
-                let same_viewport = viewport.generation == generation && viewport.mode == mode;
-                let latest = same_viewport && versions == current;
-                let compatible = same_viewport
-                    && versions.scene == current.scene
-                    && versions.render == current.render
-                    && versions.display == current.display;
-                let advances_camera = viewport
-                    .image_versions
-                    .is_none_or(|shown| versions.camera >= shown.camera);
-                match result {
-                    Ok(image) if compatible && advances_camera => {
-                        viewport.drop_image(window);
-                        if mode == RenderMode::Path {
-                            viewport.samples = viewport
-                                .path_renderer
-                                .as_ref()
-                                .map_or(0, |renderer| renderer.sample_count());
-                        }
-                        viewport.image_versions = Some(versions);
-                        viewport.image = Some(image);
-                        viewport.error = None;
-                        cx.notify();
-
-                        if latest && mode == RenderMode::Path {
-                            let timer = cx.background_executor().timer(Duration::from_millis(16));
-                            cx.spawn_in(window, async move |view, cx| {
-                                timer.await;
-                                view.update_in(cx, |view, window, cx| {
-                                    if view.viewport.mode == RenderMode::Path
-                                        && view.viewport.generation == generation
-                                        && view.state.versions() == versions
-                                    {
-                                        view.viewport.start(&view.state, window, cx);
-                                    }
-                                })
-                                .ok();
-                            })
-                            .detach();
-                        }
-                    }
-                    Err(reason) if latest => {
-                        viewport.fail(reason, window);
-                        cx.notify();
-                    }
-                    _ => {}
-                }
-                if !latest {
-                    viewport.start(&view.state, window, cx);
-                }
             })
-            .ok();
-        })
-        .detach();
+            .detach();
+            queue
+        });
+        queue.replace(Some(Request {
+            snapshot: state.snapshot(),
+            flow: self.flow.prepared().clone(),
+            extent,
+            generation: self.generation,
+            history_epoch: self.history_epoch,
+            accumulate: self.mode == RenderMode::Path,
+            #[cfg(test)]
+            delay: self.render_delay,
+        }));
     }
 
-    fn fail(&mut self, reason: String, window: &mut Window) {
+    fn accept(
+        &mut self,
+        completed: Completed,
+        current: Versions,
+        window: &mut Window,
+        cx: &mut Context<Bee>,
+    ) {
+        let versions = completed.request.snapshot.versions;
+        // 允许相机逐步追上输入，禁止旧代际或乱序完成回退画面。
+        if self.closing
+            || !self.active
+            || self.zoom_hidden
+            || completed.request.generation != self.generation
+            || completed.sequence <= self.displayed_sequence
+            || (versions.scene, versions.render, versions.display)
+                != (current.scene, current.render, current.display)
+            || self
+                .image_versions
+                .is_some_and(|shown| versions.camera < shown.camera)
+        {
+            return;
+        }
+        match completed.image {
+            Ok(image) => {
+                self.drop_image();
+                self.displayed_sequence = completed.sequence;
+                self.samples = completed.samples;
+                self.image_versions = Some(versions);
+                self.image = Some(image);
+                self.error = None;
+                self.notify_frame(cx);
+            }
+            Err(reason) if versions == current => {
+                self.fail(format!("Vulkan image readback failed: {reason}"), window);
+                self.notify_frame(cx);
+            }
+            _ => {}
+        }
+    }
+
+    pub(crate) fn set_docked(&mut self) {
+        self.docked = true;
+    }
+
+    fn notify_frame(&self, cx: &mut Context<Bee>) {
+        if self.docked {
+            cx.emit(ViewportChanged);
+        } else {
+            cx.notify();
+        }
+    }
+
+    #[cfg(test)]
+    fn running(&self) -> bool {
+        self.queue.as_ref().is_some_and(RenderQueue::running)
+    }
+
+    fn fail(&mut self, reason: String, _window: &mut Window) {
         eprintln!("{reason}");
         self.diagnostics
             .send(DiagnosticLevel::Error, "Viewport", reason.clone());
-        self.drop_image(window);
+        self.drop_image();
         self.error = Some(reason);
     }
 
-    fn drop_image(&mut self, window: &mut Window) {
+    fn drop_image(&mut self) {
         self.image_versions = None;
         self.samples = 0;
-        if let Some(image) = self.image.take() {
-            if let Err(error) = window.drop_image(image) {
-                eprintln!("Could not release GPUI image: {error:#}");
-                self.diagnostics.send(
-                    DiagnosticLevel::Error,
-                    "Viewport",
-                    format!("Could not release GPUI image: {error:#}"),
-                );
-            }
-        }
+        self.image = None;
     }
 }
 
@@ -701,15 +708,15 @@ fn render_image(image: TestImage) -> Result<Arc<RenderImage>, String> {
         return Err("Invalid Vulkan image dimensions or stride".into());
     }
 
-    // 去除 Vulkan 的行填充，再将连续像素交给 GPUI。
-    let mut packed = Vec::with_capacity(bytes);
-    for row in image
-        .bgra
-        .chunks_exact(image.row_stride)
-        .take(image.height as usize)
-    {
-        packed.extend_from_slice(&row[..row_bytes]);
+    let mut packed = image.bgra;
+    if image.row_stride != row_bytes {
+        bee_vulkan::profile::record("pixel_repack", 1.0);
+        for row in 1..image.height as usize {
+            let offset = row * image.row_stride;
+            packed.copy_within(offset..offset + row_bytes, row * row_bytes);
+        }
     }
+    packed.truncate(bytes);
     // 尽管 image 的缓冲区类型为 RGBA，GPUI 仍将原始字节解释为 BGRA。
     let buffer = image::RgbaImage::from_raw(image.width, image.height, packed)
         .ok_or("Could not create GPUI image")?;
@@ -898,7 +905,7 @@ mod tests {
             let viewport = &bee.read(cx).viewport;
             assert!(viewport.extent.is_none());
             assert!(viewport.image.is_none());
-            assert!(!viewport.running);
+            assert!(!viewport.running());
         });
         cx.dispatch_action(ToggleZoom);
         assert_eq!(assert_frame(cx, small), closed);
@@ -943,7 +950,7 @@ mod tests {
                     bee_vulkan::ValidationStatus::Enabled
                 );
                 assert!(viewport.image.is_some());
-                viewport.render_delay = Some(FRAME_DELAY);
+                viewport.render_delay = Some(FRAME_DELAY * 4);
             });
 
             let start = cx.debug_bounds("scene-canvas").unwrap().center();
@@ -954,7 +961,7 @@ mod tests {
                 cx.simulate_mouse_move(position, MouseButton::Left, Modifiers::none());
                 cx.update(|_, cx| {
                     let bee = bee.read(cx);
-                    assert!(bee.viewport.running);
+                    assert!(bee.viewport.running());
                     (bee.state.versions(), position)
                 })
             };
@@ -977,25 +984,39 @@ mod tests {
                 image
             };
 
-            // 每张在途帧完成前先到达更新的鼠标位置。
-            let (first, _) = drag(cx, 18.0);
+            let in_flight = |cx: &mut gpui::VisualTestContext| {
+                cx.update(|_, cx| bee.read(cx).viewport.queue.as_ref().unwrap().in_flight())
+            };
+
+            // 留住第一个完成回调，其余请求只能用第二个槽推进。
+            drag(cx, 18.0);
+            assert_eq!(in_flight(cx), 1);
+            bee.update_in(cx, |bee, _, _| {
+                bee.viewport.render_delay = Some(FRAME_DELAY)
+            });
             let (second, position) = drag(cx, 36.0);
+            assert_eq!(in_flight(cx), 2);
             finish_frame(cx);
-            let first_image = paint(cx, first, position);
-
-            let (skipped, _) = drag(cx, 54.0);
-            let (latest, position) = drag(cx, 72.0);
-            assert!(first.camera < second.camera && second.camera < skipped.camera);
-            assert!(skipped.camera < latest.camera);
-            finish_frame(cx);
+            assert_eq!(in_flight(cx), 1);
             let second_image = paint(cx, second, position);
-            assert!(first_image.as_bytes(0) != second_image.as_bytes(0));
 
+            let (third, _) = drag(cx, 54.0);
+            drag(cx, 72.0);
+            let (latest, position) = drag(cx, 90.0);
+            assert_eq!(in_flight(cx), 2);
+            finish_frame(cx);
+            assert_eq!(in_flight(cx), 2);
+            cx.update(|_, cx| assert_eq!(bee.read(cx).viewport.image_versions, Some(third)));
             finish_frame(cx);
             let latest_image = paint(cx, latest, position);
             assert!(second_image.as_bytes(0) != latest_image.as_bytes(0));
-            cx.update(|_, cx| assert!(!bee.read(cx).viewport.running));
+            assert_eq!(in_flight(cx), 1);
+            finish_frame(cx);
+            cx.update(|_, cx| assert!(!bee.read(cx).viewport.running()));
+            assert_eq!(paint(cx, latest, position).id, latest_image.id);
             cx.simulate_mouse_up(position, MouseButton::Left, Modifiers::none());
+            bee.update_in(cx, |bee, window, _| bee.viewport.request_close(window));
+            cx.run_until_parked();
             cx.quit();
         }
     }
@@ -1116,17 +1137,18 @@ mod tests {
                 bee.update_in(cx, |bee, window, cx| {
                     assert_eq!(bee.viewport.mode, mode);
                     assert!(bee.viewport.error.is_none(), "{:?}", bee.viewport.error);
-                    assert!(!bee.viewport.running);
+                    assert!(!bee.viewport.running());
                     assert!(bee.viewport.image.is_some());
                     if mode == RenderMode::Path {
-                        assert!(bee.viewport.path_renderer.is_some());
+                        assert!(bee.viewport.queue.is_some());
                     }
                     if in_flight {
                         bee.viewport.render_delay = Some(FRAME_DELAY);
                         bee.viewport.start(&bee.state, window, cx);
-                        assert!(bee.viewport.running);
+                        assert!(bee.viewport.running());
                     }
                 });
+                cx.run_until_parked();
 
                 if let Some(window) = file_menu_window {
                     // 直接发送确认键，检查窗口状态后再让后台任务运行。
@@ -1135,19 +1157,16 @@ mod tests {
                     cx.cx.update(|cx| {
                         let viewport = &bee.read(cx).viewport;
                         assert!(viewport.closing);
-                        assert_eq!(viewport.running, in_flight);
-                        assert_eq!(cx.windows().is_empty(), !in_flight);
+                        assert_eq!(viewport.running(), in_flight);
+                        assert_eq!(cx.windows().len(), 1);
                     });
                 } else {
-                    assert_eq!(cx.simulate_close(), !in_flight);
-                    if !in_flight {
-                        cx.update(|window, _| window.remove_window());
-                    }
+                    assert!(!cx.simulate_close());
                 }
                 cx.run_until_parked();
                 if in_flight {
                     cx.cx.update(|cx| {
-                        assert!(bee.read(cx).viewport.running);
+                        assert!(bee.read(cx).viewport.running());
                         assert_eq!(cx.windows().len(), 1);
                     });
                     assert!(backend.upgrade().is_some());
@@ -1157,9 +1176,9 @@ mod tests {
                 cx.cx.update(|cx| {
                     // 界面实体仍被测试持有时，也必须完成 GPU 清理。
                     let viewport = &bee.read(cx).viewport;
-                    assert!(!viewport.running);
+                    assert!(!viewport.running());
                     assert!(viewport.backend.is_none());
-                    assert!(viewport.path_renderer.is_none());
+                    assert!(viewport.queue.is_none());
                     assert!(viewport.image.is_none());
                     assert!(cx.windows().is_empty());
                 });
@@ -1271,7 +1290,7 @@ mod tests {
         // 在途样本完成后保持暂停，恢复时继续使用当前场景和流程。
         bee.update_in(cx, |bee, window, cx| {
             bee.viewport.start(&bee.state, window, cx);
-            assert!(bee.viewport.running);
+            assert!(bee.viewport.running());
             bee.viewport.set_active(false, &bee.state, window, cx);
         });
         cx.run_until_parked();
@@ -1279,7 +1298,7 @@ mod tests {
         cx.run_until_parked();
         cx.update(|_, cx| {
             let viewport = &bee.read(cx).viewport;
-            assert!(!viewport.running);
+            assert!(!viewport.running());
             assert!(viewport.extent.is_none());
             assert!(viewport.image.is_none());
             assert_eq!(viewport.samples, 0);
@@ -1359,7 +1378,7 @@ mod tests {
             let graph = viewport.flow.active();
             let (source, _) = graph.display_source().unwrap();
             assert_eq!(graph.module(source), Some(Module::Rasterization));
-            assert!(!viewport.running);
+            assert!(!viewport.running());
         });
         drop(root);
         drop(bee);
@@ -1581,6 +1600,10 @@ mod tests {
         cx.executor().advance_clock(Duration::from_millis(17));
         cx.run_until_parked();
         drop(fresh);
+        drop(backend);
+        assert!(!view.update_in(cx, |view, window, _| view.viewport.request_close(window)));
+        cx.run_until_parked();
+        assert!(cx.cx.update(|cx| cx.windows().is_empty()));
         drop(view);
         cx.quit();
     }
@@ -1647,25 +1670,18 @@ mod tests {
         cx.simulate_mouse_move(second, MouseButton::Left, Modifiers::none());
         cx.update(|_, cx| {
             let viewport = &view.read(cx).viewport;
-            assert!(viewport.running);
+            assert!(viewport.running());
             assert_eq!(viewport.image.as_ref().unwrap().id, initial_image);
             assert_eq!(viewport.samples, 2);
         });
         finish_frame(cx);
-        cx.update(|_, cx| {
-            let view = view.read(cx);
-            assert_ne!(view.state.versions(), first_version);
-            assert_eq!(view.viewport.image_versions, Some(first_version));
-            assert_eq!(view.viewport.samples, 1);
-            assert!(view.viewport.running);
-        });
-        finish_frame(cx);
         let latest_image = cx.update(|_, cx| {
             let view = view.read(cx);
+            assert_ne!(view.state.versions(), first_version);
             assert_ne!(view.state.camera(), initial_camera);
             assert_eq!(view.viewport.image_versions, Some(view.state.versions()));
             assert_eq!(view.viewport.samples, 1);
-            assert!(!view.viewport.running);
+            assert!(!view.viewport.running());
             view.viewport.image.as_ref().unwrap().id
         });
         cx.simulate_mouse_up(second, MouseButton::Left, Modifiers::none());
@@ -1675,12 +1691,12 @@ mod tests {
         cx.run_until_parked();
         cx.update(|_, cx| {
             let viewport = &view.read(cx).viewport;
-            assert!(!viewport.running);
+            assert!(!viewport.running());
             assert_eq!(viewport.image.as_ref().unwrap().id, latest_image);
             assert_eq!(viewport.samples, 1);
         });
         cx.executor().advance_clock(Duration::from_millis(15));
-        cx.run_until_parked();
+        finish_frame(cx);
         cx.update(|_, cx| {
             let view = view.read(cx);
             assert_eq!(view.viewport.image_versions, Some(view.state.versions()));
@@ -1693,7 +1709,7 @@ mod tests {
             view.viewport.render_delay = None;
             let original_id = view.viewport.image.as_ref().unwrap().id;
             view.viewport.start(&view.state, window, cx);
-            assert!(view.viewport.running);
+            assert!(view.viewport.running());
             let mut camera = view.state.camera();
             camera.orbit(30.0, 8.0);
             assert!(view.state.set_camera(camera));
@@ -1715,7 +1731,7 @@ mod tests {
         cx.run_until_parked();
         let (backend, snapshot, extent, actual) = cx.update(|_, cx| {
             let view = view.read(cx);
-            assert!(!view.viewport.running);
+            assert!(!view.viewport.running());
             assert!(view.viewport.error.is_none(), "{:?}", view.viewport.error);
             assert_eq!(view.viewport.samples, 1);
             assert_eq!(view.viewport.image_versions, Some(view.state.versions()));
@@ -1757,7 +1773,7 @@ mod tests {
             let viewport = &view.read(cx).viewport;
             assert_eq!(viewport.mode, RenderMode::Raster);
             assert_eq!(viewport.samples, 0);
-            assert!(!viewport.running);
+            assert!(!viewport.running());
             assert!(viewport.error.is_none(), "{:?}", viewport.error);
             assert!(viewport.image.is_some());
         });
@@ -1777,6 +1793,10 @@ mod tests {
         cx.executor().advance_clock(Duration::from_millis(17));
         cx.run_until_parked();
         drop(fresh);
+        drop(backend);
+        assert!(!view.update_in(cx, |view, window, _| view.viewport.request_close(window)));
+        cx.run_until_parked();
+        assert!(cx.cx.update(|cx| cx.windows().is_empty()));
         drop(view);
         cx.quit();
     }
@@ -1955,21 +1975,20 @@ mod tests {
             cx.update(|_, cx| {
                 let view = view.read(cx);
                 assert_eq!(view.state.versions().camera, index as u64 + 1);
-                assert!(view.viewport.running);
+                assert!(view.viewport.running());
                 assert_eq!(
                     Arc::strong_count(view.viewport.backend.as_ref().unwrap()),
-                    idle_backend_owners + 1
+                    idle_backend_owners
                 );
             });
         }
         finish_frame(cx);
-        cx.update(|_, cx| assert!(view.read(cx).viewport.running));
         finish_frame(cx);
         cx.update(|_, cx| {
             let view = view.read(cx);
             assert_ne!(view.state.camera(), camera_before);
             assert!(view.viewport.error.is_none(), "{:?}", view.viewport.error);
-            assert!(!view.viewport.running);
+            assert!(!view.viewport.running());
             assert_eq!(view.viewport.image_versions, Some(view.state.versions()));
             assert!(
                 view.viewport.image.as_ref().unwrap().as_bytes(0).unwrap() != image_before,
@@ -1986,13 +2005,13 @@ mod tests {
         cx.update(|_, cx| {
             let view = view.read(cx);
             assert_eq!(view.state.versions().camera, 4);
-            assert!(view.viewport.running);
+            assert!(view.viewport.running());
         });
         finish_frame(cx);
         cx.update(|_, cx| {
             let view = view.read(cx);
             assert_eq!(view.viewport.image_versions, Some(view.state.versions()));
-            assert!(!view.viewport.running);
+            assert!(!view.viewport.running());
         });
     }
 
@@ -2048,7 +2067,7 @@ mod tests {
         cx.run_until_parked();
         let (old_image, original_extent) = cx.update(|_, cx| {
             let viewport = &view.read(cx).viewport;
-            assert!(!viewport.running);
+            assert!(!viewport.running());
             assert!(viewport.error.is_none(), "{:?}", viewport.error);
             let image = viewport.image.as_ref().expect("Vulkan image");
             let extent = viewport.extent.unwrap();
@@ -2070,22 +2089,21 @@ mod tests {
             let notified = notified.clone();
             cx.observe_self(move |view, _| notified.set(view.viewport.image_versions))
         });
-        let (first_version, latest_version) = view.update_in(cx, |view, window, cx| {
+        let latest_version = view.update_in(cx, |view, window, cx| {
             let original_id = view.viewport.image.as_ref().unwrap().id;
             let mut camera = view.state.camera();
             assert!(camera.orbit(20.0, 5.0));
             assert!(view.state.set_camera(camera));
             view.viewport
                 .synchronize(view.viewport.extent, &view.state, window, cx);
-            assert!(view.viewport.running);
+            assert!(view.viewport.running());
             assert_eq!(view.viewport.image.as_ref().unwrap().id, original_id);
-            let first = view.state.versions();
             assert!(camera.orbit(25.0, -3.0));
             assert!(view.state.set_camera(camera));
             view.viewport
                 .synchronize(view.viewport.extent, &view.state, window, cx);
             assert_eq!(view.viewport.image.as_ref().unwrap().id, original_id);
-            (first, view.state.versions())
+            view.state.versions()
         });
         let previous_paints = PAINTED_IMAGES.get().0;
         cx.draw(
@@ -2095,16 +2113,10 @@ mod tests {
         );
         assert_eq!(PAINTED_IMAGES.get().0, previous_paints + 1);
         finish_frame(cx);
-        assert_eq!(notified.get(), Some(first_version));
+        assert_eq!(notified.get(), Some(latest_version));
         cx.update(|_, cx| {
             let viewport = &view.read(cx).viewport;
-            assert!(viewport.running);
-            assert_eq!(viewport.image_versions, Some(first_version));
-        });
-        finish_frame(cx);
-        cx.update(|_, cx| {
-            let viewport = &view.read(cx).viewport;
-            assert!(!viewport.running);
+            assert!(!viewport.running());
             assert_eq!(viewport.image_versions, Some(latest_version));
             assert!(viewport.error.is_none(), "{:?}", viewport.error);
         });
@@ -2152,14 +2164,17 @@ mod tests {
             let viewport = &view.read(cx).viewport;
             assert_eq!(viewport.generation, generation);
             assert_eq!(viewport.image.as_ref().unwrap().id, image_id);
-            assert!(!viewport.running);
+            assert!(!viewport.running());
         });
 
         let expect_replacement = |cx: &mut gpui::VisualTestContext, previous| {
-            finish_frame(cx);
+            cx.run_until_parked();
             cx.update(|_, cx| {
                 let viewport = &view.read(cx).viewport;
-                assert!(viewport.running, "replaced request must start immediately");
+                assert!(
+                    viewport.running(),
+                    "replaced request must start immediately"
+                );
                 assert_eq!(viewport.image.as_ref().map(|image| image.id), previous);
                 assert!(viewport.error.is_none(), "{:?}", viewport.error);
             });
@@ -2167,7 +2182,7 @@ mod tests {
             cx.update(|_, cx| {
                 let view = view.read(cx);
                 let viewport = &view.viewport;
-                assert!(!viewport.running);
+                assert!(!viewport.running());
                 assert!(viewport.error.is_none(), "{:?}", viewport.error);
                 assert_eq!(viewport.versions, Some(view.state.versions()));
                 assert_eq!(viewport.image_versions, Some(view.state.versions()));
@@ -2203,6 +2218,8 @@ mod tests {
                 assert_ne!(view.viewport.versions, Some(view.state.versions()));
                 view.viewport.image.as_ref().unwrap().id
             });
+            cx.run_until_parked();
+            finish_frame(cx);
             expect_replacement(cx, Some(previous));
         }
 
@@ -2233,7 +2250,7 @@ mod tests {
                 .synchronize(Some((17, 9)), &view.state, window, cx);
             view.viewport
                 .synchronize(Some((7, 13)), &view.state, window, cx);
-            assert!(view.viewport.running);
+            assert!(view.viewport.running());
             assert!(view.viewport.image.is_none());
         });
         expect_replacement(cx, None);
@@ -2248,14 +2265,17 @@ mod tests {
         view.update_in(cx, |view, window, cx| {
             view.viewport
                 .synchronize(Some((19, 11)), &view.state, window, cx);
+        });
+        cx.run_until_parked();
+        view.update_in(cx, |view, window, cx| {
             view.viewport.synchronize(None, &view.state, window, cx);
             assert!(view.viewport.image.is_none());
-            assert!(view.viewport.running);
+            assert!(view.viewport.running());
         });
         finish_frame(cx);
         cx.update(|_, cx| {
             let viewport = &view.read(cx).viewport;
-            assert!(!viewport.running);
+            assert!(!viewport.running());
             assert!(viewport.image.is_none());
             assert!(viewport.extent.is_none());
         });
@@ -2271,7 +2291,7 @@ mod tests {
         view.update_in(cx, |view, window, cx| {
             let extent = view.viewport.extent;
             view.viewport.start(&view.state, window, cx);
-            assert!(view.viewport.running);
+            assert!(view.viewport.running());
             view.viewport.set_active(false, &view.state, window, cx);
             view.viewport.set_active(true, &view.state, window, cx);
             view.viewport.synchronize(extent, &view.state, window, cx);
@@ -2287,7 +2307,7 @@ mod tests {
             assert!(view.state.set_scene(invalid));
             view.viewport
                 .synchronize(view.viewport.extent, &view.state, window, cx);
-            assert!(view.viewport.running);
+            assert!(view.viewport.running());
             assert!(view.state.set_scene(scene));
             view.viewport
                 .synchronize(view.viewport.extent, &view.state, window, cx);
@@ -2353,5 +2373,7 @@ mod tests {
             assert!(viewport.extent.is_some());
             assert!(viewport.image.is_some());
         });
+        assert!(!view.update_in(cx, |view, window, _| view.viewport.request_close(window)));
+        cx.run_until_parked();
     }
 }

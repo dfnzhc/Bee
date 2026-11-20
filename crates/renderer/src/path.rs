@@ -1,41 +1,20 @@
-use crate::{Access, DisplayWork, GraphResources, Module, ModuleGraph, ResourceId, Usage};
-use ash::vk;
-use bee_scene::{RenderSnapshot, Scene};
-use bee_vulkan::{AccelerationScene, Backend, GraphImage, PathTracer, ReadbackBuffer};
-use std::sync::Arc;
+use crate::{FrameSlot, Module, ModuleGraph, PreparedFlow, ViewportRenderer};
+use bee_scene::RenderSnapshot;
+use bee_vulkan::Backend;
 
 pub struct PathRenderer {
-    tracer: PathTracer,
-    mapper: bee_vulkan::ToneMapper,
-    scene: Option<(Arc<Scene>, u64, AccelerationScene)>,
-    history: Option<History>,
-    previous: Option<RenderSnapshot>,
+    renderer: ViewportRenderer,
+    flow: Option<PreparedFlow>,
+    slot: FrameSlot,
     samples: u32,
-}
-
-struct History {
-    resources: GraphResources,
-    color: ResourceId,
-    mapped: ResourceId,
-    viewport: ResourceId,
-    mapped_image: GraphImage,
-    readback: ReadbackBuffer,
-    width: u32,
-    height: u32,
 }
 
 impl PathRenderer {
     pub fn new(backend: &Backend) -> Result<Self, String> {
         Ok(Self {
-            tracer: backend
-                .create_path_tracer()
-                .map_err(|error| error.to_string())?,
-            mapper: backend
-                .create_tone_mapper()
-                .map_err(|error| error.to_string())?,
-            scene: None,
-            history: None,
-            previous: None,
+            renderer: ViewportRenderer::path(backend)?,
+            flow: None,
+            slot: FrameSlot::default(),
             samples: 0,
         })
     }
@@ -74,118 +53,24 @@ impl PathRenderer {
         seed: u32,
         modules: &ModuleGraph,
     ) -> Result<Vec<u8>, String> {
-        let (path, _) = modules.display_source()?;
-        if modules.module(path) != Some(Module::PathTracing) {
+        let flow = PreparedFlow::prepare(modules, self.flow.as_ref())?;
+        if flow.source() != Module::PathTracing {
             return Err("viewport source is not a path tracing module".into());
         }
-        if width == 0 || height == 0 {
-            return Err("invalid path tracing extent".into());
-        }
-        let scene_changed = self.scene.as_ref().is_none_or(|(scene, version, _)| {
-            !Arc::ptr_eq(scene, &snapshot.scene) || *version != snapshot.versions.scene
-        });
-        if scene_changed {
-            let (data, vertices) = crate::raster::scene_data(snapshot)?;
-            let scene = backend
-                .build_acceleration_scene(&data, vertices)
-                .map_err(|error| error.to_string())?;
-            self.scene = Some((snapshot.scene.clone(), snapshot.versions.scene, scene));
-        }
-        let changed = scene_changed
-            || self.previous.as_ref().is_none_or(|previous| {
-                previous.versions.accumulation_key() != snapshot.versions.accumulation_key()
-                    || previous.camera != snapshot.camera
-                    || previous.render != snapshot.render
-            })
-            || self
-                .history
-                .as_ref()
-                .is_none_or(|history| history.width != width || history.height != height);
-        if self
-            .history
-            .as_ref()
-            .is_none_or(|history| history.width != width || history.height != height)
-        {
-            self.history = Some(History::new(backend, width, height)?);
-        }
-        if changed || self.samples == u32::MAX {
-            self.samples = 0;
-        }
-        let matrix = snapshot
-            .camera
-            .view_projection(width as f32 / height as f32)
-            .and_then(|matrix| matrix.inverse())
-            .ok_or("invalid path tracing camera")?
-            .to_array();
-        let history = self.history.as_mut().unwrap();
-        history
-            .resources
-            .set_temporary(history.mapped, history.mapped_image.clone())?;
-        let mut graph = history.resources.graph()?;
-        let trace = graph.add_work(
-            "path tracing",
-            vec![Access {
-                resource: history.color,
-                usage: if self.samples == 0 {
-                    Usage::ShaderWrite
-                } else {
-                    Usage::ShaderReadWrite
-                },
-            }],
+        let pending = self.renderer.submit(
+            backend,
+            &flow,
+            snapshot,
+            (width, height),
+            0,
+            seed,
+            &mut self.slot,
         )?;
-        let display = DisplayWork::declare(
-            modules,
-            &mut graph,
-            &[(path, history.color)],
-            history.mapped,
-            history.viewport,
-        )?;
-        let read = graph.add_work(
-            "read viewport",
-            vec![Access {
-                resource: history.viewport,
-                usage: Usage::TransferRead,
-            }],
-        )?;
-        let scene = &self.scene.as_ref().unwrap().2;
-        unsafe {
-            history
-                .resources
-                .submit(backend, &graph, |work, frame, images| {
-                    if work == trace {
-                        frame
-                            .trace_paths(
-                                &self.tracer,
-                                scene,
-                                images[history.color.index()].image()?,
-                                matrix,
-                                snapshot.scene.environment,
-                                self.samples,
-                                snapshot.render.max_path_bounces,
-                                seed,
-                            )
-                            .map_err(|error| error.to_string())?;
-                    } else if work == read {
-                        frame
-                            .copy_graph_image_to_readback(
-                                images[history.viewport.index()].image()?,
-                                &history.readback,
-                            )
-                            .map_err(|error| error.to_string())?;
-                    } else if !display.record(work, frame, images, &self.mapper)? {
-                        return Err("unknown path tracing work".into());
-                    }
-                    Ok(())
-                })?;
-            history.resources.wait()?;
-            self.samples += 1;
-            self.previous = Some(snapshot.clone());
-            let mut pixels = history.readback.read().map_err(|error| error.to_string())?;
-            for pixel in pixels.chunks_exact_mut(4) {
-                pixel.swap(0, 2);
-            }
-            Ok(pixels)
-        }
+        self.samples = pending.samples;
+        let (slot, pixels) = pending.finish();
+        self.slot = slot;
+        self.flow = Some(flow);
+        pixels
     }
 }
 
@@ -197,6 +82,7 @@ mod tests {
         Transform3, Vector3, Vertex,
     };
     use bee_vulkan::ValidationStatus;
+    use std::sync::Arc;
 
     #[test]
     #[ignore = "requires a ray tracing device and Vulkan validation layer"]
@@ -423,51 +309,5 @@ mod tests {
             ..Camera::default()
         };
         (snapshot, wall)
-    }
-}
-
-impl History {
-    fn new(backend: &Backend, width: u32, height: u32) -> Result<Self, String> {
-        let size = (width as usize)
-            .checked_mul(height as usize)
-            .and_then(|size| size.checked_mul(4))
-            .ok_or("viewport size overflow")?;
-        let image = |format, usage| unsafe {
-            backend
-                .create_graph_image(width, height, format, usage, vk::ImageAspectFlags::COLOR)
-                .map_err(|error| error.to_string())
-        };
-        let mut resources = GraphResources::default();
-        let color = resources.add_history(image(
-            vk::Format::R32G32B32A32_SFLOAT,
-            vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::SAMPLED,
-        )?);
-        let mapped_image = image(
-            vk::Format::R8G8B8A8_UNORM,
-            vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC,
-        )?;
-        let mapped = resources.add_temporary(mapped_image.clone());
-        let viewport = unsafe {
-            resources.add_external(
-                image(
-                    vk::Format::R8G8B8A8_UNORM,
-                    vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::TRANSFER_SRC,
-                )?,
-                None,
-            )
-        };
-        let readback = backend
-            .create_readback_buffer(size)
-            .map_err(|error| error.to_string())?;
-        Ok(Self {
-            resources,
-            color,
-            mapped,
-            viewport,
-            mapped_image,
-            readback,
-            width,
-            height,
-        })
     }
 }
