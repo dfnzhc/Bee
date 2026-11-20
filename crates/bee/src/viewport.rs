@@ -2,6 +2,7 @@ mod queue;
 
 use crate::flow_editor::FlowEditor;
 use crate::Bee;
+use bee::scene_document::{PreparedScene, SceneDocument};
 use bee_renderer::Module;
 use bee_scene::{DisplayParameters, SceneState, Versions};
 use bee_vulkan::{Backend, DiagnosticLevel, DiagnosticSender, TestImage};
@@ -130,6 +131,25 @@ impl Viewport {
             }
             _ => None,
         }
+    }
+
+    pub(crate) fn prepare_scene(&self, document: &SceneDocument) -> Result<PreparedScene, String> {
+        document.prepare(Self::path_unavailable(self.backend.as_deref()))
+    }
+
+    pub(crate) fn load_flow(
+        &mut self,
+        flow: FlowEditor,
+        state: &SceneState,
+        window: &mut Window,
+        cx: &mut Context<Bee>,
+    ) {
+        self.mode = RenderMode::from_source(flow.prepared().source());
+        self.flow = flow;
+        self.drag_position = None;
+        self.versions = None;
+        self.generation = self.generation.wrapping_add(1);
+        self.synchronize(self.extent, state, window, cx);
     }
 
     fn mode_button(

@@ -2,7 +2,7 @@ pub(crate) mod flow_editor;
 mod viewport;
 mod workbench;
 
-use bee::scene_document::SceneDocument;
+use bee::scene_document::{PreparedScene, SceneDocument};
 use bee_scene::SceneState;
 use bee_vulkan::{Backend, DiagnosticLevel};
 use flow_editor::FlowEditor;
@@ -14,7 +14,7 @@ use std::sync::Arc;
 use viewport::Viewport;
 use workbench::Workbench;
 
-actions!(bee, [FocusNext, FocusPrevious]);
+actions!(bee, [FocusNext, FocusPrevious, SaveScene]);
 
 pub(crate) struct Bee {
     viewport: Viewport,
@@ -29,7 +29,12 @@ fn sharing_unavailable_reason() -> &'static str {
 }
 
 impl Bee {
+    #[cfg(test)]
     pub(crate) fn new() -> Self {
+        Self::with_device(&SceneDocument::builtin())
+    }
+
+    pub(crate) fn with_device(document: &SceneDocument) -> Self {
         // 先建立诊断通道，实例创建和设备失败消息也能保留。
         let mut console = workbench::console::Console::default();
         match bee_vulkan::Backend::new_with_diagnostics(
@@ -75,28 +80,35 @@ impl Bee {
                     Some(Arc::new(backend)),
                     lines,
                     console,
-                    &SceneDocument::builtin(),
+                    document,
                 )
-                .expect("builtin scene")
+                .expect("valid initial scene")
             }
-            Err(error) => Self::failure_with_console(format!("{error:#}"), console),
+            Err(error) => Self::failure_with_console(format!("{error:#}"), console, document),
         }
     }
 
     #[cfg(test)]
     fn failure(reason: String) -> Self {
-        Self::failure_with_console(reason, workbench::console::Console::default())
+        Self::failure_with_console(
+            reason,
+            workbench::console::Console::default(),
+            &SceneDocument::builtin(),
+        )
     }
 
-    fn failure_with_console(reason: String, mut console: workbench::console::Console) -> Self {
+    fn failure_with_console(
+        reason: String,
+        mut console: workbench::console::Console,
+        document: &SceneDocument,
+    ) -> Self {
         let message = format!("Vulkan initialization failed: {reason}");
         eprintln!("{message}");
         console
             .sender
             .send(DiagnosticLevel::Error, "Device", message.clone());
         console.drain();
-        Self::with_scene(None, vec![message], console, &SceneDocument::builtin())
-            .expect("builtin scene")
+        Self::with_scene(None, vec![message], console, document).expect("valid initial scene")
     }
 
     fn with_scene(
@@ -117,6 +129,13 @@ impl Bee {
             lines,
             console,
         })
+    }
+
+    fn load_scene(&mut self, scene: PreparedScene, window: &mut Window, cx: &mut Context<Self>) {
+        self.state = scene.state;
+        let flow = FlowEditor::new(scene.flow, scene.preview, scene.preview_reason);
+        self.viewport.load_flow(flow, &self.state, window, cx);
+        cx.notify();
     }
 }
 
@@ -190,6 +209,7 @@ fn main() {
             cx.bind_keys([
                 KeyBinding::new("tab", FocusNext, None),
                 KeyBinding::new("shift-tab", FocusPrevious, None),
+                KeyBinding::new("ctrl-s", SaveScene, None),
                 KeyBinding::new("ctrl-w", gpui_component::dock::ClosePanel, None),
             ]);
             let bounds = Bounds::centered(None, size(px(1200.0), px(800.0)), cx);
@@ -199,8 +219,8 @@ fn main() {
                     ..Default::default()
                 },
                 |window, cx| {
-                    let bee = cx.new(|_| Bee::new());
-                    let workbench = cx.new(|cx| Workbench::new(bee, window, cx));
+                    let bee = cx.new(|_| Bee::with_device(&SceneDocument::blank()));
+                    let workbench = cx.new(|cx| Workbench::start(bee, window, cx));
                     cx.new(|cx| gpui_component::Root::new(workbench, window, cx))
                 },
             )

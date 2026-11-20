@@ -25,7 +25,6 @@ impl FlowEditor {
         }
     }
 
-    #[cfg(test)]
     pub(crate) fn draft(&self) -> &ModuleGraph {
         self.flow.draft()
     }

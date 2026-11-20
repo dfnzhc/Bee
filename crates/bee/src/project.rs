@@ -238,6 +238,10 @@ impl<C: SceneContent> Project<C> {
         &self.manifest
     }
 
+    pub fn root(&self) -> &Path {
+        &self.root
+    }
+
     pub fn assets_dir(&self) -> Result<PathBuf> {
         check_dir(&self.root, ASSETS, true)
     }

@@ -144,7 +144,9 @@ fn main() {
                     ..Default::default()
                 },
                 |window, cx| {
-                    let bee = cx.new(|_| Bee::new());
+                    let bee = cx.new(|_| {
+                        Bee::with_device(&bee::scene_document::SceneDocument::builtin())
+                    });
                     let viewport = cx.new(|cx| ProbePanel {
                         title: "Viewport",
                         focus: cx.focus_handle(),

@@ -17,6 +17,7 @@ use std::sync::Arc;
 
 pub(crate) mod console;
 mod files;
+mod projects;
 mod scene;
 
 const BACKGROUND: u32 = 0x1b1f20;
@@ -335,6 +336,7 @@ impl Render for WorkbenchPanel {
 enum AppMenu {
     File,
     View,
+    Scenes,
 }
 
 struct Drawer {
@@ -354,30 +356,52 @@ fn contains_panel(state: &PanelState, kind: PanelKind) -> bool {
 
 pub(crate) struct Workbench {
     bee: Entity<Bee>,
+    projects: Option<projects::Projects>,
+    selection: Entity<scene::Selection>,
+    closing: bool,
     dock: Entity<DockArea>,
     panels: Vec<Entity<WorkbenchPanel>>,
     drawer: Drawer,
     drawer_focus: [FocusHandle; 3],
-    menu_focus: [FocusHandle; 2],
+    menu_focus: [FocusHandle; 3],
     menu: Option<(AppMenu, Entity<PopupMenu>)>,
     menu_press_was_open: bool,
 }
 
 impl Workbench {
+    pub(crate) fn start(bee: Entity<Bee>, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        Self::with_projects(bee, Some(projects::Projects::load()), window, cx)
+    }
+
+    #[cfg(test)]
     pub(crate) fn new(bee: Entity<Bee>, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        Self::with_projects(bee, None, window, cx)
+    }
+
+    fn with_projects(
+        bee: Entity<Bee>,
+        projects: Option<projects::Projects>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
         bee.update(cx, |bee, _| bee.viewport.set_docked());
-        let closing_bee = bee.downgrade();
+        let workbench = cx.weak_entity();
         window.on_window_should_close(cx, move |window, cx| {
-            Self::request_close(&closing_bee, window, cx)
+            workbench
+                .update(cx, |this, cx| this.request_exit(window, cx))
+                .unwrap_or(true)
         });
         let selection = cx.new(|_| scene::Selection::default());
         let observed_selection = selection.clone();
-        cx.observe(&bee, move |_, bee, cx| {
+        cx.observe(&bee, move |this, bee, cx| {
             if observed_selection.read(cx).is_stale(&bee.read(cx).state) {
                 observed_selection.update(cx, |selection, cx| {
                     selection.clear();
                     cx.notify();
                 });
+            }
+            if this.projects.is_some() {
+                cx.notify();
             }
         })
         .detach();
@@ -402,6 +426,9 @@ impl Workbench {
         .detach();
         Self {
             bee,
+            projects,
+            selection,
+            closing: false,
             dock,
             panels,
             drawer,
@@ -412,9 +439,15 @@ impl Workbench {
         }
     }
 
-    fn request_close(bee: &WeakEntity<Bee>, window: &mut Window, cx: &mut App) -> bool {
-        bee.update(cx, |bee, _| bee.viewport.request_close(window))
-            .unwrap_or(true)
+    fn viewport_panel_visible(&self, cx: &App) -> bool {
+        let viewport = self.panels[PanelKind::Viewport as usize].read(cx);
+        (self.drawer.open
+            || !contains_panel(&self.drawer.stack.read(cx).dump(cx), PanelKind::Viewport))
+            && viewport.tab().is_some_and(|tab| {
+                tab.read(cx)
+                    .active_panel(cx)
+                    .is_some_and(|panel| panel.panel_name(cx) == viewport.kind.title())
+            })
     }
 
     fn reset(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -480,14 +513,17 @@ impl Workbench {
         &self.menu_focus[kind as usize]
     }
 
-    fn menu_item(label: &'static str, selector: impl Into<SharedString>) -> PopupMenuItem {
+    fn menu_item(label: impl Into<SharedString>, selector: impl Into<SharedString>) -> PopupMenuItem {
+        let label = label.into();
         let selector = selector.into();
         PopupMenuItem::element(move |_, _| {
             let selector = selector.clone();
             div()
                 .id(selector.clone())
                 .debug_selector(move || selector.to_string())
-                .child(label)
+                .min_w_0()
+                .text_ellipsis()
+                .child(label.clone())
         })
     }
 
@@ -500,17 +536,28 @@ impl Workbench {
         }
 
         let workbench = cx.weak_entity();
-        let bee = self.bee.downgrade();
         let menu = PopupMenu::build(window, cx, |mut menu, _, _| {
             menu = menu.min_w(px(180.0));
             if kind == AppMenu::File {
+                if self.projects.is_some() {
+                    menu = self.file_menu_items(menu, &workbench);
+                }
                 return menu.item(Self::menu_item("Exit", "exit-bee").on_click(
                     move |_, window, cx| {
-                        if Self::request_close(&bee, window, cx) {
+                        if workbench
+                            .update(cx, |this, cx| this.request_exit(window, cx))
+                            .unwrap_or(true)
+                        {
                             window.remove_window();
                         }
                     },
                 ));
+            }
+            if kind == AppMenu::Scenes {
+                return self.scene_menu_items(
+                    menu.action_context(self.menu_focus(kind).clone()),
+                    &workbench,
+                );
             }
 
             for (index, panel) in PanelKind::ALL.into_iter().enumerate() {
@@ -551,11 +598,19 @@ impl Workbench {
         cx.notify();
     }
 
-    fn menu_button(&self, kind: AppMenu, cx: &Context<Self>) -> impl IntoElement {
-        let (id, title) = match kind {
+    fn menu_button(
+        &self,
+        kind: AppMenu,
+        scene_name: Option<SharedString>,
+        cx: &Context<Self>,
+    ) -> impl IntoElement {
+        let (id, label) = match kind {
             AppMenu::File => ("file-menu", "File"),
             AppMenu::View => ("view-menu", "View"),
+            AppMenu::Scenes => ("scene-menu", "Scenes"),
         };
+        let title = scene_name.unwrap_or_else(|| label.into());
+        let dirty = kind == AppMenu::Scenes && self.scene_dirty(cx);
         let popup = self
             .menu
             .as_ref()
@@ -564,6 +619,9 @@ impl Workbench {
         let menu_open = popup.is_some();
         div()
             .relative()
+            .min_w_0()
+            .when(kind != AppMenu::Scenes, |this| this.flex_shrink_0())
+            .when(kind == AppMenu::Scenes, |this| this.max_w(px(250.0)))
             .child(
                 div()
                     .id(id)
@@ -582,7 +640,17 @@ impl Workbench {
                     .hover(|style| style.bg(rgb(PANEL)))
                     .focus(|style| style.border_color(rgb(ACCENT)))
                     .when(menu_open, |this| this.bg(rgb(PANEL)))
-                    .child(title)
+                    .child(div().min_w_0().text_ellipsis().child(title))
+                    .when(dirty, |this| {
+                        this.child(
+                            div()
+                                .id("scene-dirty")
+                                .debug_selector(|| "scene-dirty".into())
+                                .flex_shrink_0()
+                                .text_color(rgb(ACCENT))
+                                .child("*"),
+                        )
+                    })
                     .child(Icon::new(IconName::ChevronDown).xsmall())
                     .on_mouse_down(
                         MouseButton::Left,
@@ -602,6 +670,8 @@ impl Workbench {
                     }))
                     .on_key_down(cx.listener(move |this, event: &KeyDownEvent, window, cx| {
                         if matches!(event.keystroke.key.as_str(), "enter" | "space" | "down") {
+                            window.prevent_default();
+                            cx.stop_propagation();
                             this.toggle_menu(kind, window, cx);
                         }
                     })),
@@ -840,7 +910,12 @@ impl Workbench {
 }
 
 impl Render for Workbench {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let show_workspace = self
+            .projects
+            .as_ref()
+            .is_none_or(projects::Projects::has_session);
+        let titles = self.project_titles();
         div()
             .size_full()
             .flex()
@@ -850,32 +925,56 @@ impl Render for Workbench {
             .text_size(px(13.0))
             .on_action(cx.listener(|_, _: &crate::FocusNext, window, _| window.focus_next()))
             .on_action(cx.listener(|_, _: &crate::FocusPrevious, window, _| window.focus_prev()))
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .h(px(34.0))
-                    .flex_shrink_0()
-                    .gap_3()
-                    .px_3()
-                    .border_b_1()
-                    .border_color(rgb(BORDER))
-                    .tab_group()
-                    .child(div().font_semibold().text_color(rgb(ACCENT)).child("Bee"))
-                    .child(self.menu_button(AppMenu::File, cx))
-                    .child(self.menu_button(AppMenu::View, cx)),
-            )
-            .child(
-                div()
-                    .flex_1()
-                    .min_h_0()
-                    .min_w_0()
-                    .tab_index(1)
-                    .tab_stop(false)
-                    .tab_group()
-                    .child(self.dock.clone()),
-            )
-            .child(self.drawer_bar(cx))
+            .on_action(cx.listener(|this, _: &super::SaveScene, window, cx| {
+                if this.projects.is_some()
+                    && !gpui_component::WindowExt::has_active_dialog(window, cx)
+                {
+                    this.save_project_scene(cx);
+                }
+            }))
+            .when(show_workspace, |this| {
+                this.child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .h(px(34.0))
+                        .flex_shrink_0()
+                        .gap_3()
+                        .px_3()
+                        .border_b_1()
+                        .border_color(rgb(BORDER))
+                        .tab_group()
+                        .child(div().font_semibold().text_color(rgb(ACCENT)).child("Bee"))
+                        .child(self.menu_button(AppMenu::File, None, cx))
+                        .child(self.menu_button(AppMenu::View, None, cx))
+                        .when_some(titles, |header, (project, scene)| {
+                            header
+                                .child(
+                                    div()
+                                        .min_w_0()
+                                        .max_w(px(280.0))
+                                        .text_ellipsis()
+                                        .text_color(rgb(MUTED))
+                                        .child(project),
+                                )
+                                .child(self.menu_button(AppMenu::Scenes, Some(scene), cx))
+                        }),
+                )
+                .child(
+                    div()
+                        .flex_1()
+                        .min_h_0()
+                        .min_w_0()
+                        .tab_index(1)
+                        .tab_stop(false)
+                        .tab_group()
+                        .child(self.dock.clone()),
+                )
+                .child(self.drawer_bar(cx))
+            })
+            .when(!show_workspace, |this| this.child(self.project_chooser(cx)))
+            .children(self.project_status())
+            .children(gpui_component::Root::render_dialog_layer(window, cx))
     }
 }
 

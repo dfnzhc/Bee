@@ -1,6 +1,6 @@
 # Bee
 
-Bee 是一个 Windows 三维渲染原型，使用 GPUI 显示界面，由项目内的 Vulkan 后端渲染内置场景。
+Bee 是一个 Windows 三维渲染原型，使用 GPUI 显示界面，由项目内的 Vulkan 后端渲染 Bee 项目中的场景。
 
 ## 运行环境
 
@@ -27,9 +27,22 @@ $env:VK_LAYER_VALIDATE_SYNC = '1'
 .\target\debug\bee.exe
 ```
 
+## 项目与场景
+
+1. 启动后在 `Bee Projects` 选择 `New Project`，选定位置，输入项目名称并选择 `Built-in Example` 或 `Blank`。默认在所选位置创建同名子目录。直接使用已选的空目录时，选择 `Use the selected empty folder`。点击 `Create` 后进入首个场景。
+2. `File` > `Close Project` 返回项目选择页。用 `Recent Projects` 重新打开，或用 `Open Project` 选择包含 `project.beeproj` 的目录。工作台里的 `File` 菜单也能新建或打开项目。项目移动后可从新目录打开，或用最近列表的 `Locate` 更新位置。`Remove` 仅移除本机最近记录。
+3. 顶栏显示项目和当前场景名称。打开场景选择器可切换场景，或使用 `New Scene`、`Copy Saved Scene`、`Rename Scene`、`Set as Startup Scene`。复制读取来源场景已保存的版本。列表中的 `Current` 和 `Startup` 分别标出当前场景和下次打开项目时使用的场景。
+4. 旋转或缩放只改变本次浏览视角。需要下次从该视角开始时，在场景选择器选择 `Set Current View as Start View`，再用 `File` > `Save Scene` 或 `Ctrl+S` 保存。保存包含起始相机、Render Flow 草稿和最后一次应用成功的流程。场景名旁的 `*` 表示有未保存的改动。离开该场景时可选择 `Save`、`Discard` 或 `Cancel`。
+
+随项目一起移动或备份整个目录。`project.beeproj` 登记项目名称、场景及启动场景。`Scenes/<场景 ID>.beescene` 保存独立的场景文档。`Assets/` 存放项目共享资源。
+
+每次替换已保存的场景都会保留 `Scenes/<场景 ID>.beescene.bak`。若正式文件丢失或损坏，重新打开项目或切换到该场景时，可在错误对话框选择其他场景，或选择 `Restore Backup` 并确认恢复。恢复使用上一份有效的已保存版本。
+
+通过 `Delete Current Scene` 删除时，先选择下一个要打开的场景。删除的是启动场景时，该选项也成为新的启动场景。项目至少保留一个场景。删除后的文件通常位于 `Trash/<场景 ID>.beescene`。工作台会报告实际保留路径，包括移动失败时的原位置。
+
 ## 操作
 
-- 顶部 `File` > `Exit` 关闭 Bee，有在途渲染工作时等待其完成并释放资源。`View` 提供六个面板入口和 `Reset Layout`，可切换或恢复面板，以及重置布局。用 Tab 聚焦菜单，Enter 或空格打开，方向键选择条目，Enter 确认，Escape 关闭并返回对应菜单按钮。
+- `File` > `Exit` 和窗口关闭按钮都先处理未保存改动，再等待在途渲染工作完成并释放资源。`View` 提供六个面板入口和 `Reset Layout`，可切换或恢复面板，以及重置布局。用 Tab 聚焦菜单或场景选择器，Enter 或空格打开，方向键选择条目，Enter 确认，Escape 关闭并返回对应按钮。
 - 默认布局从左至右是 `Scene`、`Viewport`、`Properties`，底部抽屉默认收起。点击底部 `Files`、`Console` 或 `Render Flow` 展开或切换，也可用 Tab 聚焦入口后按 Enter 或空格。再次选择抽屉中的当前入口，或使用底部右侧的收起按钮，可把空间还给视口。面板拖到其他停靠位置后，入口会聚焦新位置。`View` 也可显示或恢复面板。`Reset Layout` 恢复默认分区并收起抽屉，保留浏览位置、控制台历史与筛选，以及流程草稿和生效流程。
 - 在场景画面上按住鼠标左键拖动以旋转相机，滚动鼠标滚轮以缩放。
 - 使用视口单行工具栏中的 `Raster` 和 `Path tracing` 快捷按钮切换路径。切换时会修改当前流程草稿的渲染源并尝试应用整份草稿，按钮的 `active` 标记表示实际生效的路径。光追生效时，同一行显示当前样本数。
@@ -41,13 +54,13 @@ $env:VK_LAYER_VALIDATE_SYNC = '1'
 
 ## 设备与验证诊断
 
-启动后在 `Console` 查看实际设备名、Vulkan 版本、图形队列、图像尺寸限制、光追能力及 `Validation` 状态。`Viewport` 来源的 `Image presentation` 信息记录当前画面接入方式。`enabled` 表示验证层和消息回调可用；`requested but unavailable` 表示本机缺少所请求的验证层；`enabled; debug callback unavailable` 表示验证层已启用但缺少调试回调扩展；`disabled` 表示本次未请求验证。缺少验证层或回调时会额外记录 `Warning`，不会显示为完整启用。
+打开项目后在 `Console` 查看实际设备名、Vulkan 版本、图形队列、图像尺寸限制、光追能力及 `Validation` 状态。`Viewport` 来源的 `Image presentation` 信息记录当前画面接入方式。`enabled` 表示验证层和消息回调可用；`requested but unavailable` 表示本机缺少所请求的验证层；`enabled; debug callback unavailable` 表示验证层已启用但缺少调试回调扩展；`disabled` 表示本次未请求验证。缺少验证层或回调时会额外记录 `Warning`，不会显示为完整启用。
 
 设备报告使用 `Info`，初始化、视口及流程失败使用 `Error`；Vulkan 回调保留验证层给出的警告或错误级别，同时继续写入标准错误。要检查流程错误，可断开色调映射节点的输入并点击 `Apply flow`：Render Flow 会保留无效草稿和原错误提示，Console 记录对应的 `Error`，上一份有效流程继续生效。只有已启用的验证层实际产生消息时，控制台才会出现 `Vulkan validation` 条目。
 
 ## 当前限制
 
-两条路径使用相同的内置几何体、漫反射材质、点光源和相机。路径追踪是渐进采样，运动时允许噪点，暂不提供降噪；节点图暂不保存到磁盘。当前 GPUI 版本没有可用的 Windows 外部纹理和同步交接入口，画面通过 Vulkan 异步读回再上传到 GPUI，可能带来额外延迟。没有预设帧率验收门槛。
+两条路径使用当前场景的几何体、漫反射材质、点光源和相机。路径追踪是渐进采样，运动时允许噪点，暂不提供降噪。当前 GPUI 版本没有可用的 Windows 外部纹理和同步交接入口，画面通过 Vulkan 异步读回再上传到 GPUI，可能带来额外延迟。没有预设帧率验收门槛。
 
 待排查：工作台改动后，用户反馈渲染体感明显变慢。原因尚未确认，后续可在相同视口物理尺寸和构建配置下比较渲染、读回、显示及面板刷新耗时。
 
