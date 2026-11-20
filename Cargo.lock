@@ -536,7 +536,13 @@ dependencies = [
  "gpui-component",
  "gpui-component-assets",
  "image",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.21",
+ "uuid",
  "windows 0.61.3",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
