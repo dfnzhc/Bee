@@ -1,43 +1,80 @@
 //! 界面和渲染路径共享的场景数据。
 
 use euclid::default::{Point3D, Transform3D, Vector3D};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 pub type Point3 = Point3D<f32>;
 pub type Vector3 = Vector3D<f32>;
 pub type Transform3 = Transform3D<f32>;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Vertex {
     pub position: Point3,
     pub normal: Vector3,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+impl Vertex {
+    pub fn validate(&self) -> Result<(), &'static str> {
+        let p = self.position;
+        let n = self.normal;
+        if ![p.x, p.y, p.z, n.x, n.y, n.z]
+            .into_iter()
+            .all(f32::is_finite)
+        {
+            return Err("invalid vertex position or normal");
+        }
+        if n == Vector3::zero() {
+            return Err("invalid vertex normal");
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Geometry {
     pub vertices: Vec<Vertex>,
     pub indices: Vec<u32>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Instance {
     pub geometry: usize,
     pub material: usize,
     pub transform: Transform3,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+impl Instance {
+    pub fn inverse_transform(&self) -> Result<Transform3, &'static str> {
+        let transform = self.transform;
+        if !transform.to_array().into_iter().all(f32::is_finite)
+            || transform.m14 != 0.0
+            || transform.m24 != 0.0
+            || transform.m34 != 0.0
+            || transform.m44 != 1.0
+            || !transform.determinant().is_finite()
+        {
+            return Err("invalid instance transform");
+        }
+        transform
+            .inverse()
+            .filter(|inverse| inverse.to_array().into_iter().all(f32::is_finite))
+            .ok_or("non-invertible instance transform")
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct DiffuseMaterial {
     pub albedo: [f32; 3],
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct PointLight {
     pub position: Point3,
     pub intensity: [f32; 3],
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Scene {
     pub geometries: Vec<Geometry>,
     pub instances: Vec<Instance>,
@@ -46,9 +83,23 @@ pub struct Scene {
     pub environment: [f32; 3],
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 pub struct RenderParameters {
     pub max_path_bounces: u32,
+}
+
+impl Default for RenderParameters {
+    fn default() -> Self {
+        Self {
+            max_path_bounces: 2,
+        }
+    }
+}
+
+impl RenderParameters {
+    pub fn is_valid(self) -> bool {
+        self.max_path_bounces >= 2
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -89,19 +140,31 @@ pub struct SceneState {
 
 impl Default for SceneState {
     fn default() -> Self {
-        Self {
-            scene: Arc::new(Scene::builtin()),
-            camera: Camera::default(),
-            render: RenderParameters {
-                max_path_bounces: 2,
-            },
-            display: DisplayParameters { exposure_ev: 0.0 },
-            versions: Versions::default(),
-        }
+        Self::new(
+            Scene::builtin(),
+            Camera::default(),
+            RenderParameters::default(),
+            DisplayParameters { exposure_ev: 0.0 },
+        )
     }
 }
 
 impl SceneState {
+    pub fn new(
+        scene: Scene,
+        camera: Camera,
+        render: RenderParameters,
+        display: DisplayParameters,
+    ) -> Self {
+        Self {
+            scene: Arc::new(scene),
+            camera,
+            render,
+            display,
+            versions: Versions::default(),
+        }
+    }
+
     pub fn scene(&self) -> &Scene {
         &self.scene
     }
@@ -146,7 +209,7 @@ impl SceneState {
     }
 
     pub fn set_render_parameters(&mut self, render: RenderParameters) -> bool {
-        if self.render == render || render.max_path_bounces < 2 {
+        if self.render == render || !render.is_valid() {
             return false;
         }
         self.render = render;
@@ -169,7 +232,7 @@ fn increment(version: &mut u64) {
 }
 
 /// 世界坐标采用右手系，+Y 向上；相机默认从 +Z 方向看向场景。
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Camera {
     pub target: Point3,
     pub yaw: f32,
@@ -195,6 +258,27 @@ impl Default for Camera {
 }
 
 impl Camera {
+    pub fn is_valid(&self) -> bool {
+        let Some(inverse) = self
+            .view_projection(1.0)
+            .and_then(|matrix| matrix.inverse())
+        else {
+            return false;
+        };
+        if !inverse.to_array().into_iter().all(f32::is_finite) {
+            return false;
+        }
+        // 光追用近平面和远平面重建射线，远平面不能因浮点精度落在无穷远。
+        let (Some(near), Some(far)) = (
+            inverse.transform_point3d(Point3::origin()),
+            inverse.transform_point3d(Point3::new(0.0, 0.0, 1.0)),
+        ) else {
+            return false;
+        };
+        let length_squared = (far - near).square_length();
+        length_squared.is_finite() && length_squared > 0.0
+    }
+
     pub fn position(&self) -> Point3 {
         let horizontal = self.distance * self.pitch.cos();
         self.target
@@ -329,6 +413,61 @@ impl Camera {
 }
 
 impl Scene {
+    pub fn blank() -> Self {
+        Self {
+            geometries: Vec::new(),
+            instances: Vec::new(),
+            materials: Vec::new(),
+            lights: Vec::new(),
+            environment: [0.03; 3],
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), &'static str> {
+        let valid_color = |color: [f32; 3]| color.into_iter().all(|v| v.is_finite() && v >= 0.0);
+        if !valid_color(self.environment) {
+            return Err("invalid environment color");
+        }
+        if self.materials.iter().any(|m| !valid_color(m.albedo)) {
+            return Err("invalid material albedo");
+        }
+        if self.lights.iter().any(|light| {
+            let p = light.position;
+            ![p.x, p.y, p.z].into_iter().all(f32::is_finite) || !valid_color(light.intensity)
+        }) {
+            return Err("invalid point light");
+        }
+        for geometry in &self.geometries {
+            if !geometry.indices.len().is_multiple_of(3)
+                || geometry.indices.len() > u32::MAX as usize / 2
+            {
+                return Err("invalid triangle count");
+            }
+            if geometry
+                .indices
+                .iter()
+                .any(|&i| i as usize >= geometry.vertices.len())
+            {
+                return Err("invalid geometry index");
+            }
+            for vertex in &geometry.vertices {
+                vertex.validate()?;
+            }
+        }
+        for instance in &self.instances {
+            if instance.geometry >= self.geometries.len() {
+                return Err("invalid instance geometry");
+            }
+            if instance.material >= self.materials.len()
+                || u32::try_from(instance.material).is_err()
+            {
+                return Err("invalid instance material");
+            }
+            instance.inverse_transform()?;
+        }
+        Ok(())
+    }
+
     pub fn builtin() -> Self {
         let mut ground = Geometry {
             vertices: Vec::new(),

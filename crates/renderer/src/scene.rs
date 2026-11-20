@@ -1,5 +1,5 @@
 use crate::GraphResource;
-use bee_scene::{Geometry, Instance, Scene, Transform3};
+use bee_scene::{Geometry, Instance, Scene};
 use bee_vulkan::{
     profile, AccelerationMesh, AccelerationScene, Backend, RasterGeometry, RasterInstance,
     RasterInstances, RayInstance, SceneBuffer,
@@ -175,7 +175,7 @@ impl PathScene {
                     .instances
                     .iter()
                     .map(|instance| {
-                        inverse_transform(instance.transform)?;
+                        instance.inverse_transform()?;
                         let t = instance.transform;
                         // euclid 为列主序，Vulkan 实例读取行主序的 3x4 仿射矩阵。
                         Ok::<_, String>(RayInstance {
@@ -220,18 +220,10 @@ fn mesh_vertices(geometry: &Geometry) -> Result<Vec<[f32; 4]>, String> {
             .vertices
             .get(index as usize)
             .ok_or("invalid geometry index")?;
+        vertex.validate()?;
         let p = vertex.position;
         let n = vertex.normal;
-        if ![p.x, p.y, p.z, n.x, n.y, n.z]
-            .into_iter()
-            .all(f32::is_finite)
-        {
-            return Err("invalid vertex position or normal".into());
-        }
         let scale = n.x.abs().max(n.y.abs()).max(n.z.abs());
-        if scale == 0.0 {
-            return Err("invalid vertex normal".into());
-        }
         values.extend([
             [p.x, p.y, p.z, 1.0],
             [n.x / scale, n.y / scale, n.z / scale, 0.0],
@@ -240,24 +232,8 @@ fn mesh_vertices(geometry: &Geometry) -> Result<Vec<[f32; 4]>, String> {
     Ok(values)
 }
 
-fn inverse_transform(transform: Transform3) -> Result<Transform3, String> {
-    if transform.to_array().iter().any(|value| !value.is_finite())
-        || transform.m14 != 0.0
-        || transform.m24 != 0.0
-        || transform.m34 != 0.0
-        || transform.m44 != 1.0
-        || !transform.determinant().is_finite()
-    {
-        return Err("invalid instance transform".into());
-    }
-    transform
-        .inverse()
-        .filter(|inverse| inverse.to_array().iter().all(|v| v.is_finite()))
-        .ok_or_else(|| "non-invertible instance transform".into())
-}
-
 fn raster_instance(instance: &Instance) -> Result<RasterInstance, String> {
-    let inverse = inverse_transform(instance.transform)?;
+    let inverse = instance.inverse_transform()?;
     Ok(RasterInstance {
         model: instance.transform.to_array(),
         normal: [
@@ -272,7 +248,7 @@ fn raster_instance(instance: &Instance) -> Result<RasterInstance, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bee_scene::{Point3, Vector3, Vertex};
+    use bee_scene::{Point3, Transform3, Vector3, Vertex};
 
     #[test]
     fn prepares_object_space_mesh_and_inverse_transpose_instances() {

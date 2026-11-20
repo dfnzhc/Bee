@@ -1,10 +1,13 @@
+use serde::{Deserialize, Serialize};
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PortType {
     LinearSceneColor,
     DisplayColor,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Module {
     Rasterization,
     PathTracing,
@@ -30,7 +33,7 @@ impl Module {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
 pub struct NodeId(usize);
 
 impl NodeId {
@@ -39,7 +42,7 @@ impl NodeId {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct ModuleGraph {
     nodes: Vec<Option<Module>>,
     connections: Vec<(NodeId, NodeId)>,
@@ -96,7 +99,29 @@ impl ModuleGraph {
         self.execution_order().map(|_| ())
     }
 
+    pub fn validate_structure(&self) -> Result<(), String> {
+        // 草稿可以缺少连接或暂时无法执行，但引用和参数必须有效。
+        let mut has_input = vec![false; self.nodes.len()];
+        for &(from, to) in &self.connections {
+            if self.module(from).is_none() || self.module(to).is_none() {
+                return Err(format!(
+                    "connection from {from:?} to {to:?} refers to a missing module"
+                ));
+            }
+            if std::mem::replace(&mut has_input[to.index()], true) {
+                return Err(format!("module {to:?} has multiple input connections"));
+            }
+        }
+        for (id, module) in self.nodes() {
+            if matches!(module, Module::ToneMapping { exposure_ev } if !exposure_ev.is_finite()) {
+                return Err(format!("module {id:?} has invalid exposure"));
+            }
+        }
+        Ok(())
+    }
+
     pub fn execution_order(&self) -> Result<Vec<NodeId>, String> {
+        self.validate_structure()?;
         // 先检查环，使循环连接不会被后续的端口类型错误掩盖。
         let mut incoming = vec![0; self.nodes.len()];
         for &(_, to) in &self.connections {
@@ -143,10 +168,6 @@ impl ModuleGraph {
             }
         }
         for (index, module) in self.nodes.iter().enumerate() {
-            if matches!(module, Some(Module::ToneMapping { exposure_ev }) if !exposure_ev.is_finite())
-            {
-                return Err(format!("module {:?} has invalid exposure", NodeId(index)));
-            }
             if module.is_some_and(|module| module.input_type().is_some())
                 && !self.connections.iter().any(|&(_, to)| to == NodeId(index))
             {
@@ -199,6 +220,16 @@ pub struct RenderFlow {
 }
 
 impl RenderFlow {
+    pub fn from_saved(active: ModuleGraph, draft: ModuleGraph) -> Result<Self, String> {
+        active.validate()?;
+        draft.validate_structure()?;
+        Ok(Self {
+            active: Some(active),
+            draft,
+            error: None,
+        })
+    }
+
     pub fn draft(&self) -> &ModuleGraph {
         &self.draft
     }

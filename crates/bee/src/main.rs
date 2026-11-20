@@ -2,8 +2,10 @@ pub(crate) mod flow_editor;
 mod viewport;
 mod workbench;
 
+use bee::scene_document::SceneDocument;
 use bee_scene::SceneState;
-use bee_vulkan::DiagnosticLevel;
+use bee_vulkan::{Backend, DiagnosticLevel};
+use flow_editor::FlowEditor;
 use gpui::{
     actions, div, prelude::*, px, relative, rgb, size, App, Application, Bounds, Context,
     KeyBinding, Window, WindowBounds, WindowOptions,
@@ -69,13 +71,13 @@ impl Bee {
                         .send(DiagnosticLevel::Info, "Device", line.clone());
                 }
                 console.drain();
-                Self {
-                    viewport: Viewport::new(Some(Arc::new(backend)), console.sender.clone()),
-                    state: SceneState::default(),
+                Self::with_scene(
+                    Some(Arc::new(backend)),
                     lines,
-                    failed: false,
                     console,
-                }
+                    &SceneDocument::builtin(),
+                )
+                .expect("builtin scene")
             }
             Err(error) => Self::failure_with_console(format!("{error:#}"), console),
         }
@@ -93,13 +95,28 @@ impl Bee {
             .sender
             .send(DiagnosticLevel::Error, "Device", message.clone());
         console.drain();
-        Self {
-            viewport: Viewport::new(None, console.sender.clone()),
-            state: SceneState::default(),
-            lines: vec![message],
-            failed: true,
+        Self::with_scene(None, vec![message], console, &SceneDocument::builtin())
+            .expect("builtin scene")
+    }
+
+    fn with_scene(
+        backend: Option<Arc<Backend>>,
+        lines: Vec<String>,
+        console: workbench::console::Console,
+        document: &SceneDocument,
+    ) -> Result<Self, String> {
+        let scene = document.prepare(Viewport::path_unavailable(backend.as_deref()))?;
+        Ok(Self {
+            failed: backend.is_none(),
+            viewport: Viewport::new(
+                backend,
+                console.sender.clone(),
+                FlowEditor::new(scene.flow, scene.preview, scene.preview_reason),
+            ),
+            state: scene.state,
+            lines,
             console,
-        }
+        })
     }
 }
 

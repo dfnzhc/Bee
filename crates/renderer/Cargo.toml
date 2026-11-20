@@ -8,3 +8,4 @@ ash = "=0.38.0"
 bee-vulkan = { path = "../vulkan" }
 bee-scene = { path = "../scene" }
 rayon = "1.12"
+serde = { version = "1", features = ["derive"] }

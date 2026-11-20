@@ -25,6 +25,16 @@ enum RenderMode {
     Path,
 }
 
+impl RenderMode {
+    fn from_source(source: Module) -> Self {
+        match source {
+            Module::Rasterization => Self::Raster,
+            Module::PathTracing => Self::Path,
+            _ => unreachable!("validated scene source"),
+        }
+    }
+}
+
 pub(crate) struct ViewportChanged;
 impl EventEmitter<ViewportChanged> for Bee {}
 
@@ -60,7 +70,11 @@ pub struct Viewport {
 }
 
 impl Viewport {
-    pub fn new(backend: Option<Arc<Backend>>, diagnostics: DiagnosticSender) -> Self {
+    pub fn new(
+        backend: Option<Arc<Backend>>,
+        diagnostics: DiagnosticSender,
+        flow: FlowEditor,
+    ) -> Self {
         if backend.is_some() {
             diagnostics.send(
                 DiagnosticLevel::Info,
@@ -86,9 +100,9 @@ impl Viewport {
             image_versions: None,
             error: None,
             drag_position: None,
-            mode: RenderMode::Raster,
+            mode: RenderMode::from_source(flow.prepared().source()),
             samples: 0,
-            flow: FlowEditor::default(),
+            flow,
             #[cfg(test)]
             render_delay: None,
         }
@@ -102,12 +116,14 @@ impl Viewport {
         } else if self.backend.is_none() {
             Some("Viewport unavailable | See Console".into())
         } else {
-            None
+            self.flow
+                .preview_reason()
+                .map(|reason| format!("Raster preview | Path tracing unavailable: {reason}"))
         }
     }
 
-    fn path_unavailable(&self) -> Option<String> {
-        match &self.backend {
+    pub(crate) fn path_unavailable(backend: Option<&Backend>) -> Option<String> {
+        match backend {
             None => Some("Vulkan device unavailable".into()),
             Some(backend) if !backend.report.ray_tracing_missing.is_empty() => {
                 Some(backend.report.ray_tracing_missing.join(", "))
@@ -209,7 +225,11 @@ impl Viewport {
                     .text_size(px(12.0))
                     .tab_group()
                     .child(self.mode_button(RenderMode::Raster, None, cx))
-                    .child(self.mode_button(RenderMode::Path, self.path_unavailable(), cx))
+                    .child(self.mode_button(
+                        RenderMode::Path,
+                        Self::path_unavailable(self.backend.as_deref()),
+                        cx,
+                    ))
                     .when(self.mode == RenderMode::Path, |toolbar| {
                         toolbar.child(
                             div()
@@ -414,7 +434,7 @@ impl Viewport {
         window: &mut Window,
         cx: &mut Context<Bee>,
     ) {
-        if self.mode == mode {
+        if self.mode == mode && self.flow.preview_reason().is_none() {
             return;
         }
         let source = match mode {
@@ -438,7 +458,7 @@ impl Viewport {
         window: &mut Window,
         cx: &mut Context<Bee>,
     ) {
-        let unavailable = self.path_unavailable();
+        let unavailable = Self::path_unavailable(self.backend.as_deref());
         let previous = self.flow.active().clone();
         let graph = match self.flow.apply(unavailable) {
             Ok(graph) => graph,
@@ -455,11 +475,7 @@ impl Viewport {
             return;
         }
         let exposure_ev = self.flow.prepared().exposure_ev;
-        let mode = match self.flow.prepared().source() {
-            Module::Rasterization => RenderMode::Raster,
-            Module::PathTracing => RenderMode::Path,
-            _ => unreachable!("validated scene source"),
-        };
+        let mode = RenderMode::from_source(self.flow.prepared().source());
         let mode_changed = self.mode != mode;
         self.mode = mode;
         state.set_display_parameters(DisplayParameters { exposure_ev });
@@ -1805,10 +1821,7 @@ mod tests {
     #[ignore = "requires a Vulkan graphics device"]
     fn gpui_unavailable_path_keeps_raster_view() {
         let mut backend = Backend::new(true).unwrap();
-        backend
-            .report
-            .ray_tracing_missing
-            .push("simulated missing ray tracing".into());
+        backend.report.ray_tracing_missing = vec!["simulated missing ray tracing".into()];
         let backend = Arc::new(backend);
         let mut app = gpui::TestAppContext::single();
         app.update(|cx| {
@@ -1819,13 +1832,11 @@ mod tests {
         let (root, cx) = app.add_window_view(|window, cx| {
             let view = cx.new(|_| {
                 let console = crate::workbench::console::Console::default();
-                Bee {
-                    viewport: Viewport::new(Some(backend.clone()), console.sender.clone()),
-                    state: SceneState::default(),
-                    lines: vec![],
-                    failed: false,
-                    console,
-                }
+                let mut document = bee::scene_document::SceneDocument::builtin();
+                let (source, _) = document.applied_flow.display_source().unwrap();
+                *document.applied_flow.module_mut(source).unwrap() = Module::PathTracing;
+                document.draft_flow = document.applied_flow.clone();
+                Bee::with_scene(Some(backend.clone()), vec![], console, &document).unwrap()
             });
             bee = Some(view.clone());
             let workbench = cx.new(|cx| crate::workbench::Workbench::new(view, window, cx));
@@ -1842,7 +1853,10 @@ mod tests {
             let bee = bee.read(cx);
             let viewport = &bee.viewport;
             assert_eq!(viewport.mode, RenderMode::Raster);
-            assert!(viewport.notice().is_none());
+            assert_eq!(
+                viewport.notice().as_deref(),
+                Some("Raster preview | Path tracing unavailable: simulated missing ray tracing")
+            );
             (
                 viewport.flow.active().clone(),
                 viewport.image.as_ref().expect("raster image").id,
@@ -1850,6 +1864,7 @@ mod tests {
             )
         });
         let canvas = cx.debug_bounds("scene-canvas").unwrap();
+        assert!(cx.debug_bounds("viewport-notice").is_some());
         let path_button = cx.debug_bounds("path-mode").unwrap().center();
         cx.simulate_click(path_button, Modifiers::none());
         cx.draw(point(px(0.0), px(0.0)), dimensions, |_, _| root.clone());

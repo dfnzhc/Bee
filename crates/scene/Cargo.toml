@@ -4,4 +4,5 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-euclid = "=0.22.14"
+euclid = { version = "=0.22.14", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }

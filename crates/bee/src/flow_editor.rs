@@ -5,30 +5,26 @@ use gpui::{div, prelude::*, rgb, Context, Div, KeyDownEvent, SharedString, State
 pub struct FlowEditor {
     flow: RenderFlow,
     prepared: PreparedFlow,
+    preview_reason: Option<String>,
     selected_output: Option<NodeId>,
     error: Option<String>,
 }
 
-impl Default for FlowEditor {
-    fn default() -> Self {
-        let mut flow = RenderFlow::default();
-        let raster = flow.edit().add(Module::Rasterization);
-        flow.edit().add(Module::PathTracing);
-        let tone = flow.edit().add(Module::ToneMapping { exposure_ev: 0.0 });
-        let output = flow.edit().add(Module::ViewportOutput);
-        flow.edit().connect(raster, tone).unwrap();
-        flow.edit().connect(tone, output).unwrap();
-        flow.apply().unwrap();
+impl FlowEditor {
+    pub(crate) fn new(
+        flow: RenderFlow,
+        prepared: PreparedFlow,
+        preview_reason: Option<String>,
+    ) -> Self {
         Self {
-            prepared: PreparedFlow::prepare(flow.active().unwrap(), None).unwrap(),
+            prepared,
             flow,
+            preview_reason,
             selected_output: None,
             error: None,
         }
     }
-}
 
-impl FlowEditor {
     #[cfg(test)]
     pub(crate) fn draft(&self) -> &ModuleGraph {
         self.flow.draft()
@@ -45,6 +41,10 @@ impl FlowEditor {
 
     pub(crate) fn prepared(&self) -> &PreparedFlow {
         &self.prepared
+    }
+
+    pub(crate) fn preview_reason(&self) -> Option<&str> {
+        self.preview_reason.as_deref()
     }
 
     pub fn error(&self) -> Option<&str> {
@@ -86,6 +86,7 @@ impl FlowEditor {
             let prepared = PreparedFlow::prepare(self.flow.draft(), Some(&self.prepared))?;
             self.flow.apply()?;
             self.prepared = prepared;
+            self.preview_reason = None;
             Ok(self.active().clone())
         });
         self.error = result.as_ref().err().cloned();
