@@ -1,5 +1,5 @@
 use crate::device::{Backend, DeviceState};
-use crate::ray::RayBuffer;
+use crate::ray::{bytes_of_slice, SceneBuffer};
 use crate::{Frame, GraphImage};
 use anyhow::{bail, Context, Result};
 use ash::vk;
@@ -15,8 +15,21 @@ pub struct Rasterizer {
 
 #[derive(Clone)]
 pub struct RasterGeometry {
-    data: Arc<RayBuffer>,
+    data: SceneBuffer,
     vertex_count: u32,
+}
+
+#[repr(C)]
+pub struct RasterInstance {
+    pub model: [f32; 16],
+    pub normal: [[f32; 4]; 3],
+    pub material: [u32; 4],
+}
+
+#[derive(Clone)]
+pub struct RasterInstances {
+    data: SceneBuffer,
+    meshes: Arc<[usize]>,
 }
 
 struct Pipeline {
@@ -70,37 +83,36 @@ impl Rasterizer {
 }
 
 impl Backend {
-    pub fn upload_raster_geometry(
-        &self,
-        data: &[[f32; 4]],
-        vertex_count: u32,
-    ) -> Result<RasterGeometry> {
-        let light_offset = vertex_count
-            .checked_mul(3)
-            .context("too many raster vertices")?;
-        let size = std::mem::size_of_val(data);
-        let limits = unsafe {
-            self.device
-                .instance
-                .instance
-                .get_physical_device_properties(self.device.physical_device)
+    pub fn upload_raster_geometry(&self, data: &[[f32; 4]]) -> Result<RasterGeometry> {
+        if !data.len().is_multiple_of(6) {
+            bail!("invalid raster triangle data");
         }
-        .limits;
-        if !vertex_count.is_multiple_of(3)
-            || data.len() < light_offset as usize
-            || !(data.len() - light_offset as usize).is_multiple_of(2)
-            || size > limits.max_storage_buffer_range as usize
-            || data.iter().flatten().any(|value| !value.is_finite())
-        {
-            bail!("invalid raster scene data");
-        }
-        let buffer = RayBuffer::host_storage(&self.device, size.max(16) as u64)?;
-        let bytes = unsafe { std::slice::from_raw_parts(data.as_ptr().cast::<u8>(), size) };
-        crate::profile::span("mesh_upload_us", || buffer.write(bytes))?;
+        let vertex_count = u32::try_from(data.len() / 2).context("too many raster vertices")?;
+        let data = crate::profile::span("mesh_upload_us", || self.upload_scene_buffer(data))?;
         crate::profile::record("mesh_upload", 1.0);
-        Ok(RasterGeometry {
-            data: Arc::new(buffer),
-            vertex_count,
+        Ok(RasterGeometry { data, vertex_count })
+    }
+
+    pub fn upload_raster_instances(
+        &self,
+        data: &[RasterInstance],
+        meshes: Vec<usize>,
+    ) -> Result<RasterInstances> {
+        if data.len() != meshes.len()
+            || u32::try_from(data.len()).is_err()
+            || data.iter().any(|instance| {
+                instance
+                    .model
+                    .iter()
+                    .chain(instance.normal.iter().flatten())
+                    .any(|value| !value.is_finite())
+            })
+        {
+            bail!("invalid raster instance data");
+        }
+        Ok(RasterInstances {
+            data: SceneBuffer::upload(&self.device, unsafe { bytes_of_slice(data) })?,
+            meshes: meshes.into(),
         })
     }
 
@@ -125,11 +137,17 @@ impl Backend {
             pipeline: vk::Pipeline::null(),
         };
         let stages = vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT;
-        let bindings = [vk::DescriptorSetLayoutBinding::default()
-            .binding(0)
-            .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
-            .descriptor_count(1)
-            .stage_flags(stages)];
+        let bindings = [0, 1, 2, 3].map(|binding| {
+            vk::DescriptorSetLayoutBinding::default()
+                .binding(binding)
+                .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+                .descriptor_count(1)
+                .stage_flags(if binding == 3 {
+                    vk::ShaderStageFlags::FRAGMENT
+                } else {
+                    vk::ShaderStageFlags::VERTEX
+                })
+        });
         pipeline.descriptor_layout = unsafe {
             device.create_descriptor_set_layout(
                 &vk::DescriptorSetLayoutCreateInfo::default().bindings(&bindings),
@@ -277,25 +295,30 @@ impl Backend {
 struct Constants {
     view_projection: [f32; 16],
     environment: [f32; 3],
-    light_offset: u32,
+    _padding: u32,
 }
 
 impl Frame {
     /// # Safety
-    /// 图像须处于图形附件布局，且场景数据由调用方在提交前准备完成。
+    /// 图像须处于图形附件布局；实例中的材质索引须指向有效条目。
     pub unsafe fn rasterize(
         &mut self,
         rasterizer: &Rasterizer,
         color: &GraphImage,
         depth: &GraphImage,
-        geometry: &RasterGeometry,
+        meshes: &[RasterGeometry],
+        instances: &RasterInstances,
+        materials: &SceneBuffer,
+        lights: &SceneBuffer,
         view_projection: [f32; 16],
         environment: [f32; 3],
     ) -> Result<()> {
-        let vertex_count = geometry.vertex_count;
-        let light_offset = vertex_count * 3;
         if !Arc::ptr_eq(&self.device, &rasterizer.inner.device)
-            || !Arc::ptr_eq(&self.device, &geometry.data.device)
+            || [&instances.data, materials, lights]
+                .into_iter()
+                .chain(meshes.iter().map(|mesh| &mesh.data))
+                .any(|buffer| !Arc::ptr_eq(&self.device, &buffer.0.device))
+            || instances.meshes.iter().any(|&index| index >= meshes.len())
             || !Arc::ptr_eq(&self.device, &color.inner.device)
             || !Arc::ptr_eq(&self.device, &depth.inner.device)
             || color.inner.width != depth.inner.width
@@ -359,35 +382,42 @@ impl Frame {
             )
             .context("could not create raster framebuffer")?;
 
+        let set_count = u32::try_from(meshes.len().max(1)).context("too many raster meshes")?;
         let sizes = [vk::DescriptorPoolSize::default()
             .ty(vk::DescriptorType::STORAGE_BUFFER)
-            .descriptor_count(1)];
+            .descriptor_count(
+                set_count
+                    .checked_mul(4)
+                    .context("too many raster bindings")?,
+            )];
         pass.descriptor_pool = device
             .create_descriptor_pool(
                 &vk::DescriptorPoolCreateInfo::default()
-                    .max_sets(1)
+                    .max_sets(set_count)
                     .pool_sizes(&sizes),
                 None,
             )
             .context("could not create raster descriptor pool")?;
-        let layouts = [rasterizer.inner.descriptor_layout];
-        let descriptor = device
+        let layouts = vec![rasterizer.inner.descriptor_layout; set_count as usize];
+        let descriptors = device
             .allocate_descriptor_sets(
                 &vk::DescriptorSetAllocateInfo::default()
                     .descriptor_pool(pass.descriptor_pool)
                     .set_layouts(&layouts),
             )
-            .context("could not allocate raster descriptor")?[0];
-        let buffers = [vk::DescriptorBufferInfo::default()
-            .buffer(geometry.data.buffer)
-            .offset(0)
-            .range(geometry.data.size)];
-        let writes = [vk::WriteDescriptorSet::default()
-            .dst_set(descriptor)
-            .dst_binding(0)
-            .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&buffers)];
-        device.update_descriptor_sets(&writes, &[]);
+            .context("could not allocate raster descriptors")?;
+        for (mesh, &descriptor) in meshes.iter().zip(&descriptors) {
+            let buffers = [&mesh.data, &instances.data, materials, lights]
+                .map(|buffer| [buffer.0.descriptor()]);
+            let writes = [0, 1, 2, 3].map(|binding| {
+                vk::WriteDescriptorSet::default()
+                    .dst_set(descriptor)
+                    .dst_binding(binding)
+                    .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+                    .buffer_info(&buffers[binding as usize])
+            });
+            device.update_descriptor_sets(&writes, &[]);
+        }
 
         let extent = vk::Extent2D {
             width: color.inner.width,
@@ -426,7 +456,7 @@ impl Frame {
         let constants = Constants {
             view_projection,
             environment,
-            light_offset,
+            _padding: 0,
         };
         let bytes = std::slice::from_raw_parts(
             (&constants as *const Constants).cast::<u8>(),
@@ -438,14 +468,6 @@ impl Frame {
             vk::PipelineBindPoint::GRAPHICS,
             rasterizer.inner.pipeline,
         );
-        device.cmd_bind_descriptor_sets(
-            self.command_buffer,
-            vk::PipelineBindPoint::GRAPHICS,
-            rasterizer.inner.layout,
-            0,
-            &[descriptor],
-            &[],
-        );
         device.cmd_push_constants(
             self.command_buffer,
             rasterizer.inner.layout,
@@ -455,10 +477,38 @@ impl Frame {
         );
         device.cmd_set_viewport(self.command_buffer, 0, &[viewport]);
         device.cmd_set_scissor(self.command_buffer, 0, &[area]);
-        device.cmd_draw(self.command_buffer, vertex_count, 1, 0, 0);
+        let mut first_instance = 0;
+        for batch in instances.meshes.chunk_by(|a, b| a == b) {
+            let index = batch[0];
+            let vertex_count = meshes[index].vertex_count;
+            if vertex_count > 0 {
+                device.cmd_bind_descriptor_sets(
+                    self.command_buffer,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    rasterizer.inner.layout,
+                    0,
+                    &[descriptors[index]],
+                    &[],
+                );
+                device.cmd_draw(
+                    self.command_buffer,
+                    vertex_count,
+                    batch.len() as u32,
+                    0,
+                    first_instance,
+                );
+            }
+            first_instance += batch.len() as u32;
+        }
         device.cmd_end_render_pass(self.command_buffer);
-        self.resources.push(geometry.data.clone());
+        for buffer in [&instances.data, materials, lights]
+            .into_iter()
+            .chain(meshes.iter().map(|mesh| &mesh.data))
+        {
+            self.resources.push(buffer.0.clone());
+        }
         self.resources.push(Arc::new(pass));
+        crate::profile::record("raster_pass", 1.0);
         Ok(())
     }
 }

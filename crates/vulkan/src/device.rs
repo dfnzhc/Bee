@@ -668,7 +668,7 @@ mod tests {
             .iter()
             .any(|item| item.contains("VK_KHR_ray_tracing_pipeline")));
         assert!(backend.create_path_tracer().is_err());
-        assert!(backend.build_acceleration_scene(&[], 0).is_err());
+        assert!(backend.build_acceleration_scene(&[], &[], None).is_err());
         assert_ne!(backend.device.queue, vk::Queue::null());
         Ok(())
     }

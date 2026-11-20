@@ -208,8 +208,8 @@ mod tests {
         indirect.display.exposure_ev = 1.0;
         let display_change = renderer.render(&backend, &indirect, 1, 1, 1).unwrap();
         let expected =
-            (crate::map_linear_color([1.0 / 3.0; 4], 1.0).unwrap()[0] * 255.0).round() as u8;
-        assert_eq!(renderer.sample_count(), 3);
+            (crate::map_linear_color([0.5; 4], 1.0).unwrap()[0] * 255.0).round() as u8;
+        assert_eq!(renderer.sample_count(), 2);
         assert!(
             display_change[0].abs_diff(expected) <= 2,
             "display change lost history: {display_change:?}, expected {expected}"

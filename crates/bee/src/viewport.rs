@@ -1552,12 +1552,12 @@ mod tests {
             "{different} path image channels differ by more than 2"
         );
 
-        // 色调映射变化不丢弃已经累积的路径样本。
+        // 重新映射曝光时仍呈现已有的首个样本。
         click(cx, "flow-exposure-up-2");
         click(cx, "flow-apply");
         let graph = cx.update(|_, cx| {
             let viewport = &view.read(cx).viewport;
-            assert_eq!(viewport.samples, 2);
+            assert_eq!(viewport.samples, 1);
             assert!(viewport.image.as_ref().unwrap().as_bytes(0).unwrap() != path_pixels);
             viewport.flow.active().clone()
         });

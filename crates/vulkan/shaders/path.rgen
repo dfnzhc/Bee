@@ -3,11 +3,10 @@
 
 layout(set = 0, binding = 0) uniform accelerationStructureEXT scene_as;
 layout(set = 0, binding = 1, rgba32f) uniform image2D history;
-layout(set = 0, binding = 2, std430) readonly buffer SceneData { vec4 values[]; } scene;
+layout(set = 0, binding = 4, std430) readonly buffer Lights { vec4 values[]; } lights;
 layout(push_constant) uniform Constants {
     mat4 inverse_view_projection;
     vec4 environment;
-    uint light_offset;
     uint sample_index;
     uint max_bounces;
     uint seed;
@@ -44,8 +43,8 @@ void main() {
         vec3 position = payload.position.xyz;
         vec3 normal = payload.normal.xyz;
         vec3 albedo = payload.albedo.xyz;
-        for (uint i = constants.light_offset; i + 1 < scene.values.length(); i += 2) {
-            vec3 to_light = scene.values[i].xyz - position;
+        for (uint i = 0; i + 1 < lights.values.length(); i += 2) {
+            vec3 to_light = lights.values[i].xyz - position;
             float distance_squared = dot(to_light, to_light);
             if (distance_squared > 0.000001) {
                 float distance = sqrt(distance_squared);
@@ -56,7 +55,7 @@ void main() {
                     traceRayEXT(scene_as, gl_RayFlagsOpaqueEXT | gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT,
                         0xff, 0, 0, 0, position + normal * 0.001, 0.0001, light_direction, distance - 0.002, 0);
                     if (payload.position.w == 0.0) {
-                        radiance += throughput * albedo * scene.values[i + 1].xyz * (cosine / (3.14159265 * distance_squared));
+                        radiance += throughput * albedo * lights.values[i + 1].xyz * (cosine / (3.14159265 * distance_squared));
                     }
                 }
             }

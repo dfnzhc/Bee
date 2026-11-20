@@ -1,8 +1,9 @@
+use crate::scene::RasterScene;
 use crate::{
     Access, GraphResource, Module, ModuleGraph, NodeId, ResourceId, Usage, WorkGraph, WorkId,
 };
-use bee_scene::{RenderSnapshot, Vector3};
-use bee_vulkan::{Backend, Frame, RasterGeometry, Rasterizer};
+use bee_scene::RenderSnapshot;
+use bee_vulkan::{Backend, Frame, Rasterizer};
 
 pub struct RasterWork {
     color: ResourceId,
@@ -43,136 +44,36 @@ impl RasterWork {
 
     /// # Safety
     /// 工作图须已建立附件屏障，并保证图像用途和设备有效。
-    pub unsafe fn record(
+    pub(crate) unsafe fn record(
         &self,
         work: WorkId,
         frame: &mut Frame,
         images: &[GraphResource],
         rasterizer: &Rasterizer,
-        geometry: &RasterGeometry,
-        snapshot: &RenderSnapshot,
-        width: u32,
-        height: u32,
+        scene: &RasterScene,
+        view_projection: [f32; 16],
     ) -> Result<bool, String> {
         if work != self.work {
             return Ok(false);
         }
-        if width == 0 || height == 0 || images.len() <= self.color.0.max(self.depth.0) {
-            return Err("raster work is missing attachments or a valid extent".into());
+        if images.len() <= self.color.0.max(self.depth.0) {
+            return Err("raster work is missing attachments".into());
         }
-        let matrix = snapshot
-            .camera
-            .view_projection(width as f32 / height as f32)
-            .ok_or("invalid raster camera")?
-            .to_array();
         frame
             .rasterize(
                 rasterizer,
                 images[self.color.0].image()?,
                 images[self.depth.0].image()?,
-                geometry,
-                matrix,
-                snapshot.scene.environment,
+                &scene.meshes,
+                &scene.instances,
+                &scene.materials,
+                &scene.lights,
+                view_projection,
+                scene.source.environment,
             )
             .map_err(|error| error.to_string())?;
         Ok(true)
     }
-}
-
-pub(crate) fn scene_data(snapshot: &RenderSnapshot) -> Result<(Vec<[f32; 4]>, u32), String> {
-    let scene = &snapshot.scene;
-    let valid_color =
-        |color: &[f32; 3]| color.iter().all(|value| value.is_finite() && *value >= 0.0);
-    if !valid_color(&scene.environment) {
-        return Err("invalid environment color".into());
-    }
-    let mut data = Vec::new();
-    for instance in &scene.instances {
-        let geometry = scene
-            .geometries
-            .get(instance.geometry)
-            .ok_or("invalid instance geometry")?;
-        let material = scene
-            .materials
-            .get(instance.material)
-            .ok_or("invalid instance material")?;
-        let transform = instance.transform;
-        if !valid_color(&material.albedo)
-            || !geometry.indices.len().is_multiple_of(3)
-            || transform.to_array().iter().any(|value| !value.is_finite())
-            || transform.m14 != 0.0
-            || transform.m24 != 0.0
-            || transform.m34 != 0.0
-            || transform.m44 != 1.0
-        {
-            return Err("invalid geometry, material, or instance transform".into());
-        }
-        let inverse = transform
-            .inverse()
-            .ok_or("non-invertible instance transform")?;
-        for &index in &geometry.indices {
-            let vertex = geometry
-                .vertices
-                .get(index as usize)
-                .ok_or("invalid geometry index")?;
-            let position = transform
-                .transform_point3d(vertex.position)
-                .ok_or("invalid vertex position")?;
-            let normal = Vector3::new(
-                inverse.m11 * vertex.normal.x
-                    + inverse.m12 * vertex.normal.y
-                    + inverse.m13 * vertex.normal.z,
-                inverse.m21 * vertex.normal.x
-                    + inverse.m22 * vertex.normal.y
-                    + inverse.m23 * vertex.normal.z,
-                inverse.m31 * vertex.normal.x
-                    + inverse.m32 * vertex.normal.y
-                    + inverse.m33 * vertex.normal.z,
-            );
-            let normal_length_squared = normal.square_length();
-            if ![
-                position.x, position.y, position.z, normal.x, normal.y, normal.z,
-            ]
-            .iter()
-            .all(|value| value.is_finite())
-                || !normal_length_squared.is_finite()
-                || normal_length_squared <= 0.0
-            {
-                return Err("invalid vertex position or normal".into());
-            }
-            let normal = normal.normalize();
-            data.extend([
-                [position.x, position.y, position.z, 1.0],
-                [normal.x, normal.y, normal.z, 0.0],
-                [
-                    material.albedo[0],
-                    material.albedo[1],
-                    material.albedo[2],
-                    0.0,
-                ],
-            ]);
-        }
-    }
-    let vertices = u32::try_from(data.len() / 3).map_err(|_| "too many raster vertices")?;
-    for light in &scene.lights {
-        if !valid_color(&light.intensity)
-            || ![light.position.x, light.position.y, light.position.z]
-                .iter()
-                .all(|value| value.is_finite())
-        {
-            return Err("invalid point light".into());
-        }
-        data.extend([
-            [light.position.x, light.position.y, light.position.z, 1.0],
-            [
-                light.intensity[0],
-                light.intensity[1],
-                light.intensity[2],
-                0.0,
-            ],
-        ]);
-    }
-    Ok((data, vertices))
 }
 
 /// 渲染快照并返回紧密排列的 BGRA 像素，调用方应在后台线程执行。
@@ -224,7 +125,7 @@ mod tests {
     use super::*;
     use bee_scene::{
         Camera, DiffuseMaterial, Geometry, Instance, Point3, PointLight, Scene, SceneState,
-        Transform3, Vertex,
+        Transform3, Vector3, Vertex,
     };
     use bee_vulkan::ValidationStatus;
     use std::sync::Arc;
@@ -263,10 +164,8 @@ mod tests {
             backend.report
         );
         let snapshot = SceneState::default().snapshot();
-        let (data, vertices) = scene_data(&snapshot).unwrap();
-        let acceleration = backend.build_acceleration_scene(&data, vertices).unwrap();
-        assert_eq!(vertices, 78);
-        assert_eq!(acceleration.triangle_count(), 26);
+        let scene = crate::scene::PathScene::path(&backend, &snapshot.scene, None).unwrap();
+        assert_eq!(scene.instances.triangle_count(), 26);
     }
 
     fn snapshot() -> RenderSnapshot {
@@ -322,26 +221,6 @@ mod tests {
             ..Camera::default()
         };
         snapshot
-    }
-
-    #[test]
-    fn validates_scene_and_transforms_normals() {
-        let mut snapshot = snapshot();
-        let scene = Arc::make_mut(&mut snapshot.scene);
-        scene.instances.truncate(1);
-        scene.instances[0].transform = Transform3::scale(2.0, 1.0, 1.0);
-        for vertex in &mut scene.geometries[0].vertices {
-            vertex.normal = Vector3::new(1.0, 1.0, 0.0);
-        }
-        let (data, vertices) = scene_data(&snapshot).unwrap();
-        assert_eq!(vertices, 3);
-        assert!((data[1][0] - 0.447_213_6).abs() < 0.00001);
-        assert!((data[1][1] - 0.894_427_2).abs() < 0.00001);
-        Arc::make_mut(&mut snapshot.scene).instances[0].transform =
-            Transform3::scale(10_000.0, 10_000.0, 10_000.0);
-        assert!(scene_data(&snapshot).is_ok());
-        Arc::make_mut(&mut snapshot.scene).geometries[0].indices[0] = 99;
-        assert!(scene_data(&snapshot).unwrap_err().contains("index"));
     }
 
     #[test]
@@ -452,6 +331,47 @@ mod tests {
             pixel(&snapshot)[0] > flipped[0],
             "all point lights must contribute"
         );
+
+        let mut shared = self::snapshot();
+        let scene = Arc::make_mut(&mut shared.scene);
+        scene.instances[0].transform =
+            Transform3::scale(0.55, 1.0, 1.0).then_translate(Vector3::new(-0.8, 0.0, 0.0));
+        scene.instances[1].transform =
+            Transform3::scale(0.4, 1.0, 1.0).then_translate(Vector3::new(0.8, 0.0, 0.0));
+        scene.instances[1].transform.m21 = 0.2;
+        scene.environment = [0.0; 3];
+        scene.lights.push(PointLight {
+            position: Point3::new(1.5, 0.0, 2.0),
+            intensity: [12.0; 3],
+        });
+        for vertex in &mut scene.geometries[0].vertices {
+            vertex.normal = Vector3::new(1.0, 0.0, 1.0);
+        }
+        let transformed = render_raster_snapshot(&backend, &shared, 64, 64).unwrap();
+        assert!(transformed.chunks_exact(4).any(|p| p[2] > 100));
+        assert!(transformed.chunks_exact(4).any(|p| p[0] > 100));
+        // 预变换的参考网格同时覆盖实例位置和非均匀缩放的逆转置法线。
+        let scene = Arc::make_mut(&mut shared.scene);
+        let object_mesh = scene.geometries.pop().unwrap();
+        for (index, instance) in scene.instances.iter_mut().enumerate() {
+            let mut mesh = object_mesh.clone();
+            for vertex in &mut mesh.vertices {
+                vertex.position = instance
+                    .transform
+                    .transform_point3d(vertex.position)
+                    .unwrap();
+                vertex.normal.x /= instance.transform.m11;
+                vertex.normal.y -= instance.transform.m21 * vertex.normal.x;
+            }
+            scene.geometries.push(mesh);
+            instance.geometry = index;
+            instance.transform = Transform3::identity();
+        }
+        let reference = render_raster_snapshot(&backend, &shared, 64, 64).unwrap();
+        assert!(transformed
+            .iter()
+            .zip(reference)
+            .all(|(&a, b)| a.abs_diff(b) <= 1));
 
         // 验证共享相机、尺寸与色调映射确实改变完整渲染结果。
         let mut snapshot = SceneState::default().snapshot();

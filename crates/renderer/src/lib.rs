@@ -4,6 +4,7 @@ mod display;
 mod modules;
 mod path;
 mod raster;
+mod scene;
 mod resources;
 mod viewport;
 mod work;

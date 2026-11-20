@@ -1,12 +1,12 @@
 use crate::{
-    raster::scene_data, Access, DisplayWork, GraphResources, Module, ModuleGraph, NodeId,
-    RasterWork, ResourceId, Usage, WorkGraph, WorkId, WorkPlan,
+    scene::{PathScene, RasterScene},
+    Access, DisplayWork, GraphResources, Module, ModuleGraph, NodeId, RasterWork, ResourceId,
+    Usage, WorkGraph, WorkId, WorkPlan,
 };
 use ash::vk;
-use bee_scene::{RenderSnapshot, Scene};
+use bee_scene::RenderSnapshot;
 use bee_vulkan::{
-    profile, AccelerationScene, Backend, GraphImage, PathTracer, RasterGeometry, Rasterizer,
-    ReadbackBuffer, ToneMapper,
+    profile, Backend, GraphImage, PathTracer, Rasterizer, ReadbackBuffer, ToneMapper,
 };
 use std::sync::Arc;
 
@@ -28,6 +28,9 @@ struct FlowPlan {
     continued_trace: Option<WorkId>,
     tone: DisplayWork,
     read: WorkId,
+    display_only: WorkPlan,
+    display_tone: DisplayWork,
+    display_read: WorkId,
 }
 
 enum SceneWork {
@@ -48,10 +51,14 @@ impl PreparedFlow {
             });
         }
 
-        let mut graph = WorkGraph::default();
-        let scene = graph.add_resource(None);
-        let depth = (mode == Module::Rasterization).then(|| graph.add_resource(None));
-        let display = graph.add_resource(None);
+        let make_graph = |scene_usage| {
+            let mut graph = WorkGraph::default();
+            let scene = graph.add_resource(scene_usage);
+            let depth = (mode == Module::Rasterization).then(|| graph.add_resource(None));
+            let display = graph.add_resource(None);
+            (graph, scene, depth, display)
+        };
+        let (mut graph, scene, depth, display) = make_graph(None);
         let first_work = match mode {
             Module::Rasterization => SceneWork::Raster(RasterWork::declare(
                 modules,
@@ -71,9 +78,7 @@ impl PreparedFlow {
         let first = graph.compile()?;
         let (continued, continued_trace) = if mode == Module::PathTracing {
             // 续采仅在前一个已提交样本定义历史后使用。
-            let mut graph = WorkGraph::default();
-            let scene = graph.add_resource(Some(Usage::ShaderRead));
-            let display = graph.add_resource(None);
+            let (mut graph, scene, _, display) = make_graph(Some(Usage::ShaderRead));
             let trace = trace_work(&mut graph, scene, Usage::ShaderReadWrite)?;
             DisplayWork::declare(modules, &mut graph, &[(chain[0], scene)], display, display)?;
             let continued_read = read_work(&mut graph, display)?;
@@ -82,6 +87,11 @@ impl PreparedFlow {
         } else {
             (None, None)
         };
+        let (mut graph, _, _, _) = make_graph(Some(Usage::ShaderRead));
+        let display_tone =
+            DisplayWork::declare(modules, &mut graph, &[(chain[0], scene)], display, display)?;
+        let display_read = read_work(&mut graph, display)?;
+        let display_only = graph.compile()?;
         Ok(Self {
             plan: Arc::new(FlowPlan {
                 chain,
@@ -95,6 +105,9 @@ impl PreparedFlow {
                 continued_trace,
                 tone,
                 read,
+                display_only,
+                display_tone,
+                display_read,
             }),
             exposure_ev,
         })
@@ -131,9 +144,9 @@ type Extent = (u32, u32);
 pub struct ViewportRenderer {
     display: Option<(vk::Format, ToneMapper)>,
     raster: Option<Rasterizer>,
-    raster_geometry: Option<(Arc<Scene>, u64, RasterGeometry)>,
+    raster_scene: Option<RasterScene>,
     tracer: Option<PathTracer>,
-    acceleration: Option<(Arc<Scene>, u64, AccelerationScene)>,
+    path_scene: Option<PathScene>,
     history: Option<History>,
 }
 
@@ -144,6 +157,7 @@ struct History {
     image: GraphImage,
     usage: Option<Usage>,
     previous: Option<RenderSnapshot>,
+    exposure_ev: f32,
     samples: u32,
 }
 
@@ -228,83 +242,76 @@ impl ViewportRenderer {
                 .map_err(string_error)
         };
         let color = vk::ImageAspectFlags::COLOR;
-        if tracing {
-            if self
-                .acceleration
-                .as_ref()
-                .is_none_or(|(scene, version, _)| !same_scene(scene, *version, snapshot))
-            {
-                let (data, vertices) = profile::span("scene_prepare_us", || scene_data(snapshot))?;
-                let acceleration = profile::span("acceleration_us", || {
-                    backend.build_acceleration_scene(&data, vertices)
-                })
-                .map_err(string_error)?;
-                self.acceleration = Some((
-                    snapshot.scene.clone(),
-                    snapshot.versions.scene,
-                    acceleration,
-                ));
-            }
-            if self.history.as_ref().is_none_or(|history| {
-                history.extent != extent
-                    || history.epoch != epoch
-                    || !Arc::ptr_eq(&history.flow, plan)
-            }) {
-                let image = make_image(
+        if self.history.as_ref().is_none_or(|history| {
+            history.extent != extent || history.epoch != epoch || !Arc::ptr_eq(&history.flow, plan)
+        }) {
+            let image = profile::span("targets_us", || {
+                make_image(
                     vk::Format::R32G32B32A32_SFLOAT,
-                    vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::SAMPLED,
+                    (if tracing {
+                        vk::ImageUsageFlags::STORAGE
+                    } else {
+                        vk::ImageUsageFlags::COLOR_ATTACHMENT
+                    }) | vk::ImageUsageFlags::SAMPLED,
                     color,
-                )?;
-                self.history = Some(History {
-                    flow: plan.clone(),
-                    epoch,
-                    extent,
-                    image,
-                    usage: None,
-                    previous: None,
-                    samples: 0,
-                });
-            }
-        } else if self
-            .raster_geometry
-            .as_ref()
-            .is_none_or(|(scene, version, _)| !same_scene(scene, *version, snapshot))
-        {
-            let (data, vertices) = profile::span("scene_prepare_us", || scene_data(snapshot))?;
-            let geometry = backend
-                .upload_raster_geometry(&data, vertices)
-                .map_err(string_error)?;
-            self.raster_geometry =
-                Some((snapshot.scene.clone(), snapshot.versions.scene, geometry));
+                )
+            })?;
+            self.history = Some(History {
+                flow: plan.clone(),
+                epoch,
+                extent,
+                image,
+                usage: None,
+                previous: None,
+                exposure_ev: flow.exposure_ev,
+                samples: 0,
+            });
         }
 
-        let history = self.history.as_mut().filter(|_| tracing);
-        let samples = history.as_ref().map_or(0, |history| {
-            let same = history.previous.as_ref().is_some_and(|previous| {
-                same_scene(&previous.scene, previous.versions.scene, snapshot)
-                    && previous.versions.accumulation_key() == snapshot.versions.accumulation_key()
-                    && previous.camera == snapshot.camera
-                    && previous.render == snapshot.render
-            });
-            if same && history.samples < u32::MAX {
-                history.samples
-            } else {
-                0
-            }
+        let history = self.history.as_mut().unwrap();
+        let same = history.previous.as_ref().is_some_and(|previous| {
+            Arc::ptr_eq(&previous.scene, &snapshot.scene)
+                && previous.versions.accumulation_key() == snapshot.versions.accumulation_key()
+                && previous.camera == snapshot.camera
+                && previous.render == snapshot.render
         });
+        let display_only = same
+            && (history.exposure_ev != flow.exposure_ev
+                || history.previous.as_ref().is_some_and(|previous| {
+                    previous.versions.display != snapshot.versions.display
+                }));
+        let samples = if tracing && same && history.samples < u32::MAX {
+            history.samples
+        } else {
+            0
+        };
+        if !display_only {
+            if tracing
+                && self
+                    .path_scene
+                    .as_ref()
+                    .is_none_or(|scene| !Arc::ptr_eq(&scene.source, &snapshot.scene))
+            {
+                self.path_scene = Some(profile::span("scene_prepare_us", || {
+                    PathScene::path(backend, &snapshot.scene, self.path_scene.as_ref())
+                })?);
+            }
+            if !tracing
+                && self
+                    .raster_scene
+                    .as_ref()
+                    .is_none_or(|scene| !Arc::ptr_eq(&scene.source, &snapshot.scene))
+            {
+                self.raster_scene = Some(profile::span("scene_prepare_us", || {
+                    RasterScene::raster(backend, &snapshot.scene, self.raster_scene.as_ref())
+                })?);
+            }
+        }
+
         let key = (extent, plan.mode);
         if slot.key != Some(key) {
             // 分配成功后才替换槽中的绑定。命令池与尺寸无关，可继续复用。
-            let (scene, depth, display, readback) = profile::span("targets_us", || {
-                let scene = if let Some(history) = &history {
-                    history.image.clone()
-                } else {
-                    make_image(
-                        vk::Format::R32G32B32A32_SFLOAT,
-                        vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED,
-                        color,
-                    )?
-                };
+            let (depth, display, readback) = profile::span("targets_us", || {
                 let depth = self
                     .raster
                     .as_ref()
@@ -326,11 +333,13 @@ impl ViewportRenderer {
                     .checked_mul(height as usize)
                     .and_then(|n| n.checked_mul(4))
                     .ok_or("viewport size overflow")?;
-                let readback = backend.create_readback_buffer(bytes).map_err(string_error)?;
-                Ok::<_, String>((scene, depth, display, readback))
+                let readback = backend
+                    .create_readback_buffer(bytes)
+                    .map_err(string_error)?;
+                Ok::<_, String>((depth, display, readback))
             })?;
             slot.resources.clear_bindings();
-            let scene_id = slot.resources.add_history(scene);
+            let scene_id = slot.resources.add_history(history.image.clone());
             let depth_id = depth.map(|image| slot.resources.add_history(image));
             let display_id = slot.resources.add_history(display);
             assert_eq!(
@@ -341,91 +350,86 @@ impl ViewportRenderer {
             slot.key = Some(key);
         }
 
-        let work_plan = if samples == 0 {
-            &plan.first
+        let (work_plan, tone, read) = if display_only {
+            (&plan.display_only, &plan.display_tone, plan.display_read)
+        } else if samples == 0 {
+            (&plan.first, &plan.tone, plan.read)
         } else {
-            plan.continued.as_ref().unwrap()
+            (plan.continued.as_ref().unwrap(), &plan.tone, plan.read)
         };
         let readback = slot.readback.as_ref().unwrap();
         unsafe {
-            if let Some(history) = &history {
-                // 共享历史只有此协调器提交，后续命令按队列顺序接续其布局和访问。
-                slot.resources
-                    .bind_ordered(plan.scene, history.image.clone(), history.usage);
-            }
+            // 两个槽在同一队列交接 HDR，按已提交的顺序继续访问与转换布局。
+            slot.resources
+                .bind_ordered(plan.scene, history.image.clone(), history.usage);
             slot.resources
                 .submit_plan(backend, work_plan, |work, frame, images| {
-                    if work == plan.read {
+                    if work == read {
                         frame
                             .copy_graph_image_to_readback(
                                 images[plan.display.index()].image()?,
                                 readback,
                             )
                             .map_err(string_error)?;
-                    } else if let SceneWork::Raster(raster) = &plan.first_work {
-                        if raster.record(
-                            work,
-                            frame,
-                            images,
-                            self.raster.as_ref().unwrap(),
-                            &self.raster_geometry.as_ref().unwrap().2,
-                            snapshot,
-                            width,
-                            height,
-                        )? {
-                            return Ok(());
-                        }
-                        if !plan.tone.record_exposure(
-                            work,
-                            frame,
-                            images,
-                            mapper,
-                            flow.exposure_ev,
-                        )? {
-                            return Err("unknown raster graph work".into());
-                        }
-                    } else if Some(work)
-                        == if samples == 0 {
-                            match plan.first_work {
-                                SceneWork::Trace(id) => Some(id),
-                                _ => None,
-                            }
-                        } else {
-                            plan.continued_trace
-                        }
-                    {
-                        frame
-                            .trace_paths(
-                                self.tracer.as_ref().unwrap(),
-                                &self.acceleration.as_ref().unwrap().2,
-                                images[plan.scene.index()].image()?,
-                                matrix,
-                                snapshot.scene.environment,
-                                samples,
-                                snapshot.render.max_path_bounces,
-                                seed,
-                            )
-                            .map_err(string_error)?;
-                    } else if !plan.tone.record_exposure(
-                        work,
-                        frame,
-                        images,
-                        mapper,
-                        flow.exposure_ev,
-                    )? {
-                        return Err("unknown path graph work".into());
+                        return Ok(());
                     }
-                    Ok(())
+                    if tone.record_exposure(work, frame, images, mapper, flow.exposure_ev)? {
+                        return Ok(());
+                    }
+                    if !display_only {
+                        match &plan.first_work {
+                            SceneWork::Raster(raster) => {
+                                if raster.record(
+                                    work,
+                                    frame,
+                                    images,
+                                    self.raster.as_ref().unwrap(),
+                                    self.raster_scene.as_ref().unwrap(),
+                                    matrix,
+                                )? {
+                                    return Ok(());
+                                }
+                            }
+                            SceneWork::Trace(first)
+                                if Some(work)
+                                    == if samples == 0 {
+                                        Some(*first)
+                                    } else {
+                                        plan.continued_trace
+                                    } =>
+                            {
+                                let scene = self.path_scene.as_ref().unwrap();
+                                frame
+                                    .trace_paths(
+                                        self.tracer.as_ref().unwrap(),
+                                        &scene.instances,
+                                        &scene.materials,
+                                        &scene.lights,
+                                        images[plan.scene.index()].image()?,
+                                        matrix,
+                                        snapshot.scene.environment,
+                                        samples,
+                                        snapshot.render.max_path_bounces,
+                                        seed,
+                                    )
+                                    .map_err(string_error)?;
+                                return Ok(());
+                            }
+                            _ => {}
+                        }
+                    }
+                    Err("unknown viewport graph work".into())
                 })?;
         }
-        if let Some(history) = history {
-            history.usage = slot.resources.usage(plan.scene);
-            history.previous = Some(snapshot.clone());
-            history.samples = samples + 1;
+        history.usage = slot.resources.usage(plan.scene);
+        history.exposure_ev = flow.exposure_ev;
+        history.previous = Some(snapshot.clone());
+        if !display_only {
+            history.samples = if tracing { samples + 1 } else { 0 };
         }
         Ok(PendingViewport {
             slot: std::mem::take(slot),
-            samples: if tracing { samples + 1 } else { 0 },
+            samples: history.samples,
             bgra: *format == vk::Format::B8G8R8A8_UNORM,
         })
     }
@@ -453,10 +457,6 @@ impl PendingViewport {
     }
 }
 
-fn same_scene(scene: &Arc<Scene>, version: u64, snapshot: &RenderSnapshot) -> bool {
-    version == snapshot.versions.scene && Arc::ptr_eq(scene, &snapshot.scene)
-}
-
 fn string_error(error: impl std::fmt::Display) -> String {
     error.to_string()
 }
@@ -464,7 +464,7 @@ fn string_error(error: impl std::fmt::Display) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bee_scene::SceneState;
+    use bee_scene::{Camera, Point3, SceneState, Transform3};
 
     fn modules(mode: Module) -> (ModuleGraph, NodeId, NodeId) {
         let mut graph = ModuleGraph::default();
@@ -482,8 +482,7 @@ mod tests {
         let first = PreparedFlow::prepare(&graph, None).unwrap();
         graph.add(Module::PathTracing);
         *graph.module_mut(tone).unwrap() = Module::ToneMapping { exposure_ev: 2.0 };
-        let (updated, events) =
-            profile::capture(|| PreparedFlow::prepare(&graph, Some(&first)));
+        let (updated, events) = profile::capture(|| PreparedFlow::prepare(&graph, Some(&first)));
         let updated = updated.unwrap();
         assert!(Arc::ptr_eq(&first.plan, &updated.plan));
         assert_eq!(updated.exposure_ev, 2.0);
@@ -501,8 +500,213 @@ mod tests {
                 .iter()
                 .filter(|event| event.name == "graph_compile")
                 .count(),
-            1
+            2
         );
+    }
+
+    #[test]
+    #[ignore = "requires a ray tracing device and Vulkan validation layer"]
+    fn updates_scene_parts_and_remaps_in_flight_hdr() {
+        let (diagnostics, messages) = bee_vulkan::diagnostic_channel();
+        let backend = Backend::new_with_diagnostics(true, diagnostics).unwrap();
+        assert_eq!(
+            backend.report.validation,
+            bee_vulkan::ValidationStatus::Enabled
+        );
+        let extent = (64, 64);
+        let pixel = |pixels: &[u8], x: usize, y: usize| {
+            let offset = (y * 64 + x) * 4;
+            <[u8; 4]>::try_from(&pixels[offset..offset + 4]).unwrap()
+        };
+        let counts = |events: &[profile::Event], expected: &[&str]| {
+            for name in [
+                "graph_compile",
+                "mesh_upload",
+                "instance_upload",
+                "material_upload",
+                "light_upload",
+                "blas_build",
+                "tlas_build",
+                "tlas_update",
+                "raster_pass",
+                "trace_sample",
+            ] {
+                assert_eq!(
+                    events.iter().filter(|event| event.name == name).count(),
+                    expected.iter().filter(|&&event| event == name).count(),
+                    "{name}",
+                );
+            }
+        };
+
+        for mode in [Module::Rasterization, Module::PathTracing] {
+            let tracing = mode == Module::PathTracing;
+            let scene_pass = if tracing {
+                "trace_sample"
+            } else {
+                "raster_pass"
+            };
+            let (mut graph, tone, _) = modules(mode);
+            let mut flow = PreparedFlow::prepare(&graph, None).unwrap();
+            let mut renderer = ViewportRenderer::default();
+            let mut slots: [FrameSlot; 2] = Default::default();
+            let mut state = SceneState::default();
+            state.set_camera(Camera {
+                target: Point3::new(0.0, 0.5, 0.0),
+                pitch: 0.0,
+                distance: 4.0,
+                ..Camera::default()
+            });
+            let mut scene = state.scene().clone();
+            scene.instances[1].transform = Transform3::translation(-0.85, 0.5, 0.0);
+            scene.instances[2].transform = Transform3::translation(0.85, 0.5, 0.0);
+            assert!(state.set_scene(scene));
+
+            let draw = |renderer: &mut ViewportRenderer,
+                        flow: &PreparedFlow,
+                        state: &SceneState,
+                        slot: &mut FrameSlot| {
+                let pending = renderer
+                    .submit(&backend, flow, &state.snapshot(), extent, 0, 1, slot)
+                    .unwrap();
+                let samples = pending.samples;
+                let pixels;
+                (*slot, pixels) = pending.finish();
+                (samples, pixels.unwrap())
+            };
+            let (first_samples, pixels) = draw(&mut renderer, &flow, &state, &mut slots[0]);
+            assert_eq!(first_samples, u32::from(tracing));
+            let red = |[b, _, r, _]: [u8; 4]| r > b.saturating_add(25);
+            let blue = |[b, _, r, _]: [u8; 4]| b > r.saturating_add(25);
+            assert!(red(pixel(&pixels, 19, 32)));
+            assert!(blue(pixel(&pixels, 45, 32)));
+
+            let original = renderer
+                .submit(
+                    &backend,
+                    &flow,
+                    &state.snapshot(),
+                    extent,
+                    0,
+                    1,
+                    &mut slots[0],
+                )
+                .unwrap();
+            *graph.module_mut(tone).unwrap() = Module::ToneMapping { exposure_ev: 2.0 };
+            let ((samples, brighter), events) = profile::capture(|| {
+                flow = PreparedFlow::prepare(&graph, Some(&flow)).unwrap();
+                draw(&mut renderer, &flow, &state, &mut slots[1])
+            });
+            counts(&events, &[]);
+            assert_eq!(samples, original.samples);
+            assert_eq!(samples, if tracing { 2 } else { 0 });
+            let old_pixels;
+            (slots[0], old_pixels) = original.finish();
+            let mut channels = brighter.iter().zip(old_pixels.as_ref().unwrap());
+            assert!(channels.clone().all(|(after, before)| after >= before));
+            assert!(channels.any(|(after, before)| after > before));
+
+            let mut previous = brighter;
+            for edit in 0..5 {
+                let in_flight = renderer
+                    .submit(
+                        &backend,
+                        &flow,
+                        &state.snapshot(),
+                        extent,
+                        0,
+                        1,
+                        &mut slots[1],
+                    )
+                    .unwrap();
+                let mut scene = state.scene().clone();
+                let expected = match edit {
+                    0 => {
+                        scene.instances[1].transform = Transform3::translation(-0.85, 1.55, 0.0);
+                        if tracing {
+                            "tlas_update"
+                        } else {
+                            "instance_upload"
+                        }
+                    }
+                    1 => {
+                        for vertex in &mut scene.geometries[1].vertices {
+                            vertex.position.x += 0.65;
+                        }
+                        "mesh_upload"
+                    }
+                    2 => {
+                        scene.materials[2].albedo = [0.1, 0.75, 0.15];
+                        "material_upload"
+                    }
+                    3 => {
+                        scene.lights[0].intensity = [2.0; 3];
+                        "light_upload"
+                    }
+                    _ => {
+                        scene.instances.pop();
+                        if tracing {
+                            "tlas_build"
+                        } else {
+                            "instance_upload"
+                        }
+                    }
+                };
+                assert!(state.set_scene(scene));
+                let ((samples, changed), events) = profile::capture(|| {
+                    flow = PreparedFlow::prepare(&graph, Some(&flow)).unwrap();
+                    draw(&mut renderer, &flow, &state, &mut slots[0])
+                });
+                if tracing && edit == 1 {
+                    counts(
+                        &events,
+                        &[scene_pass, expected, "blas_build", "tlas_update"],
+                    );
+                } else {
+                    counts(&events, &[scene_pass, expected]);
+                }
+                assert_eq!(samples, u32::from(tracing), "scene edit {edit}");
+                if edit == 0 {
+                    assert!(!red(pixel(&changed, 19, 32)));
+                    assert!(red(pixel(&changed, 19, 16)));
+                    assert!(blue(pixel(&changed, 45, 32)));
+                }
+                slots[1] = in_flight.finish().0;
+                // 以新渲染器的首帧核对每次更新的数值和累积清零。
+                let (_, fresh) = draw(
+                    &mut ViewportRenderer::default(),
+                    &flow,
+                    &state,
+                    &mut slots[1],
+                );
+                assert!(
+                    changed.iter().zip(fresh).all(|(&a, b)| a.abs_diff(b) <= 1),
+                    "scene edit {edit}"
+                );
+                assert_ne!(changed, previous, "scene edit {edit}");
+                previous = changed;
+                let (samples, _) = draw(&mut renderer, &flow, &state, &mut slots[0]);
+                assert_eq!(samples, if tracing { 2 } else { 0 });
+            }
+            let mut camera = state.camera();
+            assert!(camera.orbit(10.0, 0.0));
+            assert!(state.set_camera(camera));
+            *graph.module_mut(tone).unwrap() = Module::ToneMapping { exposure_ev: -1.0 };
+            flow = PreparedFlow::prepare(&graph, Some(&flow)).unwrap();
+            let ((samples, _), events) =
+                profile::capture(|| draw(&mut renderer, &flow, &state, &mut slots[1]));
+            counts(&events, &[scene_pass]);
+            assert_eq!(samples, u32::from(tracing));
+        }
+        drop(backend);
+        for message in messages.drain() {
+            assert_ne!(
+                message.level,
+                bee_vulkan::DiagnosticLevel::Error,
+                "{}",
+                message.message
+            );
+        }
     }
 
     #[test]

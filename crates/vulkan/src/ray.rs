@@ -1,6 +1,6 @@
 use crate::device::{Backend, DeviceState};
 use crate::test_image::memory_type;
-use crate::{Frame, GraphImage};
+use crate::{AccelerationScene, Frame, GraphImage};
 use anyhow::{bail, Context, Result};
 use ash::vk;
 use std::io::Cursor;
@@ -148,320 +148,49 @@ impl RayBuffer {
         }
         Ok(())
     }
-}
 
-#[derive(Clone)]
-pub struct AccelerationScene {
-    pub(crate) inner: Arc<AccelerationState>,
-}
-
-pub(crate) struct AccelerationState {
-    pub device: Arc<DeviceState>,
-    pub top: Structure,
-    _bottom: Structure,
-    pub vertices: RayBuffer,
-    pub vertex_count: u32,
-}
-
-pub(crate) struct Structure {
-    loader: ash::khr::acceleration_structure::Device,
-    pub handle: vk::AccelerationStructureKHR,
-    _storage: RayBuffer,
-}
-
-impl Drop for Structure {
-    fn drop(&mut self) {
-        unsafe {
-            self.loader
-                .destroy_acceleration_structure(self.handle, None)
-        }
+    pub(crate) fn descriptor(&self) -> vk::DescriptorBufferInfo {
+        vk::DescriptorBufferInfo::default()
+            .buffer(self.buffer)
+            .range(self.size)
     }
 }
 
-impl AccelerationScene {
-    pub fn triangle_count(&self) -> u32 {
-        self.inner.vertex_count / 3
+#[derive(Clone)]
+pub struct SceneBuffer(pub(crate) Arc<RayBuffer>);
+
+impl SceneBuffer {
+    pub(crate) fn upload(device: &Arc<DeviceState>, bytes: &[u8]) -> Result<Self> {
+        let size = bytes.len().max(16);
+        let limits = unsafe {
+            device
+                .instance
+                .instance
+                .get_physical_device_properties(device.physical_device)
+        }
+        .limits;
+        if size > limits.max_storage_buffer_range as usize {
+            bail!("scene data exceeds Vulkan storage buffer limits");
+        }
+        let buffer = RayBuffer::host_storage(device, size as u64)?;
+        buffer.write(bytes)?;
+        Ok(Self(Arc::new(buffer)))
     }
 }
 
 impl Backend {
-    pub fn build_acceleration_scene(
-        &self,
-        values: &[[f32; 4]],
-        vertex_count: u32,
-    ) -> Result<AccelerationScene> {
-        if !self.device.ray_tracing_enabled {
-            bail!(
-                "ray tracing unavailable: {}",
-                self.report.ray_tracing_missing.join(", ")
-            );
+    pub fn upload_scene_buffer(&self, values: &[[f32; 4]]) -> Result<SceneBuffer> {
+        if values.iter().flatten().any(|value| !value.is_finite()) {
+            bail!("non-finite scene buffer data");
         }
-        let vertex_values = vertex_count
-            .checked_mul(3)
-            .context("too many scene vertices")? as usize;
-        if !vertex_count.is_multiple_of(3)
-            || values.len() < vertex_values
-            || !(values.len() - vertex_values).is_multiple_of(2)
-            || values.iter().flatten().any(|value| !value.is_finite())
-        {
-            bail!("invalid acceleration scene data");
-        }
-        let size = values
-            .len()
-            .checked_mul(16)
-            .context("acceleration scene size overflow")?;
-        let mut acceleration_properties =
-            vk::PhysicalDeviceAccelerationStructurePropertiesKHR::default();
-        let mut properties =
-            vk::PhysicalDeviceProperties2::default().push_next(&mut acceleration_properties);
-        unsafe {
-            self.device
-                .instance
-                .instance
-                .get_physical_device_properties2(self.device.physical_device, &mut properties)
-        };
-        if size.max(48) as u64 > properties.properties.limits.max_storage_buffer_range as u64
-            || (vertex_count / 3) as u64 > acceleration_properties.max_primitive_count
-        {
-            bail!("acceleration scene exceeds Vulkan device limits");
-        }
-        let vertices = RayBuffer::new(
-            &self.device,
-            size.max(48) as u64,
-            vk::BufferUsageFlags::STORAGE_BUFFER
-                | vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
-            true,
-        )?;
-        let bytes = unsafe { std::slice::from_raw_parts(values.as_ptr().cast::<u8>(), size) };
-        crate::profile::record("mesh_upload", 1.0);
-        crate::profile::span("mesh_upload_us", || vertices.write(bytes))?;
-        let loader = ash::khr::acceleration_structure::Device::new(
-            &self.device.instance.instance,
-            &self.device.device,
-        );
-
-        let triangles = vk::AccelerationStructureGeometryTrianglesDataKHR::default()
-            .vertex_format(vk::Format::R32G32B32_SFLOAT)
-            .vertex_data(vk::DeviceOrHostAddressConstKHR {
-                device_address: vertices.address,
-            })
-            .vertex_stride(48)
-            .max_vertex(vertex_count.saturating_sub(1))
-            .index_type(vk::IndexType::NONE_KHR);
-        let bottom_geometry = [vk::AccelerationStructureGeometryKHR::default()
-            .geometry_type(vk::GeometryTypeKHR::TRIANGLES)
-            .geometry(vk::AccelerationStructureGeometryDataKHR { triangles })
-            .flags(vk::GeometryFlagsKHR::OPAQUE)];
-        // 空场景不提交三角形几何，避免验证层计算顶点上界时下溢。
-        let primitives = vertex_count / 3;
-        let geometry_count = usize::from(primitives != 0);
-        let bottom_info = vk::AccelerationStructureBuildGeometryInfoKHR::default()
-            .ty(vk::AccelerationStructureTypeKHR::BOTTOM_LEVEL)
-            .flags(vk::BuildAccelerationStructureFlagsKHR::PREFER_FAST_TRACE)
-            .mode(vk::BuildAccelerationStructureModeKHR::BUILD)
-            .geometries(&bottom_geometry[..geometry_count]);
-        let mut bottom_sizes = vk::AccelerationStructureBuildSizesInfoKHR::default();
-        unsafe {
-            loader.get_acceleration_structure_build_sizes(
-                vk::AccelerationStructureBuildTypeKHR::DEVICE,
-                &bottom_info,
-                &[primitives][..geometry_count],
-                &mut bottom_sizes,
-            )
-        };
-        let bottom_storage = RayBuffer::new(
-            &self.device,
-            bottom_sizes.acceleration_structure_size,
-            vk::BufferUsageFlags::ACCELERATION_STRUCTURE_STORAGE_KHR,
-            false,
-        )?;
-        let bottom = unsafe {
-            loader.create_acceleration_structure(
-                &vk::AccelerationStructureCreateInfoKHR::default()
-                    .buffer(bottom_storage.buffer)
-                    .size(bottom_sizes.acceleration_structure_size)
-                    .ty(vk::AccelerationStructureTypeKHR::BOTTOM_LEVEL),
-                None,
-            )
-        }
-        .context("could not create bottom-level acceleration structure")?;
-        let bottom = Structure {
-            loader: loader.clone(),
-            handle: bottom,
-            _storage: bottom_storage,
-        };
-
-        // 在创建过程失败时也要先销毁加速结构，再释放底层存储。
-        let bottom_address = unsafe {
-            loader.get_acceleration_structure_device_address(
-                &vk::AccelerationStructureDeviceAddressInfoKHR::default()
-                    .acceleration_structure(bottom.handle),
-            )
-        };
-        let instance = vk::AccelerationStructureInstanceKHR {
-            transform: vk::TransformMatrixKHR {
-                matrix: [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0],
-            },
-            instance_custom_index_and_mask: vk::Packed24_8::new(0, 0xff),
-            instance_shader_binding_table_record_offset_and_flags: vk::Packed24_8::new(
-                0,
-                vk::GeometryInstanceFlagsKHR::TRIANGLE_FACING_CULL_DISABLE.as_raw() as u8,
-            ),
-            acceleration_structure_reference: vk::AccelerationStructureReferenceKHR {
-                device_handle: bottom_address,
-            },
-        };
-        let result =
-            (|| -> Result<_> {
-                let instances = RayBuffer::new(
-                    &self.device,
-                    std::mem::size_of_val(&instance) as u64,
-                    vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
-                    true,
-                )?;
-                instances.write(unsafe {
-                    std::slice::from_raw_parts(
-                        (&instance as *const vk::AccelerationStructureInstanceKHR).cast::<u8>(),
-                        std::mem::size_of_val(&instance),
-                    )
-                })?;
-                let instance_data = vk::AccelerationStructureGeometryInstancesDataKHR::default()
-                    .array_of_pointers(false)
-                    .data(vk::DeviceOrHostAddressConstKHR {
-                        device_address: instances.address,
-                    });
-                let top_geometry = [vk::AccelerationStructureGeometryKHR::default()
-                    .geometry_type(vk::GeometryTypeKHR::INSTANCES)
-                    .geometry(vk::AccelerationStructureGeometryDataKHR {
-                        instances: instance_data,
-                    })];
-                let top_info = vk::AccelerationStructureBuildGeometryInfoKHR::default()
-                    .ty(vk::AccelerationStructureTypeKHR::TOP_LEVEL)
-                    .flags(vk::BuildAccelerationStructureFlagsKHR::PREFER_FAST_TRACE)
-                    .mode(vk::BuildAccelerationStructureModeKHR::BUILD)
-                    .geometries(&top_geometry);
-                let mut top_sizes = vk::AccelerationStructureBuildSizesInfoKHR::default();
-                unsafe {
-                    loader.get_acceleration_structure_build_sizes(
-                        vk::AccelerationStructureBuildTypeKHR::DEVICE,
-                        &top_info,
-                        &[1],
-                        &mut top_sizes,
-                    )
-                };
-                let top_storage = RayBuffer::new(
-                    &self.device,
-                    top_sizes.acceleration_structure_size,
-                    vk::BufferUsageFlags::ACCELERATION_STRUCTURE_STORAGE_KHR,
-                    false,
-                )?;
-                let top = unsafe {
-                    loader.create_acceleration_structure(
-                        &vk::AccelerationStructureCreateInfoKHR::default()
-                            .buffer(top_storage.buffer)
-                            .size(top_sizes.acceleration_structure_size)
-                            .ty(vk::AccelerationStructureTypeKHR::TOP_LEVEL),
-                        None,
-                    )
-                }
-                .context("could not create top-level acceleration structure")?;
-                let top = Structure {
-                    loader: loader.clone(),
-                    handle: top,
-                    _storage: top_storage,
-                };
-                let bottom_handle = bottom.handle;
-                let top_handle = top.handle;
-                let scene = Arc::new(AccelerationState {
-                    device: self.device.clone(),
-                    _bottom: bottom,
-                    top,
-                    vertices,
-                    vertex_count,
-                });
-
-                let alignment = acceleration_properties
-                    .min_acceleration_structure_scratch_offset_alignment
-                    as u64;
-                let scratch_size = bottom_sizes
-                    .build_scratch_size
-                    .max(top_sizes.build_scratch_size);
-                let scratch = Arc::new(RayBuffer::new(
-                    &self.device,
-                    scratch_size
-                        .checked_add(alignment)
-                        .context("scratch size overflow")?,
-                    vk::BufferUsageFlags::STORAGE_BUFFER,
-                    false,
-                )?);
-                let scratch_address = align_up(scratch.address, alignment)?;
-                let mut frame = self.begin_frame()?;
-                let bottom_build = bottom_info
-                    .dst_acceleration_structure(bottom_handle)
-                    .scratch_data(vk::DeviceOrHostAddressKHR {
-                        device_address: scratch_address,
-                    });
-                let top_build = top_info
-                    .dst_acceleration_structure(top_handle)
-                    .scratch_data(vk::DeviceOrHostAddressKHR {
-                        device_address: scratch_address,
-                    });
-                let bottom_ranges = [vk::AccelerationStructureBuildRangeInfoKHR::default()
-                    .primitive_count(primitives)];
-                let blas = frame.profile_begin("gpu_blas_us");
-                crate::profile::record("blas_build", 1.0);
-                unsafe {
-                    loader.cmd_build_acceleration_structures(
-                        frame.command_buffer,
-                        &[bottom_build],
-                        &[&bottom_ranges[..geometry_count]],
-                    );
-                    frame.profile_end(blas);
-                    let barrier = vk::MemoryBarrier::default()
-                        .src_access_mask(vk::AccessFlags::ACCELERATION_STRUCTURE_WRITE_KHR)
-                        .dst_access_mask(
-                            vk::AccessFlags::ACCELERATION_STRUCTURE_READ_KHR
-                                | vk::AccessFlags::ACCELERATION_STRUCTURE_WRITE_KHR,
-                        );
-                    self.device.device.cmd_pipeline_barrier(
-                        frame.command_buffer,
-                        vk::PipelineStageFlags::ACCELERATION_STRUCTURE_BUILD_KHR,
-                        vk::PipelineStageFlags::ACCELERATION_STRUCTURE_BUILD_KHR,
-                        vk::DependencyFlags::empty(),
-                        &[barrier],
-                        &[],
-                        &[],
-                    );
-                    let tlas = frame.profile_begin("gpu_tlas_us");
-                    crate::profile::record("tlas_build", 1.0);
-                    loader.cmd_build_acceleration_structures(
-                        frame.command_buffer,
-                        &[top_build],
-                        &[&[vk::AccelerationStructureBuildRangeInfoKHR::default()
-                            .primitive_count(1)]],
-                    );
-                    frame.profile_end(tlas);
-                    let barrier = vk::MemoryBarrier::default()
-                        .src_access_mask(vk::AccessFlags::ACCELERATION_STRUCTURE_WRITE_KHR)
-                        .dst_access_mask(vk::AccessFlags::ACCELERATION_STRUCTURE_READ_KHR);
-                    self.device.device.cmd_pipeline_barrier(
-                        frame.command_buffer,
-                        vk::PipelineStageFlags::ACCELERATION_STRUCTURE_BUILD_KHR,
-                        vk::PipelineStageFlags::RAY_TRACING_SHADER_KHR,
-                        vk::DependencyFlags::empty(),
-                        &[barrier],
-                        &[],
-                        &[],
-                    );
-                }
-                frame.resources.push(scene.clone());
-                frame.resources.push(scratch);
-                frame.resources.push(Arc::new(instances));
-                frame.submit()?.wait()?;
-                Ok(AccelerationScene { inner: scene })
-            })();
-        result
+        SceneBuffer::upload(&self.device, unsafe { bytes_of_slice(values) })
     }
+}
+
+/// # Safety
+/// 元素的所有字节（包括填充）必须已初始化。
+pub(crate) unsafe fn bytes_of_slice<T>(values: &[T]) -> &[u8] {
+    std::slice::from_raw_parts(values.as_ptr().cast(), std::mem::size_of_val(values))
 }
 
 pub struct PathTracer {
@@ -495,6 +224,7 @@ struct TracePass {
     device: Arc<DeviceState>,
     _pipeline: Arc<RayPipeline>,
     _scene: AccelerationScene,
+    _lighting: [SceneBuffer; 2],
     _image: GraphImage,
     image_view: vk::ImageView,
     descriptor_pool: vk::DescriptorPool,
@@ -511,7 +241,7 @@ impl Drop for TracePass {
     }
 }
 
-fn align_up(value: u64, alignment: u64) -> Result<u64> {
+pub(crate) fn align_up(value: u64, alignment: u64) -> Result<u64> {
     if !alignment.is_power_of_two() {
         bail!("invalid ray tracing alignment");
     }
@@ -561,7 +291,17 @@ impl Backend {
                 .binding(2)
                 .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
                 .descriptor_count(1)
-                .stage_flags(stages),
+                .stage_flags(vk::ShaderStageFlags::CLOSEST_HIT_KHR),
+            vk::DescriptorSetLayoutBinding::default()
+                .binding(3)
+                .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+                .descriptor_count(1)
+                .stage_flags(vk::ShaderStageFlags::CLOSEST_HIT_KHR),
+            vk::DescriptorSetLayoutBinding::default()
+                .binding(4)
+                .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+                .descriptor_count(1)
+                .stage_flags(vk::ShaderStageFlags::RAYGEN_KHR),
         ];
         pipeline.descriptor_layout = unsafe {
             device.create_descriptor_set_layout(
@@ -729,7 +469,6 @@ impl Backend {
 struct TraceConstants {
     inverse_view_projection: [f32; 16],
     environment: [f32; 4],
-    light_offset: u32,
     sample_index: u32,
     max_bounces: u32,
     seed: u32,
@@ -738,10 +477,13 @@ struct TraceConstants {
 impl Frame {
     /// # Safety
     /// 历史图像须处于 GENERAL 布局，且前序读写已同步；首次采样须使用编号零。
+    /// 实例的材质索引须指向有效条目。
     pub unsafe fn trace_paths(
         &mut self,
         tracer: &PathTracer,
         scene: &AccelerationScene,
+        materials: &SceneBuffer,
+        lights: &SceneBuffer,
         history: &GraphImage,
         inverse_view_projection: [f32; 16],
         environment: [f32; 3],
@@ -751,7 +493,9 @@ impl Frame {
     ) -> Result<()> {
         let size = (history.inner.width as u64) * (history.inner.height as u64);
         if !Arc::ptr_eq(&self.device, &tracer.inner.device)
-            || !Arc::ptr_eq(&self.device, &scene.inner.device)
+            || !Arc::ptr_eq(&self.device, scene.device())
+            || !Arc::ptr_eq(&self.device, &materials.0.device)
+            || !Arc::ptr_eq(&self.device, &lights.0.device)
             || !Arc::ptr_eq(&self.device, &history.inner.device)
             || history.inner.format != vk::Format::R32G32B32A32_SFLOAT
             || history.inner.aspect != vk::ImageAspectFlags::COLOR
@@ -771,6 +515,7 @@ impl Frame {
             device: self.device.clone(),
             _pipeline: tracer.inner.clone(),
             _scene: scene.clone(),
+            _lighting: [materials.clone(), lights.clone()],
             _image: history.clone(),
             image_view: vk::ImageView::null(),
             descriptor_pool: vk::DescriptorPool::null(),
@@ -799,7 +544,7 @@ impl Frame {
                 .descriptor_count(1),
             vk::DescriptorPoolSize::default()
                 .ty(vk::DescriptorType::STORAGE_BUFFER)
-                .descriptor_count(1),
+                .descriptor_count(3),
         ];
         pass.descriptor_pool = device
             .create_descriptor_pool(
@@ -817,16 +562,13 @@ impl Frame {
                     .set_layouts(&layouts),
             )
             .context("could not allocate path tracing descriptor")?[0];
-        let structures = [scene.inner.top.handle];
+        let structures = [scene.handle()];
         let mut acceleration = vk::WriteDescriptorSetAccelerationStructureKHR::default()
             .acceleration_structures(&structures);
         let image = [vk::DescriptorImageInfo::default()
             .image_view(pass.image_view)
             .image_layout(vk::ImageLayout::GENERAL)];
-        let buffer = [vk::DescriptorBufferInfo::default()
-            .buffer(scene.inner.vertices.buffer)
-            .offset(0)
-            .range(scene.inner.vertices.size)];
+        let buffers = [&scene.hits, materials, lights].map(|buffer| [buffer.0.descriptor()]);
         let writes = [
             vk::WriteDescriptorSet::default()
                 .dst_set(descriptor)
@@ -843,17 +585,22 @@ impl Frame {
                 .dst_set(descriptor)
                 .dst_binding(2)
                 .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
-                .buffer_info(&buffer),
+                .buffer_info(&buffers[0]),
+            vk::WriteDescriptorSet::default()
+                .dst_set(descriptor)
+                .dst_binding(3)
+                .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+                .buffer_info(&buffers[1]),
+            vk::WriteDescriptorSet::default()
+                .dst_set(descriptor)
+                .dst_binding(4)
+                .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+                .buffer_info(&buffers[2]),
         ];
         device.update_descriptor_sets(&writes, &[]);
         let constants = TraceConstants {
             inverse_view_projection,
             environment: [environment[0], environment[1], environment[2], 0.0],
-            light_offset: scene
-                .inner
-                .vertex_count
-                .checked_mul(3)
-                .context("too many scene vertices")?,
             sample_index,
             max_bounces,
             seed,
@@ -897,6 +644,7 @@ impl Frame {
             1,
         );
         self.resources.push(Arc::new(pass));
+        crate::profile::record("trace_sample", 1.0);
         Ok(())
     }
 }
